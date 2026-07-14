@@ -23,7 +23,7 @@ cd android && ./gradlew assembleDebug
 - **必须 JDK 21**，JDK 17 编译会报 `无效的源发行版：21`（Capacitor这个版本要求的）。
 - 需要安卓SDK的 `platform-tools` + `platforms;android-34` + `build-tools;34.0.0`。
 - `android/local.properties` 要写 `sdk.dir=<SDK路径>`，这个文件因机器而异、已被gitignore，每台机器自己建。
-- **如果在配了网络代理的 Claude Code session 里跑构建**：`sdkmanager` 装SDK组件、Gradle编译时都需要连 `dl.google.com` / `maven.google.com`；这个session之前用的一个住宅代理连这两个域名会被连接重置（Recv failure）。遇到这种情况，把要用到网络的命令加上 `env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy` 前缀去掉代理再跑，能直接连通。
+- **如果在配了网络代理的 Claude Code session 里跑构建，或者 `git push`/`git pull` 到GitHub**：`sdkmanager` 装SDK组件、Gradle编译需要连 `dl.google.com` / `maven.google.com`，`git push` 需要连 `github.com`；这个session之前用的一个住宅代理连这些域名会失败（`dl.google.com`/`maven.google.com` 报连接重置 Recv failure，`github.com` 报 `Proxy CONNECT aborted`）。遇到这种情况，把要用到网络的命令加上 `env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy` 前缀去掉代理再跑，能直接连通。
 
 ## 硬性铁律，改代码前必看
 
