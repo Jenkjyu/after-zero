@@ -1,0 +1,825 @@
+<title>债务管理</title>
+<style>
+  :root {
+    --bg: #EEF0F4; --surface: #FFFFFF; --surface-2: #F6F7FA; --border: #DCE0E8;
+    --text: #23272F; --text-muted: #697082; --accent: #3E5C76; --accent-soft: #E6ECF2;
+    --critical: #BE3A3A; --critical-soft: #F9E8E8; --warning: #A66A0A; --warning-soft: #FAF0D9;
+    --good: #2C7A4E; --good-soft: #E2F0E8; --shadow: 0 2px 10px rgba(30,40,60,.08);
+    --font-ui: system-ui, -apple-system, "PingFang SC", "Segoe UI", Roboto, sans-serif;
+    --font-num: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #101318; --surface: #191D24; --surface-2: #20252E; --border: #2B313B;
+      --text: #E4E8EF; --text-muted: #98A0B0; --accent: #7CA2C6; --accent-soft: #222A35;
+      --critical: #E56A6A; --critical-soft: #2E1D1F; --warning: #D69A3C; --warning-soft: #2B2316;
+      --good: #5CB585; --good-soft: #16271E; --shadow: 0 2px 12px rgba(0,0,0,.35); }
+  }
+  :root[data-theme="light"] { --bg: #EEF0F4; --surface: #FFFFFF; --surface-2: #F6F7FA; --border: #DCE0E8;
+    --text: #23272F; --text-muted: #697082; --accent: #3E5C76; --accent-soft: #E6ECF2;
+    --critical: #BE3A3A; --critical-soft: #F9E8E8; --warning: #A66A0A; --warning-soft: #FAF0D9;
+    --good: #2C7A4E; --good-soft: #E2F0E8; --shadow: 0 2px 10px rgba(30,40,60,.08); }
+  :root[data-theme="dark"] { --bg: #101318; --surface: #191D24; --surface-2: #20252E; --border: #2B313B;
+    --text: #E4E8EF; --text-muted: #98A0B0; --accent: #7CA2C6; --accent-soft: #222A35;
+    --critical: #E56A6A; --critical-soft: #2E1D1F; --warning: #D69A3C; --warning-soft: #2B2316;
+    --good: #5CB585; --good-soft: #16271E; --shadow: 0 2px 12px rgba(0,0,0,.35); }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-ui); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+  button { font-family: inherit; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+  .app { max-width: 560px; margin: 0 auto; padding: 18px 14px 100px; }
+  header { padding: 4px 4px 14px; }
+  h1 { margin: 3px 0 0; font-size: 24px; font-weight: 700; letter-spacing: -.01em; }
+  .asof { color: var(--text-muted); font-size: 12.5px; margin-top: 3px; }
+
+  .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 10px; box-shadow: var(--shadow); }
+  .kpi .v { font-size: 18px; font-weight: 700; }
+  .kpi .k { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .kpi.wide { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; }
+  .kpi.wide .v { font-size: 23px; }
+
+  .tabbar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; z-index: 20; padding-bottom: env(safe-area-inset-bottom); }
+  .tabbar button { flex: 1; background: none; border: none; color: var(--text-muted); padding: 9px 2px 11px; font-size: 11.5px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .tabbar button .ic { font-size: 18px; line-height: 1; }
+  .tabbar button[aria-selected="true"] { color: var(--accent); font-weight: 600; }
+
+  .view { display: none; } .view.active { display: block; }
+  .section-label { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted);
+    font-weight: 600; margin: 4px 2px 8px; display: flex; justify-content: space-between; align-items: center; }
+
+  .debt { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px 11px;
+    margin-bottom: 9px; box-shadow: var(--shadow); border-left-width: 4px; }
+  .debt .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .debt .nm { font-size: 15.5px; font-weight: 600; }
+  .debt .amtbox { text-align: right; flex: none; }
+  .debt .bal { font-size: 18px; font-weight: 700; display: block; }
+  .debt .ballab { font-size: 10.5px; color: var(--text-muted); }
+  .debt .orig { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+  .debt .mid { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .tag { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .tag.rate-hi { background: var(--critical-soft); color: var(--critical); }
+  .tag.rate-mid { background: var(--warning-soft); color: var(--warning); }
+  .tag.rate-lo { background: var(--good-soft); color: var(--good); }
+  .tag.dim { background: var(--accent-soft); color: var(--accent); }
+  .debt .meta { font-size: 12px; color: var(--text-muted); margin-top: 7px; }
+  .debt .flag { display: block; font-size: 11px; color: var(--warning); font-weight: 600; margin-top: 5px; }
+  .card-actions { display: flex; gap: 8px; margin-top: 11px; }
+  .act { flex: 1; border-radius: 9px; padding: 9px; font-size: 13px; font-weight: 600; border: 1px solid var(--border); }
+  .act.sale { background: var(--good); color: #fff; border-color: transparent; }
+  .act.detail { background: var(--surface-2); color: var(--text); }
+
+  .add-btn { width: 100%; background: var(--accent-soft); color: var(--accent); border: 1px dashed var(--accent);
+    border-radius: 12px; padding: 13px; font-size: 14px; font-weight: 600; margin-top: 4px; }
+
+  .settled-wrap { margin-top: 22px; }
+  .settled-item { display: flex; align-items: center; gap: 10px; padding: 10px 13px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 10px; margin-bottom: 7px; box-shadow: var(--shadow); }
+  .settled-item .sn { flex: 1; font-size: 13.5px; color: var(--text-muted); text-decoration: line-through; }
+  .settled-item .sd { font-size: 11.5px; color: var(--good); font-weight: 600; }
+  .settled-item .restore { background: none; border: 1px solid var(--border); color: var(--text-muted); border-radius: 8px; padding: 4px 9px; font-size: 11.5px; }
+
+  .pay { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; box-shadow: var(--shadow); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .dot.crit { background: var(--critical); } .dot.warn { background: var(--warning); } .dot.dim { background: var(--accent); }
+  .pay .d { width: 62px; flex: none; }
+  .pay .d .day { font-weight: 700; font-size: 15px; }
+  .pay .d .rel { font-size: 11px; color: var(--text-muted); }
+  .pay .w { flex: 1; font-size: 14px; }
+  .pay .a { font-weight: 700; font-size: 15px; }
+
+  .file-row { display: flex; align-items: center; gap: 11px; padding: 12px 14px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 11px; margin-bottom: 7px; box-shadow: var(--shadow); width: 100%; text-align: left; color: inherit; }
+  .file-row[aria-current="true"] { border-color: var(--accent); }
+  .file-ic { font-size: 19px; flex: none; }
+  .file-name { flex: 1; font-size: 14px; }
+  .file-name small { display: block; color: var(--text-muted); font-size: 11px; font-family: var(--font-num); }
+  .file-dl { background: var(--accent-soft); color: var(--accent); border: none; border-radius: 8px; padding: 6px 11px; font-size: 12px; font-weight: 600; flex: none; }
+  .preview-label { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin: 18px 2px 8px; }
+  .doc-body { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 15px; box-shadow: var(--shadow); }
+  .poster { width: 100%; border-radius: 10px; display: block; }
+  .md-body h2, .md-body h3, .md-body h4, .md-body h5, .md-body h6 { color: var(--accent); margin: 18px 0 8px; line-height: 1.3; text-wrap: balance; }
+  .md-body h2 { font-size: 19px; } .md-body h3 { font-size: 16px; } .md-body h4 { font-size: 14px; }
+  .md-body > :first-child { margin-top: 0; }
+  .md-body p { font-size: 13.5px; margin: 0 0 10px; }
+  .md-body ul, .md-body ol { font-size: 13.5px; margin: 0 0 10px; padding-left: 20px; }
+  .md-body li { margin-bottom: 5px; }
+  .md-body blockquote { margin: 0 0 10px; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--surface-2); border-radius: 0 8px 8px 0; font-size: 13px; color: var(--text-muted); }
+  .md-body hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  .md-body code { font-family: var(--font-num); background: var(--surface-2); padding: 1px 5px; border-radius: 5px; font-size: 12.5px; }
+  .md-body strong { font-weight: 700; }
+  .md-pre { font-family: var(--font-num); background: var(--surface-2); padding: 12px; border-radius: 8px; font-size: 12px; overflow-x: auto; white-space: pre; margin: 0 0 10px; }
+  .md-tbl { overflow-x: auto; margin: 0 0 12px; }
+  .md-tbl table { border-collapse: collapse; font-size: 12.5px; width: 100%; }
+  .md-tbl th, .md-tbl td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; }
+  .md-tbl th { background: var(--surface-2); font-weight: 600; }
+
+  .data-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+  .data-card h3 { margin: 0 0 6px; font-size: 15px; }
+  .data-card p { margin: 0 0 10px; font-size: 12.5px; color: var(--text-muted); }
+  .data-card textarea { width: 100%; min-height: 84px; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 9px; padding: 10px; font-family: var(--font-num); font-size: 11px; resize: vertical; }
+  .data-actions { display: flex; gap: 8px; margin-top: 9px; }
+  .btn { border: none; border-radius: 10px; padding: 11px; font-size: 14px; font-weight: 600; flex: 1; }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.ghost { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+  .btn.danger { background: var(--critical-soft); color: var(--critical); }
+
+  .scrim { position: fixed; inset: 0; background: rgba(15,20,30,.55); z-index: 30; display: none; }
+  .scrim.open { display: block; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; background: var(--surface); border-radius: 18px 18px 0 0;
+    max-width: 560px; margin: 0 auto; max-height: 94vh; overflow-y: auto; transform: translateY(100%);
+    transition: transform .28s cubic-bezier(.2,.7,.3,1); padding: 8px 16px calc(24px + env(safe-area-inset-bottom)); }
+  .sheet.open { transform: translateY(0); }
+  @media (prefers-reduced-motion: reduce) { .sheet { transition: none; } }
+  .grip { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 8px auto 12px; }
+  .sheet h2 { margin: 0 0 4px; font-size: 19px; }
+  .sheet .subh { color: var(--text-muted); font-size: 13px; margin-bottom: 14px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; }
+  .field input, .field select, .field textarea { width: 100%; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 9px; padding: 10px 11px; font-size: 15px; font-family: inherit; }
+  .field textarea { min-height: 52px; resize: vertical; }
+  .field.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .field.two .field { margin-bottom: 0; }
+  .sheet-actions { display: flex; gap: 10px; margin-top: 6px; }
+  .subhead { font-size: 13px; font-weight: 700; margin: 18px 0 8px; color: var(--accent); }
+  .checkline { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 12px; color: var(--text); }
+  .checkline input { width: 18px; height: 18px; flex: none; }
+
+  /* plan editor */
+  .plan-sum { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .plan-sum .c { background: var(--surface-2); border-radius: 8px; padding: 6px 10px; font-size: 12px; color: var(--text-muted); }
+  .plan-sum .c b { color: var(--text); font-family: var(--font-num); }
+  .gen-panel { background: var(--surface-2); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+  .gen-panel .field.two { margin-bottom: 10px; }
+  .paidset { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 10px; }
+  .paidset .field { flex: 1; margin-bottom: 0; }
+  .paidset button { flex: none; }
+  .batch { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; background: var(--surface-2); border-radius: 9px; padding: 9px 10px; margin-bottom: 10px; font-size: 12.5px; color: var(--text-muted); }
+  .batch select, .batch input { padding: 6px 8px; font-size: 12.5px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); font-family: inherit; }
+  .batch input { width: 84px; font-family: var(--font-num); }
+  .batch button { flex: none; background: var(--accent); color: #fff; border: none; border-radius: 7px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; }
+  .plan-rows { border: 1px solid var(--border); border-radius: 10px; max-height: 360px; overflow: auto; margin-bottom: 8px; }
+  .prow { border-top: 1px solid var(--border); padding: 8px 9px; }
+  .prow:first-child { border-top: none; }
+  .prow.paid { opacity: .55; }
+  .prow .r1 { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .prow .pn { font-size: 11.5px; color: var(--text-muted); font-family: var(--font-num); min-width: 42px; }
+  .prow .r1 input[type=date] { flex: 1; padding: 6px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-family: var(--font-num); }
+  .prow .chk { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+  .prow .chk input { width: 17px; height: 17px; }
+  .prow .del { background: none; border: none; color: var(--critical); font-size: 15px; padding: 0 2px; }
+  .prow .r2 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .prow .r2 > div { display: flex; flex-direction: column; gap: 2px; }
+  .prow .r2 span { font-size: 10px; color: var(--text-muted); }
+  .prow .r2 input { padding: 6px 5px; font-size: 12.5px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); width: 100%; font-family: var(--font-num); }
+
+  .dl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; margin-bottom: 16px; }
+  .dl-grid .k { font-size: 11.5px; color: var(--text-muted); }
+  .dl-grid .v { font-size: 15px; font-weight: 600; margin-top: 1px; }
+  .dl-grid .full { grid-column: 1 / -1; }
+  .dl-warn { background: var(--warning-soft); color: var(--warning); border-radius: 9px; padding: 10px 12px; font-size: 12.5px; font-weight: 600; margin-bottom: 14px; }
+  .sch-wrap { max-height: 320px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 16px; }
+  table.sch { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.sch th, table.sch td { padding: 7px 7px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--border); }
+  table.sch th:first-child, table.sch td:first-child { text-align: left; }
+  table.sch thead th { position: sticky; top: 0; background: var(--surface-2); color: var(--text-muted); font-size: 11px; font-weight: 600; }
+  table.sch tbody tr:last-child td { border-bottom: none; }
+  table.sch tr.paidrow td { color: var(--text-muted); text-decoration: line-through; }
+  table.sch tr.nextrow td { background: var(--accent-soft); }
+  .per { color: var(--text-muted); font-family: var(--font-num); }
+
+  .modal-scrim { position: fixed; inset: 0; background: rgba(15,20,30,.55); z-index: 50; display: none; align-items: center; justify-content: center; padding: 24px; }
+  .modal-scrim.open { display: flex; }
+  .modal { background: var(--surface); border-radius: 16px; max-width: 380px; width: 100%; padding: 20px; box-shadow: 0 8px 40px rgba(0,0,0,.3); }
+  .modal .mtitle { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .modal .mbody { font-size: 13.5px; color: var(--text); white-space: pre-line; margin-bottom: 18px; line-height: 1.55; }
+  .modal-actions { display: flex; gap: 10px; }
+
+  .footnote { text-align: center; font-size: 11.5px; color: var(--text-muted); margin-top: 14px; padding: 0 10px; line-height: 1.5; }
+  .flash { position: fixed; bottom: 92px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--good); color: #fff;
+    padding: 9px 20px; border-radius: 999px; font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; transition: all .25s; z-index: 60; max-width: 90%; text-align: center; }
+  .flash.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+
+<div class="app">
+  <header id="topHeader">
+    <h1>债务管理</h1>
+    <div class="asof"><span id="count">—</span></div>
+  </header>
+  <div id="topSummary">
+    <div class="summary" id="summary"></div>
+    <div class="footnote" id="sumNote" style="margin-top:-8px;margin-bottom:16px;text-align:left;padding:0 2px">在还总负债 = 各未结清债务「未还本金」之和（只算本金、不含未来利息/手续费）。<br>经常性月供 = 各笔下一期应还之和（不含标记为「一次性还清」的借款）。</div>
+  </div>
+
+  <section class="view active" id="view-debts">
+    <div class="section-label">在还债务（按利率高→低）</div>
+    <div id="debtList"></div>
+    <button class="add-btn" id="addBtn">＋ 新增一笔债务</button>
+    <div class="settled-wrap" id="settledWrap"></div>
+  </section>
+
+  <section class="view" id="view-pay">
+    <div class="section-label">接下来的还款日（按今天自动排序）</div>
+    <div id="payList"></div>
+  </section>
+
+  <section class="view" id="view-docs">
+    <div class="section-label">档案库 · 文档与文件（图片/PDF等，仅存本设备）</div>
+    <input type="file" id="uploadInput" style="display:none">
+    <button class="add-btn" id="uploadBtn">＋ 上传文件</button>
+    <div id="fileList"></div>
+    <div class="preview-label" id="previewLabel" style="display:none">预览</div>
+    <div id="docContent"></div>
+  </section>
+
+  <section class="view" id="view-data">
+    <div class="section-label">用户数据 · 只存在这台设备</div>
+    <div class="data-card">
+      <h3>全部数据（债务 + 档案，导出/备份）</h3>
+      <p>换手机、清缓存前，复制或下载这段存好。含全部债务计划和档案文档。</p>
+      <textarea id="exportBox" readonly></textarea>
+      <div class="data-actions"><button class="btn primary" id="copyBtn">一键复制</button><button class="btn ghost" id="dlBackupBtn">下载备份文件</button></div>
+    </div>
+    <div class="data-card">
+      <h3>导入数据（覆盖当前）</h3>
+      <p>把之前备份的那段粘进来，一键恢复债务和档案。</p>
+      <textarea id="importBox" placeholder="在此粘贴备份的数据…"></textarea>
+      <div class="data-actions"><button class="btn ghost" id="importBtn">导入覆盖</button></div>
+    </div>
+  </section>
+</div>
+
+<nav class="tabbar" role="tablist">
+  <button role="tab" aria-selected="true" data-view="debts"><span class="ic">💳</span>债务</button>
+  <button role="tab" aria-selected="false" data-view="pay"><span class="ic">📅</span>还款日</button>
+  <button role="tab" aria-selected="false" data-view="docs"><span class="ic">🧭</span>档案库</button>
+  <button role="tab" aria-selected="false" data-view="data"><span class="ic">🗄️</span>数据</button>
+</nav>
+
+<div class="scrim" id="scrimDetail"></div>
+<div class="sheet" id="detailSheet" role="dialog" aria-modal="true" aria-labelledby="dTitle">
+  <div class="grip"></div>
+  <h2 id="dTitle"></h2>
+  <div class="subh" id="dSub"></div>
+  <div id="dInfo"></div>
+  <div class="sheet-actions">
+    <button type="button" class="btn ghost" id="dEdit">✎ 编辑</button>
+    <button type="button" class="btn primary" id="dSale">✓ 销这期</button>
+  </div>
+  <div class="sheet-actions" style="margin-top:10px">
+    <button type="button" class="btn danger" id="dSettle">提前结清</button>
+    <button type="button" class="btn ghost" id="dClose">关闭</button>
+  </div>
+</div>
+
+<div class="scrim" id="scrimEdit"></div>
+<div class="sheet" id="editSheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="grip"></div>
+  <h2 id="sheetTitle">编辑债务</h2>
+  <form id="debtForm">
+    <div class="field"><label for="f-name">贷款产品</label><input id="f-name" required></div>
+    <div class="field two">
+      <div class="field"><label for="f-funder">出资方</label><input id="f-funder"></div>
+      <div class="field"><label for="f-type">借款类型</label><select id="f-type">
+        <option>银行贷</option><option>信用卡分期</option><option>网贷</option><option>私人借款</option>
+      </select></div>
+    </div>
+    <div class="field two">
+      <div class="field"><label for="f-opened">借款日</label><input id="f-opened" type="date"></div>
+      <div class="field"><label for="f-day">还款日（几号）</label><input id="f-day" type="number" min="1" max="31" inputmode="numeric"></div>
+    </div>
+    <label class="checkline"><input type="checkbox" id="f-oneTime">一次性还清（不计入经常性月供，销项即结清）</label>
+    <div class="field"><label for="f-notes">备注</label><textarea id="f-notes"></textarea></div>
+
+    <div class="subhead">还款计划（这是源头，其它自动推算）</div>
+    <div class="plan-sum" id="planSum"></div>
+    <button type="button" class="btn ghost" id="genToggle" style="margin-bottom:12px">用公式生成 / 重建计划 ▾</button>
+    <div class="gen-panel" id="genPanel" style="display:none">
+      <div class="field"><label for="g-kind">计息方式</label><select id="g-kind">
+        <option value="amort">等额本息（银行贷/网贷/金条）</option>
+        <option value="equalfee">信用卡等本等费（每期本金相同）</option>
+        <option value="interestfirst">先息后本（前 N 期利息、后 M 期本金）</option>
+        <option value="custom">自定义（生成空白行自己填）</option>
+      </select></div>
+      <div data-gg="amort">
+        <div class="field two"><div class="field"><label for="g-P">借款金额 ¥</label><input id="g-P" type="number" step="0.01" inputmode="decimal"></div><div class="field"><label for="g-rate">年化 %</label><input id="g-rate" type="number" step="0.01" inputmode="decimal"></div></div>
+        <div class="field"><label for="g-n">期数</label><input id="g-n" type="number" min="1" inputmode="numeric"></div>
+      </div>
+      <div data-gg="equalfee">
+        <div class="field two"><div class="field"><label for="g-pp">每期本金 ¥</label><input id="g-pp" type="number" step="0.01" inputmode="decimal"></div><div class="field"><label for="g-pf">每期手续费 ¥</label><input id="g-pf" type="number" step="0.01" inputmode="decimal"></div></div>
+        <div class="field"><label for="g-n2">期数</label><input id="g-n2" type="number" min="1" inputmode="numeric"></div>
+      </div>
+      <div data-gg="interestfirst">
+        <div class="field two"><div class="field"><label for="g-P3">借款本金 ¥</label><input id="g-P3" type="number" step="0.01" inputmode="decimal"></div><div class="field"><label for="g-rate3">年化 %</label><input id="g-rate3" type="number" step="0.01" inputmode="decimal"></div></div>
+        <div class="field two"><div class="field"><label for="g-ni">利息期数</label><input id="g-ni" type="number" min="0" inputmode="numeric"></div><div class="field"><label for="g-np">还本期数</label><input id="g-np" type="number" min="1" inputmode="numeric"></div></div>
+      </div>
+      <div data-gg="custom">
+        <div class="field"><label for="g-nc">生成几期空白行</label><input id="g-nc" type="number" min="1" inputmode="numeric"></div>
+      </div>
+      <div class="field"><label for="g-first">首期还款日</label><input id="g-first" type="date"></div>
+      <button type="button" class="btn primary" id="doGen">生成计划</button>
+    </div>
+
+    <div class="paidset">
+      <div class="field"><label for="paidThrough">已还至第几期（自动勾选）</label><input id="paidThrough" type="number" min="0" inputmode="numeric"></div>
+      <button type="button" class="btn ghost" id="applyPaid">应用</button>
+    </div>
+    <div class="batch">批量把每期<select id="batchCol"><option value="principal">本金</option><option value="interest">利息/费</option><option value="amount">金额</option></select>设为<input id="batchVal" type="number" step="0.01" inputmode="decimal" placeholder="数值"><button type="button" id="batchApply">应用到全部</button></div>
+    <div class="plan-rows" id="planRows"></div>
+    <button type="button" class="btn ghost" id="addRow" style="margin-bottom:14px">＋ 加一期</button>
+
+    <div class="sheet-actions">
+      <button type="button" class="btn danger" id="deleteBtn">删除</button>
+      <button type="button" class="btn ghost" id="cancelBtn">取消</button>
+      <button type="submit" class="btn primary">保存</button>
+    </div>
+  </form>
+</div>
+
+<div class="modal-scrim" id="modalScrim">
+  <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="mTitle">
+    <div class="mtitle" id="mTitle">确认</div>
+    <div class="mbody" id="mBody"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="mCancel">取消</button>
+      <button class="btn primary" id="mOk">确认</button>
+    </div>
+  </div>
+</div>
+
+<div class="flash" id="flash">已保存 ✓</div>
+
+<script>
+(function () {
+  "use strict";
+  var KEY = "debt-manager-v5", DKEY = "debt-manager-docs-v5";
+  // SEED: minimal spec; full plan generated on load
+  var SEED = [];
+  var DOCS_SEED = [];
+  var POSTER = "";
+  var POSTER_NAME = "我想要的人生.png";
+
+  var $ = function (id) { return document.getElementById(id); };
+  function clone(x) { return JSON.parse(JSON.stringify(x)); }
+  function r2(x) { return Math.round((Number(x) || 0) * 100) / 100; }
+  function fmt(n) { return Math.round(Number(n) || 0).toLocaleString("en-US"); }
+  function money(n) { return (Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function parseDate(s) { if (!s) return null; var p = String(s).split("-"); return new Date(+p[0], (+p[1]) - 1, +p[2]); }
+  function addMonths(d, m) { return new Date(d.getFullYear(), d.getMonth() + m, d.getDate()); }
+  function fmtDate(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function rateClass(r) { return r >= 18 ? "rate-hi" : (r >= 10 ? "rate-mid" : "rate-lo"); }
+  function todayStr() { var d = new Date(); return (d.getMonth() + 1) + "/" + d.getDate(); }
+  function baseName(p) { return (p || "").split("/").pop(); }
+  function today0() { var t = new Date(); t.setHours(0, 0, 0, 0); return t; }
+
+  // plan generation
+  function genPlan(spec) {
+    var rows = [], start = spec.first ? parseDate(spec.first) : today0();
+    function push(k, amount, principal, interest) { rows.push({ date: fmtDate(addMonths(start, k)), amount: r2(amount), principal: r2(principal), interest: r2(interest), paid: false }); }
+    if (spec.kind === "amort") {
+      var P = +spec.P || 0, i = (+spec.rate || 0) / 1200, n = +spec.n || 0, bal = P, m = i > 0 ? P * i / (1 - Math.pow(1 + i, -n)) : (n ? P / n : 0);
+      for (var k = 0; k < n; k++) { var it = bal * i, pr = (k === n - 1) ? bal : (m - it), amt = (k === n - 1) ? bal + it : m; bal -= pr; push(k, amt, pr, it); }
+    } else if (spec.kind === "equalfee") {
+      var pp = +spec.pp || 0, pf = +spec.pf || 0, n2 = +spec.n || 0;
+      for (var j = 0; j < n2; j++) push(j, pp + pf, pp, pf);
+    } else if (spec.kind === "interestfirst") {
+      var P3 = +spec.P || 0, i3 = (+spec.rate || 0) / 1200, ni = +spec.ni || 0, np = +spec.np || 0, it3 = P3 * i3;
+      for (var a = 0; a < ni; a++) push(a, it3, 0, it3);
+      var m3 = i3 > 0 ? P3 * i3 / (1 - Math.pow(1 + i3, -np)) : (np ? P3 / np : 0), bal3 = P3;
+      for (var b = 0; b < np; b++) { var itb = bal3 * i3, prb = (b === np - 1) ? bal3 : (m3 - itb), amtb = (b === np - 1) ? bal3 + itb : m3; bal3 -= prb; push(ni + b, amtb, prb, itb); }
+    } else {
+      var nc = +spec.n || 0;
+      for (var c = 0; c < nc; c++) push(c, 0, 0, 0);
+    }
+    return rows;
+  }
+
+  // implied APR from full plan (IRR via bisection)
+  function npv(r, borrow, plan) { var s = -borrow; for (var k = 0; k < plan.length; k++) s += (+plan[k].amount || 0) / Math.pow(1 + r, k + 1); return s; }
+  function impliedAPR(plan) {
+    var borrow = 0; plan.forEach(function (p) { borrow += +p.principal || 0; });
+    if (!(borrow > 0) || !plan.length) return 0;
+    if (npv(0, borrow, plan) <= 0.0001) return 0;
+    var lo = 0, hi = 1;
+    for (var it = 0; it < 90; it++) { var mid = (lo + hi) / 2; if (npv(mid, borrow, plan) > 0) lo = mid; else hi = mid; }
+    return r2(((lo + hi) / 2) * 1200);
+  }
+
+  function recompute(d) {
+    var plan = d.plan || [];
+    var borrow = 0, remaining = 0, paidCount = 0;
+    plan.forEach(function (r) { borrow += +r.principal || 0; if (r.paid) paidCount++; else remaining += +r.principal || 0; });
+    d.original = plan.length ? r2(borrow) : null;
+    d.balance = r2(remaining);
+    d.totalTerms = plan.length; d.paidTerms = paidCount; d.terms = plan.length - paidCount;
+    var next = null; for (var k = 0; k < plan.length; k++) { if (!plan[k].paid) { next = plan[k]; break; } }
+    d.monthly = next ? (+next.amount || 0) : 0;
+    d.nextDate = next ? next.date : null;
+    d.rate = impliedAPR(plan);
+  }
+  function normalize(d) { if (!d.plan) { d.plan = genPlan(d.gen); markPaidThrough(d.plan, (d.gen && d.gen.paid) || 0); } recompute(d); }
+  function markPaidThrough(plan, n) { for (var k = 0; k < plan.length; k++) plan[k].paid = k < n; }
+
+  function loadJSON(k, seed) { try { var r = localStorage.getItem(k); if (r) return JSON.parse(r); } catch (e) {} return clone(seed); }
+  function saveAll() { try { localStorage.setItem(KEY, JSON.stringify(debts)); localStorage.setItem(DKEY, JSON.stringify(docs)); } catch (e) {} }
+
+  var debts = loadJSON(KEY, SEED);
+  var docs = loadJSON(DKEY, DOCS_SEED);
+  debts.forEach(normalize);
+  var editIndex = -1, detailIndex = -1, docSel = -1, editingPlan = [];
+
+  // custom confirm
+  var _onOk = null;
+  function ask(title, body, onOk) { $("mTitle").textContent = title; $("mBody").textContent = body; _onOk = onOk; $("modalScrim").classList.add("open"); }
+  function closeModal() { $("modalScrim").classList.remove("open"); _onOk = null; }
+  $("mOk").addEventListener("click", function () { var f = _onOk; closeModal(); if (f) f(); });
+  $("mCancel").addEventListener("click", closeModal);
+  $("modalScrim").addEventListener("click", function (e) { if (e.target === $("modalScrim")) closeModal(); });
+
+  var flashTimer;
+  function toast(msg) { var f = $("flash"); f.textContent = msg; f.classList.add("show"); clearTimeout(flashTimer); flashTimer = setTimeout(function () { f.classList.remove("show"); }, 1800); }
+  function isActive(d) { return !d.settled; }
+  function nextDateObj(d) { return d.nextDate ? parseDate(d.nextDate) : null; }
+
+  function renderSummary() {
+    var total = 0, monthly = 0, active = 0, settled = 0;
+    debts.forEach(function (d) { if (d.settled) { settled++; return; } active++; total += +d.balance || 0; if (!d.oneTime) monthly += +d.monthly || 0; });
+    $("summary").innerHTML =
+      '<div class="kpi wide"><div class="k">在还总负债</div><div class="v num">¥' + fmt(total) + '</div></div>' +
+      '<div class="kpi"><div class="v num">¥' + fmt(monthly) + '</div><div class="k">经常性月供</div></div>' +
+      '<div class="kpi"><div class="v num">' + active + '</div><div class="k">在还笔数</div></div>' +
+      '<div class="kpi"><div class="v num" style="color:var(--good)">' + settled + '</div><div class="k">已结清</div></div>';
+    $("count").textContent = active + " 笔在还" + (settled ? " · " + settled + " 笔已清" : "");
+  }
+  function renderDebts() {
+    var sorted = debts.map(function (d, i) { return { d: d, i: i }; }).filter(function (o) { return isActive(o.d); }).sort(function (a, b) { return (b.d.rate || 0) - (a.d.rate || 0); });
+    var list = $("debtList"); list.innerHTML = "";
+    sorted.forEach(function (o) {
+      var d = o.d, rc = rateClass(d.rate || 0), accent = d.rate >= 18 ? "var(--critical)" : (d.rate >= 10 ? "var(--warning)" : "var(--good)");
+      var el = document.createElement("div"); el.className = "debt"; el.style.borderLeftColor = accent;
+      var rateTag = d.rate ? '<span class="tag ' + rc + '">' + Number(d.rate).toFixed(2) + '%</span>' : '';
+      el.innerHTML =
+        '<div class="top"><span class="nm"></span><span class="amtbox"><span class="bal num">¥' + fmt(d.balance) + '</span><span class="ballab">剩余待还</span></span></div>' +
+        (d.original != null ? '<div class="orig">借款金额 ¥' + fmt(d.original) + '</div>' : '') +
+        '<div class="mid">' + rateTag + '<span class="tag dim">' + (d.oneTime ? '一次性 ¥' + fmt(d.monthly) : '下期 ¥' + fmt(d.monthly)) + '</span><span class="tag dim">剩 ' + (d.terms || 0) + '/' + (d.totalTerms || 0) + ' 期</span></div>' +
+        '<div class="meta"></div>' +
+        (d.cliff ? '<span class="flag">⚠ 2027-05 起还本，月供跳至 ¥2,182</span>' : '') +
+        '<div class="card-actions"><button class="act detail">查看详情</button><button class="act sale">✓ 销这期</button></div>';
+      el.querySelector(".nm").textContent = d.name;
+      el.querySelector(".meta").textContent = (d.funder ? "出资方：" + d.funder : "") + (d.type ? " · " + d.type : "");
+      el.querySelector(".detail").addEventListener("click", function () { openDetail(o.i); });
+      el.querySelector(".sale").addEventListener("click", function () { payInstallment(o.i); });
+      list.appendChild(el);
+    });
+    var settled = debts.map(function (d, i) { return { d: d, i: i }; }).filter(function (o) { return o.d.settled; });
+    var sw = $("settledWrap"); sw.innerHTML = "";
+    if (settled.length) {
+      var lab = document.createElement("div"); lab.className = "section-label"; lab.textContent = "已结清 ✓"; sw.appendChild(lab);
+      settled.forEach(function (o) {
+        var row = document.createElement("div"); row.className = "settled-item";
+        row.innerHTML = '<span class="sn"></span><span class="sd">已结清 ' + (o.d.settledDate || "") + '</span><button class="restore">恢复</button>';
+        row.querySelector(".sn").textContent = o.d.name;
+        row.querySelector(".restore").addEventListener("click", function () { unsettle(o.i); });
+        sw.appendChild(row);
+      });
+    }
+  }
+  function renderPay() {
+    var t0 = today0();
+    var items = debts.filter(function (d) { return isActive(d) && d.nextDate; }).map(function (d) { var n = parseDate(d.nextDate); return { d: d, next: n, diff: Math.round((n - t0) / 86400000) }; }).sort(function (a, b) { return a.diff - b.diff; });
+    var list = $("payList"); list.innerHTML = "";
+    if (!items.length) { list.innerHTML = '<div class="footnote">没有在还债务</div>'; return; }
+    items.forEach(function (o) {
+      var dotc = o.diff <= 3 ? "crit" : (o.diff <= 14 ? "warn" : "dim");
+      var rel = o.diff < 0 ? "已到期" : (o.diff === 0 ? "就在今天" : o.diff + " 天后");
+      var el = document.createElement("div"); el.className = "pay";
+      el.innerHTML = '<span class="dot ' + dotc + '"></span><div class="d"><div class="day num">' + (o.next.getMonth() + 1) + '/' + o.next.getDate() + '</div><div class="rel">' + rel + '</div></div><div class="w"></div><div class="a num">¥' + fmt(o.d.monthly) + '</div>';
+      el.querySelector(".w").textContent = o.d.name; list.appendChild(el);
+    });
+  }
+  function renderAll() { debts.forEach(recompute); renderSummary(); renderDebts(); renderPay(); $("exportBox").value = JSON.stringify({ version: 5, exportedAt: new Date().toISOString(), debts: debts, docs: docs }, null, 1); }
+
+  function kv(k, v) { return '<div><div class="k">' + k + '</div><div class="v num">' + v + '</div></div>'; }
+  function openDetail(i) {
+    detailIndex = i; var d = debts[i], plan = d.plan || [];
+    $("dTitle").textContent = d.name;
+    $("dSub").textContent = (d.funder ? d.funder + " · " : "") + (d.type || "");
+    var nextNo = -1; for (var k = 0; k < plan.length; k++) { if (!plan[k].paid) { nextNo = k; break; } }
+    var info = '<div class="dl-grid">'
+      + kv("借款金额", d.original != null ? "¥" + fmt(d.original) : "—")
+      + kv("剩余待还", "¥" + fmt(d.balance))
+      + kv("年化利率(推算)", d.rate ? Number(d.rate).toFixed(2) + "%" : "无息")
+      + kv(d.oneTime ? "应还" : "下期月供", "¥" + fmt(d.monthly))
+      + kv("下个还款日", d.nextDate || "—")
+      + kv("借款日", d.opened || "—")
+      + kv("进度", d.paidTerms + " / " + d.totalTerms + " 期已还")
+      + kv("出资方", d.funder || "—")
+      + (d.notes ? '<div class="full"><div class="k">备注</div><div class="v" style="font-size:13px;font-weight:400"></div></div>' : '')
+      + '</div>';
+    $("dInfo").innerHTML = info;
+    if (d.notes) $("dInfo").querySelector(".full .v").textContent = d.notes;
+    if (d.cliff) { var w = document.createElement("div"); w.className = "dl-warn"; w.textContent = "先息后本：前 12 期只还利息 ¥180，第 13 期(2027-05)起还本、月供跳至约 ¥2,182 —— 下方计划已按此列出。"; $("dInfo").appendChild(w); }
+    if (plan.length) {
+      var html = '<div class="preview-label" style="margin-top:0">完整还款计划（含已还，✓ 为已还）</div><div class="sch-wrap"><table class="sch"><thead><tr><th>期次</th><th>日期</th><th>金额</th><th>本金</th><th>利息/费</th><th>剩余本金</th></tr></thead><tbody>';
+      var rembal = d.original || 0;
+      plan.forEach(function (r, idx) {
+        rembal -= (+r.principal || 0);
+        var cls = r.paid ? "paidrow" : (idx === nextNo ? "nextrow" : "");
+        html += '<tr class="' + cls + '"><td class="per">' + (r.paid ? "✓ " : "") + (idx + 1) + '/' + plan.length + '</td><td class="num">' + r.date + '</td><td class="num">' + money(r.amount) + '</td><td class="num">' + money(r.principal) + '</td><td class="num">' + money(r.interest) + '</td><td class="num">' + fmt(Math.max(rembal, 0)) + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      var sc = document.createElement("div"); sc.innerHTML = html; $("dInfo").appendChild(sc);
+    }
+    $("dSale").textContent = d.oneTime ? "✓ 一次性结清" : "✓ 销这期";
+    $("dSale").style.display = d.terms > 0 ? "block" : "none";
+    $("scrimDetail").classList.add("open"); $("detailSheet").classList.add("open");
+  }
+  function closeDetail() { $("scrimDetail").classList.remove("open"); $("detailSheet").classList.remove("open"); detailIndex = -1; }
+
+  function payInstallment(i) {
+    var d = debts[i], plan = d.plan || [], idx = -1;
+    for (var k = 0; k < plan.length; k++) { if (!plan[k].paid) { idx = k; break; } }
+    if (idx < 0) { toast("已全部还清"); return; }
+    var r = plan[idx], isLast = true;
+    for (var j = idx + 1; j < plan.length; j++) if (!plan[j].paid) { isLast = false; break; }
+    var title = d.oneTime ? "一次性结清" : (isLast ? "最后一期" : "销这一期");
+    var body = "销第 " + (idx + 1) + "/" + plan.length + " 期（" + r.date + "）\n金额 ¥" + money(r.amount) + "（本金 " + money(r.principal) + " + 利息/费 " + money(r.interest) + "）" + (isLast ? "\n这是最后一期，还完即结清。" : "");
+    ask(title, body, function () {
+      r.paid = true; recompute(d);
+      if (d.terms <= 0) { d.settled = true; d.settledDate = todayStr(); }
+      saveAll(); renderAll(); if (d.settled) closeDetail(); else if (detailIndex === i) openDetail(i);
+      toast(d.settled ? d.name + " 已还清 🎉" : "已销第 " + (idx + 1) + " 期 · 本金 -¥" + fmt(r.principal));
+    });
+  }
+  function settleFull(i) {
+    var d = debts[i];
+    ask("提前结清", "把「" + d.name + "」标记为已结清？\n不再计入在还总债（可在列表底部恢复）。", function () {
+      d.settled = true; d.settledDate = todayStr(); saveAll(); renderAll(); closeDetail(); closeEdit(); toast(d.name + " 已结清 🎉");
+    });
+  }
+  function unsettle(i) { debts[i].settled = false; recompute(debts[i]); saveAll(); renderAll(); toast("已恢复到在还"); }
+
+  // ===== edit + plan editor =====
+  function setGenUI(k) { document.querySelectorAll("[data-gg]").forEach(function (g) { g.style.display = g.getAttribute("data-gg") === k ? "block" : "none"; }); }
+  $("g-kind").addEventListener("change", function () { setGenUI(this.value); });
+  $("genToggle").addEventListener("click", function () { var p = $("genPanel"); p.style.display = p.style.display === "none" ? "block" : "none"; });
+  $("doGen").addEventListener("click", function () {
+    var k = $("g-kind").value, first = $("g-first").value, spec = { kind: k, first: first };
+    if (k === "amort") { spec.P = +$("g-P").value; spec.rate = +$("g-rate").value; spec.n = +$("g-n").value; }
+    else if (k === "equalfee") { spec.pp = +$("g-pp").value; spec.pf = +$("g-pf").value; spec.n = +$("g-n2").value; }
+    else if (k === "interestfirst") { spec.P = +$("g-P3").value; spec.rate = +$("g-rate3").value; spec.ni = +$("g-ni").value; spec.np = +$("g-np").value; }
+    else { spec.n = +$("g-nc").value; }
+    editingPlan = genPlan(spec);
+    renderPlanRows(); refreshPlanSum(); $("genPanel").style.display = "none";
+    toast("已生成 " + editingPlan.length + " 期，可再逐行改");
+  });
+  $("applyPaid").addEventListener("click", function () { var n = parseInt($("paidThrough").value, 10) || 0; markPaidThrough(editingPlan, n); renderPlanRows(); refreshPlanSum(); });
+  $("addRow").addEventListener("click", function () { var last = editingPlan[editingPlan.length - 1]; var nd = last ? fmtDate(addMonths(parseDate(last.date), 1)) : ($("f-day").value ? "" : ""); editingPlan.push({ date: nd, amount: 0, principal: 0, interest: 0, paid: false }); renderPlanRows(); refreshPlanSum(); });
+
+  function refreshPlanSum() {
+    var borrow = 0, remaining = 0, paidc = 0;
+    editingPlan.forEach(function (r) { borrow += +r.principal || 0; if (r.paid) paidc++; else remaining += +r.principal || 0; });
+    var apr = impliedAPR(editingPlan);
+    $("planSum").innerHTML = '<span class="c">借款金额 <b>¥' + fmt(borrow) + '</b></span><span class="c">剩余待还 <b>¥' + fmt(remaining) + '</b></span><span class="c">年化 <b>' + (apr ? apr.toFixed(2) + '%' : '0%') + '</b></span><span class="c">共 <b>' + editingPlan.length + '</b> 期 · 已还 <b>' + paidc + '</b></span>';
+  }
+  function linkRow(r, changed) {
+    r.principal = +r.principal || 0; r.interest = +r.interest || 0; r.amount = +r.amount || 0;
+    if (changed === "amount") { r.interest = r2(r.amount - r.principal); }
+    else { r.amount = r2(r.principal + r.interest); }
+  }
+  function renderPlanRows() {
+    var box = $("planRows"); box.innerHTML = "";
+    editingPlan.forEach(function (r, idx) {
+      var row = document.createElement("div"); row.className = "prow" + (r.paid ? " paid" : "");
+      row.innerHTML =
+        '<div class="r1"><span class="pn">第' + (idx + 1) + '期</span><input type="date" data-f="date">' +
+        '<label class="chk"><input type="checkbox" data-f="paid">已还</label>' +
+        '<button type="button" class="del">✕</button></div>' +
+        '<div class="r2">' +
+        '<div><span>金额</span><input type="number" step="0.01" inputmode="decimal" data-f="amount"></div>' +
+        '<div><span>本金</span><input type="number" step="0.01" inputmode="decimal" data-f="principal"></div>' +
+        '<div><span>利息/费</span><input type="number" step="0.01" inputmode="decimal" data-f="interest"></div>' +
+        '</div>';
+      var dEl = row.querySelector('[data-f="date"]'), aEl = row.querySelector('[data-f="amount"]'), pEl = row.querySelector('[data-f="principal"]'), iEl = row.querySelector('[data-f="interest"]'), cEl = row.querySelector('[data-f="paid"]');
+      dEl.value = r.date || ""; aEl.value = r.amount != null ? r.amount : ""; pEl.value = r.principal != null ? r.principal : ""; iEl.value = r.interest != null ? r.interest : ""; cEl.checked = !!r.paid;
+      dEl.addEventListener("change", function () { r.date = this.value; });
+      pEl.addEventListener("input", function () { r.principal = parseFloat(this.value) || 0; linkRow(r, "principal"); aEl.value = r.amount; refreshPlanSum(); });
+      iEl.addEventListener("input", function () { r.interest = parseFloat(this.value) || 0; linkRow(r, "interest"); aEl.value = r.amount; refreshPlanSum(); });
+      aEl.addEventListener("input", function () { r.amount = parseFloat(this.value) || 0; linkRow(r, "amount"); iEl.value = r.interest; refreshPlanSum(); });
+      cEl.addEventListener("change", function () { r.paid = this.checked; row.classList.toggle("paid", r.paid); refreshPlanSum(); });
+      row.querySelector(".del").addEventListener("click", function () { editingPlan.splice(idx, 1); renderPlanRows(); refreshPlanSum(); });
+      box.appendChild(row);
+    });
+  }
+  $("batchApply").addEventListener("click", function () {
+    var col = $("batchCol").value, val = parseFloat($("batchVal").value);
+    if (isNaN(val)) { toast("先填一个数值"); return; }
+    editingPlan.forEach(function (r) { r[col] = r2(val); linkRow(r, col); });
+    renderPlanRows(); refreshPlanSum();
+    toast("每期" + ({ amount: "金额", principal: "本金", interest: "利息" }[col]) + "已设为 " + val);
+  });
+  function openEdit(i) {
+    editIndex = i; var d = i >= 0 ? debts[i] : {};
+    $("sheetTitle").textContent = i >= 0 ? "编辑债务" : "新增债务";
+    $("f-name").value = d.name || ""; $("f-funder").value = d.funder || ""; $("f-type").value = d.type || "银行贷";
+    $("f-opened").value = d.opened || ""; $("f-day").value = d.day || ""; $("f-notes").value = d.notes || ""; $("f-oneTime").checked = !!d.oneTime;
+    editingPlan = clone(d.plan || []);
+    var g = d.gen || {}; $("g-kind").value = g.kind || "amort"; setGenUI($("g-kind").value);
+    $("g-P").value = g.P || ""; $("g-rate").value = g.rate || ""; $("g-n").value = g.n || "";
+    $("g-pp").value = g.pp || ""; $("g-pf").value = g.pf || ""; $("g-n2").value = g.n || "";
+    $("g-P3").value = g.P || ""; $("g-rate3").value = g.rate || ""; $("g-ni").value = g.ni || ""; $("g-np").value = g.np || "";
+    $("g-nc").value = ""; $("g-first").value = g.first || d.opened || "";
+    $("genPanel").style.display = "none";
+    $("paidThrough").value = editingPlan.filter(function (r) { return r.paid; }).length;
+    renderPlanRows(); refreshPlanSum();
+    $("deleteBtn").style.display = i >= 0 ? "block" : "none";
+    $("scrimEdit").classList.add("open"); $("editSheet").classList.add("open");
+    $("editSheet").scrollTop = 0;
+  }
+  function closeEdit() { $("scrimEdit").classList.remove("open"); $("editSheet").classList.remove("open"); editIndex = -1; }
+  function saveForm(e) {
+    e.preventDefault();
+    var name = $("f-name").value.trim(); if (!name) return;
+    var obj = { name: name, funder: $("f-funder").value.trim(), type: $("f-type").value, opened: $("f-opened").value, day: parseInt($("f-day").value, 10) || 0, notes: $("f-notes").value.trim(), oneTime: $("f-oneTime").checked, plan: clone(editingPlan) };
+    var gk = $("g-kind").value, g = { kind: gk, first: $("g-first").value };
+    if (gk === "amort") { g.P = +$("g-P").value; g.rate = +$("g-rate").value; g.n = +$("g-n").value; }
+    else if (gk === "equalfee") { g.pp = +$("g-pp").value; g.pf = +$("g-pf").value; g.n = +$("g-n2").value; }
+    else if (gk === "interestfirst") { g.P = +$("g-P3").value; g.rate = +$("g-rate3").value; g.ni = +$("g-ni").value; g.np = +$("g-np").value; }
+    else { g.n = +$("g-nc").value; }
+    obj.gen = g;
+    if (editIndex >= 0) { var old = debts[editIndex]; obj.cliff = old.cliff; obj.settled = old.settled; obj.settledDate = old.settledDate; debts[editIndex] = obj; }
+    else { debts.push(obj); }
+    recompute(obj); saveAll(); renderAll(); closeEdit(); toast("已保存 ✓");
+  }
+  function deleteDebt(i) { ask("删除债务", "彻底删除「" + debts[i].name + "」？\n这不是结清，是从记录里移除。", function () { debts.splice(i, 1); saveAll(); renderAll(); closeEdit(); closeDetail(); toast("已删除"); }); }
+
+  // markdown
+  function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function inline(s) { s = esc(s); s = s.replace(/`([^`]+)`/g, "<code>$1</code>"); s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>"); s = s.replace(/\[\[([^\]]+)\]\]/g, "<em>$1</em>"); s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1"); return s; }
+  function isHr(l) { return /^[-=─═_*]{3,}$/.test(l.replace(/\s/g, "")); }
+  function mdToHtml(src) {
+    var lines = src.replace(/\r/g, "").split("\n"), out = [], i = 0;
+    while (i < lines.length) {
+      var t = lines[i].trim();
+      if (t === "") { i++; continue; }
+      if (/^```/.test(t)) { i++; var code = []; while (i < lines.length && !/^```/.test(lines[i].trim())) { code.push(esc(lines[i])); i++; } i++; out.push('<pre class="md-pre">' + code.join("\n") + "</pre>"); continue; }
+      var h = /^(#{1,6})\s+(.*)$/.exec(t);
+      if (h) { var lv = Math.min(h[1].length + 1, 6); out.push("<h" + lv + ">" + inline(h[2]) + "</h" + lv + ">"); i++; continue; }
+      if (isHr(t)) { out.push("<hr>"); i++; continue; }
+      if (/^>\s?/.test(t)) { var q = []; while (i < lines.length && /^>\s?/.test(lines[i].trim())) { q.push(inline(lines[i].trim().replace(/^>\s?/, ""))); i++; } out.push("<blockquote>" + q.join("<br>") + "</blockquote>"); continue; }
+      if (/^\|.*\|/.test(t) && i + 1 < lines.length && /-/.test(lines[i + 1]) && /^[\s|:-]+$/.test(lines[i + 1].trim())) {
+        var cut = function (row) { var c = row.trim().split("|"); if (c[0] === "") c.shift(); if (c.length && c[c.length - 1] === "") c.pop(); return c.map(function (x) { return x.trim(); }); };
+        var head = cut(t); i += 2; var rows = []; while (i < lines.length && /^\|.*\|/.test(lines[i].trim())) { rows.push(cut(lines[i])); i++; }
+        var th = "<tr>" + head.map(function (c) { return "<th>" + inline(c) + "</th>"; }).join("") + "</tr>";
+        var tb = rows.map(function (rr) { return "<tr>" + rr.map(function (c) { return "<td>" + inline(c) + "</td>"; }).join("") + "</tr>"; }).join("");
+        out.push('<div class="md-tbl"><table>' + th + tb + "</table></div>"); continue;
+      }
+      if (/^[-*]\s+/.test(t)) { var items = []; while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) { items.push("<li>" + inline(lines[i].replace(/^\s*[-*]\s+/, "")) + "</li>"); i++; } out.push("<ul>" + items.join("") + "</ul>"); continue; }
+      if (/^\d+\.\s+/.test(t)) { var oi = []; while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) { oi.push("<li>" + inline(lines[i].replace(/^\s*\d+\.\s+/, "")) + "</li>"); i++; } out.push("<ol>" + oi.join("") + "</ol>"); continue; }
+      var para = []; while (i < lines.length) { var lt = lines[i].trim(); if (lt === "" || /^(#{1,6})\s/.test(lt) || /^[-*]\s/.test(lt) || /^\d+\.\s/.test(lt) || /^>\s?/.test(lt) || /^```/.test(lt) || isHr(lt)) break; para.push(inline(lt)); i++; }
+      if (para.length) out.push("<p>" + para.join("<br>") + "</p>");
+    }
+    return out.join("\n");
+  }
+  function download(filename, content, mime) {
+    try { var url = URL.createObjectURL(new Blob([content], { type: mime || "application/octet-stream" })); var a = document.createElement("a"); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100); }
+    catch (e) { toast("此环境不支持下载，可长按内容复制"); }
+  }
+  // uploaded PDF storage (IndexedDB — localStorage's 5MB quota is shared with debt data, PDFs need real headroom)
+  var UP_DB = "debtManagerFiles", UP_STORE = "uploads";
+  function openUploadDB() {
+    return new Promise(function (resolve, reject) {
+      var req = indexedDB.open(UP_DB, 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore(UP_STORE, { keyPath: "id" }); };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error); };
+    });
+  }
+  function upGetAll() { return openUploadDB().then(function (db) { return new Promise(function (resolve, reject) { var req = db.transaction(UP_STORE, "readonly").objectStore(UP_STORE).getAll(); req.onsuccess = function () { resolve(req.result || []); }; req.onerror = function () { reject(req.error); }; }); }); }
+  function upPut(item) { return openUploadDB().then(function (db) { return new Promise(function (resolve, reject) { var tx = db.transaction(UP_STORE, "readwrite"); tx.objectStore(UP_STORE).put(item); tx.oncomplete = function () { resolve(); }; tx.onerror = function () { reject(tx.error); }; }); }); }
+  function upDelete(id) { return openUploadDB().then(function (db) { return new Promise(function (resolve, reject) { var tx = db.transaction(UP_STORE, "readwrite"); tx.objectStore(UP_STORE).delete(id); tx.oncomplete = function () { resolve(); }; tx.onerror = function () { reject(tx.error); }; }); }); }
+
+  var uploads = [];
+  function loadUploads() {
+    if (!window.indexedDB) return;
+    upGetAll().then(function (items) {
+      uploads = items.map(function (it) { return { id: it.id, name: it.name, title: it.title, mime: it.mime, blob: it.blob, objectURL: URL.createObjectURL(it.blob), addedAt: it.addedAt }; });
+      renderFiles();
+    }).catch(function () { /* IndexedDB unavailable in this browser/context — upload UI still works per-session via in-memory list until reload */ });
+  }
+  function tryShareFile(it) {
+    var file = new File([it.blob], it.name, { type: it.mime || it.blob.type });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: it.name }).catch(function () {});
+    } else {
+      toast("此设备不支持分享，可长按预览区尝试保存");
+    }
+  }
+
+  var FILES = null;
+  function fileItems() {
+    return (POSTER ? [{ img: true, name: POSTER_NAME, label: "愿景海报" }] : [])
+      .concat(docs.map(function (d) { return { name: baseName(d.file), label: d.title, content: d.content }; }))
+      .concat(uploads.map(function (u) { return { upload: true, id: u.id, name: u.name, mime: u.mime || "", label: u.title || u.name, url: u.objectURL, blob: u.blob }; }));
+  }
+  function renderFiles() {
+    FILES = fileItems(); var box = $("fileList"); box.innerHTML = "";
+    FILES.forEach(function (it, k) {
+      var row = document.createElement("div"); row.className = "file-row"; row.setAttribute("aria-current", k === docSel ? "true" : "false");
+      var ic = it.img ? "🖼" : it.upload ? (/^image\//.test(it.mime) ? "🖼" : /pdf/.test(it.mime) ? "📑" : "📎") : "📄";
+      var actionBtn = it.upload ? '<button class="file-dl file-del">删除</button>' : (it.content ? '<button class="file-dl file-copy">复制</button>' : '');
+      row.innerHTML = '<span class="file-ic">' + ic + '</span><span class="file-name"><span class="fl"></span><small></small></span>' + actionBtn;
+      row.querySelector(".fl").textContent = it.label; row.querySelector("small").textContent = it.name;
+      if (it.upload) {
+        row.querySelector(".file-del").addEventListener("click", function (e) {
+          e.stopPropagation();
+          ask("删除文件", "删除「" + it.label + "」？此操作不可撤销。", function () {
+            upDelete(it.id).then(function () {
+              uploads = uploads.filter(function (u) { return u.id !== it.id; });
+              if (docSel === k) { docSel = -1; renderDocContent(); }
+              renderFiles(); toast("已删除");
+            });
+          });
+        });
+      } else if (it.content) {
+        row.querySelector(".file-copy").addEventListener("click", function (e) {
+          e.stopPropagation();
+          try { navigator.clipboard.writeText(it.content); } catch (e2) { var ta = document.createElement("textarea"); ta.value = it.content; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e3) {} document.body.removeChild(ta); }
+          toast("已复制到剪贴板 ✓");
+        });
+      }
+      row.addEventListener("click", function () { docSel = k; renderFiles(); renderDocContent(); $("previewLabel").style.display = "block"; $("previewLabel").scrollIntoView({ behavior: "smooth", block: "nearest" }); });
+      box.appendChild(row);
+    });
+  }
+  function renderDocContent() {
+    if (docSel < 0) { $("docContent").innerHTML = ""; return; }
+    var it = FILES[docSel];
+    if (it.img) { $("docContent").innerHTML = '<div class="doc-body"><img class="poster" alt="愿景海报：我想要的人生" src="' + POSTER + '"></div>'; return; }
+    if (it.upload && /^image\//.test(it.mime)) { $("docContent").innerHTML = '<div class="doc-body"><img class="poster" alt="' + it.label + '" src="' + it.url + '"></div><div class="footnote" style="text-align:left;margin-top:8px;padding:0">长按图片可保存到手机相册。</div>'; return; }
+    if (it.upload && /pdf/.test(it.mime)) { $("docContent").innerHTML = '<div class="doc-body"><embed src="' + it.url + '" type="application/pdf" style="width:100%;height:70vh;border:1px solid var(--border);border-radius:10px;background:var(--surface-2)"><div class="footnote" style="text-align:left;margin-top:8px;padding:0">长按预览区可保存到手机 / 通过分享菜单发送；若空白说明此设备浏览器不支持内嵌 PDF 预览。</div></div>'; return; }
+    if (it.upload) {
+      $("docContent").innerHTML = '<div class="doc-body"><div class="footnote" style="text-align:left;padding:0;margin-bottom:10px">此文件类型（' + (it.mime || "未知") + '）不支持内嵌预览。</div><div class="data-actions"><button class="btn primary" id="shareFileBtn">分享 / 保存</button></div></div>';
+      $("shareFileBtn").addEventListener("click", function () { tryShareFile(it); });
+      return;
+    }
+    $("docContent").innerHTML = '<div class="doc-body md-body">' + mdToHtml(it.content) + "</div>";
+  }
+
+  document.querySelectorAll(".tabbar button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll(".tabbar button").forEach(function (x) { x.setAttribute("aria-selected", "false"); });
+      b.setAttribute("aria-selected", "true");
+      document.querySelectorAll(".view").forEach(function (v) { v.classList.remove("active"); });
+      var view = b.getAttribute("data-view");
+      $("view-" + view).classList.add("active"); window.scrollTo(0, 0);
+      var showTop = view === "debts" || view === "pay";
+      $("topHeader").style.display = showTop ? "" : "none";
+      $("topSummary").style.display = showTop ? "" : "none";
+    });
+  });
+  $("addBtn").addEventListener("click", function () { openEdit(-1); });
+  $("cancelBtn").addEventListener("click", closeEdit);
+  $("deleteBtn").addEventListener("click", function () { if (editIndex >= 0) deleteDebt(editIndex); });
+  $("debtForm").addEventListener("submit", saveForm);
+  $("scrimEdit").addEventListener("click", closeEdit);
+  $("dEdit").addEventListener("click", function () { var i = detailIndex; closeDetail(); openEdit(i); });
+  $("dSale").addEventListener("click", function () { if (detailIndex >= 0) payInstallment(detailIndex); });
+  $("dSettle").addEventListener("click", function () { if (detailIndex >= 0) settleFull(detailIndex); });
+  $("dClose").addEventListener("click", closeDetail);
+  $("scrimDetail").addEventListener("click", closeDetail);
+  $("copyBtn").addEventListener("click", function () { var box = $("exportBox"); box.select(); try { navigator.clipboard.writeText(box.value); } catch (e) { try { document.execCommand("copy"); } catch (e2) {} } toast("已复制到剪贴板 ✓"); });
+  $("dlBackupBtn").addEventListener("click", function () { download("债务管理备份_" + todayStr().replace("/", "-") + ".json", $("exportBox").value, "application/json"); });
+  $("importBtn").addEventListener("click", function () {
+    var v = $("importBox").value.trim(); if (!v) return;
+    try {
+      var parsed = JSON.parse(v), nd, ndocs;
+      if (Array.isArray(parsed)) { nd = parsed; ndocs = docs; } else { nd = parsed.debts || debts; ndocs = parsed.docs || docs; }
+      if (!Array.isArray(nd)) throw 0;
+      ask("导入覆盖", "用粘贴的数据覆盖当前 " + debts.length + " 笔债务" + (Array.isArray(parsed) ? "" : "和档案") + "？", function () { debts = nd; docs = ndocs; debts.forEach(normalize); saveAll(); renderAll(); renderFiles(); docSel = -1; renderDocContent(); $("importBox").value = ""; toast("已导入 " + nd.length + " 笔 ✓"); });
+    } catch (e) { toast("数据格式不对，导入失败"); }
+  });
+  $("uploadBtn").addEventListener("click", function () { $("uploadInput").click(); });
+  $("uploadInput").addEventListener("change", function (e) {
+    var file = e.target.files[0]; e.target.value = "";
+    if (!file) return;
+    if (!window.indexedDB) { toast("此设备浏览器不支持文件存储"); return; }
+    var id = "u" + Date.now() + Math.random().toString(36).slice(2, 7);
+    var item = { id: id, name: file.name, title: file.name, mime: file.type, blob: file, addedAt: todayStr() };
+    upPut(item).then(function () {
+      uploads.push({ id: id, name: file.name, title: file.name, mime: file.type, blob: file, objectURL: URL.createObjectURL(file), addedAt: item.addedAt });
+      renderFiles(); toast("已上传 ✓");
+    }).catch(function () { toast("保存失败，可能是文件太大或此设备存储空间不足"); });
+  });
+
+  renderFiles(); renderDocContent(); renderAll(); loadUploads();
+})();
+</script>
