@@ -2,7 +2,7 @@
 
 一个记债务的个人工具，打包成了能真正安装的安卓app。名字的寓意：对债务归零之后生活的期待。
 
-整个app就是一个自包含的HTML文件（`www/index.html`——纯HTML/CSS/JS，不依赖任何框架，也不需要构建步骤），用 [Capacitor](https://capacitorjs.com/) 包成了原生安卓壳。数据存在设备本地（`localStorage` + 上传文件用 `IndexedDB`），不上传任何服务器。
+app的主体是一个自包含的HTML文件（`www/index.html`——纯HTML/CSS/JS，不依赖任何框架，也不需要构建步骤），用 [Capacitor](https://capacitorjs.com/) 包成了原生安卓壳；另外有一小段手写的原生插件代码，用于把档案库里的文件真正保存到手机的"下载"目录（网页标准的下载方式在安卓WebView里不可靠）。数据存在设备本地（`localStorage` + 上传文件用 `IndexedDB`），不上传任何服务器。
 
 ## 环境要求
 
@@ -14,6 +14,8 @@
   - `build-tools;34.0.0`
 
 macOS上可以用Homebrew装：`brew install --cask android-commandlinetools`，然后用 `sdkmanager` 装上面几个组件。
+
+用Homebrew装的`openjdk@21`默认不会链接到`java`命令（keg-only），跑Gradle前可能要显式指定：`JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew assembleDebug`（Apple Silicon路径；Intel Mac是`/usr/local/opt/openjdk@21`）。
 
 ## 首次配置
 
@@ -39,8 +41,8 @@ cd android
 
 ## 项目结构
 
-- `www/index.html` —— app真身（改这个）
-- `android/` —— Capacitor/Gradle自动生成的原生工程，别手动改里面的文件，改完 `www/` 后重新跑 `npx cap sync android`
+- `www/index.html` —— app真身（改这个），`www/fonts/` 是它引用的本地字体文件
+- `android/` —— Capacitor/Gradle自动生成的原生工程，绝大部分别手动改，改完 `www/` 后重新跑 `npx cap sync android`；例外是 `android/app/src/main/java/io/github/jenkjyu/afterzero/` 下有一个手写的原生插件（`SaveFile`，负责把档案库的文件真正存到手机"下载"目录），这部分不会被sync覆盖，是真实源码
 - `capacitor.config.json` —— 包名、显示名、web目录配置
 
 ## 备注
