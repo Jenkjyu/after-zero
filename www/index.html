@@ -1,3 +1,4 @@
+<meta charset="UTF-8">
 <title>债务管理</title>
 <style>
   :root {
@@ -51,6 +52,8 @@
   .view { display: none; } .view.active { display: block; }
   .section-label { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted);
     font-weight: 600; margin: 4px 2px 8px; display: flex; justify-content: space-between; align-items: center; }
+  .sort-sel { text-transform: none; letter-spacing: normal; font-size: 12px; font-weight: 600; padding: 5px 7px;
+    border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); font-family: inherit; }
 
   .debt { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px 11px;
     margin-bottom: 9px; box-shadow: var(--shadow); border-left-width: 4px; }
@@ -158,9 +161,6 @@
   .plan-sum .c b { color: var(--text); font-family: var(--font-num); }
   .gen-panel { background: var(--surface-2); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
   .gen-panel .field.two { margin-bottom: 10px; }
-  .paidset { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 10px; }
-  .paidset .field { flex: 1; margin-bottom: 0; }
-  .paidset button { flex: none; }
   .batch { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; background: var(--surface-2); border-radius: 9px; padding: 9px 10px; margin-bottom: 10px; font-size: 12.5px; color: var(--text-muted); }
   .batch select, .batch input { padding: 6px 8px; font-size: 12.5px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); font-family: inherit; }
   .batch input { width: 84px; font-family: var(--font-num); }
@@ -219,7 +219,18 @@
   </div>
 
   <section class="view active" id="view-debts">
-    <div class="section-label">在还债务（按利率高→低）</div>
+    <div class="section-label"><span>在还债务</span><select id="debtSortSel" class="sort-sel">
+      <option value="rate-desc">利率 高→低</option>
+      <option value="rate-asc">利率 低→高</option>
+      <option value="orig-desc">借款金额 高→低</option>
+      <option value="orig-asc">借款金额 低→高</option>
+      <option value="bal-desc">剩余待还 高→低</option>
+      <option value="bal-asc">剩余待还 低→高</option>
+      <option value="monthly-desc">月供金额 高→低</option>
+      <option value="monthly-asc">月供金额 低→高</option>
+      <option value="terms-desc">剩余期数 多→少</option>
+      <option value="terms-asc">剩余期数 少→多</option>
+    </select></div>
     <div id="debtList"></div>
     <button class="add-btn" id="addBtn">＋ 新增一笔债务</button>
     <div class="settled-wrap" id="settledWrap"></div>
@@ -243,15 +254,14 @@
     <div class="section-label">用户数据 · 只存在这台设备</div>
     <div class="data-card">
       <h3>全部数据（债务 + 档案，导出/备份）</h3>
-      <p>换手机、清缓存前，复制或下载这段存好。含全部债务计划和档案文档。</p>
-      <textarea id="exportBox" readonly></textarea>
-      <div class="data-actions"><button class="btn primary" id="copyBtn">一键复制</button><button class="btn ghost" id="dlBackupBtn">下载备份文件</button></div>
+      <p>换手机、清缓存前，下载这份备份存好。含全部债务计划、档案文档和上传的文件。</p>
+      <div class="data-actions"><button class="btn primary" id="dlBackupBtn">下载备份文件</button></div>
     </div>
     <div class="data-card">
       <h3>导入数据（覆盖当前）</h3>
-      <p>把之前备份的那段粘进来，一键恢复债务和档案。</p>
-      <textarea id="importBox" placeholder="在此粘贴备份的数据…"></textarea>
-      <div class="data-actions"><button class="btn ghost" id="importBtn">导入覆盖</button></div>
+      <p>选一份之前下载的备份文件，恢复债务、档案和上传的文件。</p>
+      <input type="file" id="importFileInput" accept=".json,application/json" style="display:none">
+      <div class="data-actions"><button class="btn ghost" id="importFileBtn">上传备份文件</button></div>
     </div>
   </section>
 </div>
@@ -293,7 +303,7 @@
     </div>
     <div class="field two">
       <div class="field"><label for="f-opened">借款日</label><input id="f-opened" type="date"></div>
-      <div class="field"><label for="f-day">还款日（几号）</label><input id="f-day" type="number" min="1" max="31" inputmode="numeric"></div>
+      <div class="field"><label for="f-day">还款日（几号）</label><input id="f-day" type="number" min="1" max="31" inputmode="numeric" required></div>
     </div>
     <label class="checkline"><input type="checkbox" id="f-oneTime">一次性还清（不计入经常性月供，销项即结清）</label>
     <div class="field"><label for="f-notes">备注</label><textarea id="f-notes"></textarea></div>
@@ -327,11 +337,7 @@
       <button type="button" class="btn primary" id="doGen">生成计划</button>
     </div>
 
-    <div class="paidset">
-      <div class="field"><label for="paidThrough">已还至第几期（自动勾选）</label><input id="paidThrough" type="number" min="0" inputmode="numeric"></div>
-      <button type="button" class="btn ghost" id="applyPaid">应用</button>
-    </div>
-    <div class="batch">批量把每期<select id="batchCol"><option value="principal">本金</option><option value="interest">利息/费</option><option value="amount">金额</option></select>设为<input id="batchVal" type="number" step="0.01" inputmode="decimal" placeholder="数值"><button type="button" id="batchApply">应用到全部</button></div>
+    <div class="batch" id="batchBlock">批量把每期<select id="batchCol"><option value="principal">本金</option><option value="interest">利息/费</option><option value="amount">金额</option></select>设为<input id="batchVal" type="number" step="0.01" min="0" inputmode="decimal" placeholder="数值"><button type="button" id="batchApply">应用到全部</button></div>
     <div class="plan-rows" id="planRows"></div>
     <button type="button" class="btn ghost" id="addRow" style="margin-bottom:14px">＋ 加一期</button>
 
@@ -436,10 +442,15 @@
   debts.forEach(normalize);
   var editIndex = -1, detailIndex = -1, docSel = -1, editingPlan = [];
 
+  // background scroll lock while any sheet/modal is open (counted, since the confirm modal can stack on top of the edit sheet)
+  var scrollLockCount = 0;
+  function lockScroll() { if (scrollLockCount++ === 0) document.body.style.overflow = "hidden"; }
+  function unlockScroll() { if (scrollLockCount > 0 && --scrollLockCount === 0) document.body.style.overflow = ""; }
+
   // custom confirm
   var _onOk = null;
-  function ask(title, body, onOk) { $("mTitle").textContent = title; $("mBody").textContent = body; _onOk = onOk; $("modalScrim").classList.add("open"); }
-  function closeModal() { $("modalScrim").classList.remove("open"); _onOk = null; }
+  function ask(title, body, onOk) { $("mTitle").textContent = title; $("mBody").textContent = body; _onOk = onOk; $("modalScrim").classList.add("open"); lockScroll(); }
+  function closeModal() { if (!$("modalScrim").classList.contains("open")) return; $("modalScrim").classList.remove("open"); _onOk = null; unlockScroll(); }
   $("mOk").addEventListener("click", function () { var f = _onOk; closeModal(); if (f) f(); });
   $("mCancel").addEventListener("click", closeModal);
   $("modalScrim").addEventListener("click", function (e) { if (e.target === $("modalScrim")) closeModal(); });
@@ -459,8 +470,17 @@
       '<div class="kpi"><div class="v num" style="color:var(--good)">' + settled + '</div><div class="k">已结清</div></div>';
     $("count").textContent = active + " 笔在还" + (settled ? " · " + settled + " 笔已清" : "");
   }
+  var DEBT_SORTS = {
+    "rate-desc": function (d) { return -(+d.rate || 0); }, "rate-asc": function (d) { return +d.rate || 0; },
+    "orig-desc": function (d) { return -(+d.original || 0); }, "orig-asc": function (d) { return +d.original || 0; },
+    "bal-desc": function (d) { return -(+d.balance || 0); }, "bal-asc": function (d) { return +d.balance || 0; },
+    "monthly-desc": function (d) { return -(+d.monthly || 0); }, "monthly-asc": function (d) { return +d.monthly || 0; },
+    "terms-desc": function (d) { return -(+d.terms || 0); }, "terms-asc": function (d) { return +d.terms || 0; }
+  };
+  var debtSort = "rate-desc";
   function renderDebts() {
-    var sorted = debts.map(function (d, i) { return { d: d, i: i }; }).filter(function (o) { return isActive(o.d); }).sort(function (a, b) { return (b.d.rate || 0) - (a.d.rate || 0); });
+    var keyFn = DEBT_SORTS[debtSort] || DEBT_SORTS["rate-desc"];
+    var sorted = debts.map(function (d, i) { return { d: d, i: i }; }).filter(function (o) { return isActive(o.d); }).sort(function (a, b) { return keyFn(a.d) - keyFn(b.d); });
     var list = $("debtList"); list.innerHTML = "";
     sorted.forEach(function (o) {
       var d = o.d, rc = rateClass(d.rate || 0), accent = d.rate >= 18 ? "var(--critical)" : (d.rate >= 10 ? "var(--warning)" : "var(--good)");
@@ -505,7 +525,7 @@
       el.querySelector(".w").textContent = o.d.name; list.appendChild(el);
     });
   }
-  function renderAll() { debts.forEach(recompute); renderSummary(); renderDebts(); renderPay(); $("exportBox").value = JSON.stringify({ version: 5, exportedAt: new Date().toISOString(), debts: debts, docs: docs }, null, 1); }
+  function renderAll() { debts.forEach(recompute); renderSummary(); renderDebts(); renderPay(); }
 
   function kv(k, v) { return '<div><div class="k">' + k + '</div><div class="v num">' + v + '</div></div>'; }
   function openDetail(i) {
@@ -540,9 +560,9 @@
     }
     $("dSale").textContent = d.oneTime ? "✓ 一次性结清" : "✓ 销这期";
     $("dSale").style.display = d.terms > 0 ? "block" : "none";
-    $("scrimDetail").classList.add("open"); $("detailSheet").classList.add("open");
+    $("scrimDetail").classList.add("open"); $("detailSheet").classList.add("open"); lockScroll();
   }
-  function closeDetail() { $("scrimDetail").classList.remove("open"); $("detailSheet").classList.remove("open"); detailIndex = -1; }
+  function closeDetail() { if (!$("detailSheet").classList.contains("open")) return; $("scrimDetail").classList.remove("open"); $("detailSheet").classList.remove("open"); detailIndex = -1; unlockScroll(); }
 
   function payInstallment(i) {
     var d = debts[i], plan = d.plan || [], idx = -1;
@@ -571,6 +591,13 @@
   function setGenUI(k) { document.querySelectorAll("[data-gg]").forEach(function (g) { g.style.display = g.getAttribute("data-gg") === k ? "block" : "none"; }); }
   $("g-kind").addEventListener("change", function () { setGenUI(this.value); });
   $("genToggle").addEventListener("click", function () { var p = $("genPanel"); p.style.display = p.style.display === "none" ? "block" : "none"; });
+  function syncOneTimeUI() {
+    var isOne = $("f-oneTime").checked;
+    $("genToggle").style.display = isOne ? "none" : "";
+    if (isOne) $("genPanel").style.display = "none";
+    renderPlanRows(); refreshPlanSum();
+  }
+  $("f-oneTime").addEventListener("change", syncOneTimeUI);
   $("doGen").addEventListener("click", function () {
     var k = $("g-kind").value, first = $("g-first").value, spec = { kind: k, first: first };
     if (k === "amort") { spec.P = +$("g-P").value; spec.rate = +$("g-rate").value; spec.n = +$("g-n").value; }
@@ -581,8 +608,11 @@
     renderPlanRows(); refreshPlanSum(); $("genPanel").style.display = "none";
     toast("已生成 " + editingPlan.length + " 期，可再逐行改");
   });
-  $("applyPaid").addEventListener("click", function () { var n = parseInt($("paidThrough").value, 10) || 0; markPaidThrough(editingPlan, n); renderPlanRows(); refreshPlanSum(); });
-  $("addRow").addEventListener("click", function () { var last = editingPlan[editingPlan.length - 1]; var nd = last ? fmtDate(addMonths(parseDate(last.date), 1)) : ($("f-day").value ? "" : ""); editingPlan.push({ date: nd, amount: 0, principal: 0, interest: 0, paid: false }); renderPlanRows(); refreshPlanSum(); });
+  $("addRow").addEventListener("click", function () {
+    if ($("f-oneTime").checked && editingPlan.length >= 1) return;
+    var last = editingPlan[editingPlan.length - 1]; var nd = (last && last.date) ? fmtDate(addMonths(parseDate(last.date), 1)) : "";
+    editingPlan.push({ date: nd, amount: 0, principal: 0, interest: 0, paid: false }); renderPlanRows(); refreshPlanSum();
+  });
 
   function refreshPlanSum() {
     var borrow = 0, remaining = 0, paidc = 0;
@@ -590,30 +620,33 @@
     var apr = impliedAPR(editingPlan);
     $("planSum").innerHTML = '<span class="c">借款金额 <b>¥' + fmt(borrow) + '</b></span><span class="c">剩余待还 <b>¥' + fmt(remaining) + '</b></span><span class="c">年化 <b>' + (apr ? apr.toFixed(2) + '%' : '0%') + '</b></span><span class="c">共 <b>' + editingPlan.length + '</b> 期 · 已还 <b>' + paidc + '</b></span>';
   }
-  function linkRow(r, changed) {
-    r.principal = +r.principal || 0; r.interest = +r.interest || 0; r.amount = +r.amount || 0;
-    if (changed === "amount") { r.interest = r2(r.amount - r.principal); }
-    else { r.amount = r2(r.principal + r.interest); }
+  function linkRow(r) {
+    r.principal = +r.principal || 0; r.interest = +r.interest || 0;
+    r.amount = r2(r.principal + r.interest);
   }
   function renderPlanRows() {
     var box = $("planRows"); box.innerHTML = "";
-    editingPlan.forEach(function (r, idx) {
+    var isOne = $("f-oneTime").checked;
+    var rows = isOne ? editingPlan.slice(0, 1) : editingPlan;
+    $("addRow").style.display = (isOne && editingPlan.length >= 1) ? "none" : "";
+    $("batchBlock").style.display = isOne ? "none" : "";
+    rows.forEach(function (r, idx) {
       var row = document.createElement("div"); row.className = "prow" + (r.paid ? " paid" : "");
       row.innerHTML =
         '<div class="r1"><span class="pn">第' + (idx + 1) + '期</span><input type="date" data-f="date">' +
         '<label class="chk"><input type="checkbox" data-f="paid">已还</label>' +
         '<button type="button" class="del">✕</button></div>' +
         '<div class="r2">' +
-        '<div><span>金额</span><input type="number" step="0.01" inputmode="decimal" data-f="amount"></div>' +
-        '<div><span>本金</span><input type="number" step="0.01" inputmode="decimal" data-f="principal"></div>' +
-        '<div><span>利息/费</span><input type="number" step="0.01" inputmode="decimal" data-f="interest"></div>' +
+        '<div><span>金额</span><input type="number" step="0.01" min="0" inputmode="decimal" data-f="amount"></div>' +
+        '<div><span>本金</span><input type="number" step="0.01" min="0" inputmode="decimal" data-f="principal"></div>' +
+        '<div><span>利息/费</span><input type="number" step="0.01" min="0" inputmode="decimal" data-f="interest"></div>' +
         '</div>';
       var dEl = row.querySelector('[data-f="date"]'), aEl = row.querySelector('[data-f="amount"]'), pEl = row.querySelector('[data-f="principal"]'), iEl = row.querySelector('[data-f="interest"]'), cEl = row.querySelector('[data-f="paid"]');
       dEl.value = r.date || ""; aEl.value = r.amount != null ? r.amount : ""; pEl.value = r.principal != null ? r.principal : ""; iEl.value = r.interest != null ? r.interest : ""; cEl.checked = !!r.paid;
       dEl.addEventListener("change", function () { r.date = this.value; });
-      pEl.addEventListener("input", function () { r.principal = parseFloat(this.value) || 0; linkRow(r, "principal"); aEl.value = r.amount; refreshPlanSum(); });
-      iEl.addEventListener("input", function () { r.interest = parseFloat(this.value) || 0; linkRow(r, "interest"); aEl.value = r.amount; refreshPlanSum(); });
-      aEl.addEventListener("input", function () { r.amount = parseFloat(this.value) || 0; linkRow(r, "amount"); iEl.value = r.interest; refreshPlanSum(); });
+      pEl.addEventListener("input", function () { r.principal = parseFloat(this.value) || 0; linkRow(r); aEl.value = r.amount; refreshPlanSum(); });
+      iEl.addEventListener("input", function () { r.interest = parseFloat(this.value) || 0; linkRow(r); aEl.value = r.amount; refreshPlanSum(); });
+      aEl.addEventListener("input", function () { r.amount = parseFloat(this.value) || 0; refreshPlanSum(); });
       cEl.addEventListener("change", function () { r.paid = this.checked; row.classList.toggle("paid", r.paid); refreshPlanSum(); });
       row.querySelector(".del").addEventListener("click", function () { editingPlan.splice(idx, 1); renderPlanRows(); refreshPlanSum(); });
       box.appendChild(row);
@@ -622,9 +655,18 @@
   $("batchApply").addEventListener("click", function () {
     var col = $("batchCol").value, val = parseFloat($("batchVal").value);
     if (isNaN(val)) { toast("先填一个数值"); return; }
-    editingPlan.forEach(function (r) { r[col] = r2(val); linkRow(r, col); });
-    renderPlanRows(); refreshPlanSum();
-    toast("每期" + ({ amount: "金额", principal: "本金", interest: "利息" }[col]) + "已设为 " + val);
+    if (val < 0) { toast("数值不能是负数"); return; }
+    if (!editingPlan.length) { toast("还没有还款期，先加一期"); return; }
+    function apply() {
+      editingPlan.forEach(function (r) {
+        if (col === "amount") { r.principal = 0; r.interest = 0; r.amount = r2(val); }
+        else { r[col] = r2(val); linkRow(r); }
+      });
+      renderPlanRows(); refreshPlanSum();
+      toast("每期" + ({ amount: "金额", principal: "本金", interest: "利息" }[col]) + "已设为 " + val);
+    }
+    if (col === "amount") { ask("批量设置金额", "金额由本金+利息自动算出，直接批量设金额会把每期的本金和利息清空为 0，之后需要自己重新填。确定继续？", apply); }
+    else { apply(); }
   });
   function openEdit(i) {
     editIndex = i; var d = i >= 0 ? debts[i] : {};
@@ -638,17 +680,25 @@
     $("g-P3").value = g.P || ""; $("g-rate3").value = g.rate || ""; $("g-ni").value = g.ni || ""; $("g-np").value = g.np || "";
     $("g-nc").value = ""; $("g-first").value = g.first || d.opened || "";
     $("genPanel").style.display = "none";
-    $("paidThrough").value = editingPlan.filter(function (r) { return r.paid; }).length;
-    renderPlanRows(); refreshPlanSum();
+    syncOneTimeUI();
     $("deleteBtn").style.display = i >= 0 ? "block" : "none";
     $("scrimEdit").classList.add("open"); $("editSheet").classList.add("open");
     $("editSheet").scrollTop = 0;
+    lockScroll();
   }
-  function closeEdit() { $("scrimEdit").classList.remove("open"); $("editSheet").classList.remove("open"); editIndex = -1; }
+  function closeEdit() { if (!$("editSheet").classList.contains("open")) return; $("scrimEdit").classList.remove("open"); $("editSheet").classList.remove("open"); editIndex = -1; unlockScroll(); }
   function saveForm(e) {
     e.preventDefault();
     var name = $("f-name").value.trim(); if (!name) return;
-    var obj = { name: name, funder: $("f-funder").value.trim(), type: $("f-type").value, opened: $("f-opened").value, day: parseInt($("f-day").value, 10) || 0, notes: $("f-notes").value.trim(), oneTime: $("f-oneTime").checked, plan: clone(editingPlan) };
+    var fday = parseInt($("f-day").value, 10);
+    if (!fday || fday < 1 || fday > 31) { toast("还款日必填（1-31号）"); return; }
+    if (!editingPlan.length) { toast("至少要有一期还款计划才能保存"); return; }
+    for (var k = 0; k < editingPlan.length; k++) {
+      var r = editingPlan[k];
+      if (r.amount < 0 || r.principal < 0 || r.interest < 0) { toast("第 " + (k + 1) + " 期的金额/本金/利息不能是负数"); return; }
+      if (r.principal === 0 && r.interest === 0) { toast("第 " + (k + 1) + " 期的本金和利息不能同时为0"); return; }
+    }
+    var obj = { name: name, funder: $("f-funder").value.trim(), type: $("f-type").value, opened: $("f-opened").value, day: fday, notes: $("f-notes").value.trim(), oneTime: $("f-oneTime").checked || editingPlan.length === 1, plan: clone(editingPlan) };
     var gk = $("g-kind").value, g = { kind: gk, first: $("g-first").value };
     if (gk === "amort") { g.P = +$("g-P").value; g.rate = +$("g-rate").value; g.n = +$("g-n").value; }
     else if (gk === "equalfee") { g.pp = +$("g-pp").value; g.pf = +$("g-pf").value; g.n = +$("g-n2").value; }
@@ -706,6 +756,31 @@
   function upGetAll() { return openUploadDB().then(function (db) { return new Promise(function (resolve, reject) { var req = db.transaction(UP_STORE, "readonly").objectStore(UP_STORE).getAll(); req.onsuccess = function () { resolve(req.result || []); }; req.onerror = function () { reject(req.error); }; }); }); }
   function upPut(item) { return openUploadDB().then(function (db) { return new Promise(function (resolve, reject) { var tx = db.transaction(UP_STORE, "readwrite"); tx.objectStore(UP_STORE).put(item); tx.oncomplete = function () { resolve(); }; tx.onerror = function () { reject(tx.error); }; }); }); }
   function upDelete(id) { return openUploadDB().then(function (db) { return new Promise(function (resolve, reject) { var tx = db.transaction(UP_STORE, "readwrite"); tx.objectStore(UP_STORE).delete(id); tx.oncomplete = function () { resolve(); }; tx.onerror = function () { reject(tx.error); }; }); }); }
+  function upClear() { return openUploadDB().then(function (db) { return new Promise(function (resolve, reject) { var tx = db.transaction(UP_STORE, "readwrite"); tx.objectStore(UP_STORE).clear(); tx.oncomplete = function () { resolve(); }; tx.onerror = function () { reject(tx.error); }; }); }); }
+  function blobToDataURL(blob) { return new Promise(function (resolve, reject) { var r = new FileReader(); r.onload = function () { resolve(r.result); }; r.onerror = function () { reject(r.error); }; r.readAsDataURL(blob); }); }
+  function dataURLToBlob(dataURL) { return fetch(dataURL).then(function (res) { return res.blob(); }); }
+  function uploadsForBackup() {
+    if (!window.indexedDB) return Promise.resolve([]);
+    return upGetAll().then(function (items) {
+      return Promise.all(items.map(function (it) {
+        return blobToDataURL(it.blob).then(function (dataURL) { return { id: it.id, name: it.name, title: it.title, mime: it.mime, addedAt: it.addedAt, dataURL: dataURL }; });
+      }));
+    }).catch(function () { return []; });
+  }
+  function restoreUploads(list) {
+    if (!window.indexedDB) return Promise.reject(new Error("no indexedDB"));
+    uploads.forEach(function (u) { try { URL.revokeObjectURL(u.objectURL); } catch (e) {} });
+    return upClear().then(function () {
+      return Promise.all(list.map(function (it) {
+        return dataURLToBlob(it.dataURL).then(function (blob) {
+          var item = { id: it.id, name: it.name, title: it.title, mime: it.mime, blob: blob, addedAt: it.addedAt };
+          return upPut(item).then(function () { return item; });
+        });
+      }));
+    }).then(function (items) {
+      uploads = items.map(function (it) { return { id: it.id, name: it.name, title: it.title, mime: it.mime, blob: it.blob, objectURL: URL.createObjectURL(it.blob), addedAt: it.addedAt }; });
+    });
+  }
 
   var uploads = [];
   function loadUploads() {
@@ -786,6 +861,8 @@
       $("topSummary").style.display = showTop ? "" : "none";
     });
   });
+  $("debtSortSel").value = debtSort;
+  $("debtSortSel").addEventListener("change", function () { debtSort = this.value; renderDebts(); });
   $("addBtn").addEventListener("click", function () { openEdit(-1); });
   $("cancelBtn").addEventListener("click", closeEdit);
   $("deleteBtn").addEventListener("click", function () { if (editIndex >= 0) deleteDebt(editIndex); });
@@ -796,16 +873,37 @@
   $("dSettle").addEventListener("click", function () { if (detailIndex >= 0) settleFull(detailIndex); });
   $("dClose").addEventListener("click", closeDetail);
   $("scrimDetail").addEventListener("click", closeDetail);
-  $("copyBtn").addEventListener("click", function () { var box = $("exportBox"); box.select(); try { navigator.clipboard.writeText(box.value); } catch (e) { try { document.execCommand("copy"); } catch (e2) {} } toast("已复制到剪贴板 ✓"); });
-  $("dlBackupBtn").addEventListener("click", function () { download("债务管理备份_" + todayStr().replace("/", "-") + ".json", $("exportBox").value, "application/json"); });
-  $("importBtn").addEventListener("click", function () {
-    var v = $("importBox").value.trim(); if (!v) return;
-    try {
-      var parsed = JSON.parse(v), nd, ndocs;
-      if (Array.isArray(parsed)) { nd = parsed; ndocs = docs; } else { nd = parsed.debts || debts; ndocs = parsed.docs || docs; }
-      if (!Array.isArray(nd)) throw 0;
-      ask("导入覆盖", "用粘贴的数据覆盖当前 " + debts.length + " 笔债务" + (Array.isArray(parsed) ? "" : "和档案") + "？", function () { debts = nd; docs = ndocs; debts.forEach(normalize); saveAll(); renderAll(); renderFiles(); docSel = -1; renderDocContent(); $("importBox").value = ""; toast("已导入 " + nd.length + " 笔 ✓"); });
-    } catch (e) { toast("数据格式不对，导入失败"); }
+  $("dlBackupBtn").addEventListener("click", function () {
+    toast("正在打包备份…");
+    uploadsForBackup().then(function (uploadsBackup) {
+      var payload = { version: 6, exportedAt: new Date().toISOString(), debts: debts, docs: docs, uploads: uploadsBackup };
+      var d = new Date(), yymmdd = String(d.getFullYear() % 100).padStart(2, "0") + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
+      download("AfterZero备份" + yymmdd + ".json", JSON.stringify(payload), "application/json");
+    });
+  });
+  $("importFileBtn").addEventListener("click", function () { $("importFileInput").click(); });
+  $("importFileInput").addEventListener("change", function (e) {
+    var file = e.target.files[0]; if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var v = String(reader.result || "").trim(); if (!v) { toast("文件是空的"); return; }
+      try {
+        var parsed = JSON.parse(v), nd, ndocs, nuploads;
+        if (Array.isArray(parsed)) { nd = parsed; ndocs = docs; nuploads = null; }
+        else { nd = parsed.debts || debts; ndocs = parsed.docs || docs; nuploads = Array.isArray(parsed.uploads) ? parsed.uploads : null; }
+        if (!Array.isArray(nd)) throw 0;
+        var msg = "用「" + file.name + "」覆盖当前 " + debts.length + " 笔债务" + (Array.isArray(parsed) ? "" : "和档案") + (nuploads ? "、" + nuploads.length + " 个上传文件" : "") + "？";
+        ask("导入覆盖", msg, function () {
+          debts = nd; docs = ndocs; debts.forEach(normalize); saveAll(); renderAll();
+          var finish = function () { renderFiles(); docSel = -1; renderDocContent(); toast("已导入 " + nd.length + " 笔 ✓"); };
+          if (nuploads) restoreUploads(nuploads).then(finish).catch(function () { toast("已导入，但上传文件恢复失败"); finish(); });
+          else finish();
+        });
+      } catch (err) { toast("数据格式不对，导入失败"); }
+    };
+    reader.onerror = function () { toast("文件读取失败"); };
+    reader.readAsText(file);
+    e.target.value = "";
   });
   $("uploadBtn").addEventListener("click", function () { $("uploadInput").click(); });
   $("uploadInput").addEventListener("change", function (e) {
