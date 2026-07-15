@@ -43,6 +43,7 @@ cd android
 
 - `www/index.html` —— app真身（改这个），`www/fonts/` 是它引用的本地字体文件
 - `android/` —— Capacitor/Gradle自动生成的原生工程，绝大部分别手动改，改完 `www/` 后重新跑 `npx cap sync android`；例外是 `android/app/src/main/java/io/github/jenkjyu/afterzero/` 下有一个手写的原生插件（`SaveFile`，负责把档案库的文件真正存到手机"下载"目录），这部分不会被sync覆盖，是真实源码
+- `resources/` —— App图标的设计源文件，改图标时改这里，然后跑 `npx @capacitor/assets generate --android` 重新生成 `android/app/src/main/res/mipmap-*/` 下的实际图标文件（细节和一个工具默认值的坑见 `CLAUDE.md`）
 - `capacitor.config.json` —— 包名、显示名、web目录配置
 
 ## 备注

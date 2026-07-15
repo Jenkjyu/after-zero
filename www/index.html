@@ -162,7 +162,7 @@
     transition: transform .28s cubic-bezier(.2,.7,.3,1); padding: 8px 16px calc(24px + env(safe-area-inset-bottom)); }
   .sheet.open { transform: translateY(0); }
   @media (prefers-reduced-motion: reduce) { .sheet { transition: none; } }
-  .grip { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 8px auto 12px; }
+  .grip { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 8px auto 12px; padding: 10px 24px; background-clip: content-box; box-sizing: content-box; touch-action: none; }
   .sheet h2 { margin: 0 0 4px; font-size: var(--fs-xl); }
   .sheet .subh { color: var(--text-muted); font-size: 13px; margin-bottom: 14px; }
   .field { margin-bottom: 12px; }
@@ -254,7 +254,7 @@
       <option value="terms-asc">剩余期数 少→多</option>
     </select></div>
     <div id="debtList"></div>
-    <button class="add-btn" id="addBtn">＋ 新增一笔债务</button>
+    <button class="add-btn" id="addBtn">＋ 新增一笔</button>
     <div class="settled-wrap" id="settledWrap"></div>
   </section>
 
@@ -567,6 +567,7 @@
 
   function kv(k, v) { return '<div><div class="k">' + k + '</div><div class="v num">' + v + '</div></div>'; }
   function openDetail(i) {
+    $("detailSheet").style.height = "";
     detailIndex = i; var d = debts[i], plan = d.plan || [];
     $("dTitle").textContent = d.name;
     $("dSub").textContent = (d.funder ? d.funder + " · " : "") + (d.type || "");
@@ -600,6 +601,37 @@
     $("scrimDetail").classList.add("open"); $("detailSheet").classList.add("open"); lockScroll();
   }
   function closeDetail() { if (!$("detailSheet").classList.contains("open")) return; $("scrimDetail").classList.remove("open"); $("detailSheet").classList.remove("open"); detailIndex = -1; unlockScroll(); }
+
+  // 顶部横杠拖拽：下拖超过阈值关闭，resizable=true 时上拖可把窗口拉高（用于查看详情）
+  function initGripDrag(sheet, grip, closeFn, resizable) {
+    var startY = 0, startH = 0, dragging = false;
+    var CLOSE_THRESHOLD = 90;
+    var MIN_H = window.innerHeight * 0.4, MAX_H = window.innerHeight * 0.94;
+    grip.addEventListener("pointerdown", function (e) {
+      dragging = true; startY = e.clientY; startH = sheet.getBoundingClientRect().height;
+      sheet.style.transition = "none";
+      grip.setPointerCapture(e.pointerId);
+    });
+    grip.addEventListener("pointermove", function (e) {
+      if (!dragging) return;
+      var dy = e.clientY - startY;
+      if (dy > 0) { sheet.style.transform = "translateY(" + dy + "px)"; }
+      else if (resizable) {
+        sheet.style.height = Math.min(MAX_H, Math.max(MIN_H, startH - dy)) + "px";
+        sheet.style.transform = "";
+      }
+    });
+    function endDrag(e) {
+      if (!dragging) return;
+      dragging = false;
+      sheet.style.transition = "";
+      var dy = e.clientY - startY;
+      if (dy > CLOSE_THRESHOLD) closeFn();
+      sheet.style.transform = "";
+    }
+    grip.addEventListener("pointerup", endDrag);
+    grip.addEventListener("pointercancel", endDrag);
+  }
 
   function payInstallment(i) {
     var d = debts[i], plan = d.plan || [], idx = -1;
@@ -940,6 +972,14 @@
   $("dSettle").addEventListener("click", function () { if (detailIndex >= 0) settleFull(detailIndex); });
   $("dClose").addEventListener("click", closeDetail);
   $("scrimDetail").addEventListener("click", closeDetail);
+  initGripDrag($("editSheet"), $("editSheet").querySelector(".grip"), closeEdit, false);
+  initGripDrag($("detailSheet"), $("detailSheet").querySelector(".grip"), closeDetail, true);
+  window.__handleBackButton = function () {
+    if ($("modalScrim").classList.contains("open")) { closeModal(); return true; }
+    if ($("editSheet").classList.contains("open")) { closeEdit(); return true; }
+    if ($("detailSheet").classList.contains("open")) { closeDetail(); return true; }
+    return false;
+  };
   $("dlBackupBtn").addEventListener("click", function () {
     toast("正在打包备份…");
     uploadsForBackup().then(function (uploadsBackup) {
