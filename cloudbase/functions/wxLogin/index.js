@@ -8,6 +8,22 @@ const db = app.database();
 const WX_APPID = process.env.WX_APPID;
 const WX_APPSECRET = process.env.WX_APPSECRET;
 
+// 自定义登录私钥：CloudBase控制台"身份认证/登录方式"里启用"自定义登录"后下载得到的JSON文件，
+// 里面的三个字段分别存成三个环境变量——同样绝不写死在代码里、绝不进git。
+// (没有存成单个JSON字符串的环境变量，是因为CloudBase部署时会把"看起来像JSON"的环境变量值
+// 自动解析成对象，导致 Environment.Variables.0.Value 类型校验报错，拆开三个纯字符串就没有这个问题。)
+// createTicket()必须用这把私钥初始化的app实例调用，否则会报权限错误。
+function getAuthApp() {
+  const privateKeyId = process.env.TCB_CUSTOM_LOGIN_PRIVATE_KEY_ID;
+  const privateKey = process.env.TCB_CUSTOM_LOGIN_PRIVATE_KEY;
+  const envId = process.env.TCB_CUSTOM_LOGIN_ENV_ID;
+  if (!privateKeyId || !privateKey || !envId) return null;
+  return cloudbase.init({
+    env: cloudbase.SYMBOL_CURRENT_ENV,
+    credentials: { private_key_id: privateKeyId, private_key: privateKey.replace(/\\n/g, "\n"), env_id: envId },
+  });
+}
+
 function httpGetJSON(url) {
   return new Promise((resolve, reject) => {
     https
@@ -33,6 +49,10 @@ exports.main = async (event) => {
   if (!code) return { ok: false, error: "缺少code" };
   if (!WX_APPID || !WX_APPSECRET) {
     return { ok: false, error: "云函数未配置 WX_APPID / WX_APPSECRET 环境变量" };
+  }
+  const authApp = getAuthApp();
+  if (!authApp) {
+    return { ok: false, error: "云函数未配置 TCB_CUSTOM_LOGIN_CREDENTIAL 环境变量" };
   }
 
   // 1. 用code换openid/access_token。
@@ -73,9 +93,9 @@ exports.main = async (event) => {
   }
 
   // 4. 签发CloudBase自定义登录票据。
-  // TODO：这里的票据签发方式(app.auth().createTicket(...))部署前要对照CloudBase当前"自定义登录"文档核实——
-  // node-sdk在v1/v2之间对这块API有过调整，不要假设这个方法名/参数形状就是最新的。
-  const ticket = await app.auth().createTicket(openid, { refresh: 60 * 60 * 24 * 30 });
+  // createTicket只接受一个参数(自定义用户唯一标识)，不支持refresh/expire这类选项——
+  // 已对照CloudBase当前"自定义登录"文档核实(docs.cloudbase.net/authentication-v2/method/custom-login)。
+  const ticket = await authApp.auth().createTicket(openid);
 
   return { ok: true, ticket, openid, nickname, avatarUrl };
 };

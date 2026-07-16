@@ -852,8 +852,7 @@
 
   // 账号登录：微信登录(移动应用OAuth) + 腾讯云开发(CloudBase)自定义登录。
   // 这是纯基础设施——现有四个标签页(债务/待还/档案/数据)完全不依赖登录状态，登录只是给未来功能占位。
-  // TODO：微信开放平台"移动应用"注册通过之前，下面这个环境ID是占位符，实施时换成真实CloudBase环境ID。
-  var CLOUDBASE_ENV_ID = "TODO_CLOUDBASE_ENV_ID";
+  var CLOUDBASE_ENV_ID = "after-zero-d7gub5p5f09c8cc2d";
   var _cbApp = null;
   function cbApp() { if (!_cbApp) _cbApp = cloudbase.init({ env: CLOUDBASE_ENV_ID }); return _cbApp; }
 
@@ -872,17 +871,22 @@
     if (!data.stateOk) { toast("授权状态校验失败，请重试"); return; }
     if (data.errCode !== 0 || !data.code) { toast("微信授权已取消或失败"); return; }
     toast("登录中…");
-    cbApp().callFunction({ name: "wxLogin", data: { code: data.code } }).then(function (res) {
-      var result = res && res.result;
-      if (!result || !result.ok) { toast("登录失败：" + ((result && result.error) || "请重试")); return; }
-      // TODO：CloudBase自定义登录票据的消费方式(signInWithTicket等)实施时对照当前文档核实，
-      // 官方SDK有过v1/v2 API变动，这里的方法名不保证是最新的。
-      return cbApp().auth().signInWithTicket(result.ticket).then(function () {
-        account = { openid: result.openid, nickname: result.nickname, avatarUrl: result.avatarUrl, loggedInAt: Date.now() };
-        localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
-        renderAccountUI();
-        toast("登录成功 ✓");
+    var pendingLoginResult = null;
+    var auth = cbApp().auth();
+    Promise.resolve(auth.setCustomSignFunc(function () {
+      return cbApp().callFunction({ name: "wxLogin", data: { code: data.code } }).then(function (res) {
+        var result = res && res.result;
+        if (!result || !result.ok) throw new Error((result && result.error) || "登录失败");
+        pendingLoginResult = result;
+        return result.ticket;
       });
+    })).then(function () {
+      return auth.signInWithCustomTicket();
+    }).then(function () {
+      account = { openid: pendingLoginResult.openid, nickname: pendingLoginResult.nickname, avatarUrl: pendingLoginResult.avatarUrl, loggedInAt: Date.now() };
+      localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
+      renderAccountUI();
+      toast("登录成功 ✓");
     }).catch(function (err) {
       toast("登录失败：" + ((err && err.message) || "网络错误"));
     });
