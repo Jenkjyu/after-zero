@@ -274,6 +274,17 @@
 
   <section class="view" id="view-data">
     <div class="section-label">用户数据 · 只存在这台设备</div>
+    <div class="data-card" id="accountCard">
+      <h3>账户</h3>
+      <div id="accountLoggedOut">
+        <p>登录后可解锁未来的新功能。不登录也完全不影响现有的记账、提醒、档案库和数据备份功能。</p>
+        <div class="data-actions"><button class="btn primary" id="wxLoginBtn">微信登录</button></div>
+      </div>
+      <div id="accountLoggedIn" style="display:none">
+        <p id="accountNickname"></p>
+        <div class="data-actions"><button class="btn ghost" id="wxLogoutBtn">退出登录</button></div>
+      </div>
+    </div>
     <div class="data-card">
       <h3>全部数据（债务 + 档案，导出/备份）</h3>
       <p>换手机、清缓存前，下载这份备份存好。含全部债务计划、档案文档和上传的文件。</p>
@@ -396,10 +407,14 @@
 
 <div class="flash" id="flash">已保存 ✓</div>
 
+<!-- 腾讯云开发(CloudBase) JS SDK，CDN引入，不走npm/构建工具，跟整个项目"单文件无构建步骤"的原则保持一致。 -->
+<script src="https://static.cloudbase.net/cloudbase-js-sdk/2.28.6/cloudbase.js"></script>
 <script>
 (function () {
   "use strict";
   var KEY = "debt-manager-v5", DKEY = "debt-manager-docs-v5";
+  // 账号登录状态，跟KEY/DKEY这两个债务数据的键完全独立，不能混用。
+  var ACCOUNT_KEY = "after-zero-account-v1";
   // SEED: minimal spec; full plan generated on load
   var SEED = [];
   var DOCS_SEED = [];
@@ -478,6 +493,7 @@
 
   var debts = loadJSON(KEY, SEED);
   var docs = loadJSON(DKEY, DOCS_SEED);
+  var account = loadJSON(ACCOUNT_KEY, null);
   debts.forEach(normalize);
   var editIndex = -1, detailIndex = -1, docSel = -1, editingPlan = [];
 
@@ -833,6 +849,44 @@
       saveToDeviceDownloads(getBlob(), filename, mime).then(function () { btn.disabled = false; });
     });
   }
+
+  // 账号登录：微信登录(移动应用OAuth) + 腾讯云开发(CloudBase)自定义登录。
+  // 这是纯基础设施——现有四个标签页(债务/待还/档案/数据)完全不依赖登录状态，登录只是给未来功能占位。
+  // TODO：微信开放平台"移动应用"注册通过之前，下面这个环境ID是占位符，实施时换成真实CloudBase环境ID。
+  var CLOUDBASE_ENV_ID = "TODO_CLOUDBASE_ENV_ID";
+  var _cbApp = null;
+  function cbApp() { if (!_cbApp) _cbApp = cloudbase.init({ env: CLOUDBASE_ENV_ID }); return _cbApp; }
+
+  function renderAccountUI() {
+    var loggedOut = $("accountLoggedOut"), loggedIn = $("accountLoggedIn");
+    if (account) {
+      loggedOut.style.display = "none"; loggedIn.style.display = "block";
+      $("accountNickname").textContent = "已登录" + (account.nickname ? "：" + account.nickname : "");
+    } else {
+      loggedOut.style.display = "block"; loggedIn.style.display = "none";
+    }
+  }
+
+  var wxAuthListenerBound = false;
+  function handleWxAuthResult(data) {
+    if (!data.stateOk) { toast("授权状态校验失败，请重试"); return; }
+    if (data.errCode !== 0 || !data.code) { toast("微信授权已取消或失败"); return; }
+    toast("登录中…");
+    cbApp().callFunction({ name: "wxLogin", data: { code: data.code } }).then(function (res) {
+      var result = res && res.result;
+      if (!result || !result.ok) { toast("登录失败：" + ((result && result.error) || "请重试")); return; }
+      // TODO：CloudBase自定义登录票据的消费方式(signInWithTicket等)实施时对照当前文档核实，
+      // 官方SDK有过v1/v2 API变动，这里的方法名不保证是最新的。
+      return cbApp().auth().signInWithTicket(result.ticket).then(function () {
+        account = { openid: result.openid, nickname: result.nickname, avatarUrl: result.avatarUrl, loggedInAt: Date.now() };
+        localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
+        renderAccountUI();
+        toast("登录成功 ✓");
+      });
+    }).catch(function (err) {
+      toast("登录失败：" + ((err && err.message) || "网络错误"));
+    });
+  }
   // uploaded PDF storage (IndexedDB — localStorage's 5MB quota is shared with debt data, PDFs need real headroom)
   var UP_DB = "debtManagerFiles", UP_STORE = "uploads";
   function openUploadDB() {
@@ -980,6 +1034,25 @@
     if ($("detailSheet").classList.contains("open")) { closeDetail(); return true; }
     return false;
   };
+  $("wxLoginBtn").addEventListener("click", function () {
+    var native = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.WeChatLogin;
+    if (!native) { toast("微信登录仅支持安卓App内使用"); return; }
+    native.isInstalled().then(function (r) {
+      if (!r.installed) { toast("请先安装微信"); return Promise.reject(0); }
+      if (!wxAuthListenerBound) { wxAuthListenerBound = true; native.addListener("wechatAuthResult", handleWxAuthResult); }
+      return native.login();
+    }).then(function () {
+      toast("正在跳转微信授权…");
+    }).catch(function (err) {
+      if (err && err.message) toast(err.message);
+    });
+  });
+  $("wxLogoutBtn").addEventListener("click", function () {
+    account = null;
+    localStorage.removeItem(ACCOUNT_KEY);
+    renderAccountUI();
+    toast("已退出登录");
+  });
   $("dlBackupBtn").addEventListener("click", function () {
     toast("正在打包备份…");
     uploadsForBackup().then(function (uploadsBackup) {
@@ -1025,6 +1098,6 @@
     }).catch(function () { toast("保存失败，可能是文件太大或此设备存储空间不足"); });
   });
 
-  renderFiles(); renderDocContent(); renderAll(); loadUploads();
+  renderFiles(); renderDocContent(); renderAll(); loadUploads(); renderAccountUI();
 })();
 </script>

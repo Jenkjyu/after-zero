@@ -8,7 +8,7 @@
 
 **源代码 = `www/index.html`，永远改这个文件。** `android/` 目录绝大部分是Capacitor根据`www/`自动生成的原生工程，改完`www/index.html`后要跑 `npx cap sync android` 才会同步进去，不要直接改`android/app/src/main/assets/public/index.html`（会被下次sync覆盖）。
 
-**例外：`android/app/src/main/java/io/github/jenkjyu/afterzero/` 下有手写的原生插件代码，不是sync产物。** 目前有 `SaveFilePlugin.java`（+ `MainActivity.java` 里几行注册代码），`npx cap sync android` 不会碰这两个文件，是真正的项目源码，要跟着走版本控制，不要当成自动生成的东西误删或忽略。详见下面"原生插件"一节。
+**例外：`android/app/src/main/java/io/github/jenkjyu/afterzero/` 下有手写的原生插件代码，不是sync产物。** 目前有 `SaveFilePlugin.java` 和 `WeChatLoginPlugin.java`（+ `wxapi/WXEntryActivity.java` + `MainActivity.java` 里几行注册代码），`npx cap sync android` 不会碰这些文件，是真正的项目源码，要跟着走版本控制，不要当成自动生成的东西误删或忽略。详见下面"原生插件"一节。
 
 ## 原生插件：`SaveFile`
 
@@ -19,6 +19,23 @@
 **已知边界**：这个插件只支持安卓10+（`Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q`），低于这个版本会直接`reject`一个提示文案，不会崩溃。这个项目`minSdkVersion = 24`（安卓7），所以理论上安卓7-9的机器装得上app，但点"下载"会拿到一条"此安卓版本暂不支持"的提示——这是有意的取舍（第一阶段只做10+），不是遗漏，以后要补安卓9及以下的兼容需要另外写`Environment.getExternalStoragePublicDirectory` + 运行时权限申请那一套老API。
 
 **JS这边怎么调用**：`www/index.html` 里的 `saveToDeviceDownloads(blob, filename, mime)` 函数会检测 `window.Capacitor.Plugins.SaveFile` 是否存在——存在（真机原生环境）就转base64调用原生插件；不存在（比如本地`python3 -m http.server`桌面浏览器测试）就退回到旧的`<a download>`写法。**这意味着"下载"功能本身没法在桌面浏览器里完整测出真实效果，必须编译APK装真机验证。**
+
+## 原生插件：`WeChatLogin`（账号登录基础设施）
+
+"数据"标签页里的"微信登录"入口，用的是这个自定义原生插件（`android/app/src/main/java/io/github/jenkjyu/afterzero/WeChatLoginPlugin.java` + `wxapi/WXEntryActivity.java`）。**这是纯基础设施：现有四个标签页（债务列表/待还提醒/档案库/数据备份）完全不依赖登录状态，不登录也100%可用，登录只是为将来的付费功能占位。**
+
+**为什么需要原生插件（不只是JS调API）**：微信登录在原生App里官方要求走"移动应用"OAuth流程——拉起手机上装的微信App本身走授权，不是网页扫码，这个交互没法用纯JS实现，必须靠微信官方Android SDK（`com.tencent.mm.opensdk`，Maven Central发布，见`android/app/build.gradle`）。
+
+**几个容易踩坑、且微信SDK硬编码写死不能改的地方**：
+- 回调Activity必须叫 `wxapi.WXEntryActivity`，包路径必须是 `<applicationId>.wxapi.WXEntryActivity`（也就是 `io.github.jenkjyu.afterzero.wxapi.WXEntryActivity`）——这是微信SDK自己去找这个类的硬编码路径，改名字/挪包会导致回调收不到，不是能自由重构的普通类。
+- `AndroidManifest.xml` 里必须有 `<queries><package android:name="com.tencent.mm" /></queries>`——本项目`targetSdkVersion 36`，安卓11+的包可见性限制下，没有这行`isWXAppInstalled()`/`sendReq()`会静默失效（不报错，就是不工作），排查起来容易摸不着头脑。
+- 微信登录**要求提交App的release签名证书SHA1指纹**去微信开放平台注册，debug签名注册不了——这是这个项目第一次真正生成release keystore的直接原因（见下面"硬性铁律"第4条的更新）。
+
+**JS这边怎么调用**：`www/index.html` 里点击"微信登录"按钮，跟`SaveFile`同样的模式检测 `window.Capacitor.Plugins.WeChatLogin` 是否存在，不存在（桌面浏览器测试）就提示"仅支持安卓App内使用"。存在的话调用原生插件的`login()`拉起微信，真正的授权结果是异步的，通过 `wechatAuthResult` 事件回传（因为微信App拉起和用户授权跨越了Activity生命周期，`PluginCall`没法跨这段存活，只能用事件而不是直接resolve这次调用）。拿到微信返回的`code`后，调用腾讯云开发（CloudBase）的云函数换取自定义登录票据完成登录——**AppSecret绝不出现在客户端代码里**，只存在云函数的环境变量中，客户端只带AppID（AppID本身不是秘密）。
+
+**目前的完成状态：代码已写完，但功能还跑不起来，两个外部前置条件没完成**：
+1. `WeChatLoginPlugin.java` 里的 `APP_ID` 和 `www/index.html` 里的 `CLOUDBASE_ENV_ID` 目前都是 `"TODO_..."` 占位符——微信开放平台"移动应用"注册审核通过（需要SHA1，可能需要企业资质）、腾讯云开发环境开通之后，要把这两处换成真实值。
+2. 云函数源码在仓库的 `cloudbase/functions/wxLogin/` 目录，**这不是`npx cap sync`能同步的东西**，是要单独手动部署到CloudBase控制台的服务端代码，AppSecret作为云函数环境变量配置，绝不进这个git仓库。云函数里`app.auth().createTicket(...)`这个自定义登录票据签发的具体方法名，部署前务必对照CloudBase当前"自定义登录"文档核实——他们的SDK有过v1/v2 API变动，代码里的方法名不保证还是最新的。
 
 ## 返回键处理（安卓硬件/手势返回）
 
@@ -41,6 +58,10 @@
 真正编译进APK的是 `android/app/src/main/res/mipmap-*/` 下那一整套图标文件——那些是用 [`@capacitor/assets`](https://github.com/ionic-team/capacitor-assets) 从 `resources/` 这三个源文件生成的（`npx @capacitor/assets generate --android`），不要手动改mipmap下的PNG，改了下次重新生成会被覆盖；要调整图标，改 `resources/` 里的源文件后重新跑生成命令。
 
 **踩过一个坑**：`@capacitor/assets` 默认会给 `mipmap-anydpi-v26/ic_launcher.xml`（自适应图标配置）里的 `<background>` 和 `<foreground>` 都套一层 `16.7%` 的内缩（`<inset>`）。这对本项目不对——`icon-background.png` 设计上就是要通栏铺满到边缘的（黑白对半分），内缩之后四周会露出一圈透明，实机上大概率透出桌面壁纸/系统默认色，很难看。所以 `<background>` 这层的inset已经手动去掉了（保留 `<foreground>` 的inset，因为 `icon-foreground.png` 里的图形本身上下几乎顶到画布边缘，需要靠内缩才不会被圆形/方形等不同launcher遮罩裁掉）——**以后如果重新跑 `@capacitor/assets generate`，它会把 `<background>` 的inset加回去，记得再删一次。**
+
+## 云函数源码：`cloudbase/`
+
+`cloudbase/functions/wxLogin/`是腾讯云开发（CloudBase）云函数的源码，服务端代码，负责微信登录时用`code`换`openid`、签发自定义登录票据（详见上面"原生插件：`WeChatLogin`"一节）。**这个目录不属于Capacitor/Android那套构建流程，`npx cap sync android`不会碰它，也不会自动部署**——改完要手动同步到CloudBase控制台或用他们的CLI工具部署。AppSecret等敏感配置只存在CloudBase云函数的环境变量里，不存在这个目录任何文件里，也不能加进来。
 
 ## 构建
 
@@ -68,10 +89,10 @@ cd android && ./gradlew assembleDebug
 
 ## 硬性铁律，改代码前必看
 
-1. **`localStorage` 的 KEY（在`www/index.html`里搜 `debt-manager-v5`）永远不能改。** 这是用户设备上保存真实数据的键名，改了等于让已经装过的app找不到自己原来存的数据，直接清零。
+1. **`localStorage` 的 KEY（在`www/index.html`里搜 `debt-manager-v5`）永远不能改。** 这是用户设备上保存真实数据的键名，改了等于让已经装过的app找不到自己原来存的数据，直接清零。同理，`DKEY`（`debt-manager-docs-v5`）和账号登录状态用的`ACCOUNT_KEY`（`after-zero-account-v1`）以后也不能改——三者是各自独立的键，不要以为加新功能可以复用或合并。
 2. **新安装必须是空数据。** `www/index.html` 里 `SEED`（债务种子数据）、`DOCS_SEED`（文档种子数据）、`POSTER`（海报图）这三个常量现在都是空值——这是故意的，因为这个app的定位是要发给别人用，任何人第一次打开都不能预装开发者自己的私人财务数据。**改代码时如果要放测试数据，改完记得清空再提交，别把私人内容（真实债务数字、个人反思文档、任何带真实姓名/金额的东西）带回默认值里。**
    **私人数据不止藏在这三个常量里。** 之前排查发现过一次：一个叫`cliff`的调试用标记字段，虽然完全没有UI能设置它（不是SEED、不是表单字段），但代码里直接写死了具体的还款日期和金额字符串（`"2027-05 起还本，月供跳至 ¥2,182"`这类）挂在渲染逻辑里，跟SEED是否清空无关。改代码时留意：不只是搜`SEED`/`DOCS_SEED`/`POSTER`这三个变量名，任何看着像真实日期/金额/人名的硬编码字符串都要多看一眼是不是该删。
 3. **包名 `io.github.jenkjyu.afterzero` 是这个app的永久身份，不要随便改。** 安卓系统靠包名判断"新装的这个APK是不是我认识的那个app的新版本"——包名一样+签名一致才会被当成"更新"（原地覆盖、保留数据）；包名一变，系统当成完全不相关的新app，跟原来的app和它的数据没有任何关系，装出来是第二个图标、全新空数据。这个项目早期开发阶段（曾用过 `com.jenkjyu.debtmanager` 这个包名做过几版debug包）就是因为这个原因废弃重来的——开发者自己手机上可能还留着那个旧包名、带真实数据的旧版本，跟现在这个 `io.github.jenkjyu.afterzero` 是两个互不相通的独立app，别搞混、别以为它们共享数据。
-4. **这是debug包，不是release签名包。** 装自己手机没问题；真要上架应用商店，需要另外生成release签名密钥（这个密钥一旦用来发布，必须永久保管，弄丢了以后没法再更新同一个app）——现在没做这步，先不用管。
+4. **release签名密钥已经生成（因为微信登录要求提交release签名SHA1去微信开放平台注册），但目前还没有任何正式发布用过它。** Keystore文件在 `android/app/after-zero-release.keystore`，密码等配置在 `android/keystore.properties`——两个都已gitignore，不在git历史里。`android/app/build.gradle` 里 `signingConfigs.release` 检测到 `keystore.properties` 存在才生效（没有这个文件时`buildTypes.release`不带签名配置，仍然能正常debug构建，克隆仓库的人不受影响）。**`./gradlew assembleDebug`（README默认的构建命令）产出的还是debug包，不受这次改动影响；只有显式跑 `assembleRelease` 才会用到这个release签名。** 这个keystore一旦真正拿去发布过一个版本，丢了 = 以后再也没法用同一个身份更新这个app，需要跟`localStorage`那条铁律同等严重地对待——离线、异地备份好。
 5. **License 是 PolyForm Noncommercial 1.0.0，不是MIT/ISC这类常见的宽松协议，是刻意选的。** 开发者规划未来要在这个app上加付费功能，选这个协议是为了禁止别人白嫖代码去做商业竞品（发到应用商店卖钱、内置广告等）；别人依然可以自由fork/学习/个人非商业使用。改动licensing相关内容（`LICENSE`文件、`package.json`里的`license`字段、README里的License说明）前要确认这个前提没变。
-6. **`AndroidManifest.xml` 里的 `INTERNET` 权限是故意留着的，虽然目前`www/index.html`没有任何网络请求代码。** 是为未来付费功能可能需要的联网校验/云同步预留，不是清理疏漏，不要"顺手"删掉。
+6. **`AndroidManifest.xml` 里的 `INTERNET` 权限当初是为未来付费功能预留的，现在已经真正用上了**——`www/index.html` 里的微信登录功能会加载CloudBase CDN脚本、调用腾讯云开发的云函数，是这个app第一次真正发出网络请求（`WeChatLogin`原生插件本身走的是Intent/AIDL跟微信App通信，不占用这条权限）。这条权限不要删。

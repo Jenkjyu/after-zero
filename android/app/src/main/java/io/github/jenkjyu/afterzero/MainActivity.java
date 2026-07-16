@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SaveFilePlugin.class);
+        registerPlugin(WeChatLoginPlugin.class);
         super.onCreate(savedInstanceState);
 
         // targetSdkVersion 36：安卓的手势/预测性返回走的是 OnBackPressedDispatcher，

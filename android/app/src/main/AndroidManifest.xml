@@ -27,9 +27,23 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- 微信SDK硬编码要求的回调Activity路径，包名必须是 <applicationId>.wxapi.WXEntryActivity，不可自定义。 -->
+        <activity
+            android:name=".wxapi.WXEntryActivity"
+            android:label="@string/app_name"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="io.github.jenkjyu.afterzero" />
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- 安卓11+包可见性限制：不声明这个，WeChatLoginPlugin里isWXAppInstalled()/sendReq()会静默失效。 -->
+    <queries>
+        <package android:name="com.tencent.mm" />
+    </queries>
 </manifest>
