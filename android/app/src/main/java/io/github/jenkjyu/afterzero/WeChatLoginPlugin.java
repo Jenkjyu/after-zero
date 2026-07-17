@@ -14,10 +14,9 @@ import java.util.UUID;
 @CapacitorPlugin(name = "WeChatLogin")
 public class WeChatLoginPlugin extends Plugin {
 
-    // TODO: 微信开放平台"移动应用"审核通过后，把这里换成真实AppID（AppID本身不是秘密，可以留在客户端；
-    // AppSecret绝不能出现在这个文件或任何客户端代码里，只存在云函数的环境变量中）。
+    // AppID本身不是秘密，可以留在客户端；AppSecret绝不能出现在这个文件或任何客户端代码里，只存在云函数的环境变量中。
     // public：WXEntryActivity（不同包）注册IWXAPI时也需要用同一个AppID。
-    public static final String APP_ID = "TODO_WECHAT_APPID";
+    public static final String APP_ID = "wx768c8167296b530e";
 
     // WXEntryActivity跟这个插件不是同一个Activity实例，靠这个静态引用把回调结果转发回来。
     private static WeChatLoginPlugin instance;
