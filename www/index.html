@@ -224,6 +224,51 @@
   .modal .mbody { font-size: 13.5px; color: var(--text); white-space: pre-line; margin-bottom: 18px; line-height: 1.55; overflow-wrap: break-word; word-break: break-word; }
   .modal-actions { display: flex; gap: 10px; }
 
+  .login-gate { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: none; align-items: center; justify-content: center; padding: 24px; }
+  .login-gate.open { display: flex; }
+  .login-gate-inner { max-width: 340px; width: 100%; text-align: center; }
+
+  .gate-icon { display: flex; justify-content: center; margin-bottom: 14px; }
+  .gate-icon img { width: 108px; height: 108px; object-fit: cover; border-radius: 22px; border: 1px solid var(--border); }
+
+  .gate-hw { display: block; width: 210px; height: auto; margin: 0 auto 22px; overflow: visible; }
+  .hw-letter { fill: none; stroke: var(--accent); stroke-width: 12; stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: var(--len); stroke-dashoffset: var(--len); }
+  .login-gate.open .hw-letter { animation: hwDraw .5s linear both; animation-delay: calc(var(--i) * 90ms + 150ms); }
+  @keyframes hwDraw { to { stroke-dashoffset: 0; } }
+
+  .login-gate .data-actions { opacity: 0; transform: translateY(6px); pointer-events: none; }
+  .login-gate.open .data-actions { animation: gateBtnIn .4s ease-out both; animation-delay: 1.45s; }
+  @keyframes gateBtnIn { to { opacity: 1; transform: translateY(0); pointer-events: auto; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .login-gate.open .hw-letter { animation: none !important; stroke-dashoffset: 0 !important; }
+    .login-gate.open .data-actions { animation: none !important; opacity: 1 !important; transform: none !important; pointer-events: auto !important; }
+  }
+
+  .subpage { position: fixed; inset: 0; z-index: 35; background: var(--bg); transform: translateX(100%);
+    transition: transform .28s cubic-bezier(.2,.7,.3,1); overflow-y: auto; }
+  .subpage.open { transform: translateX(0); }
+  @media (prefers-reduced-motion: reduce) { .subpage { transition: none; } }
+  .subpage-header { display: flex; align-items: center; gap: 4px; padding: 14px 6px; position: sticky; top: 0;
+    background: var(--bg); border-bottom: 1px solid var(--border); }
+  .subpage-back { background: none; border: none; padding: 8px; color: var(--text); display: flex; width: 40px; flex: none; }
+  .subpage-back svg { width: 22px; height: 22px; }
+  .subpage-title { flex: 1; text-align: center; font-size: 16px; font-weight: 700; }
+  .subpage-header-spacer { width: 40px; flex: none; }
+  .subpage-body { padding: 14px; max-width: 560px; margin: 0 auto; }
+
+  .account-row { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: none;
+    padding: 4px 2px; text-align: left; color: inherit; -webkit-tap-highlight-color: transparent; }
+  .account-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex: none; background: var(--surface-2); }
+  .account-name { flex: 1; font-size: 15.5px; font-weight: 600; }
+  .account-chevron { width: 18px; height: 18px; flex: none; color: var(--text-muted); }
+
+  .account-detail-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .account-detail-row:last-child { border-bottom: none; }
+  .account-detail-label { font-size: 13px; color: var(--text-muted); }
+  .account-detail-value { font-size: 14px; font-weight: 600; }
+
   .footnote { text-align: center; font-size: 11.5px; color: var(--text-muted); margin-top: 14px; padding: 0 10px; line-height: 1.5; }
   .flash { position: fixed; bottom: 92px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--good); color: #fff;
     padding: 9px 20px; border-radius: 999px; font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; transition: all .25s; z-index: 60; max-width: 90%; text-align: center; }
@@ -273,17 +318,12 @@
   </section>
 
   <section class="view" id="view-data">
-    <div class="section-label">用户数据 · 只存在这台设备</div>
     <div class="data-card" id="accountCard">
-      <h3>账户</h3>
-      <div id="accountLoggedOut">
-        <p>登录后可解锁未来的新功能。不登录也完全不影响现有的记账、提醒、档案库和数据备份功能。</p>
-        <div class="data-actions"><button class="btn primary" id="wxLoginBtn">微信登录</button></div>
-      </div>
-      <div id="accountLoggedIn" style="display:none">
-        <p id="accountNickname"></p>
-        <div class="data-actions"><button class="btn ghost" id="wxLogoutBtn">退出登录</button></div>
-      </div>
+      <button type="button" class="account-row" id="accountRowBtn">
+        <img class="account-avatar" id="accountAvatarImg" alt="">
+        <span class="account-name" id="accountNameText"></span>
+        <svg class="account-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
     </div>
     <div class="data-card">
       <h3>全部数据（债务 + 档案，导出/备份）</h3>
@@ -312,11 +352,57 @@
     <svg class="ic-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4.5l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
     <svg class="ic-filled" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4.5l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" fill="currentColor"/></svg>
   </button>
-  <button role="tab" aria-selected="false" data-view="data" aria-label="数据">
-    <svg class="ic-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="12" width="4" height="7" rx="1"/><rect x="10" y="8" width="4" height="11" rx="1"/><rect x="16" y="4.5" width="4" height="14.5" rx="1"/></svg>
-    <svg class="ic-filled" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="12" width="4" height="7" rx="1"/><rect x="10" y="8" width="4" height="11" rx="1"/><rect x="16" y="4.5" width="4" height="14.5" rx="1"/></svg>
+  <button role="tab" aria-selected="false" data-view="data" aria-label="我的">
+    <svg class="ic-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.3"/><path d="M4.5 19.5c0-3.6 3.3-6 7.5-6s7.5 2.4 7.5 6"/></svg>
+    <svg class="ic-filled" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
   </button>
 </nav>
+
+<div class="login-gate" id="loginGate">
+  <div class="login-gate-inner">
+    <div class="gate-icon" aria-hidden="true">
+      <img src="img/app-icon.png" alt="">
+    </div>
+    <!-- "After Zero" 手写笔迹：字母轮廓路径用fontTools从Caveat(OFL开源手写字体)精确提取，
+         不是手绘估算；每次登录门重新出现(.login-gate.open)靠stroke-dasharray/dashoffset逐笔画出。 -->
+    <svg class="gate-hw" viewBox="-0.6 0 3704.5 885.7" aria-label="After Zero">
+      <g transform="matrix(1,0,0,-1,0,728.1)">
+        <path class="hw-letter" style="--i:0;--len:3291.8" transform="translate(0.0,0)" d="M69 -33Q51 -23 49.5 -11.0Q48 1 63.0 31.0Q78 61 110 124Q134 169 146.5 194.5Q159 220 163.5 231.0Q168 242 168 245Q166 254 170.0 259.5Q174 265 183 269Q188 274 199.5 287.0Q211 300 221 318Q230 339 242.0 361.0Q254 383 274.0 416.5Q294 450 326 504Q346 539 370.0 575.5Q394 612 421 648Q432 662 441.0 670.5Q450 679 459 678Q471 678 486.5 670.0Q502 662 515.0 649.0Q528 636 534 621Q539 613 538.0 587.0Q537 561 534.0 524.0Q531 487 527 445Q524 404 518.0 348.0Q512 292 506.5 231.0Q501 170 498.0 113.5Q495 57 498 15Q499 6 498.0 -2.0Q497 -10 497 -15Q491 -21 477.5 -20.5Q464 -20 451.5 -14.0Q439 -8 437 1Q434 4 433.5 9.5Q433 15 434.0 33.0Q435 51 436 90L441 252L428 251Q419 251 394.0 249.0Q369 247 340.0 243.5Q311 240 286.5 236.5Q262 233 253 230Q244 230 231.5 218.0Q219 206 208 187Q204 173 193.5 157.5Q183 142 183 137Q176 132 171.5 125.0Q167 118 167 118Q167 112 157.5 88.5Q148 65 134.0 36.5Q120 8 106 -13L85 -45ZM276 289Q276 289 286.5 291.0Q297 293 311.5 295.5Q326 298 338 298Q380 308 399.0 311.5Q418 315 425.5 315.0Q433 315 439 312Q443 307 446.5 306.0Q450 305 450 305Q451 307 453.0 328.0Q455 349 458.5 380.0Q462 411 465.5 444.5Q469 478 471.0 506.5Q473 535 474 550Q475 569 476.0 584.5Q477 600 477 600Q471 600 451.5 578.0Q432 556 408.0 520.0Q384 484 363 443Q353 424 344.0 409.0Q335 394 330 394Q328 392 318.5 376.5Q309 361 298.0 341.5Q287 322 280.0 306.5Q273 291 276 289Z"/>
+        <path class="hw-letter" style="--i:1;--len:2296.9" transform="translate(502.0,0)" d="M123 -106Q117 -110 109.5 -104.0Q102 -98 88 -82Q81 -74 79.0 -65.0Q77 -56 80 -31Q84 -20 84.5 -10.0Q85 0 85 4Q85 10 88.5 32.0Q92 54 96.0 78.5Q100 103 103 116Q103 117 104.0 121.0Q105 125 106 128Q108 137 111.5 152.0Q115 167 118 189Q126 214 131.5 238.5Q137 263 137 272Q137 290 151 298Q152 303 157.0 313.5Q162 324 166 331Q186 388 199.0 421.5Q212 455 226 480Q232 497 239.5 515.0Q247 533 255 543Q260 556 278.0 576.5Q296 597 316.0 616.5Q336 636 348 646Q370 657 383.0 661.0Q396 665 417 665Q436 665 442.5 660.5Q449 656 462 644Q476 629 478.0 624.0Q480 619 480 605Q478 592 469.5 571.5Q461 551 451.5 534.5Q442 518 436 517Q424 513 418.5 519.5Q413 526 413 541Q413 548 409.5 554.5Q406 561 406 561Q406 564 407.5 571.5Q409 579 413 586Q418 596 415.5 601.0Q413 606 402 603Q399 601 386.0 591.0Q373 581 358.5 568.5Q344 556 333.0 545.0Q322 534 322 531Q322 531 318.0 522.5Q314 514 303 501Q296 491 290.5 481.5Q285 472 285 470Q285 466 284.5 461.5Q284 457 279 457Q279 457 276.0 448.0Q273 439 265 425Q261 415 255.0 404.5Q249 394 245 390H246Q246 390 241.5 377.5Q237 365 232.0 351.5Q227 338 227 336Q227 332 241.5 332.0Q256 332 276.0 335.5Q296 339 312 343Q326 347 331.0 347.0Q336 347 351 343Q359 338 364.5 328.5Q370 319 372.5 310.5Q375 302 372 298Q371 294 350.0 287.0Q329 280 308 276Q290 272 264.0 267.0Q238 262 218.5 258.0Q199 254 199 251Q195 251 192.0 246.5Q189 242 189 239Q189 225 185 218Q183 212 178.0 194.0Q173 176 167.5 154.0Q162 132 158.5 114.0Q155 96 155 90Q149 83 148.0 72.5Q147 62 147 54Q143 46 142.0 39.5Q141 33 141 29Q141 28 141.0 25.0Q141 22 140 19Q139 9 137.5 -7.5Q136 -24 136 -40L133 -69Q132 -82 130.0 -91.5Q128 -101 123 -106Z"/>
+        <path class="hw-letter" style="--i:2;--len:1952.8" transform="translate(793.0,0)" d="M179 7Q168 9 156.5 18.5Q145 28 136.5 40.5Q128 53 125 63Q125 65 122.5 68.0Q120 71 120 71Q116 74 115.5 97.5Q115 121 118.0 150.0Q121 179 125 196Q130 212 140.0 239.5Q150 267 157 289L184 347L144 358Q137 360 132.5 366.0Q128 372 128 376Q128 384 137.0 395.5Q146 407 150 407Q155 406 168.5 406.0Q182 406 195.0 407.0Q208 408 211 409Q215 411 219.0 414.5Q223 418 225 425Q230 436 234.0 445.5Q238 455 245 467Q252 480 256.5 489.0Q261 498 271 514Q276 521 282.0 531.0Q288 541 297 548Q306 556 315.5 555.5Q325 555 340 542Q348 532 349.0 527.0Q350 522 341 508Q333 491 322.5 474.0Q312 457 303 440Q287 418 297.0 415.0Q307 412 353 419Q382 424 395.0 416.5Q408 409 410 392Q413 368 405.0 363.0Q397 358 359 358Q335 354 318.0 353.5Q301 353 293 353Q280 352 276.0 352.0Q272 352 264 350Q256 348 252.5 343.5Q249 339 245 331Q241 327 233.0 310.0Q225 293 213 273Q199 231 189.0 189.5Q179 148 173 109Q169 84 174.0 74.5Q179 65 200 63Q211 62 235.5 63.5Q260 65 274 69Q285 74 297.0 79.5Q309 85 319 91Q328 96 337.0 101.5Q346 107 346 107Q351 115 357.0 112.0Q363 109 367 97Q367 85 362.0 72.0Q357 59 325 41Q280 13 242.5 7.5Q205 2 179 7Z"/>
+        <path class="hw-letter" style="--i:3;--len:1738.3" transform="translate(1124.0,0)" d="M276 35Q255 17 227.5 14.0Q200 11 174.0 22.5Q148 34 131 58Q114 80 109.0 108.5Q104 137 108 183Q111 222 133.0 261.5Q155 301 186.5 332.0Q218 363 249 375Q264 385 274.5 384.5Q285 384 307 382Q330 379 341.5 373.0Q353 367 360 357Q375 342 380.0 327.5Q385 313 385 299Q381 277 355.5 245.5Q330 214 289 194Q267 187 241.0 188.0Q215 189 198 201Q179 209 173.0 198.5Q167 188 162 148Q158 110 168.0 92.5Q178 75 195 72Q215 68 226.5 66.5Q238 65 255 75Q271 85 275.0 86.5Q279 88 281.5 90.5Q284 93 294 103Q301 110 305.0 113.5Q309 117 314 117Q319 117 323.0 112.5Q327 108 331 106Q341 106 335.5 94.0Q330 82 314.0 65.5Q298 49 276 35ZM275 247Q286 252 298.0 261.5Q310 271 318.5 282.5Q327 294 327 302Q327 316 314.0 325.5Q301 335 275 328Q264 325 250.0 313.5Q236 302 223.5 288.0Q211 274 203.5 263.0Q196 252 198 250Q201 245 215.0 242.5Q229 240 246.5 241.0Q264 242 275 247Z"/>
+        <path class="hw-letter" style="--i:4;--len:1379.3" transform="translate(1449.0,0)" d="M119 35Q110 42 106.5 49.0Q103 56 106 76Q109 104 114.0 125.5Q119 147 126 175Q128 187 137.5 216.0Q147 245 161.0 279.0Q175 313 189.0 343.5Q203 374 213 389Q221 395 232.5 394.0Q244 393 252 385Q263 376 255.5 353.5Q248 331 225 283Q213 256 207.0 242.5Q201 229 202.0 226.5Q203 224 211 229Q217 240 233.0 254.5Q249 269 267.0 283.0Q285 297 301.0 308.0Q317 319 323 322Q331 327 341.5 330.5Q352 334 356 336Q379 347 403.0 344.0Q427 341 433 326Q434 318 439.5 314.0Q445 310 445 310Q449 310 449.5 307.0Q450 304 450 304Q450 297 439.5 295.5Q429 294 413 293Q400 292 390.0 288.0Q380 284 366 278Q328 256 293.5 235.0Q259 214 227 179Q220 171 213.0 160.0Q206 149 198 136Q193 131 188.0 114.0Q183 97 179.5 81.5Q176 66 176 63Q176 63 173.0 53.5Q170 44 163 35Q151 19 143.0 19.0Q135 19 119 35Z"/>
+        <path class="hw-letter" style="--i:5;--len:3235.6" transform="translate(2051.0,0)" d="M122 -36Q101 -34 84.0 -30.5Q67 -27 63 -7Q61 7 66.5 21.5Q72 36 82 46Q99 64 119.5 86.0Q140 108 168.5 136.0Q197 164 237.5 202.5Q278 241 336 292Q376 326 400.0 348.5Q424 371 443.0 390.0Q462 409 485 433Q520 469 546.5 503.0Q573 537 578 557Q584 577 575.5 585.5Q567 594 545.5 597.5Q524 601 489 603Q427 608 379.5 602.5Q332 597 288 589Q281 587 271.5 592.5Q262 598 262 602Q266 607 266.0 612.0Q266 617 258 623Q254 633 258.0 639.0Q262 645 266 649Q274 653 292.0 654.5Q310 656 333 660Q348 663 377.5 664.0Q407 665 437.5 665.0Q468 665 486 663Q522 660 555.0 656.5Q588 653 612.0 644.0Q636 635 645 613Q656 590 649.5 572.0Q643 554 632 524Q620 502 591.5 465.5Q563 429 526.5 389.5Q490 350 452 315Q396 263 351.5 222.5Q307 182 263 144Q235 120 207.0 94.5Q179 69 151 43Q141 30 147.5 23.5Q154 17 195 19Q218 20 231.0 23.0Q244 26 259.0 29.0Q274 32 301 33Q353 36 399.0 39.0Q445 42 473 42Q481 42 486.5 40.0Q492 38 502 24Q511 21 513.5 15.5Q516 10 513.0 4.0Q510 -2 501 -9Q494 -9 476.5 -12.5Q459 -16 438.5 -18.5Q418 -21 402 -20Q389 -19 352.5 -21.5Q316 -24 274 -29Q237 -35 193.0 -36.0Q149 -37 122 -36Z"/>
+        <path class="hw-letter" style="--i:6;--len:1738.3" transform="translate(2573.0,0)" d="M276 35Q255 17 227.5 14.0Q200 11 174.0 22.5Q148 34 131 58Q114 80 109.0 108.5Q104 137 108 183Q111 222 133.0 261.5Q155 301 186.5 332.0Q218 363 249 375Q264 385 274.5 384.5Q285 384 307 382Q330 379 341.5 373.0Q353 367 360 357Q375 342 380.0 327.5Q385 313 385 299Q381 277 355.5 245.5Q330 214 289 194Q267 187 241.0 188.0Q215 189 198 201Q179 209 173.0 198.5Q167 188 162 148Q158 110 168.0 92.5Q178 75 195 72Q215 68 226.5 66.5Q238 65 255 75Q271 85 275.0 86.5Q279 88 281.5 90.5Q284 93 294 103Q301 110 305.0 113.5Q309 117 314 117Q319 117 323.0 112.5Q327 108 331 106Q341 106 335.5 94.0Q330 82 314.0 65.5Q298 49 276 35ZM275 247Q286 252 298.0 261.5Q310 271 318.5 282.5Q327 294 327 302Q327 316 314.0 325.5Q301 335 275 328Q264 325 250.0 313.5Q236 302 223.5 288.0Q211 274 203.5 263.0Q196 252 198 250Q201 245 215.0 242.5Q229 240 246.5 241.0Q264 242 275 247Z"/>
+        <path class="hw-letter" style="--i:7;--len:1379.3" transform="translate(2898.0,0)" d="M119 35Q110 42 106.5 49.0Q103 56 106 76Q109 104 114.0 125.5Q119 147 126 175Q128 187 137.5 216.0Q147 245 161.0 279.0Q175 313 189.0 343.5Q203 374 213 389Q221 395 232.5 394.0Q244 393 252 385Q263 376 255.5 353.5Q248 331 225 283Q213 256 207.0 242.5Q201 229 202.0 226.5Q203 224 211 229Q217 240 233.0 254.5Q249 269 267.0 283.0Q285 297 301.0 308.0Q317 319 323 322Q331 327 341.5 330.5Q352 334 356 336Q379 347 403.0 344.0Q427 341 433 326Q434 318 439.5 314.0Q445 310 445 310Q449 310 449.5 307.0Q450 304 450 304Q450 297 439.5 295.5Q429 294 413 293Q400 292 390.0 288.0Q380 284 366 278Q328 256 293.5 235.0Q259 214 227 179Q220 171 213.0 160.0Q206 149 198 136Q193 131 188.0 114.0Q183 97 179.5 81.5Q176 66 176 63Q176 63 173.0 53.5Q170 44 163 35Q151 19 143.0 19.0Q135 19 119 35Z"/>
+        <path class="hw-letter" style="--i:8;--len:1677.7" transform="translate(3258.0,0)" d="M169 15Q156 15 148.5 20.0Q141 25 130 34Q111 54 103.0 72.5Q95 91 98 108Q101 116 100.5 123.5Q100 131 100 131Q95 136 97.0 137.5Q99 139 101 143Q107 143 105 154Q103 162 113.0 189.0Q123 216 138 240Q144 250 156.0 266.5Q168 283 182.5 299.5Q197 316 209 326Q234 347 253.0 357.0Q272 367 294 372Q316 377 324.5 377.0Q333 377 348 361Q371 351 381.5 337.0Q392 323 395 296Q398 266 390.5 227.5Q383 189 343 132Q318 96 297.0 78.5Q276 61 247 44Q226 30 209.0 23.5Q192 17 169 15ZM265 121Q289 148 303.5 172.0Q318 196 331 233Q335 244 336.0 260.5Q337 277 335.5 291.5Q334 306 328 308Q316 315 299.0 312.5Q282 310 262 293Q231 267 208.0 228.5Q185 190 163 141Q148 105 156.5 83.5Q165 62 193.5 68.5Q222 75 265 121Z"/>
+      </g>
+    </svg>
+    <div class="data-actions" style="margin:0">
+      <button class="btn primary" id="wxLoginBtn"><svg class="btn-ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 0 1 .598.082l1.584.926a.272.272 0 0 0 .14.047c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 0 1-.023-.156.49.49 0 0 1 .201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.837-6.656-6.088V8.89c-.135-.01-.27-.027-.407-.03zm-2.53 3.274c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.97-.982zm4.844 0c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.969-.982z"/></svg>微信登录</button>
+    </div>
+  </div>
+</div>
+
+<div class="subpage" id="accountScreen">
+  <div class="subpage-header">
+    <button type="button" class="subpage-back" id="accountBackBtn" aria-label="返回">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="subpage-title">账户</div>
+    <div class="subpage-header-spacer"></div>
+  </div>
+  <div class="subpage-body">
+    <div class="data-card">
+      <div class="account-detail-row"><span class="account-detail-label">头像</span><img class="account-avatar" id="acctDetailAvatar" alt=""></div>
+      <div class="account-detail-row"><span class="account-detail-label">昵称</span><span class="account-detail-value" id="acctDetailNickname"></span></div>
+      <div class="account-detail-row"><span class="account-detail-label">会员</span><span class="account-detail-value">普通用户</span></div>
+      <div class="account-detail-row"><span class="account-detail-label">微信绑定</span><span class="account-detail-value">已绑定</span></div>
+    </div>
+    <div class="data-actions" style="margin-top:16px"><button class="btn ghost" id="wxLogoutBtn">退出登录</button></div>
+    <div class="data-actions" style="margin-top:10px"><button class="btn danger" id="deleteAccountBtn">注销账户</button></div>
+  </div>
+</div>
 
 <div class="scrim" id="scrimDetail"></div>
 <div class="sheet" id="detailSheet" role="dialog" aria-modal="true" aria-labelledby="dTitle">
@@ -854,20 +940,26 @@
   }
 
   // 账号登录：微信登录(移动应用OAuth) + 腾讯云开发(CloudBase)自定义登录。
-  // 这是纯基础设施——现有四个标签页(债务/待还/档案/数据)完全不依赖登录状态，登录只是给未来功能占位。
+  // 登录现在是全局强制的——account为空时#loginGate会盖住整个App（含tabbar），
+  // 四个标签页不再能离线/不登录使用，详见CLAUDE.md。
   var CLOUDBASE_ENV_ID = "after-zero-d7gub5p5f09c8cc2d";
   var _cbApp = null;
   function cbApp() { if (!_cbApp) _cbApp = cloudbase.init({ env: CLOUDBASE_ENV_ID }); return _cbApp; }
 
   function renderAccountUI() {
-    var loggedOut = $("accountLoggedOut"), loggedIn = $("accountLoggedIn");
     if (account) {
-      loggedOut.style.display = "none"; loggedIn.style.display = "block";
-      $("accountNickname").textContent = "已登录" + (account.nickname ? "：" + account.nickname : "");
-    } else {
-      loggedOut.style.display = "block"; loggedIn.style.display = "none";
+      $("accountAvatarImg").src = account.avatarUrl || "";
+      $("accountNameText").textContent = account.nickname || "";
     }
+    $("loginGate").classList.toggle("open", !account);
   }
+
+  function renderAccountDetail() {
+    $("acctDetailAvatar").src = (account && account.avatarUrl) || "";
+    $("acctDetailNickname").textContent = (account && account.nickname) || "";
+  }
+  function openAccountScreen() { renderAccountDetail(); $("accountScreen").classList.add("open"); lockScroll(); }
+  function closeAccountScreen() { if (!$("accountScreen").classList.contains("open")) return; $("accountScreen").classList.remove("open"); unlockScroll(); }
 
   var wxAuthListenerBound = false;
   function handleWxAuthResult(data) {
@@ -896,6 +988,22 @@
       toast("登录成功 ✓");
     }).catch(function (err) {
       toast("登录失败：" + ((err && err.message) || "网络错误"));
+    });
+  }
+
+  function doDeleteAccount() {
+    toast("正在注销…");
+    cbApp().callFunction({ name: "deleteAccount" }).then(function (res) {
+      var result = res && res.result;
+      if (!result || !result.ok) throw new Error((result && result.error) || "注销失败");
+      account = null;
+      localStorage.removeItem(ACCOUNT_KEY);
+      try { cbApp().auth().signOut().catch(function () {}); } catch (e) {}
+      closeAccountScreen();
+      renderAccountUI();
+      toast("已注销账户");
+    }).catch(function (err) {
+      toast("注销失败：" + ((err && err.message) || "网络错误"));
     });
   }
   // uploaded PDF storage (IndexedDB — localStorage's 5MB quota is shared with debt data, PDFs need real headroom)
@@ -1041,10 +1149,16 @@
   initGripDrag($("detailSheet"), $("detailSheet").querySelector(".grip"), closeDetail, true);
   window.__handleBackButton = function () {
     if ($("modalScrim").classList.contains("open")) { closeModal(); return true; }
+    if ($("accountScreen").classList.contains("open")) { closeAccountScreen(); return true; }
     if ($("editSheet").classList.contains("open")) { closeEdit(); return true; }
     if ($("detailSheet").classList.contains("open")) { closeDetail(); return true; }
     return false;
   };
+  $("accountRowBtn").addEventListener("click", openAccountScreen);
+  $("accountBackBtn").addEventListener("click", closeAccountScreen);
+  $("deleteAccountBtn").addEventListener("click", function () {
+    ask("注销账户", "注销后账号数据将从服务器永久删除，且需要重新微信登录才能再次使用。此操作不可撤销，确定继续吗？", doDeleteAccount);
+  });
   $("wxLoginBtn").addEventListener("click", function () {
     var native = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.WeChatLogin;
     if (!native) { toast("微信登录仅支持安卓App内使用"); return; }
@@ -1061,6 +1175,8 @@
   $("wxLogoutBtn").addEventListener("click", function () {
     account = null;
     localStorage.removeItem(ACCOUNT_KEY);
+    try { cbApp().auth().signOut().catch(function () {}); } catch (e) {}
+    closeAccountScreen();
     renderAccountUI();
     toast("已退出登录");
   });
