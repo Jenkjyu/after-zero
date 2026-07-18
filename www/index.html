@@ -34,7 +34,14 @@
     --good: #6FA8D6; --good-soft: #1E2A33; --shadow: 0 2px 12px rgba(0,0,0,.35); }
 
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-ui); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  /* 全局禁掉长按选中/复制文字，只在真正的文字输入框(input/textarea)里保留——
+     安卓WebView里，不禁掉这个的话，长按卡片会先被系统当成"选中文字"手势抢走
+     (弹出选中手柄+复制菜单)，我们自己JS写的长按拖拽排序逻辑根本收不到后续的
+     pointermove，表现就是"长按之后卡片压根拖不动"。user-select是继承属性，
+     这里在body上关一次，除了input/textarea，全站(含SVG文字)都会跟着继承关闭。 */
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-ui); line-height: 1.5; -webkit-font-smoothing: antialiased;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
+  input, textarea { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
   .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
   button { font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   button:active, .file-row:active { filter: brightness(.94); transition: filter .1s; }
@@ -46,12 +53,13 @@
   h1 { margin: 3px 0 0; font-size: 24px; font-weight: 700; letter-spacing: -.01em; }
   .asof { color: var(--text-muted); font-size: 12.5px; margin-top: 3px; }
 
-  .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
-  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 12px 10px; box-shadow: var(--shadow); }
+  .summary { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 16px; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 12px 10px; box-shadow: var(--shadow); grid-column: span 2; }
   .kpi .v { font-size: var(--fs-figure); font-weight: 700; }
   .kpi .k { font-size: var(--fs-xs); color: var(--text-muted); margin-top: 1px; }
-  .kpi.wide { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; }
-  .kpi.wide .v { font-size: var(--fs-xxl); }
+  .kpi.half { grid-column: span 3; }
+  .kpi.half .v { font-size: var(--fs-xxl); }
+  .kpi-sub { font-size: var(--fs-xs); color: var(--text-muted); margin-top: 3px; }
 
   .tabbar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--border);
     display: flex; z-index: 20; padding-bottom: env(safe-area-inset-bottom); }
@@ -71,7 +79,18 @@
     font-weight: 600; margin: 4px 2px 8px; display: flex; justify-content: space-between; align-items: center; }
   .sort-sel { text-transform: none; letter-spacing: normal; font-size: 12px; font-weight: 600; padding: 5px 7px;
     border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); font-family: inherit; }
+  .sort-controls { display: flex; align-items: center; gap: 6px; }
+  .jiggle-done-btn { display: none; text-transform: none; letter-spacing: normal; font-size: 12px; font-weight: 600;
+    padding: 5px 10px; border-radius: 7px; border: none; background: var(--accent); color: #fff; }
+  #view-debts.jiggling .jiggle-done-btn { display: inline-flex; }
 
+  /* 卡片保持默认touch-action(auto)——不锁touch-action，原生滚动全程可用、手感与卡片
+     间隙一致。长按拖拽和原生滚动的共存，靠的是touch事件那条路(onCardTouchStart)：平时
+     不preventDefault→原生滚动；确认拖拽后每次touchmove都preventDefault→挡掉滚动交给JS。
+     关键点：只有touch事件的touchmove.preventDefault()能逐次动态否决原生滚动，pointer
+     事件做不到(pointermove的preventDefault不影响滚动，滚不滚只由touch-action决定，且
+     touch-action手势中途改不了)——这是之前反复"要么拖不动、要么只能间隙滚"的根因，
+     所以触摸这条路必须用touch事件，不能用pointer事件。详见onCardTouchStart的注释。 */
   .debt { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 13px 14px 11px;
     margin-bottom: 9px; box-shadow: var(--shadow); border-left-width: 4px; }
   .debt .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
@@ -92,6 +111,18 @@
     display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
   .act.sale { background: var(--good); color: #fff; border-color: transparent; }
   .act.detail { background: var(--surface-2); color: var(--text); }
+
+  .debt.jiggle { animation: cardJiggle .26s ease-in-out infinite; animation-delay: var(--jd, 0s); will-change: transform; }
+  .debt.dragging { animation: none !important; z-index: 5; box-shadow: 0 10px 26px rgba(30,40,60,.28); }
+  .debt.shifting { transition: transform .18s ease; }
+  @keyframes cardJiggle {
+    0%, 100% { transform: rotate(calc(var(--jr, 0.45) * -1deg)); }
+    50% { transform: rotate(calc(var(--jr, 0.45) * 1deg)); }
+  }
+  @media (prefers-reduced-motion: reduce) { .debt.jiggle { animation: none; } }
+  #view-debts.jiggling .card-actions { display: none; }
+  #view-debts.jiggling #addBtn,
+  #view-debts.jiggling .settled-item .restore { pointer-events: none; opacity: .45; }
 
   .add-btn { width: 100%; background: var(--accent-soft); color: var(--accent); border: 1px dashed var(--accent);
     border-radius: 12px; padding: 13px; font-size: 14px; font-weight: 600; margin-top: 4px; }
@@ -224,8 +255,12 @@
   .modal .mbody { font-size: 13.5px; color: var(--text); white-space: pre-line; margin-bottom: 18px; line-height: 1.55; overflow-wrap: break-word; word-break: break-word; }
   .modal-actions { display: flex; gap: 10px; }
 
-  .login-gate { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: none; align-items: center; justify-content: center; padding: 24px; }
-  .login-gate.open { display: flex; }
+  /* 登录门默认(纯CSS，不依赖任何JS执行时机)就是display:flex可见的——这是刻意的"fail-closed"设计。
+     以前默认display:none、靠JS抢在CDN脚本网络等待之前把它设成可见，真机上仍然偶发"一闪而过"，
+     根源是"默认可见"这件事本身不该依赖JS能不能跑赢一段网络请求。现在反过来：默认永远可见，
+     只有真正确认登录后才用.authed隐藏它——哪怕JS完全没执行，也不可能露出底下的App内容。 */
+  .login-gate { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .login-gate.authed { display: none; }
   .login-gate-inner { max-width: 340px; width: 100%; text-align: center; }
 
   .gate-icon { display: flex; justify-content: center; margin-bottom: 14px; }
@@ -282,11 +317,13 @@
   </header>
   <div id="topSummary">
     <div class="summary" id="summary"></div>
-    <div class="footnote" id="sumNote" style="margin-top:-8px;margin-bottom:16px;text-align:left;padding:0 2px">在还总负债 = 各未结清债务「未还本金」之和（只算本金、不含未来利息/手续费）。<br>经常性月供 = 各笔下一期应还之和（不含标记为「一次性还清」的借款）。</div>
+    <div class="footnote" id="sumNote" style="margin-top:-8px;margin-bottom:16px;text-align:left;padding:0 2px">在还总负债 = 各未结清债务「未还本金」之和（只算本金、不含未来利息/手续费）。<br>已还金额 = 各未结清债务「已还期数」的本金之和；另付利息 = 这些已还期数对应的利息/手续费之和（两者都不含已结清的债务）。<br>经常性月供 = 各笔下一期应还之和（不含标记为「一次性还清」的借款）。</div>
   </div>
 
   <section class="view active" id="view-debts">
-    <div class="section-label"><span>在还债务</span><select id="debtSortSel" class="sort-sel">
+    <div class="section-label"><span>在还债务</span><div class="sort-controls">
+      <button type="button" id="jiggleDoneBtn" class="jiggle-done-btn">保存</button>
+      <select id="debtSortSel" class="sort-sel">
       <option value="rate-desc">利率 高→低</option>
       <option value="rate-asc">利率 低→高</option>
       <option value="orig-desc">借款金额 高→低</option>
@@ -297,7 +334,8 @@
       <option value="monthly-asc">月供金额 低→高</option>
       <option value="terms-desc">剩余期数 多→少</option>
       <option value="terms-asc">剩余期数 少→多</option>
-    </select></div>
+      <option value="custom">自定义</option>
+    </select></div></div>
     <div id="debtList"></div>
     <button class="add-btn" id="addBtn">＋ 新增一笔</button>
     <div class="settled-wrap" id="settledWrap"></div>
@@ -310,7 +348,7 @@
 
   <section class="view" id="view-docs">
     <div class="section-label">档案库 · 文档与文件（图片/PDF等，仅存本设备）</div>
-    <input type="file" id="uploadInput" style="display:none">
+    <input type="file" id="uploadInput" accept=".jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.bmp,.pdf,.md,.markdown,.doc,.docx,image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none">
     <button class="add-btn" id="uploadBtn">＋ 上传文件</button>
     <div id="fileList"></div>
     <div class="preview-label" id="previewLabel" style="display:none">预览</div>
@@ -383,6 +421,22 @@
     </div>
   </div>
 </div>
+
+<!-- 登录门这里立刻同步决定"是否已登录"，不能等main script——下面几行CDN <script src>
+     没有defer/async，是阻塞解析的，首次冷启动时这几个网络请求可能要花上百毫秒甚至更久。
+     但登录门本身默认(纯CSS)就是可见的(见.login-gate的CSS注释)，这段脚本只负责在确认
+     已登录时尽早加上.authed隐藏它、以及触发手写动画——不再需要"跟CDN脚本抢跑"，
+     哪怕这段脚本本身因为某种原因很晚才跑，最坏结果也只是登录门多显示一会儿，
+     不可能出现底下App内容被提前露出来的情况。 -->
+<script>
+(function () {
+  var authed = false;
+  try { authed = !!JSON.parse(localStorage.getItem("after-zero-account-v1") || "null"); } catch (e) {}
+  var gate = document.getElementById("loginGate");
+  gate.classList.toggle("authed", authed);
+  if (!authed) gate.classList.add("open");
+})();
+</script>
 
 <div class="subpage" id="accountScreen">
   <div class="subpage-header">
@@ -504,11 +558,11 @@
   var KEY = "debt-manager-v5", DKEY = "debt-manager-docs-v5";
   // 账号登录状态，跟KEY/DKEY这两个债务数据的键完全独立，不能混用。
   var ACCOUNT_KEY = "after-zero-account-v1";
+  // 在还债务列表的排序方式（含"自定义"拖拽顺序），独立于上面三个键。
+  var SORT_KEY = "debt-manager-sort-v1";
   // SEED: minimal spec; full plan generated on load
   var SEED = [];
   var DOCS_SEED = [];
-  var POSTER = "";
-  var POSTER_NAME = "我想要的人生.png";
 
   var ICON_IMG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15.5l-5.5-5-9.5 8.5"/></svg>';
   var ICON_PDF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l5 5v12.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M8.5 14.5h2M12.5 14.5h3M8.5 17.5h7"/></svg>';
@@ -527,6 +581,10 @@
   function rateClass(r) { return r >= 18 ? "rate-hi" : (r >= 10 ? "rate-mid" : "rate-lo"); }
   function todayStr() { var d = new Date(); return (d.getMonth() + 1) + "/" + d.getDate(); }
   function baseName(p) { return (p || "").split("/").pop(); }
+  // 只按扩展名判断，不按file.type/MIME——安卓有些文件选择器对.md这类不常见格式
+  // 干脆不给MIME(空字符串)或者统一报成application/octet-stream，MIME不可靠。
+  var UPLOAD_ALLOWED_EXT = ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "bmp", "pdf", "md", "markdown", "doc", "docx"];
+  function extOf(name) { var m = /\.([a-z0-9]+)$/i.exec(name || ""); return m ? m[1].toLowerCase() : ""; }
   function today0() { var t = new Date(); t.setHours(0, 0, 0, 0); return t; }
 
   // plan generation
@@ -564,10 +622,16 @@
 
   function recompute(d) {
     var plan = d.plan || [];
-    var borrow = 0, remaining = 0, paidCount = 0;
-    plan.forEach(function (r) { borrow += +r.principal || 0; if (r.paid) paidCount++; else remaining += +r.principal || 0; });
+    var borrow = 0, remaining = 0, paidCount = 0, paidPrincipal = 0, paidInterest = 0;
+    plan.forEach(function (r) {
+      borrow += +r.principal || 0;
+      if (r.paid) { paidCount++; paidPrincipal += +r.principal || 0; paidInterest += +r.interest || 0; }
+      else remaining += +r.principal || 0;
+    });
     d.original = plan.length ? r2(borrow) : null;
     d.balance = r2(remaining);
+    d.paidPrincipal = r2(paidPrincipal);
+    d.paidInterest = r2(paidInterest);
     d.totalTerms = plan.length; d.paidTerms = paidCount; d.terms = plan.length - paidCount;
     var next = null; for (var k = 0; k < plan.length; k++) { if (!plan[k].paid) { next = plan[k]; break; } }
     d.monthly = next ? (+next.amount || 0) : 0;
@@ -605,10 +669,15 @@
   function nextDateObj(d) { return d.nextDate ? parseDate(d.nextDate) : null; }
 
   function renderSummary() {
-    var total = 0, monthly = 0, active = 0, settled = 0;
-    debts.forEach(function (d) { if (d.settled) { settled++; return; } active++; total += +d.balance || 0; if (!d.oneTime) monthly += +d.monthly || 0; });
+    var total = 0, monthly = 0, active = 0, settled = 0, paidPrincipal = 0, paidInterest = 0;
+    debts.forEach(function (d) {
+      if (d.settled) { settled++; return; }
+      active++; total += +d.balance || 0; if (!d.oneTime) monthly += +d.monthly || 0;
+      paidPrincipal += +d.paidPrincipal || 0; paidInterest += +d.paidInterest || 0;
+    });
     $("summary").innerHTML =
-      '<div class="kpi wide"><div class="k">在还总负债</div><div class="v num">¥' + fmt(total) + '</div></div>' +
+      '<div class="kpi half"><div class="v num">¥' + fmt(total) + '</div><div class="k">在还总负债</div></div>' +
+      '<div class="kpi half"><div class="v num">¥' + fmt(paidPrincipal) + '</div><div class="k">已还金额</div><div class="kpi-sub">另付利息 ¥' + fmt(paidInterest) + '</div></div>' +
       '<div class="kpi"><div class="v num">¥' + fmt(monthly) + '</div><div class="k">经常性月供</div></div>' +
       '<div class="kpi"><div class="v num">' + active + '</div><div class="k">在还笔数</div></div>' +
       '<div class="kpi"><div class="v num" style="color:var(--good)">' + settled + '</div><div class="k">已结清</div></div>';
@@ -621,11 +690,23 @@
     "monthly-desc": function (d) { return -(+d.monthly || 0); }, "monthly-asc": function (d) { return +d.monthly || 0; },
     "terms-desc": function (d) { return -(+d.terms || 0); }, "terms-asc": function (d) { return +d.terms || 0; }
   };
-  var debtSort = "rate-desc";
+  var debtSort = (function () {
+    var v = null; try { v = localStorage.getItem(SORT_KEY); } catch (e) {}
+    return (DEBT_SORTS[v] || v === "custom") ? v : "rate-desc";
+  })();
+  function setDebtSort(v) {
+    debtSort = (DEBT_SORTS[v] || v === "custom") ? v : "rate-desc";
+    try { localStorage.setItem(SORT_KEY, debtSort); } catch (e) {}
+    $("debtSortSel").value = debtSort;
+  }
   function renderDebts() {
-    var keyFn = DEBT_SORTS[debtSort] || DEBT_SORTS["rate-desc"];
-    var sorted = debts.map(function (d, i) { return { d: d, i: i }; }).filter(function (o) { return isActive(o.d); }).sort(function (a, b) { return keyFn(a.d) - keyFn(b.d); });
+    var sorted = debts.map(function (d, i) { return { d: d, i: i }; }).filter(function (o) { return isActive(o.d); });
+    if (debtSort !== "custom") {
+      var keyFn = DEBT_SORTS[debtSort] || DEBT_SORTS["rate-desc"];
+      sorted.sort(function (a, b) { return keyFn(a.d) - keyFn(b.d); });
+    }
     var list = $("debtList"); list.innerHTML = "";
+    $("view-debts").classList.toggle("jiggling", jiggleMode);
     sorted.forEach(function (o) {
       var d = o.d, rc = rateClass(d.rate || 0), accent = d.rate >= 18 ? "var(--critical)" : (d.rate >= 10 ? "var(--warning)" : "var(--good)");
       var el = document.createElement("div"); el.className = "debt"; el.style.borderLeftColor = accent;
@@ -640,6 +721,11 @@
       el.querySelector(".meta").textContent = (d.funder ? "出资方：" + d.funder : "") + (d.type ? " · " + d.type : "");
       el.querySelector(".detail").addEventListener("click", function () { openDetail(o.i); });
       el.querySelector(".sale").addEventListener("click", function () { payInstallment(o.i); });
+      el.__o = o;
+      el.addEventListener("touchstart", function (e) { onCardTouchStart(e, el, o); }, { passive: true });
+      el.addEventListener("pointerdown", function (e) { onCardPointerDown(e, el, o); });
+      applyJiggleStyle(el);
+      if (jiggleMode) el.classList.add("jiggle");
       list.appendChild(el);
     });
     var settled = debts.map(function (d, i) { return { d: d, i: i }; }).filter(function (o) { return o.d.settled; });
@@ -655,6 +741,171 @@
       });
     }
   }
+
+  // 自定义排序：长按进入iOS桌面式的抖动编辑模式，编辑模式下卡片可按住拖动重新排序。
+  var jiggleMode = false, dragCtx = null;
+  // 只设置随机的--jr/--jd这两个自定义属性，不碰classList——是否真的抖动完全由
+  // 调用方显式加/去.jiggle类决定，这里不能顺手加上，否则每次renderDebts()都会让
+  // 卡片长期保持抖动态，跟jiggleMode这个状态变量脱节(之前踩过这个坑)。
+  function applyJiggleStyle(c) {
+    c.style.setProperty("--jr", (0.35 + Math.random() * 0.25).toFixed(2));
+    c.style.setProperty("--jd", (-(Math.random() * 0.24)).toFixed(3) + "s");
+  }
+  function enterJiggle() {
+    if (jiggleMode) return;
+    jiggleMode = true;
+    $("view-debts").classList.add("jiggling");
+    $("debtSortSel").disabled = true;
+    Array.prototype.slice.call($("debtList").children).forEach(function (c) { c.classList.add("jiggle"); });
+  }
+  function exitJiggle() {
+    if (!jiggleMode) return;
+    if (dragCtx) finishDrag(false);
+    jiggleMode = false;
+    $("view-debts").classList.remove("jiggling");
+    $("debtSortSel").disabled = false;
+    Array.prototype.slice.call($("debtList").children).forEach(function (c) { c.classList.remove("jiggle"); });
+  }
+  // 长按判定时长：未进入编辑模式要完整等500ms；已在编辑模式里用户意图明确，
+  // 短延迟120ms确认"按住不动"就够，这也是编辑模式下"快速滑一下=滚动"依然成立的原因。
+  function dragDelay() { return jiggleMode ? 120 : 500; }
+  // 触摸设备走这条路(Touch Events + {passive:false})——这是关键：只有touch事件的
+  // touchmove.preventDefault()才能"逐次"动态否决原生滚动。平时(等待长按/判定为滚动)
+  // 完全不preventDefault，原生滚动照常、手感和卡片间隙一致；一旦确认进入拖拽，
+  // 之后每次touchmove都preventDefault挡掉滚动、由JS接管定位。用Pointer Events做不到
+  // 这件事(pointermove的preventDefault不影响滚动，滚不滚只由touch-action决定，而
+  // touch-action手势中途改不了)——这是之前反复"要么拖不动要么只能间隙滚"的根因。
+  function onCardTouchStart(e, el, o) {
+    if (dragCtx || e.touches.length !== 1) return;
+    var t0 = e.touches[0], sx = t0.clientX, sy = t0.clientY, id = t0.identifier, timer, active = false;
+    function tOf(ev) { for (var i = 0; i < ev.changedTouches.length; i++) if (ev.changedTouches[i].identifier === id) return ev.changedTouches[i]; return null; }
+    function onMove(ev) {
+      var t = tOf(ev); if (!t) return;
+      if (active) {
+        if (!dragCtx) { cleanup(); return; }
+        ev.preventDefault();
+        dragCtx.lastClientY = t.clientY; applyDragFrame();
+        return;
+      }
+      // 还没进入拖拽：移动超过阈值 = 用户在滑动/滚动，放弃长按，交回原生滚动。
+      if (Math.abs(t.clientX - sx) > 10 || Math.abs(t.clientY - sy) > 10) cleanup();
+    }
+    function onEnd(ev) { if (!tOf(ev)) return; if (active) finishDrag(true); cleanup(); }
+    function onCancel(ev) { if (!tOf(ev)) return; if (active) finishDrag(false); cleanup(); }
+    function cleanup() { clearTimeout(timer); el.removeEventListener("touchmove", onMove); el.removeEventListener("touchend", onEnd); el.removeEventListener("touchcancel", onCancel); }
+    timer = setTimeout(function () { active = true; if (!jiggleMode) enterJiggle(); beginDrag(el, o, sy); }, dragDelay());
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("touchcancel", onCancel);
+  }
+  // 桌面鼠标走这条路(Pointer Events)——鼠标不触发touch-action滚动，没有上面那个冲突，
+  // 沿用简单的pointer逻辑即可，纯粹为了桌面浏览器还能测。触摸事件由上面的touchstart处理，
+  // 这里遇到非鼠标指针直接return，避免真机上touchstart和pointerdown两边重复触发。
+  function onCardPointerDown(e, el, o) {
+    if (e.pointerType !== "mouse" || dragCtx) return;
+    var sx = e.clientX, sy = e.clientY, pid = e.pointerId, timer, active = false;
+    function onMove(ev) {
+      if (ev.pointerId !== pid) return;
+      if (active) { if (dragCtx) { dragCtx.lastClientY = ev.clientY; applyDragFrame(); } return; }
+      if (Math.abs(ev.clientX - sx) > 10 || Math.abs(ev.clientY - sy) > 10) cleanup();
+    }
+    function onUp(ev) { if (ev.pointerId !== pid) return; if (active) finishDrag(true); cleanup(); }
+    function onCancelP(ev) { if (ev.pointerId !== pid) return; if (active) finishDrag(false); cleanup(); }
+    function cleanup() { clearTimeout(timer); el.removeEventListener("pointermove", onMove); el.removeEventListener("pointerup", onUp); el.removeEventListener("pointercancel", onCancelP); }
+    timer = setTimeout(function () { active = true; if (!jiggleMode) enterJiggle(); beginDrag(el, o, sy); }, dragDelay());
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointercancel", onCancelP);
+  }
+  // 只负责几何/视觉的拖拽启动(不绑事件——move/end由上面各自的touch/pointer路径管)。
+  // 全程用文档坐标(clientY + scrollY)，这样边缘自动滚动时不需要重新测量DOM。
+  function beginDrag(el, o, clientY) {
+    var cards = Array.prototype.slice.call($("debtList").children);
+    var scrollY = window.scrollY;
+    var naturalTop = cards.map(function (c) { return c.getBoundingClientRect().top + scrollY; });
+    dragCtx = {
+      el: el, cards: cards,
+      naturalTop: naturalTop,
+      // 拖拽范围限制在列表第一张/最后一张卡片的自然位置内，不能无限往上/往下走。
+      minTop: Math.min.apply(null, naturalTop),
+      maxTop: Math.max.apply(null, naturalTop),
+      order: cards.map(function (_, i) { return i; }),
+      k0: cards.indexOf(el),
+      startPageY: clientY + scrollY,
+      elHeight: el.offsetHeight,
+      lastClientY: clientY
+    };
+    el.classList.add("dragging");
+    // 拖拽期间其他卡片暂停抖动(.jiggle会用keyframe动画持续覆盖transform，
+    // 跟"让位"用的内联transform冲突，让位位移会被吞掉)，松手后再恢复摆动。
+    cards.forEach(function (c) { if (c !== el) { c.classList.add("shifting"); c.classList.remove("jiggle"); } });
+    dragCtx.rafId = requestAnimationFrame(autoScrollTick);
+  }
+  // 每次都从naturalTop[]重新算全部卡片该挪多少像素(不是在上一帧基础上累加)，
+  // 这样来回快速拖拽也不会产生漂移——卡片回到原位时delta自动算出0。
+  function applyDragFrame() {
+    var ctx = dragCtx;
+    var rawTop = ctx.naturalTop[ctx.k0] + ((ctx.lastClientY + window.scrollY) - ctx.startPageY);
+    var clampedTop = Math.min(ctx.maxTop, Math.max(ctx.minTop, rawTop));
+    var dy = clampedTop - ctx.naturalTop[ctx.k0];
+    ctx.el.style.transform = "translateY(" + dy + "px)";
+    var centerNow = ctx.naturalTop[ctx.k0] + ctx.elHeight / 2 + dy;
+    var order = ctx.order, pos = order.indexOf(ctx.k0);
+    if (pos > 0) {
+      var aIdx = order[pos - 1], aMid = ctx.naturalTop[aIdx] + ctx.cards[aIdx].offsetHeight / 2;
+      if (centerNow < aMid) { order.splice(pos, 1); order.splice(pos - 1, 0, ctx.k0); pos--; }
+    }
+    if (pos < order.length - 1) {
+      var bIdx = order[pos + 1], bMid = ctx.naturalTop[bIdx] + ctx.cards[bIdx].offsetHeight / 2;
+      if (centerNow > bMid) { order.splice(pos, 1); order.splice(pos + 1, 0, ctx.k0); pos++; }
+    }
+    order.forEach(function (origIdx, P) {
+      if (origIdx === ctx.k0) return;
+      ctx.cards[origIdx].style.transform = "translateY(" + (ctx.naturalTop[P] - ctx.naturalTop[origIdx]) + "px)";
+    });
+  }
+  var JIGGLE_EDGE = 60, JIGGLE_MAXSPD = 14;
+  function autoScrollTick() {
+    if (!dragCtx) return;
+    var y = dragCtx.lastClientY, vh = window.innerHeight, spd = 0;
+    if (y < JIGGLE_EDGE) spd = -JIGGLE_MAXSPD * (JIGGLE_EDGE - y) / JIGGLE_EDGE;
+    else if (y > vh - JIGGLE_EDGE) spd = JIGGLE_MAXSPD * (y - (vh - JIGGLE_EDGE)) / JIGGLE_EDGE;
+    if (spd) { window.scrollBy(0, spd); applyDragFrame(); }
+    dragCtx.rafId = requestAnimationFrame(autoScrollTick);
+  }
+  // 只负责几何/视觉收尾 + 落盘。事件监听器由各自的touch/pointer路径在自己的cleanup里摘除，
+  // 这里不碰(commit=true正常松手提交这次重排；commit=false被打断/退出编辑模式，丢弃不落盘)。
+  function finishDrag(commit) {
+    var ctx = dragCtx;
+    if (!ctx) return;
+    cancelAnimationFrame(ctx.rafId);
+    ctx.cards.forEach(function (c) { c.classList.remove("shifting", "dragging"); c.style.transform = ""; if (jiggleMode) c.classList.add("jiggle"); });
+    dragCtx = null;
+    if (!commit) return;
+    var newOrder = ctx.order.map(function (origIdx) { return ctx.cards[origIdx].__o.d; });
+    commitReorder(newOrder);
+    saveAll();
+    setDebtSort(detectMatchingSort(debts.filter(isActive)));
+    renderDebts();
+  }
+  // 稳定分区重建debts数组：原本"在还"的槽位依次填入新顺序，"已结清"的槽位原样不动。
+  function commitReorder(newOrderOfActiveDebtObjects) {
+    var queue = newOrderOfActiveDebtObjects.slice(), next = [];
+    for (var k = 0; k < debts.length; k++) next.push(isActive(debts[k]) ? queue.shift() : debts[k]);
+    debts = next;
+  }
+  // Array.sort自ES2019起规范保证稳定；万一某个古早WebView不稳定，最坏结果只是多显示"自定义"，不会误配错的预设名。
+  function detectMatchingSort(activeInOrder) {
+    var keys = Object.keys(DEBT_SORTS);
+    for (var k = 0; k < keys.length; k++) {
+      var cmp = DEBT_SORTS[keys[k]];
+      var candidate = activeInOrder.slice().sort(function (a, b) { return cmp(a) - cmp(b); });
+      var same = candidate.every(function (d, i) { return d === activeInOrder[i]; });
+      if (same) return keys[k];
+    }
+    return "custom";
+  }
+
   function renderPay() {
     var t0 = today0();
     var items = debts.filter(function (d) { return isActive(d) && d.nextDate; }).map(function (d) { var n = parseDate(d.nextDate); return { d: d, next: n, diff: Math.round((n - t0) / 86400000) }; }).sort(function (a, b) { return a.diff - b.diff; });
@@ -951,7 +1202,9 @@
       $("accountAvatarImg").src = account.avatarUrl || "";
       $("accountNameText").textContent = account.nickname || "";
     }
-    $("loginGate").classList.toggle("open", !account);
+    var gate = $("loginGate");
+    gate.classList.toggle("authed", !!account);
+    if (!account) gate.classList.add("open");
   }
 
   function renderAccountDetail() {
@@ -1064,15 +1317,14 @@
 
   var FILES = null;
   function fileItems() {
-    return (POSTER ? [{ img: true, name: POSTER_NAME, label: "愿景海报" }] : [])
-      .concat(docs.map(function (d, i) { return { name: baseName(d.file), label: d.title, content: d.content, docIndex: i }; }))
+    return docs.map(function (d, i) { return { name: baseName(d.file), label: d.title, content: d.content, docIndex: i }; })
       .concat(uploads.map(function (u) { return { upload: true, id: u.id, name: u.name, mime: u.mime || "", label: u.title || u.name, url: u.objectURL, blob: u.blob }; }));
   }
   function renderFiles() {
     FILES = fileItems(); var box = $("fileList"); box.innerHTML = "";
     FILES.forEach(function (it, k) {
       var row = document.createElement("div"); row.className = "file-row"; row.setAttribute("aria-current", k === docSel ? "true" : "false");
-      var ic = it.img ? ICON_IMG : it.upload ? (/^image\//.test(it.mime) ? ICON_IMG : /pdf/.test(it.mime) ? ICON_PDF : ICON_CLIP) : ICON_DOC;
+      var ic = it.upload ? (/^image\//.test(it.mime) ? ICON_IMG : /pdf/.test(it.mime) ? ICON_PDF : ICON_CLIP) : ICON_DOC;
       var actionBtn = (it.upload || it.content) ? '<button class="file-dl file-get">下载</button><button class="file-dl file-del">删除</button>' : '';
       row.innerHTML = '<span class="file-ic">' + ic + '</span><span class="file-name"><span class="fl"></span><small></small></span>' + actionBtn;
       row.querySelector(".fl").textContent = it.label; row.querySelector("small").textContent = it.name;
@@ -1109,7 +1361,6 @@
   function renderDocContent() {
     if (docSel < 0) { $("docContent").innerHTML = ""; return; }
     var it = FILES[docSel];
-    if (it.img) { $("docContent").innerHTML = '<div class="doc-body"><img class="poster" alt="愿景海报：我想要的人生" src="' + POSTER + '"></div>'; return; }
     if (it.upload && /^image\//.test(it.mime)) { $("docContent").innerHTML = '<div class="doc-body"><img class="poster" alt="' + it.label + '" src="' + it.url + '"></div><div class="footnote" style="text-align:left;margin-top:8px;padding:0">长按图片可保存到手机相册。</div>'; return; }
     if (it.upload && /pdf/.test(it.mime)) { $("docContent").innerHTML = '<div class="doc-body"><embed src="' + it.url + '" type="application/pdf" style="width:100%;height:70vh;border:1px solid var(--border);border-radius:10px;background:var(--surface-2)"><div class="footnote" style="text-align:left;margin-top:8px;padding:0">长按预览区可保存到手机 / 通过分享菜单发送；若空白说明此设备浏览器不支持内嵌 PDF 预览。</div></div>'; return; }
     if (it.upload) {
@@ -1122,6 +1373,7 @@
 
   document.querySelectorAll(".tabbar button").forEach(function (b) {
     b.addEventListener("click", function () {
+      if (jiggleMode) exitJiggle();
       document.querySelectorAll(".tabbar button").forEach(function (x) { x.setAttribute("aria-selected", "false"); });
       b.setAttribute("aria-selected", "true");
       b.classList.remove("bounce"); void b.offsetWidth; b.classList.add("bounce");
@@ -1134,7 +1386,14 @@
     });
   });
   $("debtSortSel").value = debtSort;
-  $("debtSortSel").addEventListener("change", function () { debtSort = this.value; renderDebts(); });
+  $("debtSortSel").addEventListener("change", function () { setDebtSort(this.value); renderDebts(); });
+  $("jiggleDoneBtn").addEventListener("click", exitJiggle);
+  // 安卓WebView长按默认会触发系统级"上下文菜单"手势(震动反馈+可能弹出菜单)，
+  // 这是独立于文字选中(user-select)的另一套原生手势，且一旦被判定触发，
+  // 常常会把整个touch序列在原生层面"劫走"，导致我们自己长按拖拽逻辑收不到
+  // 后续的pointermove。全局阻止contextmenu是让自定义长按手势能正常收到
+  // 后续事件的关键一步，跟上面的user-select是两回事，缺一不可。
+  document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   $("addBtn").addEventListener("click", function () { openEdit(-1); });
   $("cancelBtn").addEventListener("click", closeEdit);
   $("deleteBtn").addEventListener("click", function () { if (editIndex >= 0) deleteDebt(editIndex); });
@@ -1148,6 +1407,7 @@
   initGripDrag($("editSheet"), $("editSheet").querySelector(".grip"), closeEdit, false);
   initGripDrag($("detailSheet"), $("detailSheet").querySelector(".grip"), closeDetail, true);
   window.__handleBackButton = function () {
+    if (jiggleMode) { exitJiggle(); return true; }
     if ($("modalScrim").classList.contains("open")) { closeModal(); return true; }
     if ($("accountScreen").classList.contains("open")) { closeAccountScreen(); return true; }
     if ($("editSheet").classList.contains("open")) { closeEdit(); return true; }
@@ -1185,14 +1445,17 @@
     uploadsForBackup().then(function (uploadsBackup) {
       var payload = { version: 6, exportedAt: new Date().toISOString(), debts: debts, docs: docs, uploads: uploadsBackup };
       var d = new Date(), yymmdd = String(d.getFullYear() % 100).padStart(2, "0") + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
-      download("AfterZero备份" + yymmdd + ".json", JSON.stringify(payload), "application/json");
+      var blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+      saveToDeviceDownloads(blob, "AfterZero备份" + yymmdd + ".json", "application/json");
     });
   });
   $("importFileBtn").addEventListener("click", function () { $("importFileInput").click(); });
   $("importFileInput").addEventListener("change", function (e) {
     var file = e.target.files[0]; if (!file) return;
+    var input = e.target;
     var reader = new FileReader();
     reader.onload = function () {
+      input.value = "";
       var v = String(reader.result || "").trim(); if (!v) { toast("文件是空的"); return; }
       try {
         var parsed = JSON.parse(v), nd, ndocs, nuploads;
@@ -1208,14 +1471,19 @@
         });
       } catch (err) { toast("数据格式不对，导入失败"); }
     };
-    reader.onerror = function () { toast("文件读取失败"); };
+    // 安卓WebView从content://（比如"文件"App选的备份json）读取时，readAsText是异步的；
+    // 之前在这里同步地把input.value清空，会在读取还没完成时就抢跑，某些WebView版本下
+    // 会连带把这次还没结束的FileReader读取打断/丢弃——表现为选完文件后界面毫无反应，
+    // 不报错也不提示，只是偶发（部分机型/部分次数才会撞上这个时机）。改成只在
+    // onload/onerror里读取结束之后才清空，避免这个竞态。
+    reader.onerror = function () { input.value = ""; toast("文件读取失败"); };
     reader.readAsText(file);
-    e.target.value = "";
   });
   $("uploadBtn").addEventListener("click", function () { $("uploadInput").click(); });
   $("uploadInput").addEventListener("change", function (e) {
     var file = e.target.files[0]; e.target.value = "";
     if (!file) return;
+    if (UPLOAD_ALLOWED_EXT.indexOf(extOf(file.name)) < 0) { toast("不支持的文件格式，仅支持图片 / PDF / Markdown / Word"); return; }
     if (!window.indexedDB) { toast("此设备浏览器不支持文件存储"); return; }
     var id = "u" + Date.now() + Math.random().toString(36).slice(2, 7);
     var item = { id: id, name: file.name, title: file.name, mime: file.type, blob: file, addedAt: todayStr() };
