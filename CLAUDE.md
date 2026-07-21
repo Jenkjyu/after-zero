@@ -95,6 +95,22 @@ cd cloudbase
 npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
 ```
 
+## 原生插件（官方npm）：`@capacitor/local-notifications`（还款提醒通知）
+
+"还款日"标签页顶部"最近还款日"卡片右上角有个铃铛图标，点开是一个通知设置面板（`#notifySheet`），可以打开/关闭通知、添加"提前N天+几点"的提醒规则（全局共享，对所有在还债务统一生效，不按债务单独配置）。
+
+**跟`SaveFile`/`WeChatLogin`那两个手写插件性质完全不同，别用同一套心智模型去改它**：`@capacitor/local-notifications`是官方发布在npm上的标准Capacitor插件（`package.json`里的依赖，不是`android/app/src/main/java/io/github/jenkjyu/afterzero/`下的手写`.java`文件）。装完跑`npx cap sync android`会自动处理**所有**原生接线——Gradle依赖（`android/capacitor.settings.gradle`/`android/app/capacitor.build.gradle`，这两个文件本身就是"DO NOT EDIT"的自动生成文件）、`AndroidManifest.xml`里的`POST_NOTIFICATIONS`/`RECEIVE_BOOT_COMPLETED`/`WAKE_LOCK`权限和几个receiver，全部靠插件自己的AAR manifest merge自动注入。**这意味着这个插件不需要、也不应该在`MainActivity.java`里手动`registerPlugin()`**（那是给`SaveFilePlugin`/`WeChatLoginPlugin`这种不是npm包的手写插件用的注册方式，官方npm插件靠Capacitor构建时自动发现），也不需要手动改`AndroidManifest.xml`——已经在合并后的release manifest里核实过这几条权限和receiver确实自动出现了。
+
+**数据模型是全局共享的一份配置，不是挂在每笔债务上**：`NOTIF_KEY`（`after-zero-notify-v1`）存的是`{enabled, rules:[{offsetDays, time}]}`，`offsetDays`只允许`0|1|2|3`（当天到期～提前3天），`time`是`"HH:MM"`。之所以能做成全局共享而不用给每笔债务发明一个稳定id，是因为需求本身就是"同一套提醒规则套用到所有债务"，不是按债务区分——如果以后要改成"每笔债务单独配置提醒"，得先解决这个项目"债务没有id字段、纯靠数组下标寻址"这个更大的架构问题（见下面"在还债务自定义排序"一节）。
+
+**调度策略是"全清再重排"，不是增量更新**：`syncNotifications()`每次调用先把所有待触发的通知全部`cancel`掉，再根据当下`debts`+`notify.rules`重新排一遍——因为这个App没有别的功能用本地通知，全清不会误伤别的东西，比给每条通知发明持久稳定ID去做增量diff简单可靠得多。这个函数挂在`renderAll()`末尾，意味着**任何改动债务数据的地方（还款、增删债务、结清、导入备份……）最终都会走到`saveAll();renderAll();`这个收尾模式，规则就自动跟着当下最新的`d.nextDate`重新排一遍**——这也是"提前N天"这种相对规则不需要`repeats`标记就能自动滚动到下一期的原因，每次重排读到的`nextDate`本来就已经是`recompute()`推进过的最新值。
+
+**通知渠道(channel)必须手动建，插件不会自动建**：安卓8+发通知必须先有一个channel，`LN.createChannel({id:"repay",...})`在App启动时调一次（幂等，重复调用无副作用）。**状态栏小图标不能直接用现有的全彩`mipmap-*/ic_launcher*`**——安卓要求这个图标必须是纯白/透明的单色剪影，新增了一个专门的矢量drawable`android/app/src/main/res/drawable/ic_stat_notify.xml`（单个vector覆盖所有密度，不用出PNG套图）；这个文件在`android/app/src/main/res/`下，`npx cap sync`不会碰它，需要手动创建一次、长期保留。
+
+**故意选择"非精确闹钟"，不申请`SCHEDULE_EXACT_ALARM`**：这是权衡后的明确取舍——申请精确闹钟权限需要用户在安卓12+系统设置里额外手动开一个"闹钟和提醒"权限（这个App没上应用商店，走不了商店审核那条豁免路径），换来的是"到点分毫不差"；不申请的话完全不需要额外操作，代价是安卓省电策略可能让实际弹出时间比设定的晚几分钟到十几分钟。对"还款提醒"这个场景，晚几分钟不影响实际使用，所以选了不用额外权限的路子。**以后如果要改成精确闹钟，除了申请权限，还要在`schedule()`的`schedule`对象里研究`allowWhileIdle`等参数，且要重新评估这条路径。**
+
+**JS这边的检测模式跟`SaveFile`/`WeChatLogin`一致**：`window.Capacitor && window.Capacitor.Plugins.LocalNotifications`存在才调用，不存在（桌面浏览器测试）就静默跳过或提示"仅支持安卓App内使用"——同样是"真实通知能不能弹出没法在桌面浏览器完整验证，必须编译APK装真机"这条老规矩。
+
 ## 返回键处理（安卓硬件/手势返回）
 
 弹窗关闭 + 退出App这两件事，走的是"原生问JS，JS说了算"的桥接，两头都有各自的坑：
@@ -103,7 +119,7 @@ npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
 
 **JS这边（`www/index.html`）**：每次按返回键，原生层用 `evaluateJavascript` 问挂在 `window` 上的 `window.__handleBackButton()`（业务代码整体是IIFE包起来的，这个入口函数必须显式挂到 `window` 才能被原生层拿到）——返回 `true` 表示"我自己关掉了一层东西"，原生层什么都不做；返回 `false` 表示"没什么可关的"，原生层才 `finish()` 退出App。
 
-**这个函数内部按"最上层的先关"的顺序逐层判断**（在还债务的抖动编辑模式 `jiggleMode` → 居中确认弹窗 `#modalScrim` → 账户详情页 `#accountScreen` → 编辑窗 `#editSheet` → 详情窗 `#detailSheet`），实现的是"一层一层退"而不是一键全退到桌面。**以后新增别的弹窗/浮层，如果也想让返回键能关掉它，得手动把它的判断加进这个函数的优先级链——这是JS和Java两边靠一个字符串名字"约定"起来的隐性契约，编译器不会提醒你漏加，加漏了也不报错，只是那个新弹窗按返回键没反应、直接退出App，很容易漏测出来。**`#accountScreen`和`jiggleMode`都是这条警告的具体例子：都是新增的浮层/模式，被显式加进了这条链。
+**这个函数内部按"最上层的先关"的顺序逐层判断**（在还债务的抖动编辑模式 `jiggleMode` → 居中确认弹窗 `#modalScrim` → 账户详情页 `#accountScreen` → 通知设置面板 `#notifySheet` → 编辑窗 `#editSheet` → 详情窗 `#detailSheet`），实现的是"一层一层退"而不是一键全退到桌面。**以后新增别的弹窗/浮层，如果也想让返回键能关掉它，得手动把它的判断加进这个函数的优先级链——这是JS和Java两边靠一个字符串名字"约定"起来的隐性契约，编译器不会提醒你漏加，加漏了也不报错，只是那个新弹窗按返回键没反应、直接退出App，很容易漏测出来。**`#accountScreen`和`jiggleMode`都是这条警告的具体例子：都是新增的浮层/模式，被显式加进了这条链。`#notifySheet`同理，只是它走的是`.sheet`那套（跟`#editSheet`/`#detailSheet`同类），不是`#accountScreen`那种`.subpage`整页推入。
 
 **`#loginGate`（登录门）反而故意不加进这条链**——它没有关闭函数，设计上就是不可关闭的。登录门显示时，上面几个`if`全部为false，自然落到`return false`，原生层`finish()`退出App，这正是想要的"没什么可关的，直接退出"效果，不是漏加。
 
@@ -128,6 +144,32 @@ npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
 **排序方式（含自定义）现在会跨App重启记住**——`debtSort`存在独立的`SORT_KEY`（`debt-manager-sort-v1`）里，通过`setDebtSort()`这一个函数统一读写，不要绕过它直接改`debtSort`变量（会漏掉持久化）。
 
 **编辑模式期间`#addBtn`（新增一笔）、已结清区域的"恢复"按钮、`#debtSortSel`下拉框都会被禁用**（CSS靠`#view-debts.jiggling`这个类切换），目的是保证编辑模式期间不会有别的sheet被同时打开——这也是为什么`window.__handleBackButton`里`jiggleMode`的判断可以放在最前面、跟其余判断互斥（见上面"返回键处理"一节）。
+
+## 还款提醒页：hero卡片 + 左滑标记已还
+
+"还款日"标签页顶部有一张"最近还款日"卡片（`#payHero`，`renderPayHero()`），取所有在还债务里下一期还款日最近的那一笔，底色按急迫程度换色。下面`#payList`列表里每一条债务卡片支持向左滑动，滑出一个"标记已还"按钮（类似iOS/微信聊天列表左滑删除）。
+
+**急迫程度是3档阈值，卡片底色和列表圆点共用同一套`urgencyTier(diff)`**（`diff`=距还款日的天数）：≤3天=红(`crit`)、≤14天=黄(`warn`)、其余=绿(`dim`)。**`dim`档一开始用的是`--accent`（品牌绿），浅色模式下这个绿是`#18453B`深墨绿，9px小圆点尺寸下几乎看着像黑色**——已经改成`--good`（这个项目里"已结清"/"低利率"这些正面信号一直用的蓝色），清晰可辨。以后再调这类小尺寸状态色，先拿实际渲染尺寸眼看一遍，不要只看色值本身是不是"绿色"就假设够用。
+
+**左滑手势沿用"在还债务"长按拖拽那条踩过的教训（见下面"在还债务自定义排序"一节），但场景更简单**：拖拽排序需要在同一个垂直轴上"平时滚动、长按后接管"，只能用Touch Events；这里左滑只需要接管**水平**轴，垂直滚动完全交给原生，所以可以额外用`touch-action:pan-y`提前告诉浏览器"水平不归你管"，减少和原生手势抢的可能，JS里对水平方向再补一层`preventDefault`兜底。触摸设备走Touch Events（`touchstart`/`touchmove`+`{passive:false}`/`touchend`），第一次移动时按dx/dy哪个更大判断"这是横滑还是竖直滚动"；桌面鼠标走独立的Pointer Events分支（`pointerType==='mouse'`才处理），纯为桌面浏览器可测。
+
+**⚠️ 踩过一个坑：`__justDragged`这个"防止拖拽结束后紧接着的click把刚展开的滑块关掉"的标记位，必须在每次新手势开始时重置，不能只靠点击去消费它**——真正带位移的拖拽/滑动手势结束后，浏览器**不会**触发click事件（只有原地无位移的tap才会），所以如果只在click handler里"用一次就清空"，这个标记位在一次真实拖拽后会一直是`true`、永远等不到click来消费它，直到很久以后一次完全独立、毫不相关的正常点击也被这个陈旧的标记位误伤（表现是"点开着的滑块想关掉它，点了没反应"）。修法：`touchstart`/`pointerdown`一开始就先重置`front.__justDragged = false`，而不是只寄希望于click阶段清空。以后写类似"拖拽后抑制紧跟着的一次click"的逻辑，先确认这次手势结束后浏览器到底会不会补发click，别想当然。
+
+**同一时间只允许一条卡片保持展开**（`paySwipeOpen`模块级变量），展开新的会自动收起旧的；点开着的卡片本身会收起它；切到别的tab会强制收起（`closePaySwipe`）。滑出的"标记已还"按钮直接复用`payInstallment(i)`（债务详情页"销这期"背后的同一个函数），确认弹窗、结清判断、toast提示全部保持一致，没有另写一套逻辑。
+
+## 新增/编辑债务表单（`#editSheet`）
+
+**"一次性还清"复选框(`f-oneTime`)勾选/取消勾选，靠`oneTimeStash`暂存被隐藏的期数，不能只是视觉隐藏**：早期`renderPlanRows()`勾上"一次性还清"时只是把第2期起从界面上`slice(0,1)`隐藏掉，底层`editingPlan`数组没有真的删——如果用户先手动加了2期再勾选，保存时那第2期还是会跟着存进去，导致"一次性¥X"（只显示第1期金额）和"借款金额"（全部期数本金相加）对不上，是个真实bug。修法：`syncOneTimeUI()`里勾选时把第2期起真正挪到`oneTimeStash`里（不是丢弃），取消勾选时原样放回`editingPlan`——这样来回勾选不会丢手动填过的数据。`oneTimeStash`每次`openEdit()`都要清空，不能跨债务残留。
+
+**"手动添加"/"公式生成"是二选一的分段切换器（`planMode`变量 + `#planModeToggle`），不是两套入口同时堆在页面上**——原来是"用公式生成▾"折叠按钮和常驻的"＋加一期"按钮并存，容易同时露出两套UI显得乱。现在点哪个就只显示哪个的内容，公式生成完之后自动切回"手动添加"（`setPlanMode("manual")`）方便直接在结果上逐行微调。
+
+**⚠️ `#gFirstField`（首期还款日）只有一份DOM，靠JS在切换计息方式时物理搬家，不是四份独立字段**：公式生成有4种计息方式（等额本息/信用卡等本等费/先息后本/自定义），"首期还款日"这个输入框是所有计息方式共用的同一个字段，但用户要求"期数"和"首期还款日"在默认的"等额本息"模式下要拼成一行——由于`data-gg`各计息方式区块之间是互斥显示（切换时`display:none/block`），没法让同一个DOM节点同时"属于"两个不同区块。解决方式是`setGenUI(k)`每次切换计息方式时，用`appendChild`把`#gFirstField`这个`.field`容器整个搬到当前生效区块里——等额本息时搬进`#amortPeriodRow`（跟"期数"拼成`.field.two`一行），其它三种搬到各自区块末尾（单独一行，位置跟以前一样）。**以后如果要再调整这个字段的布局，记住它是"移动"不是"复制"，四种计息方式任何时候都只有一份`#g-first`输入框存在于DOM里，只是挂在不同父节点下。**
+
+**"还款日（几号）"(`f-day`)不再手动填，是从还款计划第1期的实际日期里自动推出来的**（`updateFDayFromPlan()`，挂在每次计划变动的地方：加/删行、改日期、公式生成、批量设置还款日、一次性还清勾选/取消）。这个字段现在是`readonly`，不带必填星号，`saveForm()`校验时也直接读`editingPlan[0].date`而不是这个DOM字段的值。这么改是因为`d.day`这个字段过去在整个App里**完全没有别的地方读取/显示**（纯粹是用户手填、存进去就再也用不上的孤立数据），让它跟真实计划数据保持一致远比允许手填一个可能对不上的数字更有意义。
+
+**批量设置还款日：选"几号"之后点"应用到全部"会额外弹一个要"首期哪年哪月"的确认框**——这是给`ask()`这个原有的通用确认弹窗新加的可选第4个参数`opts.month`（会临时显示一个`<input type="month">`，`onOk`回调收到选中的月份字符串），其它调用`ask()`的地方不传这个参数就是原来纯文字确认框，不受影响。确认后按"首期年月+几号，每期顺延一个月"批量铺日期，超过当月天数会clamp到当月最后一天。
+
+**批量设置的"几号"和公式生成的"首期还款日"都不允许选29/30/31号，但还款计划表格里逐行手动填的日期不受限制**——这两个入口本质是在投射"每月同一天"的重复规律，29-31号在有些月份根本不存在，会导致还款日在不同月份之间漂移（有的月28号有的月31号），所以直接拦（`isBadRepeatDay(day)`），toast提示去表格里逐行手动填。表格里每一行的日期选择器（`#planRows`里的`data-f="date"`）代表的是"这一期具体是哪天"的真实数据，现实中贷款完全可能就是某个月的30号到期，所以这里故意不加这条限制——**两个入口的定位不同（一个是投射重复规律的快捷工具，一个是记录真实数据的详情表），限制也应该不同，别图省事统一加同一条规则。**
 
 ## 字体：`www/fonts/`
 
@@ -199,7 +241,7 @@ localStorage.setItem("after-zero-account-v1", JSON.stringify({openid:"test",nick
 
 ## 硬性铁律，改代码前必看
 
-1. **`localStorage` 的 KEY（在`www/index.html`里搜 `debt-manager-v5`）永远不能改。** 这是用户设备上保存真实数据的键名，改了等于让已经装过的app找不到自己原来存的数据，直接清零。同理，`DKEY`（`debt-manager-docs-v5`）、账号登录状态用的`ACCOUNT_KEY`（`after-zero-account-v1`）、在还债务排序方式用的`SORT_KEY`（`debt-manager-sort-v1`）以后也不能改——四者是各自独立的键，不要以为加新功能可以复用或合并。
+1. **`localStorage` 的 KEY（在`www/index.html`里搜 `debt-manager-v5`）永远不能改。** 这是用户设备上保存真实数据的键名，改了等于让已经装过的app找不到自己原来存的数据，直接清零。同理，`DKEY`（`debt-manager-docs-v5`）、账号登录状态用的`ACCOUNT_KEY`（`after-zero-account-v1`）、在还债务排序方式用的`SORT_KEY`（`debt-manager-sort-v1`）、还款提醒通知设置用的`NOTIF_KEY`（`after-zero-notify-v1`）以后也不能改——五者是各自独立的键，不要以为加新功能可以复用或合并。
 2. **新安装必须是空数据。** `www/index.html` 里 `SEED`（债务种子数据）、`DOCS_SEED`（文档种子数据）这两个常量现在都是空值——这是故意的，因为这个app的定位是要发给别人用，任何人第一次打开都不能预装开发者自己的私人财务数据。**改代码时如果要放测试数据，改完记得清空再提交，别把私人内容（真实债务数字、个人反思文档、任何带真实姓名/金额的东西）带回默认值里。**
    **私人数据不止藏在这三个常量里。** 之前排查发现过一次：一个叫`cliff`的调试用标记字段，虽然完全没有UI能设置它（不是SEED、不是表单字段），但代码里直接写死了具体的还款日期和金额字符串（`"2027-05 起还本，月供跳至 ¥2,182"`这类）挂在渲染逻辑里，跟SEED是否清空无关。改代码时留意：不只是搜`SEED`/`DOCS_SEED`这两个变量名，任何看着像真实日期/金额/人名的硬编码字符串都要多看一眼是不是该删。（补：曾经还有个`POSTER`"愿景海报"常量，因为没有任何UI入口能往里填内容、属于永远激活不了的死代码，已整体删除，包括`fileItems()`/`renderDocContent()`里对应的分支，别再找它。）
    **"新安装=空数据"这个假设依赖 `AndroidManifest.xml` 里 `android:allowBackup="false"`。** 安卓系统默认（`allowBackup="true"`，Capacitor脚手架生成时的默认值）会把App数据自动云备份到用户的Google账号，卸载重装或者换新手机登录同一个Google账号时可能会自动把旧数据（包括`ACCOUNT_KEY`存的登录态）恢复回来，让"重装"变得不再可靠地等于"空白状态"。这个项目已经手动改成`allowBackup="false"`彻底关掉自动备份——以后如果看到这个值被改回`true`（比如重新跑`npx cap add android`之类的脚手架命令覆盖了手改的manifest），要记得改回`false`。

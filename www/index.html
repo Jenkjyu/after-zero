@@ -83,6 +83,8 @@
   .jiggle-done-btn { display: none; text-transform: none; letter-spacing: normal; font-size: 12px; font-weight: 600;
     padding: 5px 10px; border-radius: 7px; border: none; background: var(--accent); color: #fff; }
   #view-debts.jiggling .jiggle-done-btn { display: inline-flex; }
+  .debt-hint { font-size: 11.5px; color: var(--text-muted); margin: -4px 2px 10px; }
+  #view-debts.jiggling .debt-hint { display: none; }
 
   /* 卡片保持默认touch-action(auto)——不锁touch-action，原生滚动全程可用、手感与卡片
      间隙一致。长按拖拽和原生滚动的共存，靠的是touch事件那条路(onCardTouchStart)：平时
@@ -134,15 +136,43 @@
   .settled-item .sd { font-size: 11.5px; color: var(--good); font-weight: 600; }
   .settled-item .restore { background: none; border: 1px solid var(--border); color: var(--text-muted); border-radius: 8px; padding: 4px 9px; font-size: 11.5px; }
 
+  .pay-row { position: relative; border-radius: 20px; overflow: hidden; margin-bottom: 8px; }
   .pay { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 20px; margin-bottom: 8px; box-shadow: var(--shadow); }
+    border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow);
+    position: relative; z-index: 1; touch-action: pan-y; }
+  .pay-swipe-btn { position: absolute; top: 0; right: 0; bottom: 0; width: 92px; z-index: 0;
+    border: none; background: var(--good); color: #fff; font-size: 13px; font-weight: 700; }
   .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
-  .dot.crit { background: var(--critical); } .dot.warn { background: var(--warning); } .dot.dim { background: var(--accent); }
+  .dot.crit { background: var(--critical); } .dot.warn { background: var(--warning); } .dot.dim { background: var(--good); }
   .pay .d { width: 62px; flex: none; }
   .pay .d .day { font-weight: 700; font-size: 15px; }
   .pay .d .rel { font-size: 11px; color: var(--text-muted); }
   .pay .w { flex: 1; font-size: 14px; }
   .pay .a { font-weight: 700; font-size: 15px; }
+
+  .pay-hero { border-radius: 22px; padding: 16px 18px 15px; margin-bottom: 16px; box-shadow: var(--shadow); }
+  .pay-hero-top { display: flex; align-items: center; justify-content: space-between; }
+  .pay-hero-label { font-size: 12px; font-weight: 600; letter-spacing: .06em; color: var(--text-muted); }
+  .pay-hero-bell { background: none; border: none; padding: 2px; margin: -2px; color: var(--text-muted); display: flex; }
+  .pay-hero-bell svg { width: 19px; height: 19px; }
+  .pay-hero-bell .ic-filled { display: none; }
+  .pay-hero-bell.on { color: var(--accent); }
+  .pay-hero-bell.on .ic-outline { display: none; }
+  .pay-hero-bell.on .ic-filled { display: block; }
+  .pay-hero-row { display: flex; align-items: baseline; justify-content: space-between; margin-top: 7px; gap: 10px; }
+  .pay-hero-date { display: flex; align-items: baseline; gap: 8px; }
+  .pay-hero-daynum { font-size: 24px; font-weight: 700; }
+  .pay-hero-rel { font-size: 13px; font-weight: 700; }
+  .pay-hero-amt { font-size: 21px; font-weight: 700; }
+  .pay-hero-name { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+  .pay-hero-empty-msg { font-size: 14px; color: var(--text-muted); margin-top: 8px; }
+  .pay-hero.crit { background: var(--critical-soft); }
+  .pay-hero.crit .pay-hero-rel, .pay-hero.crit .pay-hero-amt { color: var(--critical); }
+  .pay-hero.warn { background: var(--warning-soft); }
+  .pay-hero.warn .pay-hero-rel, .pay-hero.warn .pay-hero-amt { color: var(--warning); }
+  .pay-hero.dim { background: var(--good-soft); }
+  .pay-hero.dim .pay-hero-rel, .pay-hero.dim .pay-hero-amt { color: var(--good); }
+  .pay-hero.empty { background: var(--surface); border: 1px solid var(--border); }
 
   .file-row { display: flex; align-items: center; gap: 11px; padding: 12px 14px; background: var(--surface);
     border: 1px solid var(--border); border-radius: 18px; margin-bottom: 7px; box-shadow: var(--shadow); width: 100%; text-align: left; color: inherit;
@@ -203,10 +233,33 @@
   .field textarea { min-height: 52px; resize: vertical; }
   .field.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
   .field.two .field { margin-bottom: 0; }
+  .req { color: var(--critical); font-weight: 700; }
+  .f-day-auto { opacity: .6; }
   .sheet-actions { display: flex; gap: 10px; margin-top: 6px; }
   .subhead { font-size: 13px; font-weight: 700; margin: 18px 0 8px; color: var(--accent); }
+  .sheet-divider { border: none; border-top: 1px solid var(--border); margin: 22px 0 2px; }
+  .plan-mode-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
+  .pm-btn { flex: 1; padding: 8px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-2);
+    color: var(--text-muted); font-size: 13px; font-weight: 600; font-family: inherit; }
+  .pm-btn.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
   .checkline { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 12px; color: var(--text); }
   .checkline input { width: 18px; height: 18px; flex: none; }
+  .switch-row { display: flex; align-items: center; justify-content: space-between; font-size: 14.5px; font-weight: 600; padding: 4px 0 10px; }
+  .switch { position: relative; display: inline-block; width: 44px; height: 26px; flex: none; }
+  .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; }
+  .switch-track { position: absolute; inset: 0; background: var(--border); border-radius: 999px; transition: background .18s ease; }
+  .switch-track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .18s ease; }
+  .switch input:checked + .switch-track { background: var(--accent); }
+  .switch input:checked + .switch-track::after { transform: translateX(18px); }
+  .notify-add { display: flex; gap: 8px; margin-top: 10px; }
+  .notify-add select, .notify-add input[type="time"] { background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 9px; padding: 8px 9px; font-size: 13.5px; font-family: inherit; }
+  .notify-add .btn { flex: none; padding: 8px 14px; }
+  .notify-rule { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface-2);
+    border-radius: 12px; margin-bottom: 7px; font-size: 13.5px; }
+  .notify-rule .nr-text { flex: 1; }
+  .notify-rule .nr-del { background: none; border: none; color: var(--text-muted); font-size: 12.5px; font-weight: 600; padding: 2px 6px; }
 
   /* plan editor */
   .plan-sum { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
@@ -253,6 +306,8 @@
   .modal { background: var(--surface); border-radius: 22px; max-width: 380px; width: 100%; padding: 20px; box-shadow: 0 8px 40px rgba(0,0,0,.3); }
   .modal .mtitle { font-size: 16px; font-weight: 700; margin-bottom: 8px; overflow-wrap: break-word; word-break: break-word; }
   .modal .mbody { font-size: 13.5px; color: var(--text); white-space: pre-line; margin-bottom: 18px; line-height: 1.55; overflow-wrap: break-word; word-break: break-word; }
+  #mMonthInput { width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 9px; padding: 10px 11px; font-size: 15px; font-family: inherit; margin: -8px 0 18px; }
   .modal-actions { display: flex; gap: 10px; }
 
   /* 登录门默认(纯CSS，不依赖任何JS执行时机)就是display:flex可见的——这是刻意的"fail-closed"设计。
@@ -336,12 +391,14 @@
       <option value="terms-asc">剩余期数 少→多</option>
       <option value="custom">自定义</option>
     </select></div></div>
+    <div class="debt-hint">长按卡片可拖动排序</div>
     <div id="debtList"></div>
     <button class="add-btn" id="addBtn">＋ 新增一笔</button>
     <div class="settled-wrap" id="settledWrap"></div>
   </section>
 
   <section class="view" id="view-pay">
+    <div class="pay-hero" id="payHero"></div>
     <div class="section-label">接下来的还款日（按今天自动排序）</div>
     <div id="payList"></div>
   </section>
@@ -479,7 +536,7 @@
   <div class="grip"></div>
   <h2 id="sheetTitle">编辑债务</h2>
   <form id="debtForm">
-    <div class="field"><label for="f-name">贷款产品</label><input id="f-name" required></div>
+    <div class="field"><label for="f-name">贷款产品 <span class="req">*</span></label><input id="f-name" required></div>
     <div class="field two">
       <div class="field"><label for="f-funder">出资方</label><input id="f-funder"></div>
       <div class="field"><label for="f-type">借款类型</label><select id="f-type">
@@ -487,15 +544,19 @@
       </select></div>
     </div>
     <div class="field two">
-      <div class="field"><label for="f-opened">借款日</label><input id="f-opened" type="date"></div>
-      <div class="field"><label for="f-day">还款日（几号）</label><input id="f-day" type="number" min="1" max="31" inputmode="numeric" required></div>
+      <div class="field"><label for="f-opened">借款日 <span class="req">*</span></label><input id="f-opened" type="date" required></div>
+      <div class="field"><label for="f-day">还款日（几号）</label><input id="f-day" type="number" min="1" max="31" inputmode="numeric" readonly class="f-day-auto"></div>
     </div>
     <label class="checkline"><input type="checkbox" id="f-oneTime">一次性还清（不计入经常性月供，销项即结清）</label>
     <div class="field"><label for="f-notes">备注</label><textarea id="f-notes"></textarea></div>
 
+    <hr class="sheet-divider">
     <div class="subhead">还款计划（这是源头，其它自动推算）</div>
     <div class="plan-sum" id="planSum"></div>
-    <button type="button" class="btn ghost" id="genToggle" style="margin-bottom:12px">用公式生成 / 重建计划 ▾</button>
+    <div class="plan-mode-toggle" id="planModeToggle">
+      <button type="button" class="pm-btn active" id="planModeManual">手动添加</button>
+      <button type="button" class="pm-btn" id="planModeGen">公式生成</button>
+    </div>
     <div class="gen-panel" id="genPanel" style="display:none">
       <div class="field"><label for="g-kind">计息方式</label><select id="g-kind">
         <option value="amort">等额本息（银行贷/网贷/金条）</option>
@@ -504,8 +565,8 @@
         <option value="custom">自定义（生成空白行自己填）</option>
       </select></div>
       <div data-gg="amort">
-        <div class="field two"><div class="field"><label for="g-P">借款金额 ¥</label><input id="g-P" type="number" step="0.01" inputmode="decimal"></div><div class="field"><label for="g-rate">年化 %</label><input id="g-rate" type="number" step="0.01" inputmode="decimal"></div></div>
-        <div class="field"><label for="g-n">期数</label><input id="g-n" type="number" min="1" inputmode="numeric"></div>
+        <div class="field two"><div class="field"><label for="g-P">借款金额 ¥ <span class="req">*</span></label><input id="g-P" type="number" step="0.01" inputmode="decimal" required></div><div class="field"><label for="g-rate">年化 % <span class="req">*</span></label><input id="g-rate" type="number" step="0.01" inputmode="decimal" required></div></div>
+        <div class="field two" id="amortPeriodRow"><div class="field"><label for="g-n">期数 <span class="req">*</span></label><input id="g-n" type="number" min="1" inputmode="numeric" required></div></div>
       </div>
       <div data-gg="equalfee">
         <div class="field two"><div class="field"><label for="g-pp">每期本金 ¥</label><input id="g-pp" type="number" step="0.01" inputmode="decimal"></div><div class="field"><label for="g-pf">每期手续费 ¥</label><input id="g-pf" type="number" step="0.01" inputmode="decimal"></div></div>
@@ -518,11 +579,11 @@
       <div data-gg="custom">
         <div class="field"><label for="g-nc">生成几期空白行</label><input id="g-nc" type="number" min="1" inputmode="numeric"></div>
       </div>
-      <div class="field"><label for="g-first">首期还款日</label><input id="g-first" type="date"></div>
+      <div class="field" id="gFirstField"><label for="g-first">首期还款日 <span class="req">*</span></label><input id="g-first" type="date" required></div>
       <button type="button" class="btn primary" id="doGen">生成计划</button>
     </div>
 
-    <div class="batch" id="batchBlock">批量把每期<select id="batchCol"><option value="principal">本金</option><option value="interest">利息/费</option><option value="amount">金额</option></select>设为<input id="batchVal" type="number" step="0.01" min="0" inputmode="decimal" placeholder="数值"><button type="button" id="batchApply">应用到全部</button></div>
+    <div class="batch" id="batchBlock">批量把每期<select id="batchCol"><option value="principal">本金</option><option value="interest">利息/费</option><option value="amount">金额</option><option value="date">还款日</option></select>设为<input id="batchVal" type="number" step="0.01" min="0" inputmode="decimal" placeholder="数值"><button type="button" id="batchApply">应用到全部</button></div>
     <div class="plan-rows" id="planRows"></div>
     <button type="button" class="btn ghost" id="addRow" style="margin-bottom:14px">＋ 加一期</button>
 
@@ -534,10 +595,36 @@
   </form>
 </div>
 
+<div class="scrim" id="scrimNotify"></div>
+<div class="sheet" id="notifySheet" role="dialog" aria-modal="true" aria-labelledby="notifyTitle">
+  <div class="grip"></div>
+  <h2 id="notifyTitle">还款提醒通知</h2>
+  <label class="switch-row">
+    <span>启用通知</span>
+    <span class="switch"><input type="checkbox" id="notifyToggle"><span class="switch-track"></span></span>
+  </label>
+  <div class="section-label" style="margin-top:14px">提醒规则（对所有在还债务统一生效）</div>
+  <div id="notifyRuleList"></div>
+  <div class="notify-add">
+    <select id="notifyOffset">
+      <option value="0">当天到期</option>
+      <option value="1">提前1天</option>
+      <option value="2">提前2天</option>
+      <option value="3">提前3天</option>
+    </select>
+    <input type="time" id="notifyTime" value="09:00">
+    <button type="button" class="btn ghost" id="notifyAddBtn">添加</button>
+  </div>
+  <div class="sheet-actions" style="margin-top:14px">
+    <button type="button" class="btn primary" id="notifyDoneBtn">完成</button>
+  </div>
+</div>
+
 <div class="modal-scrim" id="modalScrim">
   <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="mTitle">
     <div class="mtitle" id="mTitle">确认</div>
     <div class="mbody" id="mBody"></div>
+    <input type="month" id="mMonthInput" style="display:none">
     <div class="modal-actions">
       <button class="btn ghost" id="mCancel">取消</button>
       <button class="btn primary" id="mOk">确认</button>
@@ -560,6 +647,8 @@
   var ACCOUNT_KEY = "after-zero-account-v1";
   // 在还债务列表的排序方式（含"自定义"拖拽顺序），独立于上面三个键。
   var SORT_KEY = "debt-manager-sort-v1";
+  // 还款提醒通知设置（全局共享，不按债务区分），独立于上面几个键。
+  var NOTIF_KEY = "after-zero-notify-v1";
   // SEED: minimal spec; full plan generated on load
   var SEED = [];
   var DOCS_SEED = [];
@@ -647,8 +736,16 @@
   var debts = loadJSON(KEY, SEED);
   var docs = loadJSON(DKEY, DOCS_SEED);
   var account = loadJSON(ACCOUNT_KEY, null);
+  var notify = loadJSON(NOTIF_KEY, { enabled: false, rules: [] });
+  function saveNotify() { try { localStorage.setItem(NOTIF_KEY, JSON.stringify(notify)); } catch (e) {} }
   debts.forEach(normalize);
   var editIndex = -1, detailIndex = -1, docSel = -1, editingPlan = [];
+  // 勾选"一次性还清"时，第2期起被暂存到这里（不是丢弃）；取消勾选时原样放回editingPlan，
+  // 这样来回勾选不会丢手动加过的期数。每次openEdit()都要清空，不能跨debt残留。
+  var oneTimeStash = [];
+  // 还款计划"手动添加"/"公式生成"两种录入方式的当前选中模式，二选一互斥显示，
+  // 不是同时把两套UI都堆在页面上（那样太乱）。每次openEdit()重置成"manual"。
+  var planMode = "manual";
 
   // background scroll lock while any sheet/modal is open (counted, since the confirm modal can stack on top of the edit sheet)
   var scrollLockCount = 0;
@@ -657,9 +754,20 @@
 
   // custom confirm
   var _onOk = null;
-  function ask(title, body, onOk) { $("mTitle").textContent = title; $("mBody").textContent = body; _onOk = onOk; $("modalScrim").classList.add("open"); lockScroll(); }
-  function closeModal() { if (!$("modalScrim").classList.contains("open")) return; $("modalScrim").classList.remove("open"); _onOk = null; unlockScroll(); }
-  $("mOk").addEventListener("click", function () { var f = _onOk; closeModal(); if (f) f(); });
+  // ask()第4个可选参数{month:"YYYY-MM"}：需要额外收集"哪年哪月"时用(比如批量设置还款日
+  // 要知道首期年月)，不传就是普通的纯文字确认框。onOk回调收到的参数是选中的年月字符串
+  // (没用到month input时是undefined，其它调用方原本就是零参函数，多传一个不影响)。
+  function ask(title, body, onOk, opts) {
+    $("mTitle").textContent = title; $("mBody").textContent = body; _onOk = onOk;
+    var mi = $("mMonthInput");
+    if (opts && opts.month !== undefined) { mi.style.display = ""; mi.value = opts.month || ""; } else { mi.style.display = "none"; mi.value = ""; }
+    $("modalScrim").classList.add("open"); lockScroll();
+  }
+  function closeModal() { if (!$("modalScrim").classList.contains("open")) return; $("modalScrim").classList.remove("open"); _onOk = null; $("mMonthInput").style.display = "none"; unlockScroll(); }
+  $("mOk").addEventListener("click", function () {
+    var f = _onOk, monthVal = $("mMonthInput").style.display !== "none" ? $("mMonthInput").value : undefined;
+    closeModal(); if (f) f(monthVal);
+  });
   $("mCancel").addEventListener("click", closeModal);
   $("modalScrim").addEventListener("click", function (e) { if (e.target === $("modalScrim")) closeModal(); });
 
@@ -906,20 +1014,170 @@
     return "custom";
   }
 
+  function urgencyTier(diff) { return diff <= 3 ? "crit" : (diff <= 14 ? "warn" : "dim"); }
+  function relLabel(diff) { return diff < 0 ? "已到期" : (diff === 0 ? "就在今天" : diff + " 天后"); }
+
+  // 通知铃铛：outline/filled两个svg叠放按状态类切换显示哪个，跟tabbar图标(.ic-outline/.ic-filled)
+  // 同一套手法。renderPayHero()每次整个重写#payHero的innerHTML(含空状态分支)，铃铛按钮本身
+  // 每次都是全新DOM节点，点击事件靠委托绑在#payHero这个父容器上(见initPaySwipe附近的绑定)，
+  // 不需要每次渲染重新bind。
+  function bellHtml() {
+    return '<button type="button" class="pay-hero-bell' + (notify.enabled ? ' on' : '') + '" id="notifyBellBtn" aria-label="还款提醒通知设置">' +
+      '<svg class="ic-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
+      '<svg class="ic-filled" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a6 6 0 0 0-6 6c0 7-3 9-3 9h18s-3-2-3-9a6 6 0 0 0-6-6z"/><path fill="currentColor" d="M9.5 21a2.5 2.5 0 0 0 5 0h-5z"/></svg>' +
+      '</button>';
+  }
+  function renderPayHero(o) {
+    var hero = $("payHero");
+    if (!o) {
+      hero.className = "pay-hero empty";
+      hero.innerHTML = '<div class="pay-hero-top"><div class="pay-hero-label">最近还款日</div>' + bellHtml() + '</div><div class="pay-hero-empty-msg">没有在还债务</div>';
+      return;
+    }
+    hero.className = "pay-hero " + urgencyTier(o.diff);
+    hero.innerHTML =
+      '<div class="pay-hero-top"><div class="pay-hero-label">最近还款日</div>' + bellHtml() + '</div>' +
+      '<div class="pay-hero-row">' +
+        '<div class="pay-hero-date"><span class="pay-hero-daynum num">' + (o.next.getMonth() + 1) + '月' + o.next.getDate() + '日</span><span class="pay-hero-rel"></span></div>' +
+        '<div class="pay-hero-amt num">¥' + fmt(o.d.monthly) + '</div>' +
+      '</div>' +
+      '<div class="pay-hero-name"></div>';
+    hero.querySelector(".pay-hero-rel").textContent = relLabel(o.diff);
+    hero.querySelector(".pay-hero-name").textContent = o.d.name;
+  }
+  function updateBellUI() {
+    var b = document.getElementById("notifyBellBtn");
+    if (b) b.classList.toggle("on", notify.enabled);
+  }
+  $("payHero").addEventListener("click", function (e) {
+    if (e.target.closest("#notifyBellBtn")) openNotifySheet();
+  });
+
+  // 还款提醒卡片左滑：类似iOS/微信聊天列表左滑出删除按钮，这里滑出"标记已还"。
+  // 手势本身沿用"在还债务"长按拖拽那套已验证的教训——触摸设备必须用Touch Events
+  // + {passive:false}才能逐次动态否决原生滚动，Pointer Events做不到。但这里的场景
+  // 比拖拽排序简单：只需要接管水平轴，垂直滚动完全交给原生（不用像拖拽那样连垂直也
+  // 自己接管），所以额外用touch-action:pan-y提前告诉浏览器"水平不归你管"，减少和原生
+  // 手势(比如安卓边缘返回)抢的可能，JS里对水平方向再补一层preventDefault保险。
+  var PAY_REVEAL = 92, paySwipeOpen = null;
+  function closePaySwipe(front) {
+    if (!front) return;
+    front.style.transition = "transform .18s ease"; front.style.transform = "translateX(0)"; front.dataset.open = "0";
+    if (paySwipeOpen === front) paySwipeOpen = null;
+  }
+  function openPaySwipeTo(front) {
+    if (paySwipeOpen && paySwipeOpen !== front) closePaySwipe(paySwipeOpen);
+    front.style.transition = "transform .18s ease"; front.style.transform = "translateX(-" + PAY_REVEAL + "px)"; front.dataset.open = "1";
+    paySwipeOpen = front;
+  }
+  function paySwipeSettle(front, base, dx) {
+    var finalOffset = Math.min(0, Math.max(-PAY_REVEAL, base + dx));
+    if (finalOffset < -PAY_REVEAL / 2) openPaySwipeTo(front); else closePaySwipe(front);
+  }
+  function initPaySwipe(row, front) {
+    front.addEventListener("click", function () {
+      if (front.__justDragged) { front.__justDragged = false; return; }
+      if (front.dataset.open === "1") { closePaySwipe(front); return; }
+      if (paySwipeOpen && paySwipeOpen !== front) closePaySwipe(paySwipeOpen);
+    });
+    row.addEventListener("touchstart", function (e) {
+      if (e.touches.length !== 1) return;
+      // 每次新手势开始都先清掉上一次留下的标记——真正的拖拽(有位移)不会触发浏览器的
+      // click合成，所以__justDragged不会被"消费"掉，留着不清的话会误伤下一次正常点击。
+      front.__justDragged = false;
+      var t0 = e.touches[0], sx = t0.clientX, sy = t0.clientY, id = t0.identifier;
+      var base = front.dataset.open === "1" ? -PAY_REVEAL : 0, axis = null;
+      function tOf(ev) { for (var k = 0; k < ev.changedTouches.length; k++) if (ev.changedTouches[k].identifier === id) return ev.changedTouches[k]; return null; }
+      function onMove(ev) {
+        var t = tOf(ev); if (!t) return;
+        var dx = t.clientX - sx, dy = t.clientY - sy;
+        if (axis === null) {
+          if (Math.abs(dy) > 8 && Math.abs(dy) >= Math.abs(dx)) { axis = "y"; cleanup(); return; }
+          if (Math.abs(dx) > 8) axis = "x"; else return;
+        }
+        ev.preventDefault();
+        front.style.transition = "none";
+        front.style.transform = "translateX(" + Math.min(0, Math.max(-PAY_REVEAL, base + dx)) + "px)";
+      }
+      function onEnd(ev) { var t = tOf(ev); if (!t) return; if (axis === "x") { front.__justDragged = true; paySwipeSettle(front, base, t.clientX - sx); } cleanup(); }
+      function onCancel(ev) { if (!tOf(ev)) return; if (axis === "x") closePaySwipe(front); cleanup(); }
+      function cleanup() { row.removeEventListener("touchmove", onMove); row.removeEventListener("touchend", onEnd); row.removeEventListener("touchcancel", onCancel); }
+      row.addEventListener("touchmove", onMove, { passive: false });
+      row.addEventListener("touchend", onEnd);
+      row.addEventListener("touchcancel", onCancel);
+    }, { passive: true });
+    // 桌面鼠标：Pointer Events没有和原生滚动抢的问题，纯粹为了桌面浏览器也能测。
+    row.addEventListener("pointerdown", function (e) {
+      if (e.pointerType !== "mouse") return;
+      front.__justDragged = false;
+      var sx = e.clientX, pid = e.pointerId, base = front.dataset.open === "1" ? -PAY_REVEAL : 0, moved = false;
+      function onMove(ev) {
+        if (ev.pointerId !== pid) return;
+        var dx = ev.clientX - sx; if (Math.abs(dx) > 4) moved = true;
+        front.style.transition = "none";
+        front.style.transform = "translateX(" + Math.min(0, Math.max(-PAY_REVEAL, base + dx)) + "px)";
+      }
+      function onUp(ev) { if (ev.pointerId !== pid) return; if (moved) { front.__justDragged = true; paySwipeSettle(front, base, ev.clientX - sx); } cleanup(); }
+      function cleanup() { row.removeEventListener("pointermove", onMove); row.removeEventListener("pointerup", onUp); row.removeEventListener("pointercancel", onUp); }
+      row.addEventListener("pointermove", onMove);
+      row.addEventListener("pointerup", onUp);
+      row.addEventListener("pointercancel", onUp);
+    });
+  }
+
   function renderPay() {
     var t0 = today0();
-    var items = debts.filter(function (d) { return isActive(d) && d.nextDate; }).map(function (d) { var n = parseDate(d.nextDate); return { d: d, next: n, diff: Math.round((n - t0) / 86400000) }; }).sort(function (a, b) { return a.diff - b.diff; });
+    paySwipeOpen = null;
+    var items = debts.map(function (d, i) { return { d: d, i: i }; }).filter(function (o) { return isActive(o.d) && o.d.nextDate; })
+      .map(function (o) { var n = parseDate(o.d.nextDate); return { d: o.d, i: o.i, next: n, diff: Math.round((n - t0) / 86400000) }; })
+      .sort(function (a, b) { return a.diff - b.diff; });
+    renderPayHero(items[0] || null);
     var list = $("payList"); list.innerHTML = "";
     if (!items.length) { list.innerHTML = '<div class="footnote">没有在还债务</div>'; return; }
     items.forEach(function (o) {
-      var dotc = o.diff <= 3 ? "crit" : (o.diff <= 14 ? "warn" : "dim");
-      var rel = o.diff < 0 ? "已到期" : (o.diff === 0 ? "就在今天" : o.diff + " 天后");
-      var el = document.createElement("div"); el.className = "pay";
-      el.innerHTML = '<span class="dot ' + dotc + '"></span><div class="d"><div class="day num">' + (o.next.getMonth() + 1) + '/' + o.next.getDate() + '</div><div class="rel">' + rel + '</div></div><div class="w"></div><div class="a num">¥' + fmt(o.d.monthly) + '</div>';
-      el.querySelector(".w").textContent = o.d.name; list.appendChild(el);
+      var row = document.createElement("div"); row.className = "pay-row";
+      row.innerHTML = '<button type="button" class="pay-swipe-btn">标记已还</button><div class="pay"><span class="dot ' + urgencyTier(o.diff) + '"></span><div class="d"><div class="day num">' + (o.next.getMonth() + 1) + '/' + o.next.getDate() + '</div><div class="rel">' + relLabel(o.diff) + '</div></div><div class="w"></div><div class="a num">¥' + fmt(o.d.monthly) + '</div></div>';
+      var front = row.querySelector(".pay");
+      front.querySelector(".w").textContent = o.d.name;
+      row.querySelector(".pay-swipe-btn").addEventListener("click", function () { payInstallment(o.i); });
+      initPaySwipe(row, front);
+      list.appendChild(row);
     });
   }
-  function renderAll() { debts.forEach(recompute); renderSummary(); renderDebts(); renderPay(); }
+  function renderAll() { debts.forEach(recompute); renderSummary(); renderDebts(); renderPay(); syncNotifications(); }
+
+  // 通知调度：每次都是"全清再重排"——这个App里没有别的功能用本地通知，全量重算最简单可靠，
+  // 不需要给每条通知发明持久稳定的ID去做增量diff。只排每笔在还债务"下一期"的提醒(不是整条
+  // 未来计划)，还清一期后nextDate自动推进，下次调用这个函数(payInstallment等最终都会走到
+  // saveAll();renderAll();这个收尾模式)规则就自动跟着滚到下一期，不需要额外挂钩子。
+  function syncNotifications() {
+    var LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
+    if (!LN) return; // 桌面浏览器测试：静默跳过
+    LN.getPending().then(function (res) {
+      var pend = (res && res.notifications) || [];
+      if (pend.length) return LN.cancel({ notifications: pend.map(function (n) { return { id: n.id }; }) });
+    }).then(function () {
+      if (!notify.enabled || !notify.rules.length) return;
+      var list = [], id = 1000, now = Date.now();
+      debts.forEach(function (d) {
+        if (d.settled || !d.nextDate) return;
+        var due = parseDate(d.nextDate);
+        notify.rules.forEach(function (rule) {
+          var fire = new Date(due.getFullYear(), due.getMonth(), due.getDate() - rule.offsetDays);
+          var hm = String(rule.time || "09:00").split(":");
+          fire.setHours(+hm[0] || 0, +hm[1] || 0, 0, 0);
+          if (fire.getTime() <= now) return; // 只排未来的
+          list.push({
+            id: id++, channelId: "repay", smallIcon: "ic_stat_notify",
+            title: "还款提醒",
+            body: d.name + " · " + (due.getMonth() + 1) + "月" + due.getDate() + "日到期 · ¥" + fmt(d.monthly),
+            schedule: { at: fire }
+          });
+        });
+      });
+      if (list.length) return LN.schedule({ notifications: list });
+    }).catch(function () {});
+  }
 
   function kv(k, v) { return '<div><div class="k">' + k + '</div><div class="v num">' + v + '</div></div>'; }
   function openDetail(i) {
@@ -1013,13 +1271,49 @@
   function unsettle(i) { debts[i].settled = false; recompute(debts[i]); saveAll(); renderAll(); toast("已恢复到在还"); }
 
   // ===== edit + plan editor =====
-  function setGenUI(k) { document.querySelectorAll("[data-gg]").forEach(function (g) { g.style.display = g.getAttribute("data-gg") === k ? "block" : "none"; }); }
+  function setGenUI(k) {
+    document.querySelectorAll("[data-gg]").forEach(function (g) { g.style.display = g.getAttribute("data-gg") === k ? "block" : "none"; });
+    // 首期还款日只有一份DOM，物理挪到当前生效的计息方式区块里——amort时和"期数"拼成一行
+    // (用户要求的布局)，其它三种计息方式各自单独成一行(位置跟以前一样，功能不受影响)。
+    var mount = k === "amort" ? $("amortPeriodRow") : document.querySelector('[data-gg="' + k + '"]');
+    if (mount) mount.appendChild($("gFirstField"));
+  }
   $("g-kind").addEventListener("change", function () { setGenUI(this.value); });
-  $("genToggle").addEventListener("click", function () { var p = $("genPanel"); p.style.display = p.style.display === "none" ? "block" : "none"; });
+  $("g-first").addEventListener("change", function () {
+    var d = parseDate(this.value);
+    if (d && isBadRepeatDay(d.getDate())) {
+      this.value = "";
+      toast("首期还款日不支持29/30/31号（不是每个月都有），请选1-28号；这几天到期的话，生成后到下面还款计划里逐期手动改第1期日期");
+    }
+  });
+  // 手动添加/公式生成二选一：点哪个就显示哪个的UI，不再是两套入口同时堆在页面上。
+  function setPlanMode(mode) {
+    planMode = mode;
+    $("planModeManual").classList.toggle("active", mode === "manual");
+    $("planModeGen").classList.toggle("active", mode === "gen");
+    $("genPanel").style.display = mode === "gen" ? "block" : "none";
+    renderPlanRows();
+  }
+  $("planModeManual").addEventListener("click", function () { setPlanMode("manual"); });
+  $("planModeGen").addEventListener("click", function () { setPlanMode("gen"); });
   function syncOneTimeUI() {
     var isOne = $("f-oneTime").checked;
-    $("genToggle").style.display = isOne ? "none" : "";
-    if (isOne) $("genPanel").style.display = "none";
+    // 勾上：把第2期起真正挪出editingPlan(暂存)，不能只在renderPlanRows()里视觉隐藏——
+    // 之前的bug就是隐藏归隐藏，保存时那几期还在editingPlan里，导致"一次性¥X"(只显示第1期)
+    // 和"借款金额"(全部期数本金相加)对不上。取消勾选：把暂存的期数原样放回来。
+    if (isOne) {
+      if (editingPlan.length > 1) { oneTimeStash = editingPlan.slice(1); editingPlan = editingPlan.slice(0, 1); }
+    } else if (oneTimeStash.length) {
+      editingPlan = editingPlan.concat(oneTimeStash); oneTimeStash = [];
+    }
+    // 一次性还清只会有1期，"手动/公式"二选一的切换器整个不适用（公式是生成一整套多期计划）——
+    // 隐藏切换器，只留addRow按钮自己的显隐逻辑(renderPlanRows里)决定要不要露出"加一期"。
+    $("planModeToggle").style.display = isOne ? "none" : "";
+    if (isOne) {
+      planMode = "manual";
+      $("planModeManual").classList.add("active"); $("planModeGen").classList.remove("active");
+      $("genPanel").style.display = "none";
+    }
     renderPlanRows(); refreshPlanSum();
   }
   $("f-oneTime").addEventListener("change", syncOneTimeUI);
@@ -1030,7 +1324,7 @@
     else if (k === "interestfirst") { spec.P = +$("g-P3").value; spec.rate = +$("g-rate3").value; spec.ni = +$("g-ni").value; spec.np = +$("g-np").value; }
     else { spec.n = +$("g-nc").value; }
     editingPlan = genPlan(spec);
-    renderPlanRows(); refreshPlanSum(); $("genPanel").style.display = "none";
+    setPlanMode("manual"); refreshPlanSum();
     toast("已生成 " + editingPlan.length + " 期，可再逐行改");
   });
   $("addRow").addEventListener("click", function () {
@@ -1049,11 +1343,19 @@
     r.principal = +r.principal || 0; r.interest = +r.interest || 0;
     r.amount = r2(r.principal + r.interest);
   }
+  // "还款日（几号）"不再手动填，从还款计划第1期的日期里自动推出来——两者本来就该一致，
+  // 手动填一个跟计划对不上的数字没有意义。第1期还没填日期时留空。
+  function updateFDayFromPlan() {
+    var first = editingPlan[0], d = first && first.date ? parseDate(first.date) : null;
+    $("f-day").value = d ? d.getDate() : "";
+  }
   function renderPlanRows() {
     var box = $("planRows"); box.innerHTML = "";
+    updateFDayFromPlan();
     var isOne = $("f-oneTime").checked;
     var rows = isOne ? editingPlan.slice(0, 1) : editingPlan;
-    $("addRow").style.display = (isOne && editingPlan.length >= 1) ? "none" : "";
+    // 一次性还清时addRow的显隐跟以前一样只看是否已有那唯一1期；否则跟着手动/公式的切换器走。
+    $("addRow").style.display = isOne ? ((editingPlan.length >= 1) ? "none" : "") : (planMode === "manual" ? "" : "none");
     $("batchBlock").style.display = isOne ? "none" : "";
     rows.forEach(function (r, idx) {
       var row = document.createElement("div"); row.className = "prow" + (r.paid ? " paid" : "");
@@ -1068,7 +1370,7 @@
         '</div>';
       var dEl = row.querySelector('[data-f="date"]'), aEl = row.querySelector('[data-f="amount"]'), pEl = row.querySelector('[data-f="principal"]'), iEl = row.querySelector('[data-f="interest"]'), cEl = row.querySelector('[data-f="paid"]');
       dEl.value = r.date || ""; aEl.value = r.amount != null ? r.amount : ""; pEl.value = r.principal != null ? r.principal : ""; iEl.value = r.interest != null ? r.interest : ""; cEl.checked = !!r.paid;
-      dEl.addEventListener("change", function () { r.date = this.value; });
+      dEl.addEventListener("change", function () { r.date = this.value; updateFDayFromPlan(); });
       pEl.addEventListener("input", function () { r.principal = parseFloat(this.value) || 0; linkRow(r); aEl.value = r.amount; refreshPlanSum(); });
       iEl.addEventListener("input", function () { r.interest = parseFloat(this.value) || 0; linkRow(r); aEl.value = r.amount; refreshPlanSum(); });
       aEl.addEventListener("input", function () { r.amount = parseFloat(this.value) || 0; refreshPlanSum(); });
@@ -1077,11 +1379,47 @@
       box.appendChild(row);
     });
   }
+  // 批量设置"数值"框：选"还款日"时切换成"几号"(1-31整数)，选别的列切回普通金额输入。
+  // 29/30/31号不是每个月都有——批量工具投射的是"每月同一天"的重复规律，选这三天会导致
+  // 还款日在不同月份之间漂移(有的月28号有的月31号)，所以批量工具+公式生成的首期还款日
+  // 都不让选这三天；还款计划表格里逐行手动填的具体日期不受这条限制(那是真实数据，
+  // 现实中贷款确实可能就是某个月的30号到期)。
+  function isBadRepeatDay(day) { return day >= 29 && day <= 31; }
+  $("batchCol").addEventListener("change", function () {
+    var v = $("batchVal");
+    if (this.value === "date") { v.type = "number"; v.min = "1"; v.max = "28"; v.step = "1"; v.inputMode = "numeric"; v.placeholder = "几号（1-28）"; }
+    else { v.type = "number"; v.min = "0"; v.max = ""; v.step = "0.01"; v.inputMode = "decimal"; v.placeholder = "数值"; }
+    v.value = "";
+  });
+  // 按"几号"+"首期年月"批量铺日期：每期在首期基础上顺延一个月，日期统一为指定的几号。
+  function applyBatchDate(day, monthVal) {
+    var parts = monthVal.split("-"), y = +parts[0], m = +parts[1] - 1;
+    editingPlan.forEach(function (r, idx) {
+      var dt = new Date(y, m + idx, 1);
+      var lastDay = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate();
+      dt.setDate(Math.min(day, lastDay));
+      r.date = fmtDate(dt);
+    });
+    renderPlanRows(); refreshPlanSum();
+    toast("已批量设置还款日");
+  }
   $("batchApply").addEventListener("click", function () {
-    var col = $("batchCol").value, val = parseFloat($("batchVal").value);
+    var col = $("batchCol").value;
+    if (!editingPlan.length) { toast("还没有还款期，先加一期"); return; }
+    if (col === "date") {
+      var day = parseInt($("batchVal").value, 10);
+      if (!day || day < 1 || day > 31) { toast("先填几号（1-28）"); return; }
+      if (isBadRepeatDay(day)) { toast("29/30/31号不是每个月都有，批量设置只支持1-28号；这几天到期的话，请到下面还款计划里逐期手动填具体日期"); return; }
+      var defaultMonth = editingPlan[0].date ? editingPlan[0].date.slice(0, 7) : "";
+      ask("批量设置还款日", "首期是哪年哪月还？后续每期顺延一个月，日期统一为" + day + "号。", function (monthVal) {
+        if (!monthVal) { toast("请选择首期年月"); return; }
+        applyBatchDate(day, monthVal);
+      }, { month: defaultMonth });
+      return;
+    }
+    var val = parseFloat($("batchVal").value);
     if (isNaN(val)) { toast("先填一个数值"); return; }
     if (val < 0) { toast("数值不能是负数"); return; }
-    if (!editingPlan.length) { toast("还没有还款期，先加一期"); return; }
     function apply() {
       editingPlan.forEach(function (r) {
         if (col === "amount") { r.principal = 0; r.interest = 0; r.amount = r2(val); }
@@ -1097,14 +1435,15 @@
     editIndex = i; var d = i >= 0 ? debts[i] : {};
     $("sheetTitle").textContent = i >= 0 ? "编辑债务" : "新增债务";
     $("f-name").value = d.name || ""; $("f-funder").value = d.funder || ""; $("f-type").value = d.type || "银行贷";
-    $("f-opened").value = d.opened || ""; $("f-day").value = d.day || ""; $("f-notes").value = d.notes || ""; $("f-oneTime").checked = !!d.oneTime;
+    $("f-opened").value = d.opened || ""; $("f-notes").value = d.notes || ""; $("f-oneTime").checked = !!d.oneTime;
     editingPlan = clone(d.plan || []);
+    oneTimeStash = [];
     var g = d.gen || {}; $("g-kind").value = g.kind || "amort"; setGenUI($("g-kind").value);
     $("g-P").value = g.P || ""; $("g-rate").value = g.rate || ""; $("g-n").value = g.n || "";
     $("g-pp").value = g.pp || ""; $("g-pf").value = g.pf || ""; $("g-n2").value = g.n || "";
     $("g-P3").value = g.P || ""; $("g-rate3").value = g.rate || ""; $("g-ni").value = g.ni || ""; $("g-np").value = g.np || "";
     $("g-nc").value = ""; $("g-first").value = g.first || d.opened || "";
-    $("genPanel").style.display = "none";
+    setPlanMode("manual");
     syncOneTimeUI();
     $("deleteBtn").style.display = i >= 0 ? "block" : "none";
     $("scrimEdit").classList.add("open"); $("editSheet").classList.add("open");
@@ -1112,12 +1451,68 @@
     lockScroll();
   }
   function closeEdit() { if (!$("editSheet").classList.contains("open")) return; $("scrimEdit").classList.remove("open"); $("editSheet").classList.remove("open"); editIndex = -1; unlockScroll(); }
+
+  // 还款提醒通知设置面板。规则全局共享(不按债务区分)，跟着每笔债务当下的nextDate
+  // 自动滚动到下一期(syncNotifications里体现)，这里只管开关状态和规则的增删。
+  function offsetLabel(n) { return n === 0 ? "当天到期" : "提前" + n + "天"; }
+  function renderNotifyRules() {
+    var list = $("notifyRuleList"); list.innerHTML = "";
+    if (!notify.rules.length) { list.innerHTML = '<div class="footnote" style="margin:4px 2px 8px;text-align:left">还没有提醒规则，添加一条吧</div>'; return; }
+    notify.rules.forEach(function (r, idx) {
+      var row = document.createElement("div"); row.className = "notify-rule";
+      row.innerHTML = '<span class="nr-text"></span><button type="button" class="nr-del">删除</button>';
+      row.querySelector(".nr-text").textContent = offsetLabel(r.offsetDays) + " · " + r.time;
+      row.querySelector(".nr-del").addEventListener("click", function () {
+        notify.rules.splice(idx, 1); saveNotify(); renderNotifyRules(); syncNotifications();
+      });
+      list.appendChild(row);
+    });
+  }
+  function openNotifySheet() {
+    $("notifyToggle").checked = notify.enabled;
+    renderNotifyRules();
+    $("scrimNotify").classList.add("open"); $("notifySheet").classList.add("open"); lockScroll();
+  }
+  function closeNotifySheet() {
+    if (!$("notifySheet").classList.contains("open")) return;
+    // 开了通知但一条规则都没加就退出：兜底成"当天到期 09:00"，不能让用户开了开关却什么都收不到。
+    if (notify.enabled && !notify.rules.length) { notify.rules.push({ offsetDays: 0, time: "09:00" }); saveNotify(); }
+    $("scrimNotify").classList.remove("open"); $("notifySheet").classList.remove("open"); unlockScroll();
+    updateBellUI(); syncNotifications();
+  }
+  $("notifyToggle").addEventListener("change", function () {
+    var cb = $("notifyToggle");
+    var LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
+    if (cb.checked) {
+      if (!LN) { cb.checked = false; toast("通知仅支持安卓App内使用"); return; }
+      LN.checkPermissions().then(function (r) {
+        if (r.display === "granted") return r;
+        return LN.requestPermissions();
+      }).then(function (r) {
+        if (r.display !== "granted") { cb.checked = false; toast("未授予通知权限"); return; }
+        notify.enabled = true; saveNotify();
+      }).catch(function () { cb.checked = false; toast("未授予通知权限"); });
+    } else {
+      notify.enabled = false; saveNotify();
+    }
+  });
+  $("notifyAddBtn").addEventListener("click", function () {
+    var offsetDays = +$("notifyOffset").value, time = $("notifyTime").value || "09:00";
+    notify.rules.push({ offsetDays: offsetDays, time: time });
+    saveNotify(); renderNotifyRules(); syncNotifications();
+  });
+  $("notifyDoneBtn").addEventListener("click", closeNotifySheet);
+  $("scrimNotify").addEventListener("click", closeNotifySheet);
   function saveForm(e) {
     e.preventDefault();
     var name = $("f-name").value.trim(); if (!name) return;
-    var fday = parseInt($("f-day").value, 10);
-    if (!fday || fday < 1 || fday > 31) { toast("还款日必填（1-31号）"); return; }
+    if (!$("f-opened").value) { toast("借款日必填"); return; }
     if (!editingPlan.length) { toast("至少要有一期还款计划才能保存"); return; }
+    // 还款日(几号)不再单独校验用户是否手填了1-31——它现在完全由第1期的实际日期推出来，
+    // 只要第1期日期填了(下面这个循环会连带校验)，这里就一定有值。
+    var firstDateObj = parseDate(editingPlan[0].date);
+    if (!firstDateObj) { toast("第 1 期的还款日期必须填写"); return; }
+    var fday = firstDateObj.getDate();
     for (var k = 0; k < editingPlan.length; k++) {
       var r = editingPlan[k];
       if (r.amount < 0 || r.principal < 0 || r.interest < 0) { toast("第 " + (k + 1) + " 期的金额/本金/利息不能是负数"); return; }
@@ -1374,13 +1769,14 @@
   document.querySelectorAll(".tabbar button").forEach(function (b) {
     b.addEventListener("click", function () {
       if (jiggleMode) exitJiggle();
+      if (paySwipeOpen) closePaySwipe(paySwipeOpen);
       document.querySelectorAll(".tabbar button").forEach(function (x) { x.setAttribute("aria-selected", "false"); });
       b.setAttribute("aria-selected", "true");
       b.classList.remove("bounce"); void b.offsetWidth; b.classList.add("bounce");
       document.querySelectorAll(".view").forEach(function (v) { v.classList.remove("active"); });
       var view = b.getAttribute("data-view");
       $("view-" + view).classList.add("active"); window.scrollTo(0, 0);
-      var showTop = view === "debts" || view === "pay";
+      var showTop = view === "debts";
       $("topHeader").style.display = showTop ? "" : "none";
       $("topSummary").style.display = showTop ? "" : "none";
     });
@@ -1410,6 +1806,7 @@
     if (jiggleMode) { exitJiggle(); return true; }
     if ($("modalScrim").classList.contains("open")) { closeModal(); return true; }
     if ($("accountScreen").classList.contains("open")) { closeAccountScreen(); return true; }
+    if ($("notifySheet").classList.contains("open")) { closeNotifySheet(); return true; }
     if ($("editSheet").classList.contains("open")) { closeEdit(); return true; }
     if ($("detailSheet").classList.contains("open")) { closeDetail(); return true; }
     return false;
@@ -1492,6 +1889,12 @@
       renderFiles(); toast("已上传 ✓");
     }).catch(function () { toast("保存失败，可能是文件太大或此设备存储空间不足"); });
   });
+
+  // 通知渠道：安卓8+发通知必须先建channel，插件不会自动建；幂等，每次启动调用无副作用。
+  (function () {
+    var LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
+    if (LN) LN.createChannel({ id: "repay", name: "还款提醒", description: "债务还款日提醒", importance: 4 }).catch(function () {});
+  })();
 
   renderFiles(); renderDocContent(); renderAll(); loadUploads(); renderAccountUI();
 })();
