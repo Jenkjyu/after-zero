@@ -24,6 +24,8 @@
 
 **用户在系统选择器里点"取消"是正常操作，不是错误**：`SaveFilePlugin.java`的`@ActivityCallback`方法把这种情况单独`reject("已取消")`，跟真正的写入失败区分开，JS那边不用特殊分支处理，直接把`err.message`吐出来toast就是恰当的中性文案。
 
+**⚠️`SaveFilePlugin.java`现在的写法是"先把base64落到cache临时文件、只把短临时路径带过Activity边界、回调时从临时文件流式拷贝到用户选的位置"，不是早期那种"把整段base64留在`PluginCall`里带过选择器、回调时`Base64.decode`成byte[]一次性`out.write`"——这是踩了真机崩溃坑之后改的架构，改这个文件前务必看懂原因**：系统"另存为"选择器是覆盖满屏的独立Activity，会把本App退到后台；Capacitor为了在进程可能被回收后还能把结果回调给这个`call`，会保存这个call（其`data`里就是那段base64）。当导出的文件较大时（尤其是**内嵌图表PNG的PDF、含多张sheet的xlsx**——高级统计报表导出就是这两种），这段base64会让保存/恢复call时的Binder事务超限抛`TransactionTooLargeException`，或在回调里"持有base64 + 再decode出一份等大byte[]"双份占内存OOM——两种都是**框架层未捕获异常直接闪退**（不是`call.reject`能兜住的，所以JS那边也toast不到任何错误），而此时SAF已经先把目标文件创建成**0字节**，于是真机表现就是"选完保存路径就闪退、导出的文件0B打不开、提示格式错误"。修法就是别让大数据跨Activity边界：`save()`里先`Base64.decode`写进`getCacheDir()`的临时文件，把`call`里的`data`大字段`remove`掉、只塞一个`tmpPath`短字符串，`handleSaveResult()`回调里用`FileInputStream`→`openOutputStream(uri)`**64KB缓冲流式拷贝**、`finally`删临时文件。**JSON备份之类小文件当年没触发这个坑（base64小、远不到Binder上限），所以是报表导出（大文件）才暴露出来的——以后`saveToDeviceDownloads()`要保存的东西只要可能变大，就得走这条临时文件路径，别退回"整段base64塞call"的老写法。**
+
 **JS这边怎么调用**：`www/index.html` 里的 `saveToDeviceDownloads(blob, filename, mime)` 函数会检测 `window.Capacitor.Plugins.SaveFile` 是否存在——存在（真机原生环境）就转base64调用原生插件；不存在（比如本地`python3 -m http.server`桌面浏览器测试）就退回到旧的`<a download>`写法。**这意味着"下载"功能本身没法在桌面浏览器里完整测出真实效果，必须编译APK装真机验证。**
 
 **凡是"往手机存文件"的按钮都必须走 `saveToDeviceDownloads()`，别再直接用 `<a download>`**：除了档案库单个文件的"下载"，"我的"→数据备份里的"下载备份文件"按钮也是这一类。曾经踩过坑——"下载备份文件"当初直接用了裸的 `<a download>` + blob URL，桌面浏览器测着没问题，真机上点了完全没反应（就是上面说的安卓WebView不支持这种写法），后来才改成同样走 `saveToDeviceDownloads()`。以后再加任何"导出/保存到本地"的入口，第一反应就该是复用这个函数，而不是 `<a download>`。
@@ -181,28 +183,99 @@ npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
 
 **⚠️ 踩过一个坑：`#g-P`/`#g-rate`/`#g-n`/`#g-first`（公式生成tab专属的几个字段）不能带HTML5原生`required`属性**——它们跟"保存"提交按钮共用同一个`<form id="debtForm">`。只要用户当时停留在"公式生成"这个tab（`#genPanel`是`display:block`可见状态），哪怕根本没点"生成计划"，这几个字段只要有空的，点"保存"就会被浏览器原生表单校验拦截、`saveForm()`根本不会被调用——**而安卓WebView不会像桌面浏览器那样弹校验提示气泡，拦截后的观感就是"点保存彻底没反应"**，不关窗、不报错、不提示，非常难排查（一度真机反馈"编辑债务保存点不了"，查了很久才定位到是这几个`required`）。修法：去掉这几个字段的`required`（视觉星号`<span class="req">*</span>`保留），校验挪到`#doGen`（"生成计划"按钮，`type="button"`不是`submit`）自己的点击事件里手动toast提示。**以后如果再往`#genPanel`（或者任何跟主表单共用一个`<form>`、但靠`display:none`切换显隐的子面板）里加字段，一律不要用原生`required`，会有同样的隐形阻塞风险——校验都应该手动做、用`toast()`明确提示，不要依赖浏览器原生表单校验的可见反馈（WebView里没有）。**
 
-## 订阅UI基础设施：Premium(Pro买断) + AI(月付)
+## 订阅UI基础设施：Premium(一次性买断) + Premium+(月付/年付，分级包含Premium)
 
-"我的"页"账户"卡片和"全部数据"卡片之间有一张Premium入口卡片（`#premiumEntryCard`），"在还债务"页顶部KPI卡片下方有一条低调的AI入口banner（`#aiBannerBtn`），两者都会跳到同一个新的整页浮层`#premiumScreen`（Pro/AI两个tab切换）。**这轮只做UI展示层，没有接真实支付**——App还没上架任何应用商店，接不了Google Play Billing/华为应用内购这类真实购买流程，"订阅并支付"按钮点了只会弹"暂未开放真实支付"的提示框（`ask()`, `onOk`传`null`）。以后App真正上架后，要把这个按钮换成真实购买流程，再决定`premium.pro`/`premium.ai`要不要补充到期时间等字段。
+"我的"页"账户"卡片和"全部数据"卡片之间有一张Premium入口卡片（`#premiumEntryCard`），"在还债务"页顶部KPI卡片下方有一条低调的AI入口banner（`#aiBannerBtn`），两者都会跳到同一个新的整页浮层`#premiumScreen`（Premium/Premium+两个tab切换）。**这轮只做UI展示层，没有接真实支付**——App还没上架任何应用商店，接不了Google Play Billing/华为应用内购这类真实购买流程，"订阅并支付"按钮点了只会弹"暂未开放真实支付"的提示框（`ask()`, `onOk`传`null`）。以后App真正上架后，要把这个按钮换成真实购买流程，再决定`premium.premium`/`premium.premiumPlus`要不要补充到期时间等字段。
 
-**数据模型是两个独立的可空字段，不是单一tier枚举**：`PREMIUM_KEY`（`after-zero-premium-v1`）存的是`{pro, ai}`，`premium.pro`形状是`{purchasedAt}`（一次性买断，没有"到期"概念），`premium.ai`形状是`{billing:"monthly"|"yearly", startedAt}`。之所以不用`tier:"free"|"pro"|"ai"`这种线性写法，是因为Pro（增值功能买断）和AI（AI功能订阅）是两条互相独立的产品线，用户理论上可以只买Pro、只订AI、两个都买或都不买，线性tier表达不了"有AI没Pro"这种组合。`hasPro()`/`hasAI()`/`premiumLabel()`三个helper统一负责查询和展示文案，"我的"页入口卡片、账户详情页"会员"行、AI banner三处渲染都调这三个函数，不要各写一套if/else。
+**⚠️ 这两级会员名字最早叫"Pro"/"AI"，后来改成了"Premium"/"Premium+"，且关系从"两条互相独立的产品线"改成了"分级"**——早期`hasPro()`/`hasAI()`是正交的（可以只买一个、也可以两个都买，互不包含）；现在`hasPremiumPlus()`（对应老的`hasAI()`）和`hasPremium()`（对应老的`hasPro()`）是**分级**关系：`hasPremium()`的实现是`hasPremiumPlus() || !!premium.premium`，买了Premium+就自动被判定为拥有Premium的全部功能，不需要再单独持有一份`premium.premium`记录去"凑"这个包含关系。以后如果在代码里看到`hasPro`/`hasAI`这两个名字，那是没改完的遗留，应该统一改成`hasPremium`/`hasPremiumPlus`。
+
+**数据模型依然是两个独立的可空字段，不是单一tier枚举**：`PREMIUM_KEY`（`after-zero-premium-v1`）存的是`{premium, premiumPlus}`，`premium.premium`形状是`{purchasedAt}`（一次性买断，没有"到期"概念），`premium.premiumPlus`形状是`{billing:"monthly"|"yearly"|"redeemed", startedAt}`。拆成两个字段而不是`tier:"free"|"premium"|"premiumPlus"`纯粹是历史沿革（当年Pro/AI是正交产品线时就这么设计的），现在虽然逻辑上是分级，但没必要为了"看起来更像tier"去重构存储形状——`hasPremium()`/`hasPremiumPlus()`/`premiumLabel()`三个helper已经把分级关系封装好了，"我的"页入口卡片、账户详情页"会员"行、AI banner三处渲染都调这三个函数，不要各写一套if/else，也不要绕开这两个helper直接读`premium.premium`/`premium.premiumPlus`。
 
 **开发/测试阶段没有真实支付可以验证"已订阅"UI，用`window.__debugPremium(state)`这个调试钩子**（跟CLAUDE.md早先记录的"手写localStorage跳过登录门"是同一类调试手法，但这个额外包成了函数）：
 
 ```js
-window.__debugPremium("pro")   // 模拟已买断Pro
-window.__debugPremium("ai")    // 模拟已订阅AI（月付）
-window.__debugPremium("both")  // 模拟Pro+AI都有
-window.__debugPremium("none")  // 清空，恢复"普通用户"
+window.__debugPremium("premium")      // 模拟已买断Premium
+window.__debugPremium("premiumPlus")  // 模拟已订阅Premium+（自动包含Premium的全部功能）
+window.__debugPremium("none")         // 清空，恢复"普通用户"
 ```
 
 调用后会立即重渲染"我的"页入口卡片、账户详情页"会员"行、AI banner这三处UI，不需要手动刷新页面——桌面浏览器或真机WebView的devtools console里都能执行。
 
-**订阅页价格是占位数字**（Pro ¥98一次性、AI ¥18/月或¥120/年），已经跟用户确认过接受占位、以后接入应用内购时再定真实定价和商品ID，代码里也注释了这一点。
+**兑换码：`#premiumScreen`底部"我有兑换码"入口，这一批只做了最小可用的调试功能，不是真实的兑换系统**——点开会展开一个文本输入框+"兑换"按钮，`REDEEM_CODES`是一个硬编码的`{code: tier}`映射表，目前只有一条：`"0000"`兑换`"premiumPlus"`。兑换成功会调`applyRedeemTier(tier)`直接在本地写`premium.premiumPlus`（`billing:"redeemed"`，跟真实购买的`"monthly"|"yearly"`区分开，方便以后排查这份数据是不是调试凑出来的），没有任何服务端校验、没有一次性使用限制、没有真实的码库。**App正式上线、接入真实支付渠道后，这条硬编码必须删掉**，换成真正的后端兑换码系统（生成、核销、防止重复使用、绑定具体商品）——现在这个只是给开发者自己在没有真实支付的情况下快速切到Premium+效果看的，跟`window.__debugPremium()`是同一类"临时调试手段"，只是换了个从UI里也能触发的入口。
+
+**订阅页价格是占位数字**（Premium ¥98一次性、Premium+ ¥18/月或¥120/年），已经跟用户确认过接受占位、以后接入应用内购时再定真实定价和商品ID，代码里也注释了这一点。Premium+既然分级包含Premium，未来定真实价格时，Premium+的定价逻辑上应该体现"Premium价格+差价"而不是两个完全独立算出来的数字——这次占位数字没有体现这层关系，上线定价时要重新算。
 
 **`.subpage#premiumScreen`是这个项目第二个"整页推入"型浮层**（第一个是`#accountScreen`，见上面"返回键处理"一节），完全照抄它的`.subpage`/`.subpage-header`/`.subpage-body`骨架，也同样加进了`window.__handleBackButton`那条"最上层先关"的判断链——加在`accountScreen`判断**之前**（`modalScrim`判断之后），因为`premiumScreen`在HTML里插在`accountScreen`之后，两者同为`.subpage`（z-index:35）时DOM顺序更靠后的绘制在上层，返回键要先关视觉上在最上层的那个。
 
-**Pro tab的"强调"没有照搬`.pay-hero.overdue`那种整卡实心红底的处理手法**——那是"逾期"这种真正紧急语义专属的最强视觉信号，订阅是转化场景，语义严重级别低得多，用了跟`.pm-btn.active`/`.file-row[aria-current]`同一套"描边+浅底"选中态配方，不专门为订阅页发明新的强调手法。
+**Premium tab的"强调"没有照搬`.pay-hero.overdue`那种整卡实心红底的处理手法**——那是"逾期"这种真正紧急语义专属的最强视觉信号，订阅是转化场景，语义严重级别低得多，用了跟`.pm-btn.active`/`.file-row[aria-current]`同一套"描边+浅底"选中态配方，不专门为订阅页发明新的强调手法。
+
+**兑换码输入框默认收起，每次进订阅页都强制复位成收起**：`#redeemInputWrap`默认`display:none`，点"我有兑换码"（`#redeemToggleBtn`）才展开。`openPremiumScreen()`里显式把它`display="none"`+清空输入框——不这么做的话，上次展开过、关掉订阅页再进来会残留成"一进来就展开"的观感（用户当bug报过）。以后订阅页里任何"点开才显示"的东西，都在`openPremiumScreen()`里复位初始态，别只依赖HTML的默认属性。
+
+**《购买者服务条款》是订阅页footnote里一个高亮可点的链接（`.terms-link`/`#termsLink`），点开进整页浮层`#termsScreen`看真实条款**：条款正文（`www/index.html`里`#termsScreen .terms-body`）目前是**初稿**——覆盖适用范围/会员类型/价格支付/自动续订与取消/退款/兑换码/变更终止/数据免责/更新等条目，末尾明确标注"初稿、仅占位、非最终法律文本"。App正式接入真实支付、上架前要把这份换成正式版本（措辞、退款政策要对齐实际接入的应用商店规则）。`#termsScreen`是继`accountScreen`/`premiumScreen`之后又一个`.subpage`整页浮层，已加进`__handleBackButton`判断链（见下面那条）。
+
+**"我的"页顶部账户区已从"带框的横排（头像+昵称+右箭头）"改成"无框竖排：头像居中、昵称在头像下方居中"**（`.account-head`/`.account-avatar-btn`/`.account-avatar-lg`/`.account-name-c`，替换掉原来的`.data-card#accountCard`+`.account-row`）——**点头像**（`#accountAvatarBtn`）进"账户"详情页`#accountScreen`（原来是点整条`#accountRowBtn`）。注意`.account-avatar`这个class（44px）现在只剩账户详情页在用了，别删；账户区头像用的是新的`.account-avatar-lg`（78px）。`renderAccountUI()`往`#accountAvatarImg`/`#accountNameText`塞头像和昵称，这两个id没变。
+
+**"更大档案库空间"这条Premium功能文案已删除**：档案库文件存在设备本地，开发者没有服务器成本要摊销，人为设一个容量上限纯粹是为了逼氪制造障碍，经不起"这明明不花你一分钱为什么要限制我"的质疑，跟"云备份"（有真实服务器成本）、"OCR识别"/"智能问答"（有真实算力成本）这几条不是一回事。以后再给Premium/Premium+列功能点，先想清楚这条是不是有真实成本支撑，不要照抄"更大空间/无限XX"这类通用套路。
+
+**`__handleBackButton`那条"最上层先关"判断链，随着这轮新增的三个`.subpage`（`#simScreen`/`#reportScreen`/`#backupScreen`，见下面三节）又往前插了三条**：当前完整顺序是 `modalScrim` → `termsScreen` → `backupScreen` → `reportScreen` → `simScreen` → `premiumScreen` → `accountScreen` → `notifySheet` → `editSheet` → `detailSheet`。判断依据不变——这几个新增的`.subpage`在HTML里都插在`premiumScreen`之后（`simScreen`最先、`reportScreen`次之、`backupScreen`、`termsScreen`最后），DOM顺序更靠后的在同z-index下画在上层，返回键要先判视觉上在最上层的那个。以后再加新的`.subpage`，永远加在它在DOM里紧邻的"后一个已有subpage"判断之前，不要图省事加到链尾。（`termsScreen`=购买者服务条款页，是订阅页里"《购买者服务条款》"链接点开的整页浮层，DOM里插在`backupScreen`之后，所以判断排在`backupScreen`之前、`modalScrim`之后。）
+
+## 提前还款收益模拟器（Premium）
+
+债务详情窗（`#detailSheet`）"编辑"/"销这期"下面新增了"提前还款模拟"按钮（`#dSimulate`），点击后（`hasPremium()`门禁，未购买跳订阅页）打开新的整页浮层`#simScreen`，可以选"单次多还一笔"或"每期都多还"两种模式，输入金额+从第几期开始，测算"提前几个月还清、省多少利息"。
+
+**计算模型故意不追4种计划生成器（`amort`/`equalfee`/`interestfirst`/`custom`）各自的原始逐行数学**——`equalfee`（信用卡等本等费）和`custom`（自定义）根本没有良定义的"月利率"概念，没法统一处理"注入一笔额外还款后怎么重新摊销"。改用`recompute()`已经对所有债务统一算出的三个派生值做标准等额本息模拟：`d.balance`（剩余本金）、`d.monthly`（当前月供，模拟时全程保持不变）、`d.rate`（`impliedAPR()`反推的实际年化）。新增的`amortForward(balance, i, M, extraAt)`/`simulatePrepay(d, mode, atPeriod, extra)`两个函数（在`impliedAPR`/`recompute`附近）就做这件事：给定月供不变，逐月摊销直到还清，`extraAt(monthIndex)`回调决定这个月要不要叠加一笔额外还款。**这是一个明确的简化取舍**：不管原始债务是等额本息、信用卡等本等费还是先息后本，模拟出来的"提前还清"效果都是按标准等额本息模型推算的，跟原始计划的逐行数字对不上是预期行为，不是bug。
+
+`M <= interest`（月供还不够付利息，本金永远还不完）时`amortForward`返回`null`，UI层toast"月供不足以覆盖利息，无法测算"——这不该在正常数据下触发，但custom计划允许全0金额，属于防御性兜底。
+
+**只持久化`{mode, extra}`（上次用的模式+金额），不记是哪笔债务/哪一期**：新增localStorage键`after-zero-simulate-v1`（`SIM_KEY`）。这个项目的债务没有稳定id（纯靠数组下标寻址，见"在还债务自定义排序"一节），记"哪笔债务"这类信息在债务被删除/拖拽重排后就会失效或指错对象，只记用户的数值习惯（模式+金额）更稳妥。
+
+## 高级统计报表（Premium）
+
+"我的"页新增"高级统计报表"入口卡片（`hasPremium()`门禁），打开整页浮层`#reportScreen`：2个KPI（加权平均利率、预计全部还清日期）+ 3张图（各债务余额对比的横向条形图、债务类型占比的堆叠条形图+图例、负债预测走势折线图）+ 一个`<details>`折叠的原始数据表，支持导出真正的`.xlsx`和`.pdf`文件。
+
+**这是这个项目第一批图表，配色套用了`dataviz` skill的默认8色类别色板**（`.viz-root`里的`--series-1`..`--series-8`，明暗双模式都定义了），**已经用skill自带的`validate_palette.js`对着本项目实际的浅色`#FFFFFF`/深色`#191D24`底色重新验证过**（全部PASS，只有浅色模式下3个色阶低于3:1对比度触发"relief rule"——用可见的图例文字+数据表满足，不单靠颜色）——不是直接照抄skill文档里参考色`#fcfcfb`/`#1a1a19`的验证结果，那个底色跟这个项目不是一回事，swap配色后必须重新跑一遍验证脚本，这条以后加新图表也适用。三张图全部手写（条形图用普通div+百分比宽度，堆叠条+折线图用内联SVG），没有引入任何图表库。
+
+**"债务类型占比"用`d.type`分组，不是`d.funder`**：`type`是表单里的固定下拉选项（银行贷/信用卡分期/网贷/私人借款，4个值），天然有界；`funder`是自由文本，可能有任意多种取值，容易在图上炸出一堆细碎分类。超过6类会折叠成"其他"，这是判断取舍，不是bug。
+
+**导出用两个库：`jspdf@2.5.1`（UMD，全局`window.jspdf.jsPDF`）+ SheetJS `xlsx@0.20.2`（全局`window.XLSX`）。⚠️这两个库现在是本地打包在`www/fonts`同级的`www/js/`目录下（`www/js/jspdf.umd.min.js`、`www/js/xlsx.full.min.js`），用`<script src="js/xxx">`本地引入，不走CDN——这是踩坑之后改的**：早期从`cdn.jsdelivr.net`（jspdf）/`cdn.sheetjs.com`（xlsx）引入，在国内移动网络下这两个CDN经常加载不出来（不像腾讯的`static.cloudbase.net`稳，所以微信登录/CloudBase那几个CDN脚本没事），真机上表现为点"导出Excel/PDF"弹`toast("导出组件未就绪…")`（`typeof XLSX/window.jspdf === "undefined"`），桌面浏览器却测不出来（能连通CDN）。本地引入后随APK一起装机、离线可用，`npx cap sync`会把整个`www/`（含`www/js/`）打包进去。**以后再要引第三方前端库，第一反应就是下载到`www/js/`本地引入，不要用国内网络不稳的CDN**（CloudBase那三个`static.cloudbase.net`脚本是例外，腾讯自家CDN在国内稳，且SDK有版本耦合不方便本地固化）。`www/js/`跟`www/fonts/`性质一样，是`index.html`引用的本地静态资源、该进git，别当临时产物删掉。
+
+- **Excel导出**（`exportReportXlsx()`）：`XLSX.utils.book_new()` + 3个sheet（债务明细/还款计划明细/汇总KPI），`XLSX.write(wb,{type:"array",bookType:"xlsx"})`包成`Blob`，走`saveToDeviceDownloads()`（硬性规则，见下面"原生插件：SaveFile"一节，不能用`<a download>`）。
+- **PDF导出**（`exportReportPdf()`）：**故意不去克隆屏幕上那份用CSS变量取色的主题化SVG去截图**——序列化成独立SVG文档做光栅化时，`var(--accent)`这类CSS自定义属性脱离了页面样式表的作用域根本解析不出来（渲染出空白/黑色），这是真实会踩的坑，不是猜测。改成`buildExportChartsSVG(data)`单独生成一份**颜色全部写死成字面浅色hex值**的导出专用SVG（不依赖任何CSS变量、不依赖DOM，纯数据驱动），再走`svgStringToPngDataURL()`（Blob→Image→canvas→`toDataURL`）转成PNG，`doc.addImage()`贴进jsPDF页面。**⚠️标题/KPI这几行文字也画进这份SVG里一起栅格化，不用jsPDF的`doc.text()`**——jsPDF内置字体（Helvetica等）不含中文字形，`doc.text()`画中文会整段无法显示（不是排版问题是完全画不出），除非额外内嵌中文字体到vfs（工作量大，不做）。所以整份PDF的中文全程走"SVG→canvas→PNG"这条路，代价是PDF里文字不可选中（是图片）。**PDF固定用浅色配色，不跟随设备当前深色/浅色模式**——打印品在浅色下更易读，这是刻意的取舍。
+
+**PDF现在也包含数据明细表了（不再只是图表摘要）**：早期版本PDF只有图表、明细留给Excel，后来用户要求PDF也带上明细表。因为明细是中文、同样过不了`doc.text()`，走的还是"SVG→PNG"这条路——`buildReportTableRows()`把三张表（各债务余额/类型占比/负债走势）拍平成行，`buildTablePagesSVG()`按每页约34个"行单位"（表头算2个）**分页**成多张SVG（`buildTablePageSVG()`每页一张、高度按行数动态算），`exportReportPdf()`把第1页图表 + 后续N页明细表逐张栅格化后`doc.addPage()`拼进PDF。之所以要分页而不是一张长图，是因为时间线可能几十行，单张超长图贴进A4会被页边裁掉。**屏幕上的数据明细表（`renderReportTables()`）现在也默认直接展开、不折叠了**（去掉了原来的`<details>`/`<summary>`，用户要求"直接展开不要收起"）。
+
+## 云备份（Premium）
+
+**⚠️ 这个功能第一版做的是"自动同步、单一文档覆盖"，已经推翻重做成"完全手动、每次创建一条独立备份记录"——用户自己用下来发现自动同步让人担心手滑/多设备冲突把数据搞乱，宁可自己点一下、每条备份都能单独恢复更放心。**"云同步"这个说法也一并废弃，整个App只保留"云备份"这一种说法，别再在新代码/文案里用"同步"字眼描述这个功能。
+
+"我的"页"云备份"入口卡片（`#backupEntryBtn`，`hasPremium()`门禁）打开整页浮层`#backupScreen`：一个"上次备份"时间展示 + "创建备份"按钮（`#backupCreateBtn`，点击会打包当前的债务/文档/设置/档案库文件，作为**新的一条**记录写入云端，不覆盖已有记录）+ 备份记录列表（`#backupList`，每条显示创建时间、笔数/文件数/大小，各自带"恢复"和"删除"按钮）。点"恢复"会先弹`ask()`二次确认（"此操作不可撤销，确定继续吗"），确认后才会用那条记录的内容整体覆盖本机当前数据。**没有任何自动触发的推送/拉取**——数据变动不会自动上云，登录/冷启动也不会自动去云端拉数据，一切都要用户自己点"创建备份"/"恢复"。
+
+**架构：依然是全部走云函数代理，不做客户端直传云存储**——复用`deleteAccount`已经建立的"身份完全来自服务端已认证会话（`auth.getUserInfo().customUserId`），绝不信任客户端参数"这条安全原则，不用去研究一套这个项目从没碰过的CloudBase Storage安全规则语法（那是一个完全独立于云函数"权限控制"的配置面板）。代价：文件走base64通过函数体积会膨胀~33%、受函数超时/请求体限制——**单文件上限`BACKUP_MAX_FILE_BYTES`（8MB）**，超过的文件在打包这条备份时会被跳过（`console.error`记一条日志），不参与这次备份，仍然可以走手动的本地JSON导出导入兜底。
+
+**每用户配额（写在`backupCreate`云函数里，不是客户端校验）：最多保留20条备份记录、总大小上限300MB**——这是权衡个人记账app的真实使用量给的数字：单文件已经封顶8MB，20条记录留出足够的历史版本可选，300MB对一个人的债务JSON+几张回执单/合同照片绰绰有余，同时又给CloudBase存储成本设了一个明确的硬顶不会无限增长。每次`backupCreate`成功写入新记录后，会按创建时间正序查出这个用户名下的全部记录，只要条数或总字节数超过配额就从最老的一条开始删（连带删它在Storage里的文件），一直删到重新落在配额内。如果单次备份内容自己就超过300MB会直接拒绝写入（`{ok:false, error:...}`），不会出现"删了半天最后把自己删了"的怪异结果。**这两个数字（`MAX_BACKUPS`/`MAX_TOTAL_BYTES`）都是常量写在`backupCreate/index.js`顶部，以后要调整额度直接改这两个数、重新部署即可，不涉及数据结构变动。**
+
+**5个云函数**（`cloudbase/functions/`下，写法全部照抄`deleteAccount`"身份来自`auth.getUserInfo().customUserId`，不信任客户端传参"这一条）：
+- **`backupUploadFile`**：接收`{backupId, fileId, filename, mime, base64}`，`Buffer.from(base64,"base64")`后`app.uploadFile()`到`backups/{openid}/{backupId}/{fileId}-{filename}`，返回`{fileID, size}`。**这个函数纯粹是Storage上传代理，完全不碰数据库**——它不知道也不需要知道"这份文件属于哪条备份记录的完整清单"，客户端把所有文件逐个传完、拿到每个的`fileID`之后，自己组装成`files`数组一次性交给下面的`backupCreate`。
+- **`backupCreate`**：接收`{backupId, debts, docs, notify, premium, files}`（`files`是`backupUploadFile`已经返回的`{id,name,mime,size,fileID}`列表，不含base64），`db.collection("backups").add(...)`写入**一条新文档**（不是`update`/`set`覆盖）。负责上面说的配额清理。
+- **`backupList`**：`.where({openid}).orderBy("createdAt","desc")`查这个用户名下所有记录，`.field({...})`投影只取轻量字段（`createdAt`/`totalSizeBytes`/`debtsCount`/`filesCount`），**不带完整的`debts`/`docs`内容**，列表页够用就行，完整数据留到真正点"恢复"才取。
+- **`backupRestore`**：接收`{backupId}`，`doc(backupId).get()`取出记录后**显式核对`record.openid === customUserId`**——`backupId`本身不是私密凭证（没有额外加密/签名），必须在服务端二次确认这条记录确实属于当前调用者，不能假设"客户端传得出这个id就有权限看"。核对通过后对`files`里每个`fileID`调`app.getTempFileURL()`换临时直链返回。
+- **`backupDelete`**：接收`{backupId}`，同样先核对`record.openid`归属，再删Storage文件+删文档。
+
+**这4个新（不含`backupUploadFile`纯代理，共5个）函数都不需要碰环境共用的"权限控制"配置**——安全默认值`auth.loginType != 'ANONYMOUS' && auth != null`本来就要求真实登录，正好是这几个函数需要的门槛，不用像`wxLogin`那样加具名例外（详见上面"原生插件：WeChatLogin"一节第4条那个"权限控制是环境级共享配置"的坑）。
+
+**⚠️踩过一个隐蔽的客户端坑：云备份一直报`[PERMISSION_DENIED] Permission denied`，根因是客户端把自己的登录会话降级成了匿名。** 表现：明明微信已登录（"我的"页头像昵称都在），一进云备份点任何操作就`PERMISSION_DENIED`。链路：`ensureCbAuthReady()`早期版本**无条件**调`signInAnonymously()`垫底（本意是绕开上面"WeChatLogin第2条"那个SDK对null凭证读`.scope`的崩溃bug），但这会把微信自定义登录建立的"非匿名"会话**降级成匿名**，于是命中上面那条`*`权限规则（要求非匿名）被拒。**修法**：`ensureCbAuthReady()`改成只在本地**连`account`记录都没有**（`if (account) return;`才不return、才走匿名）时才`signInAnonymously()`——用`account`这个我们自己可靠掌握的信号判断"是否已登录"，比去猜SDK内部登录态的形状（`currentUser`/`hasLoginState()`这些在2.28.6上不一定有/不一定准）稳妥得多。同时新增`cbAuth()`统一入口，`cbApp().auth({persistence:"local"})`显式要求会话持久化到localStorage（跨App冷启动自动恢复+续期，否则重启后又只剩匿名），**所有拿auth的地方（登录/注销/退出/`ensureCbAuthReady`）都走`cbAuth()`，别再直接`cbApp().auth()`**。注意登录流程`handleWxAuthResult`开头那次`signInAnonymously()`是**故意保留**的（它在自定义登录之前、且随后就`signInWithCustomTicket()`升级上去，不构成降级），别顺手也删了。
+
+**⚠️再踩一个更隐蔽的部署坑：`PERMISSION_DENIED`修好后，云备份改报`[FUNCTIONS_EXECUTE_FAIL] Error: Cannot find module '@cloudbase/node-sdk'`——根因是这5个备份函数目录里当初漏建了`package.json`。** `wxLogin`/`deleteAccount`目录下都有`package.json`声明`"@cloudbase/node-sdk"`依赖，但这5个备份函数一开始只有`index.js`、没有`package.json`。CloudBase部署时靠函数目录里的`package.json`决定装哪些npm依赖，没有它就不装，运行时`require("@cloudbase/node-sdk")`直接`Cannot find module`。**这个报错跟权限层无关、是函数真的跑起来之后在运行时崩的**——所以看到错误码从`PERMISSION_DENIED`（调用权限层）变成`FUNCTIONS_EXECUTE_FAIL`（函数执行层），其实是"权限通了、进到函数体里了"的进展信号，别当成又坏了一处。**修法**：给5个备份函数各补一个`package.json`（`{name, main:"index.js", dependencies:{"@cloudbase/node-sdk":"^3.18.3"}}`，跟`wxLogin`一致），逐个`tcb fn deploy <name> --force`重新部署。**以后新加任何云函数，第一件事就是照着`wxLogin/package.json`建好`package.json`再写`index.js`**——`index.js`里只要`require`了任何非Node内置模块（`@cloudbase/node-sdk`是必然要用的），就必须在`package.json`里声明，否则部署上去能过、一调用就`Cannot find module`。验证部署有没有真的把依赖装上：`tcb fn invoke <name>`（会以admin身份无终端用户会话跑一次），只要**不是**`Cannot find module`、而是函数自己的业务响应（比如`{"ok":false,"error":"未登录…"}`）就说明依赖到位了（`invoke`日志里那句"缺少依赖 ws 请 npm install ws"是CLI自己streaming日志用的，跟函数无关，忽略）。
+
+**`backups`集合的寻址方式变了，从"一个用户一个文档（`doc(openid)`）"改成了"一个用户多个文档（`openid`是普通字段，配合`.where()`查）"**——因为现在一个用户可以有多条备份记录，不能再用`doc(openid)`这种一对一寻址。**集合本身还是要跟当初`users`集合一样手动去控制台建**（CLI对不存在的集合查询会静默返回`[]`，不能拿来验证是否已经建好），权限选无权限[ADMINONLY]。**Storage存储桶权限也要去控制台确认设成最严格的私有选项**——这是一个跟云函数"权限控制"完全独立的配置面板，这次开发没有实机核实过具体配置项名字，上线前要对照当前CloudBase官方文档重新确认一遍。
+
+**客户端`applyBackupData()`（点"恢复"之后真正落地数据的函数）先`upClear()`清空本机现有档案库文件，再按这条备份记录的`files`清单重新铺回来**——"恢复"语义上是"整体覆盖"，如果不先清空，备份创建之后本机新加的文件会跟恢复回来的文件混在一起，不是真正的覆盖。`debts`/`docs`/`notify`/`premium`这几个JSON字段则是直接整体替换（`localStorage.setItem`），不做字段级合并。
+
+**本地只留一个极简的`after-zero-backup-meta-v1`（`BACKUP_KEY`）存`{lastBackupAt}`**，纯粹给"上次备份"这行展示用——不再像第一版那样维护`lastPushedAt`/`lastLocalChangeAt`/`pushDirty`这类冲突检测用的字段，因为完全手动、每次都是新建记录的模型下不存在"本地和云端谁更新"这种需要比较的情况，那套字段连同它们所在的`SYNC_KEY`已经整体删除，不是改名字，是真的不需要了。
+
+**注销账户联动清理**：`cloudbase/functions/deleteAccount/index.js`现在会在删`users`文档**之前**，`.where({openid: customUserId})`查出这个用户名下**全部**备份记录（不再是当年单文档模型那样`doc(customUserId)`一次搞定），逐条删除对应的Storage文件+文档——不这样做的话，云备份上线后注销账户会真实留下别人看不见但确实存在的孤儿文件，是隐私缺口，不是可选的顺手步骤。
+
+**桌面浏览器测试的边界，容易想当然**：CLAUDE.md早先记录的"用`ACCOUNT_KEY`localStorage小技巧跳过登录门"**只是伪造本地`account`对象、隐藏`#loginGate`，从来没有真正跑通`signInWithCustomTicket()`**——这个状态下`cbAuth()`根本没有真实的CloudBase已认证会话，任何`callFunction({name:"backupCreate"/"backupList"/...})`调用在服务端都会因为鉴权失败被拒（`auth.getUserInfo().customUserId`拿不到值）。**⚠️注意：现在`ensureCbAuthReady()`用`if (account) return;`判断是否已登录（见上面那条降级坑的修法）——桌面浏览器伪造`account`会让它误以为"已登录"从而跳过`signInAnonymously()`，于是连匿名会话都没有，`callFunction`可能直接踩中SDK的null凭证崩溃或鉴权失败。这不是bug，正是"云备份必须真机验证"的另一个体现：桌面伪造`account`这条老调试手法对云备份不适用（对债务/档案库等纯本地功能仍然好用）。**真正的ticket只能来自真实微信OAuth换来的`code`，只有真机走通原生插件才能拿到。**所以模拟器、报表图表/导出、Premium/Premium+订阅页UI、兑换码这几个功能可以完整在桌面浏览器验证，但云备份的真实端到端往返（创建/列表/恢复/删除）必须是装了真实微信登录的真机**，跟当初微信登录本身的验证要求一模一样，没有捷径。
 
 ## 字体：`www/fonts/`
 
@@ -230,7 +303,7 @@ window.__debugPremium("none")  // 清空，恢复"普通用户"
 
 ## 云函数源码：`cloudbase/`
 
-`cloudbase/functions/wxLogin/`是腾讯云开发（CloudBase）云函数的源码，服务端代码，负责微信登录时用`code`换`openid`、签发自定义登录票据（详见上面"原生插件：`WeChatLogin`"一节）。`cloudbase/functions/deleteAccount/`是配套的注销账户云函数，负责真正删除`users`集合里的用户文档（详见上面"云函数：`deleteAccount`"一节）。**这个目录不属于Capacitor/Android那套构建流程，`npx cap sync android`不会碰它，也不会自动部署**——改完要手动同步到CloudBase控制台或用他们的CLI工具部署。AppSecret等敏感配置只存在CloudBase云函数的环境变量里，不存在这个目录任何文件里，也不能加进来。
+`cloudbase/functions/wxLogin/`是腾讯云开发（CloudBase）云函数的源码，服务端代码，负责微信登录时用`code`换`openid`、签发自定义登录票据（详见上面"原生插件：`WeChatLogin`"一节）。`cloudbase/functions/deleteAccount/`是配套的注销账户云函数，负责真正删除`users`集合里的用户文档，现在也负责联动清理云备份数据（详见上面"云备份（Premium）"一节）。`cloudbase/functions/backupCreate/`、`backupList/`、`backupRestore/`、`backupDelete/`、`backupUploadFile/`是云备份功能的5个云函数，读写`backups`集合+Storage文件，详见上面"云备份（Premium）"一节。**这个目录不属于Capacitor/Android那套构建流程，`npx cap sync android`不会碰它，也不会自动部署**——改完要手动同步到CloudBase控制台或用他们的CLI工具部署。AppSecret等敏感配置只存在CloudBase云函数的环境变量里，不存在这个目录任何文件里，也不能加进来。
 
 ## 构建
 
@@ -274,7 +347,7 @@ localStorage.setItem("after-zero-account-v1", JSON.stringify({openid:"test",nick
 
 ## 硬性铁律，改代码前必看
 
-1. **`localStorage` 的 KEY（在`www/index.html`里搜 `debt-manager-v5`）永远不能改。** 这是用户设备上保存真实数据的键名，改了等于让已经装过的app找不到自己原来存的数据，直接清零。同理，`DKEY`（`debt-manager-docs-v5`）、账号登录状态用的`ACCOUNT_KEY`（`after-zero-account-v1`）、在还债务排序方式用的`SORT_KEY`（`debt-manager-sort-v1`）、还款提醒通知设置用的`NOTIF_KEY`（`after-zero-notify-v1`）、订阅状态用的`PREMIUM_KEY`（`after-zero-premium-v1`）以后也不能改——六者是各自独立的键，不要以为加新功能可以复用或合并。
+1. **`localStorage` 的 KEY（在`www/index.html`里搜 `debt-manager-v5`）永远不能改。** 这是用户设备上保存真实数据的键名，改了等于让已经装过的app找不到自己原来存的数据，直接清零。同理，`DKEY`（`debt-manager-docs-v5`）、账号登录状态用的`ACCOUNT_KEY`（`after-zero-account-v1`）、在还债务排序方式用的`SORT_KEY`（`debt-manager-sort-v1`）、还款提醒通知设置用的`NOTIF_KEY`（`after-zero-notify-v1`）、订阅状态用的`PREMIUM_KEY`（`after-zero-premium-v1`）、提前还款模拟器用的`SIM_KEY`（`after-zero-simulate-v1`）、云备份"上次备份时间"用的`BACKUP_KEY`（`after-zero-backup-meta-v1`）以后也不能改——八者是各自独立的键，不要以为加新功能可以复用或合并。
 2. **新安装必须是空数据。** `www/index.html` 里 `SEED`（债务种子数据）、`DOCS_SEED`（文档种子数据）这两个常量现在都是空值——这是故意的，因为这个app的定位是要发给别人用，任何人第一次打开都不能预装开发者自己的私人财务数据。**改代码时如果要放测试数据，改完记得清空再提交，别把私人内容（真实债务数字、个人反思文档、任何带真实姓名/金额的东西）带回默认值里。**
    **私人数据不止藏在这三个常量里。** 之前排查发现过一次：一个叫`cliff`的调试用标记字段，虽然完全没有UI能设置它（不是SEED、不是表单字段），但代码里直接写死了具体的还款日期和金额字符串（`"2027-05 起还本，月供跳至 ¥2,182"`这类）挂在渲染逻辑里，跟SEED是否清空无关。改代码时留意：不只是搜`SEED`/`DOCS_SEED`这两个变量名，任何看着像真实日期/金额/人名的硬编码字符串都要多看一眼是不是该删。（补：曾经还有个`POSTER`"愿景海报"常量，因为没有任何UI入口能往里填内容、属于永远激活不了的死代码，已整体删除，包括`fileItems()`/`renderDocContent()`里对应的分支，别再找它。）
    **"新安装=空数据"这个假设依赖 `AndroidManifest.xml` 里 `android:allowBackup="false"`。** 安卓系统默认（`allowBackup="true"`，Capacitor脚手架生成时的默认值）会把App数据自动云备份到用户的Google账号，卸载重装或者换新手机登录同一个Google账号时可能会自动把旧数据（包括`ACCOUNT_KEY`存的登录态）恢复回来，让"重装"变得不再可靠地等于"空白状态"。这个项目已经手动改成`allowBackup="false"`彻底关掉自动备份——以后如果看到这个值被改回`true`（比如重新跑`npx cap add android`之类的脚手架命令覆盖了手改的manifest），要记得改回`false`。

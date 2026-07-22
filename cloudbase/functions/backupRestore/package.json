@@ -1,0 +1,7 @@
+{
+  "name": "backupRestore",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^3.18.3"
+  }
+}

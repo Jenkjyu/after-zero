@@ -402,10 +402,12 @@
   .price-card .pc-period { font-size: 12px; color: var(--text-muted); }
   .price-card .pc-note { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 
-  .account-row { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: none;
-    padding: 4px 2px; text-align: left; color: inherit; -webkit-tap-highlight-color: transparent; }
+  .account-head { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px 0 4px; }
+  .account-avatar-btn { background: none; border: none; padding: 0; border-radius: 50%;
+    -webkit-tap-highlight-color: transparent; cursor: pointer; }
+  .account-avatar-lg { width: 78px; height: 78px; border-radius: 50%; object-fit: cover; display: block; background: var(--surface-2); }
+  .account-name-c { font-size: 16px; font-weight: 600; text-align: center; }
   .account-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex: none; background: var(--surface-2); }
-  .account-name { flex: 1; font-size: 15.5px; font-weight: 600; }
   .account-chevron { width: 18px; height: 18px; flex: none; color: var(--text-muted); }
 
   .premium-entry-card { padding: 14px 16px; }
@@ -426,6 +428,67 @@
   .account-detail-row:last-child { border-bottom: none; }
   .account-detail-label { font-size: 13px; color: var(--text-muted); }
   .account-detail-value { font-size: 14px; font-weight: 600; }
+
+  /* 高级统计报表：横向条形图(债务余额对比)/堆叠条形图(类型占比)/折线图(负债预测走势)，
+     全部手写SVG/HTML，不引入图表库——这是项目里第一批图表，之前没有先例可抄。配色套用
+     dataviz skill的默认类别色板，已用validate_palette.js对着本项目实际的浅色#FFFFFF/
+     深色#191D24重新验证过(不是直接抄skill文档里参考色的验证结果，那是对着skill自己的
+     参考底色#fcfcfb/#1a1a19验证的，跟本项目的底色不是一回事)。 */
+  .viz-root {
+    --series-1: #2a78d6; --series-2: #008300; --series-3: #e87ba4; --series-4: #eda100;
+    --series-5: #1baf7a; --series-6: #eb6834; --series-7: #4a3aa7; --series-8: #e34948;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      --series-1: #3987e5; --series-2: #008300; --series-3: #d55181; --series-4: #c98500;
+      --series-5: #199e70; --series-6: #d95926; --series-7: #9085e9; --series-8: #e66767;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    --series-1: #3987e5; --series-2: #008300; --series-3: #d55181; --series-4: #c98500;
+    --series-5: #199e70; --series-6: #d95926; --series-7: #9085e9; --series-8: #e66767;
+  }
+  .viz-block { margin-bottom: 22px; }
+  .viz-title { font-size: 13.5px; font-weight: 700; margin-bottom: 10px; }
+  .viz-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+  .viz-bar-name { width: 84px; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
+  .viz-bar-track { flex: 1; background: var(--surface-2); border-radius: 5px; height: 16px; position: relative; overflow: hidden; }
+  .viz-bar-fill { height: 100%; background: var(--accent); border-radius: 5px; }
+  .viz-bar-val { width: 74px; flex: none; text-align: right; font-family: var(--font-num); font-weight: 600; }
+  .viz-stack { display: flex; height: 26px; border-radius: 7px; overflow: hidden; margin-bottom: 10px; }
+  .viz-stack-seg { height: 100%; }
+  .viz-legend { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-bottom: 4px; }
+  .viz-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text); }
+  .viz-legend-swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+  .viz-line-svg { width: 100%; height: auto; display: block; }
+  .viz-line-label { font-size: 10px; fill: var(--text-muted); font-family: var(--font-ui); }
+  .viz-table-toggle { font-size: 12px; color: var(--accent); font-weight: 600; margin: 8px 0 0; }
+  .viz-table-toggle table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  .viz-table-toggle th, .viz-table-toggle td { padding: 6px 7px; text-align: right; border-bottom: 1px solid var(--border); }
+  .viz-table-toggle th:first-child, .viz-table-toggle td:first-child { text-align: left; }
+  .report-actions { display: flex; gap: 8px; margin: 4px 0 20px; }
+  .sync-status-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; }
+  .sync-status-label { font-size: 13px; color: var(--text-muted); }
+  .sync-status-value { font-size: 13.5px; font-weight: 600; }
+  .backup-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 16px; margin-bottom: 8px; box-shadow: var(--shadow); }
+  .backup-row-main { min-width: 0; }
+  .backup-row-time { font-size: 13.5px; font-weight: 600; }
+  .backup-row-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+  .backup-row-actions { display: flex; gap: 6px; flex: none; }
+  .backup-row-actions .btn { flex: none; padding: 7px 12px; font-size: 12.5px; }
+  .redeem-row { margin: 14px 2px 0; text-align: center; }
+  .redeem-toggle { background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 600; padding: 4px; font-family: inherit; }
+  .redeem-input-wrap { display: flex; gap: 8px; margin-top: 10px; }
+  .redeem-input-wrap input { flex: 1; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 9px; padding: 10px 11px; font-size: 14px; font-family: inherit; }
+  .redeem-input-wrap .btn { flex: none; padding: 10px 16px; }
+  .terms-link { background: none; border: none; padding: 0; margin: 0; font: inherit;
+    color: var(--accent); font-weight: 700; text-decoration: underline; -webkit-tap-highlight-color: transparent; }
+  .terms-body h3 { font-size: 15px; font-weight: 700; margin: 18px 0 6px; }
+  .terms-body h3:first-child { margin-top: 2px; }
+  .terms-body p { font-size: 13.5px; line-height: 1.7; color: var(--text-muted); margin: 6px 0; }
+  .terms-body .terms-note { font-size: 12px; color: var(--text-muted); margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--border); }
 
   .footnote { text-align: center; font-size: 11.5px; color: var(--text-muted); margin-top: 14px; padding: 0 10px; line-height: 1.5; }
   .flash { position: fixed; bottom: 92px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--good); color: #fff;
@@ -489,22 +552,31 @@
   </section>
 
   <section class="view" id="view-data">
-    <div class="data-card" id="accountCard">
-      <button type="button" class="account-row" id="accountRowBtn">
-        <img class="account-avatar" id="accountAvatarImg" alt="">
-        <span class="account-name" id="accountNameText"></span>
-        <svg class="account-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+    <div class="account-head">
+      <button type="button" class="account-avatar-btn" id="accountAvatarBtn" aria-label="账户">
+        <img class="account-avatar-lg" id="accountAvatarImg" alt="">
       </button>
+      <div class="account-name-c" id="accountNameText"></div>
     </div>
     <div class="data-card premium-entry-card" id="premiumEntryCard">
       <button type="button" class="premium-entry" id="premiumEntryBtn">
         <div class="premium-entry-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3L21.5 9l-4.8 4.5 1.3 6.7L12 17l-6 3.2 1.3-6.7L2.5 9l6.6-.7L12 2z"/></svg></div>
         <div class="premium-entry-text">
           <div class="premium-entry-title" id="premiumEntryTitle">升级 Premium</div>
-          <div class="premium-entry-sub" id="premiumEntrySub">云同步备份 · 提前还款模拟器 · 高级报表 · AI债务顾问</div>
+          <div class="premium-entry-sub" id="premiumEntrySub">云备份 · 提前还款模拟器 · 高级报表 · AI债务顾问</div>
         </div>
         <svg class="account-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
       </button>
+    </div>
+    <div class="data-card">
+      <h3>云备份</h3>
+      <p>Premium 会员专属：手动创建云端备份，每条记录都能单独恢复，换手机也能找回数据。</p>
+      <div class="data-actions"><button class="btn ghost" id="backupEntryBtn">打开云备份</button></div>
+    </div>
+    <div class="data-card">
+      <h3>高级统计报表</h3>
+      <p>Premium 会员专属：更完整的负债统计图表，支持导出 PDF / Excel。</p>
+      <div class="data-actions"><button class="btn ghost" id="reportEntryBtn">查看报表</button></div>
     </div>
     <div class="data-card">
       <h3>全部数据（债务 + 档案，导出/备份）</h3>
@@ -616,26 +688,26 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3L21.5 9l-4.8 4.5 1.3 6.7L12 17l-6 3.2 1.3-6.7L2.5 9l6.6-.7L12 2z"/></svg>
       </div>
       <div class="premium-hero-title">升级你的 After Zero</div>
-      <div class="premium-hero-sub">解锁云同步、还款优化模拟与 AI 债务顾问</div>
+      <div class="premium-hero-sub">解锁云备份、还款优化模拟与 AI 债务顾问</div>
     </div>
 
     <div class="premium-tabs" role="tablist">
-      <button type="button" class="premium-tab active" id="ptabPro" data-tier="pro" role="tab" aria-selected="true">Pro</button>
-      <button type="button" class="premium-tab" id="ptabAI" data-tier="ai" role="tab" aria-selected="false">AI</button>
+      <button type="button" class="premium-tab active" id="ptabPremium" data-tier="premium" role="tab" aria-selected="true">Premium</button>
+      <button type="button" class="premium-tab" id="ptabPremiumPlus" data-tier="premiumPlus" role="tab" aria-selected="false">Premium+</button>
     </div>
 
-    <div id="premiumFeaturePro" class="pf-list">
+    <div id="premiumFeaturePremium" class="pf-list">
       <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.5-8.98A5.5 5.5 0 0 1 17 8.06 4 4 0 0 1 17 18H7z"/></svg></div>
-        <div class="pf-text"><div class="pf-title">云同步 / 云备份</div><div class="pf-desc">自动同步，无需手动导出导入，换手机也不怕丢数据</div></div></div>
+        <div class="pf-text"><div class="pf-title">云备份</div><div class="pf-desc">手动创建云端备份，每条记录都能单独恢复，换手机也能找回数据</div></div></div>
       <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5M8 17h3"/></svg></div>
         <div class="pf-text"><div class="pf-title">提前还款收益模拟器</div><div class="pf-desc">测算"多还¥X，提前N个月还清，省¥Y利息"</div></div></div>
       <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M11 20V4M18 20v-7"/></svg></div>
         <div class="pf-text"><div class="pf-title">高级统计报表</div><div class="pf-desc">支持导出 PDF / Excel，方便存档与分享</div></div></div>
-      <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4.5l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg></div>
-        <div class="pf-text"><div class="pf-title">更大档案库空间</div><div class="pf-desc">上传更多凭证文件，不再受容量限制</div></div></div>
     </div>
 
-    <div id="premiumFeatureAI" class="pf-list" style="display:none">
+    <div id="premiumFeaturePremiumPlus" class="pf-list" style="display:none">
+      <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+        <div class="pf-text"><div class="pf-title">包含 Premium 全部功能</div><div class="pf-desc">云备份、还款模拟器、高级统计报表，一并解锁</div></div></div>
       <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .8 1.6v.5h5.4v-.5c0-.6.3-1.2.8-1.6A6 6 0 0 0 12 3z"/></svg></div>
         <div class="pf-text"><div class="pf-title">AI 债务优化建议</div><div class="pf-desc">雪球法 / 雪崩法分析，告诉你优先还哪笔最省钱</div></div></div>
       <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M20 15l-4.5-4-6.5 5.5"/></svg></div>
@@ -645,20 +717,20 @@
     </div>
 
     <!-- 价格为占位展示（用户已确认接受占位数字），最终定价与应用内购买商品ID要等上架应用商店时再定 -->
-    <div id="premiumPricePro" class="price-grid">
-      <button type="button" class="price-card selected" data-plan="pro-onetime">
+    <div id="premiumPricePremium" class="price-grid">
+      <button type="button" class="price-card selected" data-plan="premium-onetime">
         <span class="pc-badge">永久解锁</span>
         <div class="pc-amt num">¥98</div>
         <div class="pc-period">一次性付费，永久使用</div>
       </button>
     </div>
-    <div id="premiumPriceAI" class="price-grid two" style="display:none">
-      <button type="button" class="price-card selected" data-plan="ai-monthly">
+    <div id="premiumPricePremiumPlus" class="price-grid two" style="display:none">
+      <button type="button" class="price-card selected" data-plan="premiumplus-monthly">
         <div class="pc-amt num">¥18</div>
         <div class="pc-period">/ 月</div>
         <div class="pc-note">按月订阅，随时可取消</div>
       </button>
-      <button type="button" class="price-card" data-plan="ai-yearly">
+      <button type="button" class="price-card" data-plan="premiumplus-yearly">
         <span class="pc-badge">省 44%</span>
         <div class="pc-amt num">¥120</div>
         <div class="pc-period">/ 年</div>
@@ -669,7 +741,119 @@
     <div class="data-actions" style="margin-top:4px">
       <button type="button" class="btn primary" id="premiumSubscribeBtn">订阅并支付</button>
     </div>
-    <div class="footnote" id="premiumTerms">订阅即表示你同意我们的《购买者服务条款》。除非提前取消，否则订阅服务将自动续订，费用将从你的应用商店账户中扣除。可随时在应用商店的订阅管理中取消。</div>
+    <div class="redeem-row" id="redeemRow">
+      <button type="button" class="redeem-toggle" id="redeemToggleBtn">我有兑换码</button>
+      <div class="redeem-input-wrap" id="redeemInputWrap" style="display:none">
+        <input type="text" id="redeemCodeInput" placeholder="输入兑换码" autocomplete="off">
+        <button type="button" class="btn primary" id="redeemApplyBtn">兑换</button>
+      </div>
+    </div>
+    <div class="footnote" id="premiumTerms">订阅即表示你同意我们的<button type="button" class="terms-link" id="termsLink">《购买者服务条款》</button>。除非提前取消，否则订阅服务将自动续订，费用将从你的应用商店账户中扣除。可随时在应用商店的订阅管理中取消。</div>
+  </div>
+</div>
+
+<div class="subpage" id="simScreen">
+  <div class="subpage-header">
+    <button type="button" class="subpage-back" id="simBackBtn" aria-label="返回">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="subpage-title">提前还款模拟器</div>
+    <div class="subpage-header-spacer"></div>
+  </div>
+  <div class="subpage-body">
+    <div class="data-card">
+      <h3 id="simDebtName"></h3>
+      <p>模拟提前多还一笔钱，看看能省多少利息、提前多久还清（按当前月供、推算年化利率测算，实际以银行/平台真实计算为准）。</p>
+    </div>
+    <div class="premium-tabs" role="tablist" style="margin-bottom:14px">
+      <button type="button" class="premium-tab active" id="simModeOnce" data-mode="once" role="tab" aria-selected="true">单次多还</button>
+      <button type="button" class="premium-tab" id="simModeRecurring" data-mode="recurring" role="tab" aria-selected="false">每期多还</button>
+    </div>
+    <div class="field"><label for="simExtra">多还金额 ¥ <span class="req">*</span></label><input id="simExtra" type="number" step="0.01" min="0" inputmode="decimal"></div>
+    <div class="field"><label for="simAtPeriod">从第几期开始 <span class="req">*</span></label><input id="simAtPeriod" type="number" min="1" inputmode="numeric"></div>
+    <button type="button" class="btn primary" id="simRunBtn" style="width:100%">开始测算</button>
+    <div id="simResult" style="margin-top:18px"></div>
+  </div>
+</div>
+
+<div class="subpage" id="reportScreen">
+  <div class="subpage-header">
+    <button type="button" class="subpage-back" id="reportBackBtn" aria-label="返回">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="subpage-title">高级统计报表</div>
+    <div class="subpage-header-spacer"></div>
+  </div>
+  <div class="subpage-body">
+    <div class="summary" id="reportKpis" style="margin-bottom:18px"></div>
+    <div class="report-actions">
+      <button type="button" class="btn ghost" id="reportExportXlsxBtn">导出 Excel</button>
+      <button type="button" class="btn ghost" id="reportExportPdfBtn">导出 PDF</button>
+    </div>
+    <div class="viz-root" id="reportCharts"></div>
+  </div>
+</div>
+
+<div class="subpage" id="backupScreen">
+  <div class="subpage-header">
+    <button type="button" class="subpage-back" id="backupBackBtn" aria-label="返回">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="subpage-title">云备份</div>
+    <div class="subpage-header-spacer"></div>
+  </div>
+  <div class="subpage-body">
+    <div class="data-card">
+      <p style="margin-bottom:0">手动创建云端备份，每一条都是独立记录，可以随时选一条恢复到本机。恢复会覆盖本机当前的全部数据，请谨慎操作。</p>
+    </div>
+    <div class="data-card">
+      <div class="sync-status-row"><span class="sync-status-label">上次备份</span><span class="sync-status-value" id="backupLastText">从未备份</span></div>
+      <div class="data-actions" style="margin-top:8px"><button type="button" class="btn primary" id="backupCreateBtn">创建备份</button></div>
+    </div>
+    <div class="section-label" style="margin-top:6px">备份记录</div>
+    <div id="backupList"></div>
+  </div>
+</div>
+
+<div class="subpage" id="termsScreen">
+  <div class="subpage-header">
+    <button type="button" class="subpage-back" id="termsBackBtn" aria-label="返回">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="subpage-title">购买者服务条款</div>
+    <div class="subpage-header-spacer"></div>
+  </div>
+  <div class="subpage-body terms-body">
+    <p>本条款为《购买者服务条款》初稿，用于说明你在 After Zero 中购买或订阅会员服务（Premium / Premium+）时双方的权利与义务。在你完成任何付费购买前，请仔细阅读。一旦付费购买或使用会员功能，即视为你已阅读、理解并同意本条款。</p>
+
+    <h3>一、服务提供者与适用范围</h3>
+    <p>本条款适用于 After Zero 应用内提供的一切收费项目，包括一次性买断的 Premium 以及按周期订阅的 Premium+。本条款不适用于应用内免费提供的功能。</p>
+
+    <h3>二、会员类型与内容</h3>
+    <p>Premium 为一次性买断，付费后即长期解锁其所包含的功能，不涉及到期或续费。Premium+ 为周期性订阅（月付或年付），在订阅有效期内可使用其全部功能；Premium+ 采用分级设计，包含 Premium 的全部功能。各档位包含的具体功能以应用内当时展示的说明为准，我们可能会随版本更新调整功能范围。</p>
+
+    <h3>三、价格与支付</h3>
+    <p>应用内展示的价格当前为占位示意，最终实际价格、货币与计费商品以正式上架应用商店后、你在下单页面看到并确认的金额为准。付款将通过你所使用的应用商店账户完成，具体扣款、发票与账单由相应应用商店提供。</p>
+
+    <h3>四、自动续订与取消</h3>
+    <p>Premium+ 订阅在每个计费周期结束时默认自动续订，费用将从你的应用商店账户扣除。你可以随时在应用商店的订阅管理中关闭自动续订；关闭后当前周期到期前仍可继续使用，到期后不再续费。一次性买断的 Premium 不涉及自动续订。</p>
+
+    <h3>五、退款</h3>
+    <p>退款申请及处理依据你所使用的应用商店的退款政策执行。对于因你个人原因（如误购、不再需要）提出的退款请求，我们将在应用商店政策允许的范围内协助处理，但不保证一定获得退款。</p>
+
+    <h3>六、兑换码</h3>
+    <p>我们可能不定期提供兑换码用于解锁相应会员权益。兑换码不可兑换现金、不可转售，且可能设有使用期限或次数限制。通过非官方渠道获取的兑换码可能无效，由此产生的损失由使用者自行承担。</p>
+
+    <h3>七、服务的变更、中断与终止</h3>
+    <p>我们可能因产品迭代、技术维护或不可抗力等原因，对会员功能进行调整、暂停或终止。若发生对你已购买权益产生重大不利影响的变更，我们将尽合理努力事先告知，并在适用商店政策允许时提供相应补偿方案。</p>
+
+    <h3>八、数据与免责</h3>
+    <p>会员功能（如云备份）会按你的操作处理你的数据。我们会采取合理措施保护数据安全，但在法律允许的最大范围内，不对因网络故障、设备问题、不可抗力或你自身操作导致的数据丢失或损坏承担责任。请你自行做好重要数据的多重备份。</p>
+
+    <h3>九、条款更新</h3>
+    <p>我们可能不时更新本条款。更新后的条款将在应用内公示，你继续使用付费服务即视为接受更新后的条款。</p>
+
+    <p class="terms-note">本文本为初稿，仅用于产品占位与体验展示，不构成最终具有法律约束力的正式条款；正式上架收费前将由我们发布最终版本。如对本条款有任何疑问，可通过应用商店的开发者联系方式与我们联系。</p>
   </div>
 </div>
 
@@ -682,6 +866,9 @@
   <div class="sheet-actions">
     <button type="button" class="btn ghost" id="dEdit"><svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>编辑</button>
     <button type="button" class="btn primary" id="dSale"><svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span id="dSaleLabel">销这期</span></button>
+  </div>
+  <div class="sheet-actions" style="margin-top:10px">
+    <button type="button" class="btn ghost" id="dSimulate">提前还款模拟</button>
   </div>
   <div class="sheet-actions" style="margin-top:10px">
     <button type="button" class="btn danger" id="dSettle">提前结清</button>
@@ -800,6 +987,12 @@
 <script src="https://static.cloudbase.net/cloudbase-js-sdk/2.28.6/cloudbase.js"></script>
 <script src="https://static.cloudbase.net/cloudbase-js-sdk/2.28.6/cloudbase.auth.js"></script>
 <script src="https://static.cloudbase.net/cloudbase-js-sdk/2.28.6/cloudbase.functions.js"></script>
+<!-- 高级统计报表导出用：jsPDF导出PDF(window.jspdf.jsPDF)，SheetJS(xlsx)导出真正的.xlsx(window.XLSX)。
+     ⚠️ 这两个库本地打包在 www/js/ 下，不走CDN——早期从 cdn.jsdelivr.net / cdn.sheetjs.com 引入，
+     在国内移动网络下经常加载失败(不像腾讯的 static.cloudbase.net 稳定)，表现为导出时报"图表库加载失败"。
+     本地引入后随APK一起装机、离线可用，npx cap sync会把整个 www/ 打包进去。 -->
+<script src="js/jspdf.umd.min.js"></script>
+<script src="js/xlsx.full.min.js"></script>
 <script>
 (function () {
   "use strict";
@@ -810,10 +1003,18 @@
   var SORT_KEY = "debt-manager-sort-v1";
   // 还款提醒通知设置（全局共享，不按债务区分），独立于上面几个键。
   var NOTIF_KEY = "after-zero-notify-v1";
-  // 订阅状态：Pro(一次性买断)/AI(按月订阅)是两条独立产品线，不是线性tier，
-  // 所以拆成两个可分别为空的字段，不用单一tier枚举——理论上可以只买Pro、只订AI、
-  // 两个都买、或都不买。独立于上面几个键。
+  // 订阅状态：Premium(一次性买断)/Premium+(按月订阅，分级包含Premium全部功能)，
+  // 依然拆成两个可分别为空的字段存(不是单一tier枚举)——hasPremium()/hasPremiumPlus()
+  // 两个helper负责处理"买了Premium+就自动算有Premium"这层包含关系，字段本身不用
+  // 相互冗余记录。独立于上面几个键。
   var PREMIUM_KEY = "after-zero-premium-v1";
+  // 提前还款模拟器：只记住上次用的模式+金额，不记是哪笔债务/哪一期——债务没有稳定id
+  // (纯靠数组下标寻址，见"在还债务自定义排序"一节)，记那些容易在债务被删/重排后失效。
+  // 独立于上面几个键。
+  var SIM_KEY = "after-zero-simulate-v1";
+  // 云备份：本地只存"上次备份时间"这一件事用来展示，备份记录本身全部存在云端。
+  // 独立于上面几个键。
+  var BACKUP_KEY = "after-zero-backup-meta-v1";
   // SEED: minimal spec; full plan generated on load
   var SEED = [];
   var DOCS_SEED = [];
@@ -895,6 +1096,33 @@
   function normalize(d) { if (!d.plan) { d.plan = genPlan(d.gen); markPaidThrough(d.plan, (d.gen && d.gen.paid) || 0); } recompute(d); }
   function markPaidThrough(plan, n) { for (var k = 0; k < plan.length; k++) plan[k].paid = k < n; }
 
+  // 提前还款模拟器：4种计划生成器(等额本息/信用卡等本等费/先息后本/自定义)各自的逐行
+  // 数学不统一(equalfee/custom没有良定义的"月利率"概念)，没法统一处理"注入一笔额外还款"。
+  // 改用recompute()已经对所有债务统一算出的派生值(balance/monthly/rate)做标准等额本息
+  // 模拟，不追各自生成器的原始逐行细节——这是一个明确的简化取舍。
+  function amortForward(balance, i, M, extraAt) {
+    var bal = balance, months = 0, totalInterest = 0;
+    while (bal > 0.005 && months < 1200) {
+      var interest = bal * i;
+      if (M <= interest) return null; // 月供不足以覆盖利息，无法收敛
+      months++;
+      var principal = Math.min(M - interest, bal);
+      bal -= principal; totalInterest += interest;
+      var extra = extraAt ? (extraAt(months) || 0) : 0;
+      if (extra > 0) bal = Math.max(0, bal - Math.min(extra, bal));
+    }
+    return { months: months, totalInterest: r2(totalInterest) };
+  }
+  function simulatePrepay(d, mode, atPeriod, extra) {
+    var i = (+d.rate || 0) / 1200, M = +d.monthly || 0, balance = +d.balance || 0;
+    var baseline = amortForward(balance, i, M, null);
+    var scenario = mode === "recurring"
+      ? amortForward(balance, i, M, function (m) { return m >= atPeriod ? extra : 0; })
+      : amortForward(balance, i, M, function (m) { return m === atPeriod ? extra : 0; });
+    if (!baseline || !scenario) return null;
+    return { monthsSaved: baseline.months - scenario.months, interestSaved: r2(baseline.totalInterest - scenario.totalInterest), newMonths: scenario.months, baseMonths: baseline.months };
+  }
+
   function loadJSON(k, seed) { try { var r = localStorage.getItem(k); if (r) return JSON.parse(r); } catch (e) {} return clone(seed); }
   function saveAll() { try { localStorage.setItem(KEY, JSON.stringify(debts)); localStorage.setItem(DKEY, JSON.stringify(docs)); } catch (e) {} }
 
@@ -904,30 +1132,47 @@
   var notify = loadJSON(NOTIF_KEY, { enabled: false, rules: [] });
   function saveNotify() { try { localStorage.setItem(NOTIF_KEY, JSON.stringify(notify)); } catch (e) {} }
   // 新装必须是空数据：默认两项都是null，即"普通用户"。
-  var premium = loadJSON(PREMIUM_KEY, { pro: null, ai: null });
+  // Premium/Premium+ 是分级关系(不是当年Pro/AI那种两条互相独立的产品线)：Premium+
+  // 自动包含Premium的全部功能，hasPremium()在"买了Premium+"的情况下也会返回true，
+  // 不需要每次买Premium+时额外再补一份premium.premium记录去"凑"这个包含关系。
+  var premium = loadJSON(PREMIUM_KEY, { premium: null, premiumPlus: null });
   function savePremium() { try { localStorage.setItem(PREMIUM_KEY, JSON.stringify(premium)); } catch (e) {} }
-  function hasPro() { return !!(premium && premium.pro); }
-  function hasAI() { return !!(premium && premium.ai); }
+  var simPrefs = loadJSON(SIM_KEY, { mode: "once", extra: 0 });
+  function saveSimPrefs() { try { localStorage.setItem(SIM_KEY, JSON.stringify(simPrefs)); } catch (e) {} }
+  // 云备份只需要记住"上次备份是什么时候"这一件事用来展示——备份记录本身全部存在云端，
+  // 靠云函数backupList实时查，本地不缓存任何一条备份的内容。
+  var lastBackupMeta = loadJSON(BACKUP_KEY, { lastBackupAt: 0 });
+  function saveLastBackupMeta() { try { localStorage.setItem(BACKUP_KEY, JSON.stringify(lastBackupMeta)); } catch (e) {} }
+  function hasPremiumPlus() { return !!(premium && premium.premiumPlus); }
+  function hasPremium() { return hasPremiumPlus() || !!(premium && premium.premium); }
   function premiumLabel() {
-    if (hasPro() && hasAI()) return "Pro + AI 会员";
-    if (hasPro()) return "Pro 会员";
-    if (hasAI()) return "AI 会员";
+    if (hasPremiumPlus()) return "Premium+ 会员";
+    if (hasPremium()) return "Premium 会员";
     return null;
+  }
+  // 兑换码：这一批只做最小可用——硬编码一个调试码方便自己在没有真实支付渠道时验证
+  // Premium+效果，不是真实的兑换码发放/核销系统。App正式上线、接入真实支付后，
+  // 这条硬编码要删掉，换成真正的后端兑换码校验（一次性使用、绑定具体商品等）。
+  var REDEEM_CODES = { "0000": "premiumPlus" };
+  function applyRedeemTier(tier) {
+    if (tier === "premiumPlus") {
+      premium.premiumPlus = premium.premiumPlus || { billing: "redeemed", startedAt: new Date().toISOString() };
+    } else if (tier === "premium") {
+      premium.premium = premium.premium || { purchasedAt: new Date().toISOString() };
+    }
+    savePremium(); renderAccountDetail(); renderPremiumEntryCard(); renderAIBanner(); setPremiumTab(premiumTab);
   }
   // 开发/测试期间模拟"已订阅"效果用——App还没上应用商店，接不了真实支付，没有别的
   // 办法能走通购买流程。跟CLAUDE.md记录的"手写localStorage模拟登录"是同一类调试
   // 手法，区别是这个函数会立即重渲染当前页面上三处订阅相关UI，不需要手动刷新页面。
   // 用法（桌面浏览器或真机WebView的devtools console里执行）：
-  //   window.__debugPremium("pro")   // 模拟已买断Pro
-  //   window.__debugPremium("ai")    // 模拟已订阅AI（月付）
-  //   window.__debugPremium("both")  // 模拟Pro+AI都有
-  //   window.__debugPremium("none")  // 清空，恢复"普通用户"
+  //   window.__debugPremium("premium")      // 模拟已买断Premium
+  //   window.__debugPremium("premiumPlus")  // 模拟已订阅Premium+（自动包含Premium）
+  //   window.__debugPremium("none")         // 清空，恢复"普通用户"
   window.__debugPremium = function (state) {
-    if (state === "none") { premium = { pro: null, ai: null }; }
-    else {
-      if (state === "pro" || state === "both") premium.pro = { purchasedAt: new Date().toISOString() };
-      if (state === "ai" || state === "both") premium.ai = { billing: premiumPlanSel.ai === "ai-yearly" ? "yearly" : "monthly", startedAt: new Date().toISOString() };
-    }
+    if (state === "none") { premium = { premium: null, premiumPlus: null }; }
+    else if (state === "premium") { premium = { premium: { purchasedAt: new Date().toISOString() }, premiumPlus: null }; }
+    else if (state === "premiumPlus") { premium = { premium: null, premiumPlus: { billing: premiumPlanSel.premiumPlus === "premiumplus-yearly" ? "yearly" : "monthly", startedAt: new Date().toISOString() } }; }
     savePremium(); renderAccountDetail(); renderPremiumEntryCard(); renderAIBanner();
     toast("（调试）订阅状态已设为：" + state);
   };
@@ -1810,6 +2055,18 @@
   var CLOUDBASE_ENV_ID = "after-zero-d7gub5p5f09c8cc2d";
   var _cbApp = null;
   function cbApp() { if (!_cbApp) _cbApp = cloudbase.init({ env: CLOUDBASE_ENV_ID }); return _cbApp; }
+  // 统一从这里拿auth实例，并显式要求 persistence:'local'——微信自定义登录的会话必须持久化到
+  // localStorage 才能跨App冷启动自动恢复+续期；否则重启后只剩匿名会话，云备份那几个云函数命中
+  // "非匿名"权限规则会被 PERMISSION_DENIED 拒掉。app.auth()是单例，第一次调用带上的选项生效，
+  // 所以所有地方都走这个helper、别再直接 cbApp().auth()。选项名若被某小版本忽略也无害（try兜底）。
+  var _cbAuth = null;
+  function cbAuth() {
+    if (!_cbAuth) {
+      try { _cbAuth = cbApp().auth({ persistence: "local" }); }
+      catch (e) { _cbAuth = cbApp().auth(); }
+    }
+    return _cbAuth;
+  }
 
   function renderAccountUI() {
     if (account) {
@@ -1829,34 +2086,327 @@
   function openAccountScreen() { renderAccountDetail(); $("accountScreen").classList.add("open"); lockScroll(); }
   function closeAccountScreen() { if (!$("accountScreen").classList.contains("open")) return; $("accountScreen").classList.remove("open"); unlockScroll(); }
 
-  // 订阅页：Pro(一次性买断)/AI(按月订阅)两个tab互斥显示各自的功能列表+价格区。
+  // 订阅页：Premium(一次性买断)/Premium+(按月订阅，分级包含Premium全部功能)两个tab
+  // 互斥显示各自的功能列表+价格区。
   function renderPremiumEntryCard() {
     var label = premiumLabel();
     $("premiumEntryCard").classList.toggle("is-member", !!label);
     $("premiumEntryTitle").textContent = label || "升级 Premium";
-    $("premiumEntrySub").textContent = label ? "查看订阅详情、管理续订" : "云同步备份 · 提前还款模拟器 · 高级报表 · AI债务顾问";
+    $("premiumEntrySub").textContent = label ? "查看订阅详情、管理续订" : "云备份 · 提前还款模拟器 · 高级报表 · AI债务顾问";
   }
   function renderAIBanner() {
-    var ai = hasAI();
+    var ai = hasPremiumPlus();
     $("aiBannerBtn").classList.toggle("is-ai", ai);
     $("aiBannerTitle").textContent = ai ? "AI 债务顾问" : "AI 债务优化建议";
-    $("aiBannerSub").textContent = ai ? "已开通 · 雪球/雪崩法分析、优先还款建议" : "开通 AI 会员，获取雪球/雪崩法分析与更省钱的还款顺序";
+    $("aiBannerSub").textContent = ai ? "已开通 · 雪球/雪崩法分析、优先还款建议" : "开通 Premium+ 会员，获取雪球/雪崩法分析与更省钱的还款顺序";
   }
-  var premiumTab = "pro";
-  var premiumPlanSel = { pro: "pro-onetime", ai: "ai-monthly" };
+  var premiumTab = "premium";
+  var premiumPlanSel = { premium: "premium-onetime", premiumPlus: "premiumplus-monthly" };
   function setPremiumTab(tier) {
     premiumTab = tier;
-    $("ptabPro").classList.toggle("active", tier === "pro");
-    $("ptabPro").setAttribute("aria-selected", tier === "pro");
-    $("ptabAI").classList.toggle("active", tier === "ai");
-    $("ptabAI").setAttribute("aria-selected", tier === "ai");
-    $("premiumFeaturePro").style.display = tier === "pro" ? "" : "none";
-    $("premiumFeatureAI").style.display = tier === "ai" ? "" : "none";
-    $("premiumPricePro").style.display = tier === "pro" ? "" : "none";
-    $("premiumPriceAI").style.display = tier === "ai" ? "" : "none";
+    $("ptabPremium").classList.toggle("active", tier === "premium");
+    $("ptabPremium").setAttribute("aria-selected", tier === "premium");
+    $("ptabPremiumPlus").classList.toggle("active", tier === "premiumPlus");
+    $("ptabPremiumPlus").setAttribute("aria-selected", tier === "premiumPlus");
+    $("premiumFeaturePremium").style.display = tier === "premium" ? "" : "none";
+    $("premiumFeaturePremiumPlus").style.display = tier === "premiumPlus" ? "" : "none";
+    $("premiumPricePremium").style.display = tier === "premium" ? "" : "none";
+    $("premiumPricePremiumPlus").style.display = tier === "premiumPlus" ? "" : "none";
   }
-  function openPremiumScreen(tier) { setPremiumTab(tier || "pro"); $("premiumScreen").classList.add("open"); lockScroll(); }
+  function openPremiumScreen(tier) {
+    setPremiumTab(tier || "premium");
+    // 兑换码输入框每次进订阅页都收起（默认不展开），避免上次展开后残留成"默认打开"的观感。
+    $("redeemInputWrap").style.display = "none"; $("redeemCodeInput").value = "";
+    $("premiumScreen").classList.add("open"); lockScroll();
+  }
   function closePremiumScreen() { if (!$("premiumScreen").classList.contains("open")) return; $("premiumScreen").classList.remove("open"); unlockScroll(); }
+  function openTermsScreen() { $("termsScreen").classList.add("open"); lockScroll(); }
+  function closeTermsScreen() { if (!$("termsScreen").classList.contains("open")) return; $("termsScreen").classList.remove("open"); unlockScroll(); }
+
+  // ===== 提前还款收益模拟器（Premium）=====
+  var simIndex = -1, simMode = simPrefs.mode === "recurring" ? "recurring" : "once";
+  function setSimMode(mode) {
+    simMode = mode === "recurring" ? "recurring" : "once";
+    $("simModeOnce").classList.toggle("active", simMode === "once");
+    $("simModeOnce").setAttribute("aria-selected", simMode === "once");
+    $("simModeRecurring").classList.toggle("active", simMode === "recurring");
+    $("simModeRecurring").setAttribute("aria-selected", simMode === "recurring");
+  }
+  function openSimScreen(i) {
+    var d = debts[i]; if (!d) return;
+    simIndex = i;
+    $("simDebtName").textContent = d.name;
+    setSimMode(simMode);
+    $("simExtra").value = simPrefs.extra || "";
+    $("simAtPeriod").value = 1;
+    $("simAtPeriod").max = d.terms || 1;
+    $("simResult").innerHTML = "";
+    $("simScreen").classList.add("open"); lockScroll();
+  }
+  function closeSimScreen() { if (!$("simScreen").classList.contains("open")) return; $("simScreen").classList.remove("open"); unlockScroll(); }
+  function runSimulate() {
+    var d = debts[simIndex]; if (!d) return;
+    var extra = +$("simExtra").value || 0;
+    var atPeriod = Math.max(1, Math.min(d.terms || 1, Math.round(+$("simAtPeriod").value) || 1));
+    if (extra <= 0) { toast("请输入大于 0 的多还金额"); return; }
+    simPrefs.mode = simMode; simPrefs.extra = extra; saveSimPrefs();
+    var r = simulatePrepay(d, simMode, atPeriod, extra);
+    if (!r) { toast("月供不足以覆盖利息，无法测算"); return; }
+    var monthsSaved = Math.max(0, r.monthsSaved), interestSaved = Math.max(0, r.interestSaved);
+    $("simResult").innerHTML =
+      '<div class="summary">'
+      + '<div class="kpi half"><div class="v num">' + monthsSaved + ' 个月</div><div class="k">提前还清</div></div>'
+      + '<div class="kpi half"><div class="v num">¥' + fmt(interestSaved) + '</div><div class="k">节省利息</div></div>'
+      + '</div>'
+      + '<div class="footnote" style="text-align:left">按当前月供 ¥' + fmt(d.monthly) + '、推算年化 ' + (d.rate ? Number(d.rate).toFixed(2) : 0) + '% 模拟：原计划约 ' + r.baseMonths + ' 个月还清；'
+      + (simMode === "recurring" ? '从第 ' + atPeriod + ' 期起每期多还' : '第 ' + atPeriod + ' 期多还一次') + ' ¥' + fmt(extra) + ' 后，约 ' + r.newMonths + ' 个月还清。</div>';
+  }
+
+  // ===== 高级统计报表（Premium）=====
+  // 三张图全部手写(条形图用div，堆叠条+折线用内联SVG)，配色见<style>里.viz-root那段注释。
+  function computeReportData() {
+    var active = debts.filter(function (d) { return !d.settled; });
+    var totalBalance = 0, weightedRate = 0, payoffDate = null, byType = {};
+    var byName = [];
+    active.forEach(function (d) {
+      var bal = +d.balance || 0;
+      totalBalance += bal; weightedRate += (+d.rate || 0) * bal;
+      byName.push({ name: d.name, balance: bal });
+      var t = d.type || "未分类";
+      byType[t] = (byType[t] || 0) + bal;
+      var plan = d.plan || [];
+      for (var k = plan.length - 1; k >= 0; k--) { if (!plan[k].paid) { if (!payoffDate || plan[k].date > payoffDate) payoffDate = plan[k].date; break; } }
+    });
+    byName.sort(function (a, b) { return b.balance - a.balance; });
+    var typeList = Object.keys(byType).map(function (k) { return { name: k, value: byType[k] }; }).sort(function (a, b) { return b.value - a.value; });
+    if (typeList.length > 6) {
+      var restSum = typeList.slice(5).reduce(function (s, x) { return s + x.value; }, 0);
+      typeList = typeList.slice(0, 5).concat([{ name: "其他", value: restSum }]);
+    }
+    // 负债预测走势：把全部在还债务未来每一期的本金按日期汇总，从今天的总余额开始逐步递减
+    var byDate = {};
+    active.forEach(function (d) { (d.plan || []).forEach(function (r) { if (!r.paid) byDate[r.date] = (byDate[r.date] || 0) + (+r.principal || 0); }); });
+    var dates = Object.keys(byDate).sort();
+    var timeline = [{ date: fmtDate(today0()), balance: r2(totalBalance) }], running = totalBalance;
+    dates.forEach(function (dt) { running = Math.max(0, running - byDate[dt]); timeline.push({ date: dt, balance: r2(running) }); });
+    return { active: active, totalBalance: r2(totalBalance), avgRate: totalBalance > 0 ? weightedRate / totalBalance : 0, payoffDate: payoffDate, byName: byName, typeList: typeList, timeline: timeline };
+  }
+  function truncateLabel(s, n) { s = String(s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+  function renderBalanceBars(data) {
+    if (!data.byName.length) return '<div class="viz-block"><div class="viz-title">各债务余额对比</div><div class="footnote" style="text-align:left">暂无在还债务</div></div>';
+    var max = Math.max.apply(null, data.byName.map(function (x) { return x.balance; })) || 1;
+    var rows = data.byName.map(function (x) {
+      var pct = Math.max(2, Math.round(x.balance / max * 100));
+      return '<div class="viz-bar-row"><div class="viz-bar-name">' + esc(truncateLabel(x.name, 10)) + '</div>'
+        + '<div class="viz-bar-track"><div class="viz-bar-fill" style="width:' + pct + '%"></div></div>'
+        + '<div class="viz-bar-val num">¥' + fmt(x.balance) + '</div></div>';
+    }).join("");
+    return '<div class="viz-block"><div class="viz-title">各债务余额对比</div>' + rows + '</div>';
+  }
+  function renderTypeStack(data) {
+    if (!data.typeList.length) return "";
+    var total = data.typeList.reduce(function (s, x) { return s + x.value; }, 0) || 1;
+    var segs = data.typeList.map(function (x, i) { return '<div class="viz-stack-seg" style="width:' + (x.value / total * 100).toFixed(2) + '%;background:var(--series-' + (i + 1) + ')"></div>'; }).join("");
+    var legend = data.typeList.map(function (x, i) {
+      return '<div class="viz-legend-item"><span class="viz-legend-swatch" style="background:var(--series-' + (i + 1) + ')"></span>' + esc(x.name) + ' ' + Math.round(x.value / total * 100) + '%</div>';
+    }).join("");
+    return '<div class="viz-block"><div class="viz-title">债务类型占比</div><div class="viz-stack">' + segs + '</div><div class="viz-legend">' + legend + '</div></div>';
+  }
+  function renderPayoffLine(data) {
+    var pts = data.timeline, n = pts.length;
+    if (n < 2 || data.totalBalance <= 0) return '<div class="viz-block"><div class="viz-title">负债预测走势</div><div class="footnote" style="text-align:left">暂无足够数据（没有在还债务或还款计划）</div></div>';
+    var W = 300, H = 110, padT = 10, padB = 18, maxBal = pts[0].balance || 1;
+    var coords = pts.map(function (p, i) { return [(i / (n - 1)) * W, padT + (1 - p.balance / maxBal) * (H - padT - padB)]; });
+    var line = coords.map(function (c, i) { return (i === 0 ? "M" : "L") + c[0].toFixed(1) + "," + c[1].toFixed(1); }).join(" ");
+    var area = line + " L" + coords[n - 1][0].toFixed(1) + "," + (H - padB) + " L0," + (H - padB) + " Z";
+    return '<div class="viz-block"><div class="viz-title">负债预测走势（按现有还款计划推算）</div>'
+      + '<svg class="viz-line-svg" viewBox="0 0 ' + W + ' ' + H + '">'
+      + '<path d="' + area + '" fill="var(--accent-soft)"></path>'
+      + '<path d="' + line + '" fill="none" stroke="var(--accent)" stroke-width="2"></path>'
+      + '<circle cx="' + coords[n - 1][0].toFixed(1) + '" cy="' + coords[n - 1][1].toFixed(1) + '" r="3" fill="var(--accent)"></circle>'
+      + '<text class="viz-line-label" x="4" y="' + (H - 4) + '">今天 ¥' + fmt(pts[0].balance) + '</text>'
+      + '<text class="viz-line-label" x="' + W + '" y="' + (H - 4) + '" text-anchor="end">' + pts[n - 1].date + ' 还清</text>'
+      + '</svg></div>';
+  }
+  function renderReportTables(data) {
+    var balRows = data.byName.map(function (x) { return '<tr><td>' + esc(x.name) + '</td><td class="num">¥' + fmt(x.balance) + '</td></tr>'; }).join("");
+    var typeRows = data.typeList.map(function (x) { return '<tr><td>' + esc(x.name) + '</td><td class="num">¥' + fmt(x.value) + '</td></tr>'; }).join("");
+    var lineRows = data.timeline.map(function (p) { return '<tr><td>' + p.date + '</td><td class="num">¥' + fmt(p.balance) + '</td></tr>'; }).join("");
+    // 数据明细表默认直接展开、不做折叠（用户要求）——不再用<details>/<summary>。
+    return '<div class="viz-block"><div class="viz-title">数据明细表</div>'
+      + '<div class="preview-label" style="margin:10px 2px 4px">各债务余额</div><table><tbody>' + balRows + '</tbody></table>'
+      + '<div class="preview-label" style="margin:14px 2px 4px">债务类型占比</div><table><tbody>' + typeRows + '</tbody></table>'
+      + '<div class="preview-label" style="margin:14px 2px 4px">负债预测走势</div><table><tbody>' + lineRows + '</tbody></table>'
+      + '</div>';
+  }
+  function renderReportScreen() {
+    var data = computeReportData();
+    $("reportKpis").innerHTML =
+      '<div class="kpi half"><div class="v num">' + (data.avgRate ? data.avgRate.toFixed(2) : "0.00") + '%</div><div class="k">加权平均利率</div></div>'
+      + '<div class="kpi half"><div class="v num">' + (data.payoffDate || "—") + '</div><div class="k">预计全部还清日期</div></div>';
+    $("reportCharts").innerHTML = renderBalanceBars(data) + renderTypeStack(data) + renderPayoffLine(data) + renderReportTables(data);
+  }
+  function openReportScreen() { renderReportScreen(); $("reportScreen").classList.add("open"); lockScroll(); }
+  function closeReportScreen() { if (!$("reportScreen").classList.contains("open")) return; $("reportScreen").classList.remove("open"); unlockScroll(); }
+
+  function escSvg(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  // PDF导出用的图表是独立的、颜色写死的浅色版SVG(不是把屏幕上那份主题化的SVG克隆去截图)——
+  // 屏幕上那份用CSS变量(var(--accent)等)取色，序列化成独立文档去光栅化时，CSS变量脱离了
+  // 页面样式表的作用域会解析不出来(渲染出空/黑)，专门另建一份不依赖任何CSS变量的字面色版本
+  // 更可靠。PDF固定浅色配色(不跟随设备深色模式)是刻意的：打印品在浅色下更易读。
+  // ⚠️ 标题/KPI这几行文字也画在这份SVG里、光栅化成图片贴进PDF，不能用jsPDF自己的
+  // doc.text()——真机/桌面浏览器实测过，jsPDF默认内置字体(Helvetica等)不含中文字形，
+  // doc.text()画中文会整段变成乱码(不是排版问题，是完全无法显示)，除非额外内嵌一份中文
+  // 字体到jsPDF(vfs机制)，那份工作量不亚于登录门那次从字体提取笔画轮廓，这轮不做。
+  // 图表标签(债务名称/类型/日期这些中文)能正常显示，是因为它们从来没有经过doc.text()，
+  // 全程走的是这条"SVG→canvas→PNG"栅格化路径——所以整份PDF的中文文字统一挪进来处理。
+  function buildExportChartsSVG(data) {
+    var W = 640, H = 960;
+    var L = { text: "#23272F", muted: "#697082", border: "#DCE0E8", accent: "#18453B", accentSoft: "#E7F3F1", surface: "#FFFFFF",
+      series: ["#2a78d6", "#008300", "#e87ba4", "#eda100", "#1baf7a", "#eb6834", "#4a3aa7", "#e34948"] };
+    var p = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" font-family="sans-serif">'];
+    p.push('<rect width="' + W + '" height="' + H + '" fill="' + L.surface + '"/>');
+    var y = 34;
+    p.push('<text x="20" y="' + y + '" font-size="20" font-weight="700" fill="' + L.text + '">After Zero · 高级统计报表</text>'); y += 22;
+    p.push('<text x="20" y="' + y + '" font-size="11" fill="' + L.muted + '">导出时间：' + escSvg(new Date().toLocaleString()) + '</text>'); y += 26;
+    p.push('<text x="20" y="' + y + '" font-size="12.5" fill="' + L.text + '">在还总负债：¥' + fmt(data.totalBalance) + '</text>'); y += 18;
+    p.push('<text x="20" y="' + y + '" font-size="12.5" fill="' + L.text + '">加权平均利率：' + (data.avgRate ? data.avgRate.toFixed(2) : "0.00") + '%</text>'); y += 18;
+    p.push('<text x="20" y="' + y + '" font-size="12.5" fill="' + L.text + '">预计全部还清日期：' + escSvg(data.payoffDate || "—") + '</text>'); y += 34;
+    p.push('<text x="20" y="' + y + '" font-size="16" font-weight="700" fill="' + L.text + '">各债务余额对比</text>'); y += 20;
+    var barMax = Math.max.apply(null, data.byName.map(function (x) { return x.balance; }).concat([1])), barAreaW = W - 220;
+    data.byName.slice(0, 12).forEach(function (x) {
+      var w = Math.max(2, (x.balance / barMax) * barAreaW);
+      p.push('<text x="20" y="' + (y + 12) + '" font-size="11" fill="' + L.muted + '">' + escSvg(truncateLabel(x.name, 14)) + '</text>');
+      p.push('<rect x="160" y="' + y + '" width="' + barAreaW + '" height="16" rx="4" fill="' + L.border + '"/>');
+      p.push('<rect x="160" y="' + y + '" width="' + w.toFixed(1) + '" height="16" rx="4" fill="' + L.accent + '"/>');
+      p.push('<text x="' + (W - 20) + '" y="' + (y + 12) + '" font-size="11" text-anchor="end" fill="' + L.text + '">¥' + fmt(x.balance) + '</text>');
+      y += 24;
+    });
+    y += 20;
+    p.push('<text x="20" y="' + y + '" font-size="16" font-weight="700" fill="' + L.text + '">债务类型占比</text>'); y += 16;
+    var total = data.typeList.reduce(function (s, x) { return s + x.value; }, 0) || 1, sx = 20, stackW = W - 40;
+    data.typeList.forEach(function (x, i) { var w = (x.value / total) * stackW; p.push('<rect x="' + sx.toFixed(1) + '" y="' + y + '" width="' + w.toFixed(1) + '" height="20" fill="' + L.series[i % 8] + '"/>'); sx += w; });
+    y += 32;
+    data.typeList.forEach(function (x, i) {
+      p.push('<rect x="20" y="' + (y - 9) + '" width="10" height="10" fill="' + L.series[i % 8] + '"/>');
+      p.push('<text x="36" y="' + y + '" font-size="11" fill="' + L.text + '">' + escSvg(x.name) + ' ' + Math.round(x.value / total * 100) + '%</text>');
+      y += 16;
+    });
+    y += 24;
+    p.push('<text x="20" y="' + y + '" font-size="16" font-weight="700" fill="' + L.text + '">负债预测走势</text>'); y += 16;
+    var chartTop = y, chartH = 140, chartW = W - 40, pts = data.timeline, maxBal = (pts[0] && pts[0].balance) || 1, n = pts.length;
+    if (n >= 2) {
+      var coords = pts.map(function (pt, i) { return [20 + (i / (n - 1)) * chartW, chartTop + (1 - pt.balance / maxBal) * chartH]; });
+      var line = coords.map(function (c, i) { return (i === 0 ? "M" : "L") + c[0].toFixed(1) + "," + c[1].toFixed(1); }).join(" ");
+      var area = line + " L" + coords[n - 1][0].toFixed(1) + "," + (chartTop + chartH) + " L" + coords[0][0].toFixed(1) + "," + (chartTop + chartH) + " Z";
+      p.push('<path d="' + area + '" fill="' + L.accentSoft + '"/>');
+      p.push('<path d="' + line + '" fill="none" stroke="' + L.accent + '" stroke-width="2"/>');
+      p.push('<text x="20" y="' + (chartTop + chartH + 16) + '" font-size="11" fill="' + L.muted + '">今天：¥' + fmt(pts[0].balance) + '</text>');
+      p.push('<text x="' + (W - 20) + '" y="' + (chartTop + chartH + 16) + '" text-anchor="end" font-size="11" fill="' + L.muted + '">' + pts[n - 1].date + ' 还清</text>');
+    } else {
+      p.push('<text x="20" y="' + (chartTop + 20) + '" font-size="12" fill="' + L.muted + '">暂无足够数据</text>');
+    }
+    p.push('</svg>');
+    return p.join("");
+  }
+  function svgStringToPngDataURL(svgString, w, h, scale) {
+    return new Promise(function (resolve, reject) {
+      var blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+      var url = URL.createObjectURL(blob), img = new Image();
+      img.onload = function () {
+        var canvas = document.createElement("canvas");
+        canvas.width = w * scale; canvas.height = h * scale;
+        var ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL("image/png"));
+      };
+      img.onerror = function (e) { URL.revokeObjectURL(url); reject(e); };
+      img.src = url;
+    });
+  }
+  function exportReportXlsx() {
+    if (typeof XLSX === "undefined") { toast("导出组件未就绪，请重启 App 后重试"); return; }
+    var data = computeReportData();
+    var wb = XLSX.utils.book_new();
+    var debtRows = data.active.map(function (d) { return { 名称: d.name, 出资方: d.funder || "", 类型: d.type || "", 剩余待还: d.balance, 借款金额: d.original, 年化利率: d.rate, 下期还款日: d.nextDate, 已还期数: d.paidTerms, 总期数: d.totalTerms }; });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(debtRows), "债务明细");
+    var planRows = [];
+    data.active.forEach(function (d) { (d.plan || []).forEach(function (r, idx) { planRows.push({ 债务: d.name, 期次: idx + 1, 日期: r.date, 金额: r.amount, 本金: r.principal, "利息/费": r.interest, 是否已还: r.paid ? "是" : "否" }); }); });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(planRows), "还款计划明细");
+    var kpiRows = [{ 指标: "在还总负债", 数值: data.totalBalance }, { 指标: "加权平均利率(%)", 数值: r2(data.avgRate) }, { 指标: "预计全部还清日期", 数值: data.payoffDate || "—" }];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(kpiRows), "汇总KPI");
+    var wbout = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    var blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    var dt = new Date(), yymmdd = String(dt.getFullYear() % 100).padStart(2, "0") + String(dt.getMonth() + 1).padStart(2, "0") + String(dt.getDate()).padStart(2, "0");
+    saveToDeviceDownloads(blob, "AfterZero统计报表" + yymmdd + ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  }
+  // 数据明细表也要进PDF（用户要求）。跟图表同理，中文不能走jsPDF的doc.text()(内置字体无中文
+  // 字形)，只能走"SVG→PNG栅格化"这条路。表格行数可能不少(时间线可能几十行)，所以按固定容量把行
+  // 分页成多张SVG，每张作为PDF的一页，避免一张超长图被页边裁掉。
+  function buildReportTableRows(data) {
+    var rows = [];
+    rows.push({ h: "各债务余额" });
+    data.byName.forEach(function (x) { rows.push({ l: x.name, r: "¥" + fmt(x.balance) }); });
+    rows.push({ h: "债务类型占比" });
+    data.typeList.forEach(function (x) { rows.push({ l: x.name, r: "¥" + fmt(x.value) }); });
+    rows.push({ h: "负债预测走势" });
+    data.timeline.forEach(function (p) { rows.push({ l: p.date, r: "¥" + fmt(p.balance) }); });
+    return rows;
+  }
+  function buildTablePageSVG(rows, pageIdx, pageCount) {
+    var W = 640, marginX = 22, lineH = 22, muted = "#697082", text = "#23272F", rule = "#ECEEF2";
+    var body = [], y = 30;
+    body.push('<text x="' + marginX + '" y="' + y + '" font-size="15" font-weight="700" fill="' + text + '">数据明细表'
+      + (pageCount > 1 ? '（' + (pageIdx + 1) + '/' + pageCount + '）' : '') + '</text>');
+    y += 20;
+    rows.forEach(function (rw) {
+      if (rw.h !== undefined) {
+        y += 8;
+        body.push('<text x="' + marginX + '" y="' + y + '" font-size="13.5" font-weight="700" fill="' + text + '">' + escSvg(rw.h) + '</text>');
+        y += 20;
+      } else {
+        body.push('<text x="' + marginX + '" y="' + y + '" font-size="12" fill="' + muted + '">' + escSvg(truncateLabel(rw.l, 24)) + '</text>');
+        body.push('<text x="' + (W - marginX) + '" y="' + y + '" font-size="12" text-anchor="end" fill="' + text + '">' + escSvg(rw.r) + '</text>');
+        body.push('<line x1="' + marginX + '" y1="' + (y + 6) + '" x2="' + (W - marginX) + '" y2="' + (y + 6) + '" stroke="' + rule + '" stroke-width="1"/>');
+        y += lineH;
+      }
+    });
+    var H = y + 20;
+    return { svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" font-family="sans-serif"><rect width="' + W + '" height="' + H + '" fill="#FFFFFF"/>' + body.join("") + '</svg>', w: W, h: H };
+  }
+  function buildTablePagesSVG(data) {
+    var rows = buildReportTableRows(data), pages = [], cur = [], units = 0, cap = 34; // 每页约34个行单位(表头算2个)
+    rows.forEach(function (rw) {
+      var cost = rw.h !== undefined ? 2 : 1;
+      if (units + cost > cap && cur.length) { pages.push(cur); cur = []; units = 0; }
+      cur.push(rw); units += cost;
+    });
+    if (cur.length) pages.push(cur);
+    return pages.map(function (pg, i) { return buildTablePageSVG(pg, i, pages.length); });
+  }
+  function exportReportPdf() {
+    if (typeof window.jspdf === "undefined") { toast("导出组件未就绪，请重启 App 后重试"); return; }
+    var data = computeReportData();
+    // 第1页：标题/KPI/三张图（写死浅色的栅格图）；随后若干页：数据明细表。
+    var pages = [{ svg: buildExportChartsSVG(data), w: 640, h: 960 }].concat(buildTablePagesSVG(data));
+    Promise.all(pages.map(function (pg) {
+      return svgStringToPngDataURL(pg.svg, pg.w, pg.h, 2).then(function (png) { return { png: png, w: pg.w, h: pg.h }; });
+    })).then(function (rendered) {
+      var jsPDF = window.jspdf.jsPDF;
+      var doc = new jsPDF({ unit: "pt", format: "a4" });
+      var pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
+      rendered.forEach(function (r, i) {
+        if (i > 0) doc.addPage();
+        var imgW = pageW - 80, imgH = imgW * (r.h / r.w);
+        if (imgH > pageH - 80) { imgH = pageH - 80; imgW = imgH * (r.w / r.h); } // 兜底：单页过高时按页高约束
+        doc.addImage(r.png, "PNG", (pageW - imgW) / 2, 40, imgW, imgH);
+      });
+      var dt = new Date(), yymmdd = String(dt.getFullYear() % 100).padStart(2, "0") + String(dt.getMonth() + 1).padStart(2, "0") + String(dt.getDate()).padStart(2, "0");
+      saveToDeviceDownloads(doc.output("blob"), "AfterZero统计报表" + yymmdd + ".pdf", "application/pdf");
+    }).catch(function () { toast("图表渲染失败，请稍后重试"); });
+  }
 
   var wxAuthListenerBound = false;
   function handleWxAuthResult(data) {
@@ -1864,7 +2414,7 @@
     if (data.errCode !== 0 || !data.code) { toast("微信授权已取消或失败"); return; }
     toast("登录中…");
     var pendingLoginResult = null;
-    var auth = cbApp().auth();
+    var auth = cbAuth();
     // 全新设备/App从没建立过任何登录态时，SDK内部_getCredentials()对着null读.scope会直接崩溃
     // （SDK自身的判空顺序bug：先用后判）。用一次匿名登录垫底写入本地凭证，绕开这个坑。
     Promise.resolve(auth.signInAnonymously ? auth.signInAnonymously().catch(function () {}) : null).then(function () {
@@ -1895,7 +2445,7 @@
       if (!result || !result.ok) throw new Error((result && result.error) || "注销失败");
       account = null;
       localStorage.removeItem(ACCOUNT_KEY);
-      try { cbApp().auth().signOut().catch(function () {}); } catch (e) {}
+      try { cbAuth().signOut().catch(function () {}); } catch (e) {}
       closeAccountScreen();
       renderAccountUI();
       toast("已注销账户");
@@ -1903,6 +2453,155 @@
       toast("注销失败：" + ((err && err.message) || "网络错误"));
     });
   }
+
+  // ===== 云备份（Premium）=====
+  // 已经从"自动同步、单一文档覆盖"改成"完全手动、每次创建一条独立备份记录"——用户反馈
+  // 自动同步让人担心手滑/冲突把数据搞乱，宁可自己点一下、每条备份都能单独恢复更放心。
+  // 架构不变：全部走云函数代理(backupCreate/backupList/backupRestore/backupDelete/
+  // backupUploadFile)，不做客户端直传云存储，复用deleteAccount已经建立的"身份完全来自
+  // 服务端已认证会话，不信任客户端参数"这条安全原则。
+  var BACKUP_MAX_FILE_BYTES = 8 * 1024 * 1024; // 单文件上限，超过的文件跳过不参与这次备份
+  // 跟handleWxAuthResult同一个坑：CloudBase JS SDK 2.28.6在全新设备/从没建立过任何登录态
+  // 时，内部_getCredentials()对着null读.scope会直接抛TypeError，连带搞挂callFunction()。
+  // 登录流程本身已经用signInAnonymously()垫底绕开了，但云备份这几个函数是独立入口，
+  // 如果CloudBase自己的会话存储因为某种原因是空的(哪怕本机account不是null)，会重新踩中
+  // 同一个bug——所以这里也垫一次，失败忽略，真正有会话时这次调用只是无副作用的重复。
+  var _cbAnonReady = null;
+  function ensureCbAuthReady() {
+    if (!_cbAnonReady) {
+      var auth = cbAuth();
+      // ⚠️关键修复：只在"完全没登录过"(本地连account记录都没有)时才signInAnonymously。
+      // 一旦已经微信登录过(account有值)，CloudBase侧就应当有持久化的自定义登录会话(persistence:'local'
+      // 跨冷启动自动恢复+续期)，此时绝不能再signInAnonymously——那会把"非匿名"会话降级成匿名，
+      // 导致backup这几个云函数命中环境权限规则(要求 auth.loginType != 'ANONYMOUS')被PERMISSION_DENIED
+      // 拒掉。这正是之前"明明登录了、云备份却一直Permission denied"的根因。
+      // signInAnonymously原本只是给全新设备垫底、绕开SDK对null凭证读.scope的崩溃bug，用account这个
+      // 我们自己可靠掌握的信号判断，比去猜SDK内部登录态形状稳妥得多。
+      _cbAnonReady = Promise.resolve().then(function () {
+        if (account) return;
+        return auth.signInAnonymously ? auth.signInAnonymously().catch(function () {}) : null;
+      });
+    }
+    return _cbAnonReady;
+  }
+  function createCloudBackup() {
+    if (!account) { toast("请先登录"); return; }
+    if (!hasPremium()) { closeBackupScreen(); openPremiumScreen("premium"); return; }
+    var btn = $("backupCreateBtn"); btn.disabled = true;
+    toast("正在打包备份…");
+    var backupId = "b" + Date.now() + Math.random().toString(36).slice(2, 7);
+    ensureCbAuthReady().then(function () { return upGetAll(); }).then(function (items) {
+      var eligible = items.filter(function (it) {
+        if (it.blob.size > BACKUP_MAX_FILE_BYTES) { console.error("文件超过云备份单文件上限，跳过：", it.name); return false; }
+        return true;
+      });
+      return Promise.all(eligible.map(function (it) {
+        return blobToDataURL(it.blob).then(function (dataURL) {
+          var base64 = String(dataURL).split(",")[1] || "";
+          return cbApp().callFunction({ name: "backupUploadFile", data: { backupId: backupId, fileId: it.id, filename: it.name, mime: it.mime, base64: base64 } }).then(function (res) {
+            var result = res && res.result;
+            if (!result || !result.ok) throw new Error((result && result.error) || "文件上传失败");
+            return { id: it.id, name: it.name, mime: it.mime, size: result.size, fileID: result.fileID };
+          });
+        });
+      }));
+    }).then(function (files) {
+      return cbApp().callFunction({ name: "backupCreate", data: { backupId: backupId, debts: debts, docs: docs, notify: notify, premium: premium, files: files } });
+    }).then(function (res) {
+      var result = res && res.result;
+      if (!result || !result.ok) throw new Error((result && result.error) || "备份失败");
+      lastBackupMeta.lastBackupAt = Date.now(); saveLastBackupMeta();
+      renderBackupMeta();
+      toast("备份已创建 ✓");
+      return renderBackupList();
+    }).catch(function (err) {
+      toast("备份失败：" + ((err && err.message) || "网络错误"));
+    }).then(function () { btn.disabled = false; });
+  }
+  function renderBackupList() {
+    var box = $("backupList");
+    box.innerHTML = '<div class="footnote" style="text-align:left">加载中…</div>';
+    return ensureCbAuthReady().then(function () {
+      return cbApp().callFunction({ name: "backupList" });
+    }).then(function (res) {
+      var result = res && res.result;
+      if (!result || !result.ok) throw new Error((result && result.error) || "获取备份列表失败");
+      var list = result.list || [];
+      if (!list.length) { box.innerHTML = '<div class="footnote" style="text-align:left">还没有备份记录，点上面的按钮创建第一条</div>'; return; }
+      box.innerHTML = "";
+      list.forEach(function (rec) {
+        var row = document.createElement("div"); row.className = "backup-row";
+        var sizeKB = Math.round((rec.totalSizeBytes || 0) / 1024);
+        var sizeText = sizeKB > 1024 ? (sizeKB / 1024).toFixed(1) + " MB" : sizeKB + " KB";
+        row.innerHTML = '<div class="backup-row-main"><div class="backup-row-time"></div><div class="backup-row-sub"></div></div>'
+          + '<div class="backup-row-actions"><button type="button" class="btn ghost backup-restore">恢复</button><button type="button" class="btn danger backup-del">删除</button></div>';
+        row.querySelector(".backup-row-time").textContent = new Date(rec.createdAt).toLocaleString();
+        row.querySelector(".backup-row-sub").textContent = rec.debtsCount + " 笔债务 · " + rec.filesCount + " 个文件 · " + sizeText;
+        row.querySelector(".backup-restore").addEventListener("click", function () { confirmRestoreBackup(rec.id, rec.createdAt); });
+        row.querySelector(".backup-del").addEventListener("click", function () { confirmDeleteBackup(rec.id); });
+        box.appendChild(row);
+      });
+    }).catch(function (err) {
+      box.innerHTML = '<div class="footnote" style="text-align:left">获取备份列表失败：' + esc((err && err.message) || "网络错误") + '</div>';
+    });
+  }
+  function confirmRestoreBackup(id, createdAt) {
+    ask("恢复这条备份？",
+      "创建于 " + new Date(createdAt).toLocaleString() + " 的这条备份记录，将覆盖本机当前的全部债务/档案/设置数据。此操作不可撤销，确定继续吗？",
+      function () { doRestoreBackup(id); });
+  }
+  function doRestoreBackup(id) {
+    toast("正在恢复…");
+    ensureCbAuthReady().then(function () {
+      return cbApp().callFunction({ name: "backupRestore", data: { backupId: id } });
+    }).then(function (res) {
+      var result = res && res.result;
+      if (!result || !result.ok) throw new Error((result && result.error) || "恢复失败");
+      return applyBackupData(result.data);
+    }).then(function () {
+      toast("已恢复 ✓");
+    }).catch(function (err) {
+      toast("恢复失败：" + ((err && err.message) || "网络错误"));
+    });
+  }
+  function applyBackupData(data) {
+    debts = data.debts || []; docs = data.docs || [];
+    notify = data.notify || { enabled: false, rules: [] };
+    premium = data.premium || premium;
+    debts.forEach(normalize);
+    try { localStorage.setItem(KEY, JSON.stringify(debts)); localStorage.setItem(DKEY, JSON.stringify(docs)); } catch (e) {}
+    try { localStorage.setItem(NOTIF_KEY, JSON.stringify(notify)); } catch (e) {}
+    try { localStorage.setItem(PREMIUM_KEY, JSON.stringify(premium)); } catch (e) {}
+    var fileList = data.files || [];
+    // 恢复=覆盖：先清空本机现有上传文件，再按这条备份记录里的文件清单原样铺回来，
+    // 不然备份创建之后本机新加的文件会跟恢复回来的文件混在一起，不是真正的"覆盖"。
+    return upClear().then(function () {
+      return Promise.all(fileList.map(function (u) {
+        return fetch(u.tempURL).then(function (r) { return r.blob(); }).then(function (blob) {
+          return upPut({ id: u.id, name: u.name, title: u.name, mime: u.mime, blob: blob, addedAt: todayStr() });
+        }).catch(function () {});
+      }));
+    }).then(function () { loadUploads(); }).then(function () {
+      renderFiles(); docSel = -1; renderDocContent(); renderAll(); renderAccountDetail(); renderPremiumEntryCard(); renderAIBanner();
+    });
+  }
+  function confirmDeleteBackup(id) {
+    ask("删除这条备份记录？", "删除后无法恢复这条备份，确定继续吗？", function () {
+      ensureCbAuthReady().then(function () {
+        return cbApp().callFunction({ name: "backupDelete", data: { backupId: id } });
+      }).then(function (res) {
+        var result = res && res.result;
+        if (!result || !result.ok) throw new Error((result && result.error) || "删除失败");
+        toast("已删除");
+        return renderBackupList();
+      }).catch(function (err) { toast("删除失败：" + ((err && err.message) || "网络错误")); });
+    });
+  }
+  function renderBackupMeta() {
+    $("backupLastText").textContent = lastBackupMeta.lastBackupAt ? new Date(lastBackupMeta.lastBackupAt).toLocaleString() : "从未备份";
+  }
+  function openBackupScreen() { renderBackupMeta(); $("backupScreen").classList.add("open"); lockScroll(); renderBackupList(); }
+  function closeBackupScreen() { if (!$("backupScreen").classList.contains("open")) return; $("backupScreen").classList.remove("open"); unlockScroll(); }
   // uploaded PDF storage (IndexedDB — localStorage's 5MB quota is shared with debt data, PDFs need real headroom)
   var UP_DB = "debtManagerFiles", UP_STORE = "uploads";
   function openUploadDB() {
@@ -2046,14 +2745,34 @@
   $("scrimEdit").addEventListener("click", closeEdit);
   $("dEdit").addEventListener("click", function () { var i = detailIndex; closeDetail(); openEdit(i); });
   $("dSale").addEventListener("click", function () { if (detailIndex >= 0) payInstallment(detailIndex); });
+  $("dSimulate").addEventListener("click", function () {
+    var i = detailIndex; if (i < 0) return;
+    if (!hasPremium()) { closeDetail(); openPremiumScreen("premium"); return; }
+    closeDetail(); openSimScreen(i);
+  });
   $("dSettle").addEventListener("click", function () { if (detailIndex >= 0) settleFull(detailIndex); });
   $("dClose").addEventListener("click", closeDetail);
+  $("simBackBtn").addEventListener("click", closeSimScreen);
+  $("simModeOnce").addEventListener("click", function () { setSimMode("once"); });
+  $("simModeRecurring").addEventListener("click", function () { setSimMode("recurring"); });
+  $("simRunBtn").addEventListener("click", runSimulate);
+  $("reportEntryBtn").addEventListener("click", function () { if (!hasPremium()) { openPremiumScreen("premium"); return; } openReportScreen(); });
+  $("reportBackBtn").addEventListener("click", closeReportScreen);
+  $("reportExportXlsxBtn").addEventListener("click", exportReportXlsx);
+  $("reportExportPdfBtn").addEventListener("click", exportReportPdf);
+  $("backupEntryBtn").addEventListener("click", function () { if (!hasPremium()) { openPremiumScreen("premium"); return; } openBackupScreen(); });
+  $("backupBackBtn").addEventListener("click", closeBackupScreen);
+  $("backupCreateBtn").addEventListener("click", createCloudBackup);
   $("scrimDetail").addEventListener("click", closeDetail);
   initGripDrag($("editSheet"), $("editSheet").querySelector(".grip"), closeEdit, false);
   initGripDrag($("detailSheet"), $("detailSheet").querySelector(".grip"), closeDetail, true);
   window.__handleBackButton = function () {
     if (jiggleMode) { exitJiggle(); return true; }
     if ($("modalScrim").classList.contains("open")) { closeModal(); return true; }
+    if ($("termsScreen").classList.contains("open")) { closeTermsScreen(); return true; }
+    if ($("backupScreen").classList.contains("open")) { closeBackupScreen(); return true; }
+    if ($("reportScreen").classList.contains("open")) { closeReportScreen(); return true; }
+    if ($("simScreen").classList.contains("open")) { closeSimScreen(); return true; }
     if ($("premiumScreen").classList.contains("open")) { closePremiumScreen(); return true; }
     if ($("accountScreen").classList.contains("open")) { closeAccountScreen(); return true; }
     if ($("notifySheet").classList.contains("open")) { closeNotifySheet(); return true; }
@@ -2061,13 +2780,15 @@
     if ($("detailSheet").classList.contains("open")) { closeDetail(); return true; }
     return false;
   };
-  $("accountRowBtn").addEventListener("click", openAccountScreen);
+  $("accountAvatarBtn").addEventListener("click", openAccountScreen);
   $("accountBackBtn").addEventListener("click", closeAccountScreen);
-  $("premiumEntryBtn").addEventListener("click", function () { openPremiumScreen(hasAI() && !hasPro() ? "ai" : "pro"); });
+  $("premiumEntryBtn").addEventListener("click", function () { openPremiumScreen(hasPremiumPlus() ? "premiumPlus" : "premium"); });
   $("premiumBackBtn").addEventListener("click", closePremiumScreen);
-  $("ptabPro").addEventListener("click", function () { setPremiumTab("pro"); });
-  $("ptabAI").addEventListener("click", function () { setPremiumTab("ai"); });
-  document.querySelectorAll("#premiumPricePro .price-card, #premiumPriceAI .price-card").forEach(function (card) {
+  $("termsLink").addEventListener("click", openTermsScreen);
+  $("termsBackBtn").addEventListener("click", closeTermsScreen);
+  $("ptabPremium").addEventListener("click", function () { setPremiumTab("premium"); });
+  $("ptabPremiumPlus").addEventListener("click", function () { setPremiumTab("premiumPlus"); });
+  document.querySelectorAll("#premiumPricePremium .price-card, #premiumPricePremiumPlus .price-card").forEach(function (card) {
     card.addEventListener("click", function () {
       card.closest(".price-grid").querySelectorAll(".price-card").forEach(function (c) { c.classList.remove("selected"); });
       card.classList.add("selected");
@@ -2079,9 +2800,24 @@
     // 这里要换成真正发起购买流程，现在先给一个明确的"暂未开放"反馈。
     ask("暂未开放真实支付", "After Zero 还未上架应用商店，支付功能尚未接入。上架后即可在此完成订阅——敬请期待。", null);
   });
+  $("redeemToggleBtn").addEventListener("click", function () {
+    var wrap = $("redeemInputWrap");
+    var showing = wrap.style.display !== "none";
+    wrap.style.display = showing ? "none" : "flex";
+    if (!showing) $("redeemCodeInput").focus();
+  });
+  $("redeemApplyBtn").addEventListener("click", function () {
+    var code = ($("redeemCodeInput").value || "").trim();
+    if (!code) { toast("请输入兑换码"); return; }
+    var tier = REDEEM_CODES[code];
+    if (!tier) { toast("兑换码无效"); return; }
+    applyRedeemTier(tier);
+    $("redeemCodeInput").value = ""; $("redeemInputWrap").style.display = "none";
+    toast("兑换成功，已解锁 " + (tier === "premiumPlus" ? "Premium+" : "Premium"));
+  });
   $("aiBannerBtn").addEventListener("click", function () {
-    if (hasAI()) { toast("AI 功能开发中，敬请期待"); return; }
-    openPremiumScreen("ai");
+    if (hasPremiumPlus()) { toast("AI 功能开发中，敬请期待"); return; }
+    openPremiumScreen("premiumPlus");
   });
   $("deleteAccountBtn").addEventListener("click", function () {
     ask("注销账户", "注销后账号数据将从服务器永久删除，且需要重新微信登录才能再次使用。此操作不可撤销，确定继续吗？", doDeleteAccount);
@@ -2102,7 +2838,7 @@
   $("wxLogoutBtn").addEventListener("click", function () {
     account = null;
     localStorage.removeItem(ACCOUNT_KEY);
-    try { cbApp().auth().signOut().catch(function () {}); } catch (e) {}
+    try { cbAuth().signOut().catch(function () {}); } catch (e) {}
     closeAccountScreen();
     renderAccountUI();
     toast("已退出登录");
