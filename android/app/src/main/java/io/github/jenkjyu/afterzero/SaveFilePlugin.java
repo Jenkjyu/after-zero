@@ -1,15 +1,17 @@
 package io.github.jenkjyu.afterzero;
 
-import android.content.ContentValues;
+import android.app.Activity;
+import android.content.Intent;
 import android.net.Uri;
-import android.os.Build;
-import android.provider.MediaStore;
 import android.util.Base64;
+
+import androidx.activity.result.ActivityResult;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.OutputStream;
@@ -27,26 +29,38 @@ public class SaveFilePlugin extends Plugin {
             call.reject("缺少文件数据或文件名");
             return;
         }
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            call.reject("此安卓版本暂不支持直接保存到下载目录");
+
+        // 用系统"另存为"选择器(Storage Access Framework)代替原来静默写入MediaStore.Downloads。
+        // 老写法虽然写入本身会成功，但很多国产文件管理器的"下载"分类视图只按已知mime类型
+        // (图片/视频/文档等)过滤显示，备份用的application/json这种冷门类型会被过滤掉——
+        // 文件其实存在(在"所有文件→Download"文件夹里能找到)，但用户在分类视图里看不到，
+        // 会误以为保存失败。让用户自己选保存位置，文件存哪就一定看得见，还顺带能存到
+        // Google Drive这类云盘。ACTION_CREATE_DOCUMENT从API 19就有，早于这个项目
+        // minSdk=24，不再需要像旧版那样限制"安卓10+才支持"。
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType(mimeType);
+        intent.putExtra(Intent.EXTRA_TITLE, filename);
+        startActivityForResult(call, intent, "handleSaveResult");
+    }
+
+    @ActivityCallback
+    private void handleSaveResult(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        // 用户在系统选择器里点了"取消"是正常操作，不是错误——跟"保存失败"分开处理，
+        // reject文案里明确写"已取消"，JS那边toast出来也不会显得像出了故障。
+        if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null) {
+            call.reject("已取消");
             return;
         }
-
+        Uri uri = result.getData().getData();
+        if (uri == null) {
+            call.reject("已取消");
+            return;
+        }
         try {
-            byte[] bytes = Base64.decode(base64, Base64.DEFAULT);
-
-            ContentValues values = new ContentValues();
-            values.put(MediaStore.Downloads.DISPLAY_NAME, filename);
-            values.put(MediaStore.Downloads.MIME_TYPE, mimeType);
-            values.put(MediaStore.Downloads.IS_PENDING, 1);
-
-            Uri item = getContext().getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
-            if (item == null) {
-                call.reject("无法创建文件");
-                return;
-            }
-
-            OutputStream out = getContext().getContentResolver().openOutputStream(item);
+            byte[] bytes = Base64.decode(call.getString("data"), Base64.DEFAULT);
+            OutputStream out = getContext().getContentResolver().openOutputStream(uri);
             if (out == null) {
                 call.reject("无法写入文件");
                 return;
@@ -54,12 +68,8 @@ public class SaveFilePlugin extends Plugin {
             out.write(bytes);
             out.close();
 
-            ContentValues done = new ContentValues();
-            done.put(MediaStore.Downloads.IS_PENDING, 0);
-            getContext().getContentResolver().update(item, done, null, null);
-
             JSObject ret = new JSObject();
-            ret.put("uri", item.toString());
+            ret.put("uri", uri.toString());
             call.resolve(ret);
         } catch (Exception e) {
             call.reject("保存失败：" + e.getMessage(), e);

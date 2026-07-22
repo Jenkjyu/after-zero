@@ -60,6 +60,17 @@
   .kpi.half { grid-column: span 3; }
   .kpi.half .v { font-size: var(--fs-xxl); }
   .kpi-sub { font-size: var(--fs-xs); color: var(--text-muted); margin-top: 3px; }
+  /* AI入口banner：故意用朴素卡片外观(无box-shadow、字号明显小于KPI)压低视觉权重，
+     不能排在KPI卡片前面抢注意力，也是"不太抢眼"这个定位要求的具体落地。 */
+  .ai-banner { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 10px 12px; margin: -4px 0 14px; text-align: left; color: inherit; -webkit-tap-highlight-color: transparent; font-family: inherit; }
+  .ai-banner-ic { width: 30px; height: 30px; border-radius: 9px; background: var(--accent-soft); color: var(--accent);
+    display: flex; align-items: center; justify-content: center; flex: none; }
+  .ai-banner-ic svg { width: 16px; height: 16px; }
+  .ai-banner-text { flex: 1; min-width: 0; }
+  .ai-banner-title { font-size: 13px; font-weight: 700; }
+  .ai-banner-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ai-banner.is-ai { border-color: var(--accent); }
 
   .tabbar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--border);
     display: flex; z-index: 20; padding-bottom: env(safe-area-inset-bottom); }
@@ -144,6 +155,8 @@
     border: none; background: var(--good); color: #fff; font-size: 13px; font-weight: 700; }
   .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
   .dot.crit { background: var(--critical); } .dot.warn { background: var(--warning); } .dot.dim { background: var(--good); }
+  .dot.overdue { background: var(--critical); animation: dotPulse 1.6s ease-in-out infinite; }
+  @keyframes dotPulse { 0%, 100% { box-shadow: 0 0 0 0 var(--critical-soft); } 50% { box-shadow: 0 0 0 4px var(--critical-soft); } }
   .pay .d { width: 62px; flex: none; }
   .pay .d .day { font-weight: 700; font-size: 15px; }
   .pay .d .rel { font-size: 11px; color: var(--text-muted); }
@@ -173,6 +186,12 @@
   .pay-hero.dim { background: var(--good-soft); }
   .pay-hero.dim .pay-hero-rel, .pay-hero.dim .pay-hero-amt { color: var(--good); }
   .pay-hero.empty { background: var(--surface); border: 1px solid var(--border); }
+  /* 逾期比crit(临期)更严重，用实心红底而不是淡色底，跟"还没到期但快了"拉开视觉差距 */
+  .pay-hero.overdue { background: var(--critical); }
+  .pay-hero.overdue .pay-hero-label, .pay-hero.overdue .pay-hero-name { color: rgba(255,255,255,.78); }
+  .pay-hero.overdue .pay-hero-daynum, .pay-hero.overdue .pay-hero-rel, .pay-hero.overdue .pay-hero-amt { color: #fff; }
+  .pay-hero.overdue .pay-hero-bell { color: rgba(255,255,255,.78); }
+  .pay-hero.overdue .pay-hero-bell.on { color: #fff; }
 
   .file-row { display: flex; align-items: center; gap: 11px; padding: 12px 14px; background: var(--surface);
     border: 1px solid var(--border); border-radius: 18px; margin-bottom: 7px; box-shadow: var(--shadow); width: 100%; text-align: left; color: inherit;
@@ -348,11 +367,60 @@
   .subpage-header-spacer { width: 40px; flex: none; }
   .subpage-body { padding: 14px; max-width: 560px; margin: 0 auto; }
 
+  .premium-hero { text-align: center; padding: 22px 10px 18px; }
+  .premium-hero-ic { width: 56px; height: 56px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; }
+  .premium-hero-ic svg { width: 28px; height: 28px; }
+  /* 顶部图标区轻微浮动动效，呼应X订阅页的"图标动效区"，但幅度很小、不抢内容注意力 */
+  @keyframes premiumHeroFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  .premium-hero-ic { animation: premiumHeroFloat 2.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .premium-hero-ic { animation: none; } }
+  .premium-hero-title { font-size: 18px; font-weight: 700; }
+  .premium-hero-sub { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+  .premium-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .premium-tab { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2);
+    color: var(--text-muted); font-size: 14px; font-weight: 700; font-family: inherit; }
+  .premium-tab.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+  .pf-list { margin: 4px 0 20px; }
+  .pf-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .pf-row:last-child { border-bottom: none; }
+  .pf-ic { width: 22px; height: 22px; flex: none; color: var(--accent); margin-top: 1px; }
+  .pf-ic svg { width: 100%; height: 100%; }
+  .pf-title { font-size: 14px; font-weight: 600; }
+  .pf-desc { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  .price-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 18px; }
+  .price-grid.two { grid-template-columns: 1fr 1fr; }
+  .price-card { border: 2px solid var(--border); border-radius: 16px; padding: 14px; background: var(--surface);
+    text-align: left; font-family: inherit; }
+  .price-card.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .price-card .pc-badge { display: inline-block; font-size: 10.5px; font-weight: 700; color: #fff; background: var(--accent);
+    border-radius: 999px; padding: 2px 8px; margin-bottom: 6px; }
+  .price-card .pc-amt { font-size: 19px; font-weight: 700; }
+  .price-card .pc-period { font-size: 12px; color: var(--text-muted); }
+  .price-card .pc-note { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
   .account-row { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: none;
     padding: 4px 2px; text-align: left; color: inherit; -webkit-tap-highlight-color: transparent; }
   .account-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex: none; background: var(--surface-2); }
   .account-name { flex: 1; font-size: 15.5px; font-weight: 600; }
   .account-chevron { width: 18px; height: 18px; flex: none; color: var(--text-muted); }
+
+  .premium-entry-card { padding: 14px 16px; }
+  .premium-entry { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: none;
+    padding: 0; text-align: left; color: inherit; -webkit-tap-highlight-color: transparent; font-family: inherit; }
+  .premium-entry-ic { width: 38px; height: 38px; border-radius: 11px; background: var(--accent-soft); color: var(--accent);
+    display: flex; align-items: center; justify-content: center; flex: none; }
+  .premium-entry-ic svg { width: 20px; height: 20px; }
+  .premium-entry-text { flex: 1; min-width: 0; }
+  .premium-entry-title { font-size: 15px; font-weight: 700; }
+  .premium-entry-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  /* 已订阅态：图标块换成实心accent底+白图标——语义是"已拥有的权益"而不是"紧急"，
+     所以只强调小图标块，不整卡变色（不采用.pay-hero.overdue那种整卡实心红底的
+     处理手法，那是"逾期"这种真正紧急语义专属的最强信号）。 */
+  .premium-entry-card.is-member .premium-entry-ic { background: var(--accent); color: #fff; }
 
   .account-detail-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .account-detail-row:last-child { border-bottom: none; }
@@ -372,6 +440,14 @@
   </header>
   <div id="topSummary">
     <div class="summary" id="summary"></div>
+    <button type="button" class="ai-banner" id="aiBannerBtn">
+      <div class="ai-banner-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></div>
+      <div class="ai-banner-text">
+        <div class="ai-banner-title" id="aiBannerTitle">AI 债务优化建议</div>
+        <div class="ai-banner-sub" id="aiBannerSub">开通 AI 会员，获取雪球/雪崩法分析与更省钱的还款顺序</div>
+      </div>
+      <svg class="account-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
     <div class="footnote" id="sumNote" style="margin-top:-8px;margin-bottom:16px;text-align:left;padding:0 2px">在还总负债 = 各未结清债务「未还本金」之和（只算本金、不含未来利息/手续费）。<br>已还金额 = 各未结清债务「已还期数」的本金之和；另付利息 = 这些已还期数对应的利息/手续费之和（两者都不含已结清的债务）。<br>经常性月供 = 各笔下一期应还之和（不含标记为「一次性还清」的借款）。</div>
   </div>
 
@@ -417,6 +493,16 @@
       <button type="button" class="account-row" id="accountRowBtn">
         <img class="account-avatar" id="accountAvatarImg" alt="">
         <span class="account-name" id="accountNameText"></span>
+        <svg class="account-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+    <div class="data-card premium-entry-card" id="premiumEntryCard">
+      <button type="button" class="premium-entry" id="premiumEntryBtn">
+        <div class="premium-entry-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3L21.5 9l-4.8 4.5 1.3 6.7L12 17l-6 3.2 1.3-6.7L2.5 9l6.6-.7L12 2z"/></svg></div>
+        <div class="premium-entry-text">
+          <div class="premium-entry-title" id="premiumEntryTitle">升级 Premium</div>
+          <div class="premium-entry-sub" id="premiumEntrySub">云同步备份 · 提前还款模拟器 · 高级报表 · AI债务顾问</div>
+        </div>
         <svg class="account-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
       </button>
     </div>
@@ -507,11 +593,83 @@
     <div class="data-card">
       <div class="account-detail-row"><span class="account-detail-label">头像</span><img class="account-avatar" id="acctDetailAvatar" alt=""></div>
       <div class="account-detail-row"><span class="account-detail-label">昵称</span><span class="account-detail-value" id="acctDetailNickname"></span></div>
-      <div class="account-detail-row"><span class="account-detail-label">会员</span><span class="account-detail-value">普通用户</span></div>
+      <div class="account-detail-row"><span class="account-detail-label">会员</span><span class="account-detail-value" id="acctDetailMembership">普通用户</span></div>
       <div class="account-detail-row"><span class="account-detail-label">微信绑定</span><span class="account-detail-value">已绑定</span></div>
     </div>
     <div class="data-actions" style="margin-top:16px"><button class="btn ghost" id="wxLogoutBtn">退出登录</button></div>
     <div class="data-actions" style="margin-top:10px"><button class="btn danger" id="deleteAccountBtn">注销账户</button></div>
+  </div>
+</div>
+
+<div class="subpage" id="premiumScreen">
+  <div class="subpage-header">
+    <button type="button" class="subpage-back" id="premiumBackBtn" aria-label="返回">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="subpage-title">Premium</div>
+    <div class="subpage-header-spacer"></div>
+  </div>
+  <div class="subpage-body">
+
+    <div class="premium-hero">
+      <div class="premium-hero-ic" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3L21.5 9l-4.8 4.5 1.3 6.7L12 17l-6 3.2 1.3-6.7L2.5 9l6.6-.7L12 2z"/></svg>
+      </div>
+      <div class="premium-hero-title">升级你的 After Zero</div>
+      <div class="premium-hero-sub">解锁云同步、还款优化模拟与 AI 债务顾问</div>
+    </div>
+
+    <div class="premium-tabs" role="tablist">
+      <button type="button" class="premium-tab active" id="ptabPro" data-tier="pro" role="tab" aria-selected="true">Pro</button>
+      <button type="button" class="premium-tab" id="ptabAI" data-tier="ai" role="tab" aria-selected="false">AI</button>
+    </div>
+
+    <div id="premiumFeaturePro" class="pf-list">
+      <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.5-8.98A5.5 5.5 0 0 1 17 8.06 4 4 0 0 1 17 18H7z"/></svg></div>
+        <div class="pf-text"><div class="pf-title">云同步 / 云备份</div><div class="pf-desc">自动同步，无需手动导出导入，换手机也不怕丢数据</div></div></div>
+      <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5M8 17h3"/></svg></div>
+        <div class="pf-text"><div class="pf-title">提前还款收益模拟器</div><div class="pf-desc">测算"多还¥X，提前N个月还清，省¥Y利息"</div></div></div>
+      <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M11 20V4M18 20v-7"/></svg></div>
+        <div class="pf-text"><div class="pf-title">高级统计报表</div><div class="pf-desc">支持导出 PDF / Excel，方便存档与分享</div></div></div>
+      <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4.5l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg></div>
+        <div class="pf-text"><div class="pf-title">更大档案库空间</div><div class="pf-desc">上传更多凭证文件，不再受容量限制</div></div></div>
+    </div>
+
+    <div id="premiumFeatureAI" class="pf-list" style="display:none">
+      <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .8 1.6v.5h5.4v-.5c0-.6.3-1.2.8-1.6A6 6 0 0 0 12 3z"/></svg></div>
+        <div class="pf-text"><div class="pf-title">AI 债务优化建议</div><div class="pf-desc">雪球法 / 雪崩法分析，告诉你优先还哪笔最省钱</div></div></div>
+      <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M20 15l-4.5-4-6.5 5.5"/></svg></div>
+        <div class="pf-text"><div class="pf-title">账单 / 借条 OCR 识别</div><div class="pf-desc">拍照自动识别金额与期数，快速导入</div></div></div>
+      <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v11H8l-4 4z"/></svg></div>
+        <div class="pf-text"><div class="pf-title">智能问答</div><div class="pf-desc">针对你自己的债务数据直接提问</div></div></div>
+    </div>
+
+    <!-- 价格为占位展示（用户已确认接受占位数字），最终定价与应用内购买商品ID要等上架应用商店时再定 -->
+    <div id="premiumPricePro" class="price-grid">
+      <button type="button" class="price-card selected" data-plan="pro-onetime">
+        <span class="pc-badge">永久解锁</span>
+        <div class="pc-amt num">¥98</div>
+        <div class="pc-period">一次性付费，永久使用</div>
+      </button>
+    </div>
+    <div id="premiumPriceAI" class="price-grid two" style="display:none">
+      <button type="button" class="price-card selected" data-plan="ai-monthly">
+        <div class="pc-amt num">¥18</div>
+        <div class="pc-period">/ 月</div>
+        <div class="pc-note">按月订阅，随时可取消</div>
+      </button>
+      <button type="button" class="price-card" data-plan="ai-yearly">
+        <span class="pc-badge">省 44%</span>
+        <div class="pc-amt num">¥120</div>
+        <div class="pc-period">/ 年</div>
+        <div class="pc-note">折合 ¥10/月</div>
+      </button>
+    </div>
+
+    <div class="data-actions" style="margin-top:4px">
+      <button type="button" class="btn primary" id="premiumSubscribeBtn">订阅并支付</button>
+    </div>
+    <div class="footnote" id="premiumTerms">订阅即表示你同意我们的《购买者服务条款》。除非提前取消，否则订阅服务将自动续订，费用将从你的应用商店账户中扣除。可随时在应用商店的订阅管理中取消。</div>
   </div>
 </div>
 
@@ -565,8 +723,8 @@
         <option value="custom">自定义（生成空白行自己填）</option>
       </select></div>
       <div data-gg="amort">
-        <div class="field two"><div class="field"><label for="g-P">借款金额 ¥ <span class="req">*</span></label><input id="g-P" type="number" step="0.01" inputmode="decimal" required></div><div class="field"><label for="g-rate">年化 % <span class="req">*</span></label><input id="g-rate" type="number" step="0.01" inputmode="decimal" required></div></div>
-        <div class="field two" id="amortPeriodRow"><div class="field"><label for="g-n">期数 <span class="req">*</span></label><input id="g-n" type="number" min="1" inputmode="numeric" required></div></div>
+        <div class="field two"><div class="field"><label for="g-P">借款金额 ¥ <span class="req">*</span></label><input id="g-P" type="number" step="0.01" inputmode="decimal"></div><div class="field"><label for="g-rate">年化 % <span class="req">*</span></label><input id="g-rate" type="number" step="0.01" inputmode="decimal"></div></div>
+        <div class="field two" id="amortPeriodRow"><div class="field"><label for="g-n">期数 <span class="req">*</span></label><input id="g-n" type="number" min="1" inputmode="numeric"></div></div>
       </div>
       <div data-gg="equalfee">
         <div class="field two"><div class="field"><label for="g-pp">每期本金 ¥</label><input id="g-pp" type="number" step="0.01" inputmode="decimal"></div><div class="field"><label for="g-pf">每期手续费 ¥</label><input id="g-pf" type="number" step="0.01" inputmode="decimal"></div></div>
@@ -579,7 +737,7 @@
       <div data-gg="custom">
         <div class="field"><label for="g-nc">生成几期空白行</label><input id="g-nc" type="number" min="1" inputmode="numeric"></div>
       </div>
-      <div class="field" id="gFirstField"><label for="g-first">首期还款日 <span class="req">*</span></label><input id="g-first" type="date" required></div>
+      <div class="field" id="gFirstField"><label for="g-first">首期还款日 <span class="req">*</span></label><input id="g-first" type="date"></div>
       <button type="button" class="btn primary" id="doGen">生成计划</button>
     </div>
 
@@ -603,8 +761,11 @@
     <span>启用通知</span>
     <span class="switch"><input type="checkbox" id="notifyToggle"><span class="switch-track"></span></span>
   </label>
+  <button type="button" class="btn ghost" id="notifyTestBtn" style="width:100%">发送测试通知（10秒后）</button>
+  <div class="footnote" style="margin:6px 2px 0; text-align:left">用来验证手机能不能收到，不用等真实还款日；如果测试通知也收不到，大概率是系统电池优化/自启动限制拦了它，去系统设置里把本App加入白名单</div>
   <div class="section-label" style="margin-top:14px">提醒规则（对所有在还债务统一生效）</div>
   <div id="notifyRuleList"></div>
+  <div class="section-label" style="margin-top:18px; padding-top:16px; border-top:1px solid var(--border)">添加新提醒</div>
   <div class="notify-add">
     <select id="notifyOffset">
       <option value="0">当天到期</option>
@@ -649,6 +810,10 @@
   var SORT_KEY = "debt-manager-sort-v1";
   // 还款提醒通知设置（全局共享，不按债务区分），独立于上面几个键。
   var NOTIF_KEY = "after-zero-notify-v1";
+  // 订阅状态：Pro(一次性买断)/AI(按月订阅)是两条独立产品线，不是线性tier，
+  // 所以拆成两个可分别为空的字段，不用单一tier枚举——理论上可以只买Pro、只订AI、
+  // 两个都买、或都不买。独立于上面几个键。
+  var PREMIUM_KEY = "after-zero-premium-v1";
   // SEED: minimal spec; full plan generated on load
   var SEED = [];
   var DOCS_SEED = [];
@@ -738,6 +903,34 @@
   var account = loadJSON(ACCOUNT_KEY, null);
   var notify = loadJSON(NOTIF_KEY, { enabled: false, rules: [] });
   function saveNotify() { try { localStorage.setItem(NOTIF_KEY, JSON.stringify(notify)); } catch (e) {} }
+  // 新装必须是空数据：默认两项都是null，即"普通用户"。
+  var premium = loadJSON(PREMIUM_KEY, { pro: null, ai: null });
+  function savePremium() { try { localStorage.setItem(PREMIUM_KEY, JSON.stringify(premium)); } catch (e) {} }
+  function hasPro() { return !!(premium && premium.pro); }
+  function hasAI() { return !!(premium && premium.ai); }
+  function premiumLabel() {
+    if (hasPro() && hasAI()) return "Pro + AI 会员";
+    if (hasPro()) return "Pro 会员";
+    if (hasAI()) return "AI 会员";
+    return null;
+  }
+  // 开发/测试期间模拟"已订阅"效果用——App还没上应用商店，接不了真实支付，没有别的
+  // 办法能走通购买流程。跟CLAUDE.md记录的"手写localStorage模拟登录"是同一类调试
+  // 手法，区别是这个函数会立即重渲染当前页面上三处订阅相关UI，不需要手动刷新页面。
+  // 用法（桌面浏览器或真机WebView的devtools console里执行）：
+  //   window.__debugPremium("pro")   // 模拟已买断Pro
+  //   window.__debugPremium("ai")    // 模拟已订阅AI（月付）
+  //   window.__debugPremium("both")  // 模拟Pro+AI都有
+  //   window.__debugPremium("none")  // 清空，恢复"普通用户"
+  window.__debugPremium = function (state) {
+    if (state === "none") { premium = { pro: null, ai: null }; }
+    else {
+      if (state === "pro" || state === "both") premium.pro = { purchasedAt: new Date().toISOString() };
+      if (state === "ai" || state === "both") premium.ai = { billing: premiumPlanSel.ai === "ai-yearly" ? "yearly" : "monthly", startedAt: new Date().toISOString() };
+    }
+    savePremium(); renderAccountDetail(); renderPremiumEntryCard(); renderAIBanner();
+    toast("（调试）订阅状态已设为：" + state);
+  };
   debts.forEach(normalize);
   var editIndex = -1, detailIndex = -1, docSel = -1, editingPlan = [];
   // 勾选"一次性还清"时，第2期起被暂存到这里（不是丢弃）；取消勾选时原样放回editingPlan，
@@ -1014,8 +1207,8 @@
     return "custom";
   }
 
-  function urgencyTier(diff) { return diff <= 3 ? "crit" : (diff <= 14 ? "warn" : "dim"); }
-  function relLabel(diff) { return diff < 0 ? "已到期" : (diff === 0 ? "就在今天" : diff + " 天后"); }
+  function urgencyTier(diff) { return diff < 0 ? "overdue" : (diff <= 3 ? "crit" : (diff <= 14 ? "warn" : "dim")); }
+  function relLabel(diff) { return diff < 0 ? ("已逾期 " + (-diff) + " 天") : (diff === 0 ? "就在今天" : diff + " 天后"); }
 
   // 通知铃铛：outline/filled两个svg叠放按状态类切换显示哪个，跟tabbar图标(.ic-outline/.ic-filled)
   // 同一套手法。renderPayHero()每次整个重写#payHero的innerHTML(含空状态分支)，铃铛按钮本身
@@ -1144,7 +1337,7 @@
       list.appendChild(row);
     });
   }
-  function renderAll() { debts.forEach(recompute); renderSummary(); renderDebts(); renderPay(); syncNotifications(); }
+  function renderAll() { debts.forEach(recompute); renderSummary(); renderAIBanner(); renderDebts(); renderPay(); syncNotifications(); }
 
   // 通知调度：每次都是"全清再重排"——这个App里没有别的功能用本地通知，全量重算最简单可靠，
   // 不需要给每条通知发明持久稳定的ID去做增量diff。只排每笔在还债务"下一期"的提醒(不是整条
@@ -1176,7 +1369,7 @@
         });
       });
       if (list.length) return LN.schedule({ notifications: list });
-    }).catch(function () {});
+    }).catch(function (e) { console.error("syncNotifications failed", e); });
   }
 
   function kv(k, v) { return '<div><div class="k">' + k + '</div><div class="v num">' + v + '</div></div>'; }
@@ -1317,10 +1510,17 @@
     renderPlanRows(); refreshPlanSum();
   }
   $("f-oneTime").addEventListener("change", syncOneTimeUI);
+  // 这几个"公式生成"专属字段不用HTML5原生required（它们跟#debtForm共用一个form，如果
+  // 停留在"公式生成"这个tab时点"保存"，原生表单校验会连带拦下主表单的提交——安卓WebView
+  // 又不会像桌面浏览器那样弹校验提示气泡，拦下之后就是彻底的"点了保存没反应"，很难排查。
+  // 校验改成这里手动做、用toast提示，不会有这个副作用。
   $("doGen").addEventListener("click", function () {
     var k = $("g-kind").value, first = $("g-first").value, spec = { kind: k, first: first };
-    if (k === "amort") { spec.P = +$("g-P").value; spec.rate = +$("g-rate").value; spec.n = +$("g-n").value; }
-    else if (k === "equalfee") { spec.pp = +$("g-pp").value; spec.pf = +$("g-pf").value; spec.n = +$("g-n2").value; }
+    if (!first) { toast("首期还款日必填"); return; }
+    if (k === "amort") {
+      spec.P = +$("g-P").value; spec.rate = +$("g-rate").value; spec.n = +$("g-n").value;
+      if (!spec.P || !$("g-rate").value || !spec.n) { toast("借款金额/年化/期数必填"); return; }
+    } else if (k === "equalfee") { spec.pp = +$("g-pp").value; spec.pf = +$("g-pf").value; spec.n = +$("g-n2").value; }
     else if (k === "interestfirst") { spec.P = +$("g-P3").value; spec.rate = +$("g-rate3").value; spec.ni = +$("g-ni").value; spec.np = +$("g-np").value; }
     else { spec.n = +$("g-nc").value; }
     editingPlan = genPlan(spec);
@@ -1496,6 +1696,22 @@
       notify.enabled = false; saveNotify();
     }
   });
+  $("notifyTestBtn").addEventListener("click", function () {
+    var LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
+    if (!LN) { toast("通知仅支持安卓App内使用"); return; }
+    LN.checkPermissions().then(function (r) {
+      if (r.display === "granted") return r;
+      return LN.requestPermissions();
+    }).then(function (r) {
+      if (r.display !== "granted") { toast("未授予通知权限，去系统设置里给本App开启通知权限"); return; }
+      return LN.schedule({ notifications: [{
+        id: 999, channelId: "repay", smallIcon: "ic_stat_notify",
+        title: "测试通知",
+        body: "能看到这条说明推送链路正常。如果到了真实还款日一直收不到，大概率是系统电池优化/自启动限制拦了它，不是App本身的问题。",
+        schedule: { at: new Date(Date.now() + 10000) }
+      }] }).then(function () { toast("已安排，10秒后看通知栏"); });
+    }).catch(function (e) { toast("发送失败：" + (e && e.message ? e.message : "未知错误")); });
+  });
   $("notifyAddBtn").addEventListener("click", function () {
     var offsetDays = +$("notifyOffset").value, time = $("notifyTime").value || "09:00";
     notify.rules.push({ offsetDays: offsetDays, time: time });
@@ -1570,8 +1786,11 @@
       var base64 = String(dataURL).split(",")[1] || "";
       return native.save({ data: base64, filename: filename, mimeType: mime || "application/octet-stream" });
     }).then(function () {
-      toast("已保存到下载");
+      // 现在走系统"另存为"选择器，用户自己选的位置，不再固定是"下载"目录，文案不点名具体路径。
+      toast("已保存");
     }).catch(function (err) {
+      // 原生插件在用户点"取消"时会reject("已取消")，跟真实失败区分开，这里不用特殊分支处理，
+      // 直接把err.message吐出来toast就已经是恰当的中性文案（不会显得像出错）。
       toast((err && err.message) || "保存失败");
     });
   }
@@ -1605,9 +1824,39 @@
   function renderAccountDetail() {
     $("acctDetailAvatar").src = (account && account.avatarUrl) || "";
     $("acctDetailNickname").textContent = (account && account.nickname) || "";
+    $("acctDetailMembership").textContent = premiumLabel() || "普通用户";
   }
   function openAccountScreen() { renderAccountDetail(); $("accountScreen").classList.add("open"); lockScroll(); }
   function closeAccountScreen() { if (!$("accountScreen").classList.contains("open")) return; $("accountScreen").classList.remove("open"); unlockScroll(); }
+
+  // 订阅页：Pro(一次性买断)/AI(按月订阅)两个tab互斥显示各自的功能列表+价格区。
+  function renderPremiumEntryCard() {
+    var label = premiumLabel();
+    $("premiumEntryCard").classList.toggle("is-member", !!label);
+    $("premiumEntryTitle").textContent = label || "升级 Premium";
+    $("premiumEntrySub").textContent = label ? "查看订阅详情、管理续订" : "云同步备份 · 提前还款模拟器 · 高级报表 · AI债务顾问";
+  }
+  function renderAIBanner() {
+    var ai = hasAI();
+    $("aiBannerBtn").classList.toggle("is-ai", ai);
+    $("aiBannerTitle").textContent = ai ? "AI 债务顾问" : "AI 债务优化建议";
+    $("aiBannerSub").textContent = ai ? "已开通 · 雪球/雪崩法分析、优先还款建议" : "开通 AI 会员，获取雪球/雪崩法分析与更省钱的还款顺序";
+  }
+  var premiumTab = "pro";
+  var premiumPlanSel = { pro: "pro-onetime", ai: "ai-monthly" };
+  function setPremiumTab(tier) {
+    premiumTab = tier;
+    $("ptabPro").classList.toggle("active", tier === "pro");
+    $("ptabPro").setAttribute("aria-selected", tier === "pro");
+    $("ptabAI").classList.toggle("active", tier === "ai");
+    $("ptabAI").setAttribute("aria-selected", tier === "ai");
+    $("premiumFeaturePro").style.display = tier === "pro" ? "" : "none";
+    $("premiumFeatureAI").style.display = tier === "ai" ? "" : "none";
+    $("premiumPricePro").style.display = tier === "pro" ? "" : "none";
+    $("premiumPriceAI").style.display = tier === "ai" ? "" : "none";
+  }
+  function openPremiumScreen(tier) { setPremiumTab(tier || "pro"); $("premiumScreen").classList.add("open"); lockScroll(); }
+  function closePremiumScreen() { if (!$("premiumScreen").classList.contains("open")) return; $("premiumScreen").classList.remove("open"); unlockScroll(); }
 
   var wxAuthListenerBound = false;
   function handleWxAuthResult(data) {
@@ -1805,6 +2054,7 @@
   window.__handleBackButton = function () {
     if (jiggleMode) { exitJiggle(); return true; }
     if ($("modalScrim").classList.contains("open")) { closeModal(); return true; }
+    if ($("premiumScreen").classList.contains("open")) { closePremiumScreen(); return true; }
     if ($("accountScreen").classList.contains("open")) { closeAccountScreen(); return true; }
     if ($("notifySheet").classList.contains("open")) { closeNotifySheet(); return true; }
     if ($("editSheet").classList.contains("open")) { closeEdit(); return true; }
@@ -1813,6 +2063,26 @@
   };
   $("accountRowBtn").addEventListener("click", openAccountScreen);
   $("accountBackBtn").addEventListener("click", closeAccountScreen);
+  $("premiumEntryBtn").addEventListener("click", function () { openPremiumScreen(hasAI() && !hasPro() ? "ai" : "pro"); });
+  $("premiumBackBtn").addEventListener("click", closePremiumScreen);
+  $("ptabPro").addEventListener("click", function () { setPremiumTab("pro"); });
+  $("ptabAI").addEventListener("click", function () { setPremiumTab("ai"); });
+  document.querySelectorAll("#premiumPricePro .price-card, #premiumPriceAI .price-card").forEach(function (card) {
+    card.addEventListener("click", function () {
+      card.closest(".price-grid").querySelectorAll(".price-card").forEach(function (c) { c.classList.remove("selected"); });
+      card.classList.add("selected");
+      premiumPlanSel[premiumTab] = card.getAttribute("data-plan");
+    });
+  });
+  $("premiumSubscribeBtn").addEventListener("click", function () {
+    // 这次只做UI，不接真实支付——App还没上应用商店。真实支付渠道接入之后，
+    // 这里要换成真正发起购买流程，现在先给一个明确的"暂未开放"反馈。
+    ask("暂未开放真实支付", "After Zero 还未上架应用商店，支付功能尚未接入。上架后即可在此完成订阅——敬请期待。", null);
+  });
+  $("aiBannerBtn").addEventListener("click", function () {
+    if (hasAI()) { toast("AI 功能开发中，敬请期待"); return; }
+    openPremiumScreen("ai");
+  });
   $("deleteAccountBtn").addEventListener("click", function () {
     ask("注销账户", "注销后账号数据将从服务器永久删除，且需要重新微信登录才能再次使用。此操作不可撤销，确定继续吗？", doDeleteAccount);
   });
@@ -1896,6 +2166,6 @@
     if (LN) LN.createChannel({ id: "repay", name: "还款提醒", description: "债务还款日提醒", importance: 4 }).catch(function () {});
   })();
 
-  renderFiles(); renderDocContent(); renderAll(); loadUploads(); renderAccountUI();
+  renderFiles(); renderDocContent(); renderAll(); loadUploads(); renderAccountUI(); renderPremiumEntryCard();
 })();
 </script>

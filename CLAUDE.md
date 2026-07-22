@@ -14,11 +14,15 @@
 
 ## 原生插件：`SaveFile`
 
-档案库的"下载"按钮存文件到设备"下载"目录，用的是这个自定义原生插件（`android/app/src/main/java/io/github/jenkjyu/afterzero/SaveFilePlugin.java`），不是网页标准的`<a download>`。
+档案库的"下载"按钮存文件到用户自己选的位置，用的是这个自定义原生插件（`android/app/src/main/java/io/github/jenkjyu/afterzero/SaveFilePlugin.java`），不是网页标准的`<a download>`。
 
-**为什么需要一个原生插件**：`<a download>` + `blob:` URL 这种纯网页写法在桌面浏览器没问题，但在安卓WebView里基本不生效（点了没反应）。要让文件真正落到用户手机能在"下载"App/文件管理器里看到的地方，安卓10+（API 29+）必须用 `MediaStore.Downloads` 这套系统API——好处是这样写完全不需要在`AndroidManifest.xml`里申请任何存储权限（app只操作自己创建的MediaStore条目，不受分区存储限制）。
+**为什么需要一个原生插件**：`<a download>` + `blob:` URL 这种纯网页写法在桌面浏览器没问题，但在安卓WebView里基本不生效（点了没反应）。
 
-**已知边界**：这个插件只支持安卓10+（`Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q`），低于这个版本会直接`reject`一个提示文案，不会崩溃。这个项目`minSdkVersion = 24`（安卓7），所以理论上安卓7-9的机器装得上app，但点"下载"会拿到一条"此安卓版本暂不支持"的提示——这是有意的取舍（第一阶段只做10+），不是遗漏，以后要补安卓9及以下的兼容需要另外写`Environment.getExternalStoragePublicDirectory` + 运行时权限申请那一套老API。
+**现在用的是系统"另存为"选择器（Storage Access Framework, `Intent.ACTION_CREATE_DOCUMENT`），不是早期版本静默写入`MediaStore.Downloads`那一套**——这是踩坑之后换的架构，原因见下面"踩过的坑"。用户点"下载"会弹系统自带的文件选择界面，自己挑文件夹（也能选Google Drive这类云盘）、确认文件名后再保存，不再是"点了就无声存完"。好处：完全不需要在`AndroidManifest.xml`里申请任何存储权限（SAF本身就不需要），且`ACTION_CREATE_DOCUMENT`从API 19（远早于这个项目`minSdkVersion=24`）就存在，不像旧的`MediaStore.Downloads`写法那样要求安卓10+——**这个插件现在对minSdk覆盖的所有安卓版本（7+）都支持，没有版本边界要特殊处理**，CLAUDE.md早前记录的"安卓10以下不支持"这条限制已经不存在。
+
+**踩过的坑（为什么从静默写入MediaStore.Downloads换成SAF选择器）**：老写法用`MediaStore.Downloads.EXTERNAL_CONTENT_URI` + `IS_PENDING`那套流程写入，原生层面`call.resolve()`确实是在真正写入成功之后才触发的，不是假成功。但**很多国产手机的文件管理器"下载"这个分类入口，只按识别得出的mime类型（图片/视频/文档/安装包...）过滤显示**——图片/PDF能命中分类、正常可见，但备份文件用的`application/json`是冷门类型，命中不了任何分类，会被过滤掉不显示，文件其实原样躺在"所有文件→内部存储→Download"这个真实文件夹里，只是分类视图里看不到。表现为"App提示已保存到下载，用户去文件管理器翻却怎么也找不到"，很容易被误判成"保存失败"，实际上原生代码从来没有真的失败过。换成SAF"另存为"选择器后，文件存在哪是用户自己点出来确认的，不存在"看不见"这个问题。
+
+**用户在系统选择器里点"取消"是正常操作，不是错误**：`SaveFilePlugin.java`的`@ActivityCallback`方法把这种情况单独`reject("已取消")`，跟真正的写入失败区分开，JS那边不用特殊分支处理，直接把`err.message`吐出来toast就是恰当的中性文案。
 
 **JS这边怎么调用**：`www/index.html` 里的 `saveToDeviceDownloads(blob, filename, mime)` 函数会检测 `window.Capacitor.Plugins.SaveFile` 是否存在——存在（真机原生环境）就转base64调用原生插件；不存在（比如本地`python3 -m http.server`桌面浏览器测试）就退回到旧的`<a download>`写法。**这意味着"下载"功能本身没法在桌面浏览器里完整测出真实效果，必须编译APK装真机验证。**
 
@@ -111,6 +115,10 @@ npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
 
 **JS这边的检测模式跟`SaveFile`/`WeChatLogin`一致**：`window.Capacitor && window.Capacitor.Plugins.LocalNotifications`存在才调用，不存在（桌面浏览器测试）就静默跳过或提示"仅支持安卓App内使用"——同样是"真实通知能不能弹出没法在桌面浏览器完整验证，必须编译APK装真机"这条老规矩。
 
+**通知面板里有个"发送测试通知"按钮**（10秒后弹一条），专门用来在不用等真实还款日的情况下，快速验证真机上"权限→渠道→调度→系统弹出"这整条链路通不通。`syncNotifications()`末尾原来把所有调度失败都静默吞掉（空`.catch`），已经改成至少`console.error`出来，方便配合`chrome://inspect`/`edge://inspect`（见上面"环境要求"里release包调试那条）排查。
+
+**已实测确认一个真实坑：华为/荣耀（EMUI/HarmonyOS）把"从最近任务卡片划掉App"当成对这个App的软性强制停止处理**，会连带撤销它的后台唤醒权限，导致App在前台时测试通知能收到、划掉最近任务后同一条测试通知就再也收不到——这不是`syncNotifications()`调度逻辑的bug（AlarmManager本身是系统级的，不依赖App进程存活），是系统限制。**排查"通知到点收不到"类反馈，先问两件事：手机品牌/系统是什么、用户是怎么"关闭"App的（划掉最近任务 vs 单纯回到桌面 vs 系统设置里手动强制停止）**——这两个变量决定了是要去"应用启动管理"里放行，还是真的要去查调度代码。华为/荣耀这台上的解法：**手机管家→应用启动管理**，找到这个App把"自动管理"关掉，手动打开"自启动/关联启动/后台活动"三个开关；小米/OPPO/vivo等其他国产系统大概率有同类限制，只是入口页面名字不同，遇到报告先按这个思路查对应设置页，不要先怀疑代码。
+
 ## 返回键处理（安卓硬件/手势返回）
 
 弹窗关闭 + 退出App这两件事，走的是"原生问JS，JS说了算"的桥接，两头都有各自的坑：
@@ -149,7 +157,7 @@ npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
 
 "还款日"标签页顶部有一张"最近还款日"卡片（`#payHero`，`renderPayHero()`），取所有在还债务里下一期还款日最近的那一笔，底色按急迫程度换色。下面`#payList`列表里每一条债务卡片支持向左滑动，滑出一个"标记已还"按钮（类似iOS/微信聊天列表左滑删除）。
 
-**急迫程度是3档阈值，卡片底色和列表圆点共用同一套`urgencyTier(diff)`**（`diff`=距还款日的天数）：≤3天=红(`crit`)、≤14天=黄(`warn`)、其余=绿(`dim`)。**`dim`档一开始用的是`--accent`（品牌绿），浅色模式下这个绿是`#18453B`深墨绿，9px小圆点尺寸下几乎看着像黑色**——已经改成`--good`（这个项目里"已结清"/"低利率"这些正面信号一直用的蓝色），清晰可辨。以后再调这类小尺寸状态色，先拿实际渲染尺寸眼看一遍，不要只看色值本身是不是"绿色"就假设够用。
+**急迫程度现在是4档阈值，卡片底色和列表圆点共用同一套`urgencyTier(diff)`**（`diff`=距还款日的天数）：`diff<0`=逾期(`overdue`)、≤3天=红(`crit`)、≤14天=黄(`warn`)、其余=绿(`dim`)。**逾期是后来单独从`crit`拆出来的一档**——早期逾期和"3天内到期"共享同一个`crit`视觉，都是淡色底；逾期这一档现在故意用`--critical`实心底+白字（比其它三档的淡色底更强烈），列表圆点也加了`dotPulse`脉冲动画（`box-shadow`用`--critical-soft`做呼吸圈），因为逾期没还的实际代价（利息/信用）比"还没到但快了"更高，需要更抢眼的提示，不能被当成同一档忽略掉。`relLabel(diff)`对应也从含糊的"已到期"改成"已逾期 N 天"。**`dim`档一开始用的是`--accent`（品牌绿），浅色模式下这个绿是`#18453B`深墨绿，9px小圆点尺寸下几乎看着像黑色**——已经改成`--good`（这个项目里"已结清"/"低利率"这些正面信号一直用的蓝色），清晰可辨。以后再调这类小尺寸状态色，先拿实际渲染尺寸眼看一遍，不要只看色值本身是不是"绿色"就假设够用。
 
 **左滑手势沿用"在还债务"长按拖拽那条踩过的教训（见下面"在还债务自定义排序"一节），但场景更简单**：拖拽排序需要在同一个垂直轴上"平时滚动、长按后接管"，只能用Touch Events；这里左滑只需要接管**水平**轴，垂直滚动完全交给原生，所以可以额外用`touch-action:pan-y`提前告诉浏览器"水平不归你管"，减少和原生手势抢的可能，JS里对水平方向再补一层`preventDefault`兜底。触摸设备走Touch Events（`touchstart`/`touchmove`+`{passive:false}`/`touchend`），第一次移动时按dx/dy哪个更大判断"这是横滑还是竖直滚动"；桌面鼠标走独立的Pointer Events分支（`pointerType==='mouse'`才处理），纯为桌面浏览器可测。
 
@@ -170,6 +178,31 @@ npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
 **批量设置还款日：选"几号"之后点"应用到全部"会额外弹一个要"首期哪年哪月"的确认框**——这是给`ask()`这个原有的通用确认弹窗新加的可选第4个参数`opts.month`（会临时显示一个`<input type="month">`，`onOk`回调收到选中的月份字符串），其它调用`ask()`的地方不传这个参数就是原来纯文字确认框，不受影响。确认后按"首期年月+几号，每期顺延一个月"批量铺日期，超过当月天数会clamp到当月最后一天。
 
 **批量设置的"几号"和公式生成的"首期还款日"都不允许选29/30/31号，但还款计划表格里逐行手动填的日期不受限制**——这两个入口本质是在投射"每月同一天"的重复规律，29-31号在有些月份根本不存在，会导致还款日在不同月份之间漂移（有的月28号有的月31号），所以直接拦（`isBadRepeatDay(day)`），toast提示去表格里逐行手动填。表格里每一行的日期选择器（`#planRows`里的`data-f="date"`）代表的是"这一期具体是哪天"的真实数据，现实中贷款完全可能就是某个月的30号到期，所以这里故意不加这条限制——**两个入口的定位不同（一个是投射重复规律的快捷工具，一个是记录真实数据的详情表），限制也应该不同，别图省事统一加同一条规则。**
+
+**⚠️ 踩过一个坑：`#g-P`/`#g-rate`/`#g-n`/`#g-first`（公式生成tab专属的几个字段）不能带HTML5原生`required`属性**——它们跟"保存"提交按钮共用同一个`<form id="debtForm">`。只要用户当时停留在"公式生成"这个tab（`#genPanel`是`display:block`可见状态），哪怕根本没点"生成计划"，这几个字段只要有空的，点"保存"就会被浏览器原生表单校验拦截、`saveForm()`根本不会被调用——**而安卓WebView不会像桌面浏览器那样弹校验提示气泡，拦截后的观感就是"点保存彻底没反应"**，不关窗、不报错、不提示，非常难排查（一度真机反馈"编辑债务保存点不了"，查了很久才定位到是这几个`required`）。修法：去掉这几个字段的`required`（视觉星号`<span class="req">*</span>`保留），校验挪到`#doGen`（"生成计划"按钮，`type="button"`不是`submit`）自己的点击事件里手动toast提示。**以后如果再往`#genPanel`（或者任何跟主表单共用一个`<form>`、但靠`display:none`切换显隐的子面板）里加字段，一律不要用原生`required`，会有同样的隐形阻塞风险——校验都应该手动做、用`toast()`明确提示，不要依赖浏览器原生表单校验的可见反馈（WebView里没有）。**
+
+## 订阅UI基础设施：Premium(Pro买断) + AI(月付)
+
+"我的"页"账户"卡片和"全部数据"卡片之间有一张Premium入口卡片（`#premiumEntryCard`），"在还债务"页顶部KPI卡片下方有一条低调的AI入口banner（`#aiBannerBtn`），两者都会跳到同一个新的整页浮层`#premiumScreen`（Pro/AI两个tab切换）。**这轮只做UI展示层，没有接真实支付**——App还没上架任何应用商店，接不了Google Play Billing/华为应用内购这类真实购买流程，"订阅并支付"按钮点了只会弹"暂未开放真实支付"的提示框（`ask()`, `onOk`传`null`）。以后App真正上架后，要把这个按钮换成真实购买流程，再决定`premium.pro`/`premium.ai`要不要补充到期时间等字段。
+
+**数据模型是两个独立的可空字段，不是单一tier枚举**：`PREMIUM_KEY`（`after-zero-premium-v1`）存的是`{pro, ai}`，`premium.pro`形状是`{purchasedAt}`（一次性买断，没有"到期"概念），`premium.ai`形状是`{billing:"monthly"|"yearly", startedAt}`。之所以不用`tier:"free"|"pro"|"ai"`这种线性写法，是因为Pro（增值功能买断）和AI（AI功能订阅）是两条互相独立的产品线，用户理论上可以只买Pro、只订AI、两个都买或都不买，线性tier表达不了"有AI没Pro"这种组合。`hasPro()`/`hasAI()`/`premiumLabel()`三个helper统一负责查询和展示文案，"我的"页入口卡片、账户详情页"会员"行、AI banner三处渲染都调这三个函数，不要各写一套if/else。
+
+**开发/测试阶段没有真实支付可以验证"已订阅"UI，用`window.__debugPremium(state)`这个调试钩子**（跟CLAUDE.md早先记录的"手写localStorage跳过登录门"是同一类调试手法，但这个额外包成了函数）：
+
+```js
+window.__debugPremium("pro")   // 模拟已买断Pro
+window.__debugPremium("ai")    // 模拟已订阅AI（月付）
+window.__debugPremium("both")  // 模拟Pro+AI都有
+window.__debugPremium("none")  // 清空，恢复"普通用户"
+```
+
+调用后会立即重渲染"我的"页入口卡片、账户详情页"会员"行、AI banner这三处UI，不需要手动刷新页面——桌面浏览器或真机WebView的devtools console里都能执行。
+
+**订阅页价格是占位数字**（Pro ¥98一次性、AI ¥18/月或¥120/年），已经跟用户确认过接受占位、以后接入应用内购时再定真实定价和商品ID，代码里也注释了这一点。
+
+**`.subpage#premiumScreen`是这个项目第二个"整页推入"型浮层**（第一个是`#accountScreen`，见上面"返回键处理"一节），完全照抄它的`.subpage`/`.subpage-header`/`.subpage-body`骨架，也同样加进了`window.__handleBackButton`那条"最上层先关"的判断链——加在`accountScreen`判断**之前**（`modalScrim`判断之后），因为`premiumScreen`在HTML里插在`accountScreen`之后，两者同为`.subpage`（z-index:35）时DOM顺序更靠后的绘制在上层，返回键要先关视觉上在最上层的那个。
+
+**Pro tab的"强调"没有照搬`.pay-hero.overdue`那种整卡实心红底的处理手法**——那是"逾期"这种真正紧急语义专属的最强视觉信号，订阅是转化场景，语义严重级别低得多，用了跟`.pm-btn.active`/`.file-row[aria-current]`同一套"描边+浅底"选中态配方，不专门为订阅页发明新的强调手法。
 
 ## 字体：`www/fonts/`
 
@@ -241,7 +274,7 @@ localStorage.setItem("after-zero-account-v1", JSON.stringify({openid:"test",nick
 
 ## 硬性铁律，改代码前必看
 
-1. **`localStorage` 的 KEY（在`www/index.html`里搜 `debt-manager-v5`）永远不能改。** 这是用户设备上保存真实数据的键名，改了等于让已经装过的app找不到自己原来存的数据，直接清零。同理，`DKEY`（`debt-manager-docs-v5`）、账号登录状态用的`ACCOUNT_KEY`（`after-zero-account-v1`）、在还债务排序方式用的`SORT_KEY`（`debt-manager-sort-v1`）、还款提醒通知设置用的`NOTIF_KEY`（`after-zero-notify-v1`）以后也不能改——五者是各自独立的键，不要以为加新功能可以复用或合并。
+1. **`localStorage` 的 KEY（在`www/index.html`里搜 `debt-manager-v5`）永远不能改。** 这是用户设备上保存真实数据的键名，改了等于让已经装过的app找不到自己原来存的数据，直接清零。同理，`DKEY`（`debt-manager-docs-v5`）、账号登录状态用的`ACCOUNT_KEY`（`after-zero-account-v1`）、在还债务排序方式用的`SORT_KEY`（`debt-manager-sort-v1`）、还款提醒通知设置用的`NOTIF_KEY`（`after-zero-notify-v1`）、订阅状态用的`PREMIUM_KEY`（`after-zero-premium-v1`）以后也不能改——六者是各自独立的键，不要以为加新功能可以复用或合并。
 2. **新安装必须是空数据。** `www/index.html` 里 `SEED`（债务种子数据）、`DOCS_SEED`（文档种子数据）这两个常量现在都是空值——这是故意的，因为这个app的定位是要发给别人用，任何人第一次打开都不能预装开发者自己的私人财务数据。**改代码时如果要放测试数据，改完记得清空再提交，别把私人内容（真实债务数字、个人反思文档、任何带真实姓名/金额的东西）带回默认值里。**
    **私人数据不止藏在这三个常量里。** 之前排查发现过一次：一个叫`cliff`的调试用标记字段，虽然完全没有UI能设置它（不是SEED、不是表单字段），但代码里直接写死了具体的还款日期和金额字符串（`"2027-05 起还本，月供跳至 ¥2,182"`这类）挂在渲染逻辑里，跟SEED是否清空无关。改代码时留意：不只是搜`SEED`/`DOCS_SEED`这两个变量名，任何看着像真实日期/金额/人名的硬编码字符串都要多看一眼是不是该删。（补：曾经还有个`POSTER`"愿景海报"常量，因为没有任何UI入口能往里填内容、属于永远激活不了的死代码，已整体删除，包括`fileItems()`/`renderDocContent()`里对应的分支，别再找它。）
    **"新安装=空数据"这个假设依赖 `AndroidManifest.xml` 里 `android:allowBackup="false"`。** 安卓系统默认（`allowBackup="true"`，Capacitor脚手架生成时的默认值）会把App数据自动云备份到用户的Google账号，卸载重装或者换新手机登录同一个Google账号时可能会自动把旧数据（包括`ACCOUNT_KEY`存的登录态）恢复回来，让"重装"变得不再可靠地等于"空白状态"。这个项目已经手动改成`allowBackup="false"`彻底关掉自动备份——以后如果看到这个值被改回`true`（比如重新跑`npx cap add android`之类的脚手架命令覆盖了手改的manifest），要记得改回`false`。
