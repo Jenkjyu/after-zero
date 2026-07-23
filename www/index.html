@@ -17,21 +17,49 @@
     --fs-xs: 11px; --fs-sm: 11.5px; --fs-base: 14px; --fs-lg: 15.5px; --fs-figure: 18px; --fs-xl: 19px; --fs-xxl: 23px;
     --font-ui: 'Inter var', system-ui, -apple-system, "PingFang SC", "Segoe UI", Roboto, sans-serif;
     --font-num: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --text-faint: #9AA3AD; --accent-rgb: 24,69,59; --app-grad: linear-gradient(180deg,#EFF2EF,#E7ECE8);
+    --card-grad: linear-gradient(180deg,#FFFFFF,#FBFCFB); --hair: rgba(26,42,35,.06);
+    --graphite-a: #253039; --graphite-b: #151A20; --graphite-text: #FFFFFF; --graphite-dim: #9BA6B4;
+    --graphite-sheen: rgba(111,190,158,.18);
+    --e1: 0 1px 2px rgba(22,38,32,.04), 0 4px 10px rgba(22,38,32,.045);
+    --e2: 0 2px 6px rgba(22,38,32,.05), 0 16px 32px rgba(22,38,32,.08);
+    --e3: 0 24px 50px rgba(12,24,18,.26);
+    --glass: rgba(255,255,255,.5); --glass-border: rgba(255,255,255,.7); --glass-hi: rgba(255,255,255,.6);
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #101318; --surface: #191D24; --surface-2: #20252E; --border: #2B313B;
       --text: #E4E8EF; --text-muted: #98A0B0; --accent: #6FBE9E; --accent-soft: #1D2B28;
       --critical: #E56A6A; --critical-soft: #2E1D1F; --warning: #D69A3C; --warning-soft: #2B2316;
-      --good: #6FA8D6; --good-soft: #1E2A33; --shadow: 0 2px 12px rgba(0,0,0,.35); }
+      --good: #6FA8D6; --good-soft: #1E2A33; --shadow: 0 2px 12px rgba(0,0,0,.35);
+      --text-faint: #6E7787; --accent-rgb: 111,190,158; --app-grad: linear-gradient(180deg,#12161C,#0C0F14);
+      --card-grad: linear-gradient(180deg,#1E232B,#191D24); --hair: rgba(255,255,255,.05);
+      --graphite-a: #272F3A; --graphite-b: #171C24; --graphite-text: #F2F5F9; --graphite-dim: #99A4B2;
+      --graphite-sheen: rgba(111,190,158,.22);
+      --e1: 0 1px 2px rgba(0,0,0,.35); --e2: 0 4px 18px rgba(0,0,0,.4); --e3: 0 22px 46px rgba(0,0,0,.55);
+      --glass: rgba(30,36,45,.5); --glass-border: rgba(255,255,255,.09); --glass-hi: rgba(255,255,255,.07); }
   }
   :root[data-theme="light"] { --bg: #EEF0F4; --surface: #FFFFFF; --surface-2: #F6F7FA; --border: #DCE0E8;
     --text: #23272F; --text-muted: #697082; --accent: #18453B; --accent-soft: #E7F3F1;
     --critical: #BE3A3A; --critical-soft: #F9E8E8; --warning: #A66A0A; --warning-soft: #FAF0D9;
-    --good: #2E5F8A; --good-soft: #E1EBF4; --shadow: 0 2px 10px rgba(30,40,60,.08); }
+    --good: #2E5F8A; --good-soft: #E1EBF4; --shadow: 0 2px 10px rgba(30,40,60,.08);
+    --text-faint: #9AA3AD; --accent-rgb: 24,69,59; --app-grad: linear-gradient(180deg,#EFF2EF,#E7ECE8);
+    --card-grad: linear-gradient(180deg,#FFFFFF,#FBFCFB); --hair: rgba(26,42,35,.06);
+    --graphite-a: #253039; --graphite-b: #151A20; --graphite-text: #FFFFFF; --graphite-dim: #9BA6B4;
+    --graphite-sheen: rgba(111,190,158,.18);
+    --e1: 0 1px 2px rgba(22,38,32,.04), 0 4px 10px rgba(22,38,32,.045);
+    --e2: 0 2px 6px rgba(22,38,32,.05), 0 16px 32px rgba(22,38,32,.08);
+    --e3: 0 24px 50px rgba(12,24,18,.26);
+    --glass: rgba(255,255,255,.5); --glass-border: rgba(255,255,255,.7); --glass-hi: rgba(255,255,255,.6); }
   :root[data-theme="dark"] { --bg: #101318; --surface: #191D24; --surface-2: #20252E; --border: #2B313B;
     --text: #E4E8EF; --text-muted: #98A0B0; --accent: #6FBE9E; --accent-soft: #1D2B28;
     --critical: #E56A6A; --critical-soft: #2E1D1F; --warning: #D69A3C; --warning-soft: #2B2316;
-    --good: #6FA8D6; --good-soft: #1E2A33; --shadow: 0 2px 12px rgba(0,0,0,.35); }
+    --good: #6FA8D6; --good-soft: #1E2A33; --shadow: 0 2px 12px rgba(0,0,0,.35);
+    --text-faint: #6E7787; --accent-rgb: 111,190,158; --app-grad: linear-gradient(180deg,#12161C,#0C0F14);
+    --card-grad: linear-gradient(180deg,#1E232B,#191D24); --hair: rgba(255,255,255,.05);
+    --graphite-a: #272F3A; --graphite-b: #171C24; --graphite-text: #F2F5F9; --graphite-dim: #99A4B2;
+    --graphite-sheen: rgba(111,190,158,.22);
+    --e1: 0 1px 2px rgba(0,0,0,.35); --e2: 0 4px 18px rgba(0,0,0,.4); --e3: 0 22px 46px rgba(0,0,0,.55);
+    --glass: rgba(30,36,45,.5); --glass-border: rgba(255,255,255,.09); --glass-hi: rgba(255,255,255,.07); }
 
   * { box-sizing: border-box; }
   /* 全局禁掉长按选中/复制文字，只在真正的文字输入框(input/textarea)里保留——
@@ -48,29 +76,78 @@
   button:disabled { opacity: .5; pointer-events: none; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 
-  .app { max-width: 560px; margin: 0 auto; padding: 18px 14px 100px; }
-  header { padding: 4px 4px 14px; }
-  h1 { margin: 3px 0 0; font-size: 24px; font-weight: 700; letter-spacing: -.01em; }
-  .asof { color: var(--text-muted); font-size: 12.5px; margin-top: 3px; }
+  .app { max-width: 560px; margin: 0 auto; padding: 18px 14px 100px; background: var(--app-grad); min-height: 100vh; }
 
-  .summary { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 16px; }
-  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 12px 10px; box-shadow: var(--shadow); grid-column: span 2; }
-  .kpi .v { font-size: var(--fs-figure); font-weight: 700; }
-  .kpi .k { font-size: var(--fs-xs); color: var(--text-muted); margin-top: 1px; }
-  .kpi.half { grid-column: span 3; }
-  .kpi.half .v { font-size: var(--fs-xxl); }
-  .kpi-sub { font-size: var(--fs-xs); color: var(--text-muted); margin-top: 3px; }
-  /* AI入口banner：故意用朴素卡片外观(无box-shadow、字号明显小于KPI)压低视觉权重，
-     不能排在KPI卡片前面抢注意力，也是"不太抢眼"这个定位要求的具体落地。 */
-  .ai-banner { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 10px 12px; margin: -4px 0 14px; text-align: left; color: inherit; -webkit-tap-highlight-color: transparent; font-family: inherit; }
-  .ai-banner-ic { width: 30px; height: 30px; border-radius: 9px; background: var(--accent-soft); color: var(--accent);
+  /* ===== 顶部：手写 wordmark + 头像入口（替代原来的"债务管理"标题） ===== */
+  header#topHeader { padding: 4px 3px 4px; display: flex; align-items: center; justify-content: space-between; min-height: 36px; }
+  .wordmark { height: 26px; color: var(--text); display: flex; align-items: center; }
+  .wordmark svg { height: 100%; width: auto; display: block; }
+  .avatar-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--hair); padding: 0; background: var(--surface-2);
+    box-shadow: var(--e1); display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; flex: none; }
+  .avatar-btn svg { width: 21px; height: 21px; color: var(--text-muted); }
+  .asof { color: var(--text-muted); font-size: 12.5px; margin: 0 3px 14px; }
+
+  /* ===== 石墨主角卡：唯一的"在还总负债"焦点 ===== */
+  .hero { position: relative; border-radius: 24px; padding: 20px 20px 18px; margin-bottom: 13px; overflow: hidden;
+    background: linear-gradient(155deg, var(--graphite-a), var(--graphite-b)); color: var(--graphite-text); box-shadow: var(--e3); }
+  .hero::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 2;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.1); }
+  .hero > * { position: relative; z-index: 1; }
+  .hero-smoke { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; z-index: 0; }
+  .hero-puff { position: absolute; border-radius: 50%; filter: blur(30px); mix-blend-mode: screen; opacity: .55; }
+  .hero-puff.a { width: 200px; height: 200px; left: -12%; top: 8%;
+    background: radial-gradient(circle, rgba(111,190,158,.55), transparent 70%); animation: heroDrift1 8s ease-in-out infinite; }
+  .hero-puff.b { width: 170px; height: 170px; right: -8%; top: 30%;
+    background: radial-gradient(circle, rgba(90,170,180,.5), transparent 70%); animation: heroDrift2 10s ease-in-out infinite; }
+  .hero-puff.c { width: 150px; height: 150px; left: 30%; bottom: -20%;
+    background: radial-gradient(circle, rgba(120,200,150,.4), transparent 70%); animation: heroDrift3 12.5s ease-in-out infinite; }
+  @keyframes heroDrift1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(40px,20px) scale(1.15); } }
+  @keyframes heroDrift2 { 0%,100% { transform: translate(0,0) scale(1.05); } 50% { transform: translate(-36px,-16px) scale(.92); } }
+  @keyframes heroDrift3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(24px,-30px) scale(1.2); } }
+  @media (prefers-reduced-motion: reduce) { .hero-puff { animation: none; } }
+  .hero-top { display: flex; align-items: center; justify-content: space-between; }
+  .hero-label { font-size: 12.5px; font-weight: 600; letter-spacing: .04em; color: var(--graphite-dim); }
+  .hero-pill { font-size: 11px; font-weight: 600; color: var(--graphite-dim); border: 1px solid rgba(255,255,255,.16);
+    border-radius: 999px; padding: 3px 10px; }
+  .hero-amt { font-size: 36px; font-weight: 700; margin: 8px 0 0; font-family: var(--font-num); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .hero-amt .cur { font-size: 21px; font-weight: 600; margin-right: 2px; color: var(--graphite-dim); }
+  .hero-prog { margin-top: 15px; }
+  .hero-prog-track { height: 6px; border-radius: 999px; background: rgba(255,255,255,.12); overflow: hidden; }
+  .hero-prog-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, rgba(var(--accent-rgb),.75), #6FBE9E); }
+  .hero-prog-row { display: flex; justify-content: space-between; align-items: baseline; margin-top: 8px; }
+  .hero-prog-row .l { font-size: 11.5px; color: var(--graphite-dim); }
+  .hero-prog-row .r { font-size: 11.5px; color: var(--graphite-text); font-weight: 600; font-family: var(--font-num); }
+
+  /* ===== 降权的 4 个小指标 ===== */
+  .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 13px; }
+  .kpi { background: var(--card-grad); border: 1px solid var(--hair); border-radius: 18px; padding: 12px 14px; box-shadow: var(--e1); }
+  .kpi .v { font-size: 17px; font-weight: 650; margin-top: 3px; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+  .kpi .k { font-size: 11px; color: var(--text-muted); }
+  .kpi-sub { font-size: 10.5px; color: var(--text-faint); margin-top: 2px; }
+  /* 灵动AI入口：对话气泡+魔法棒图标，胶囊描边扫光+呼吸光晕；开通前更克制、不发光。 */
+  .ai-banner { position: relative; display: flex; align-items: center; gap: 11px; width: 100%; border: none;
+    border-radius: 999px; padding: 12px 16px 12px 12px; background: var(--card-grad); cursor: pointer;
+    margin: 0 0 20px; text-align: left; color: inherit; isolation: isolate; overflow: hidden; box-shadow: var(--e2); font-family: inherit; }
+  .ai-banner::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.4px;
+    background: linear-gradient(120deg, rgba(var(--accent-rgb),.14), rgba(var(--accent-rgb),.6), rgba(var(--accent-rgb),.14));
+    background-size: 220% 100%; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude; animation: aiSheen 5s linear infinite; }
+  .ai-banner::after { content: ""; position: absolute; inset: -30%; z-index: -1; border-radius: 50%;
+    background: radial-gradient(circle, rgba(var(--accent-rgb),.14), transparent 65%); animation: aiGlow 3.6s ease-in-out infinite; }
+  .ai-banner:not(.is-ai)::before, .ai-banner:not(.is-ai)::after { display: none; }
+  @keyframes aiSheen { to { background-position: -220% 0; } }
+  @keyframes aiGlow { 0%,100% { opacity: .5; transform: scale(.94); } 50% { opacity: 1; transform: scale(1.04); } }
+  .ai-banner-ic { width: 33px; height: 33px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
     display: flex; align-items: center; justify-content: center; flex: none; }
-  .ai-banner-ic svg { width: 16px; height: 16px; }
+  .ai-banner:not(.is-ai) .ai-banner-ic { background: var(--surface-2); color: var(--text-muted); }
+  .ai-banner-ic svg { width: 18px; height: 18px; overflow: visible; }
+  .wand { filter: drop-shadow(0 0 2px rgba(var(--accent-rgb),.5)); animation: wandGlow 2.4s ease-in-out infinite; }
+  .ai-banner:not(.is-ai) .wand { filter: none; animation: none; opacity: .55; }
+  @keyframes wandGlow { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
   .ai-banner-text { flex: 1; min-width: 0; }
   .ai-banner-title { font-size: 13px; font-weight: 700; }
   .ai-banner-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ai-banner.is-ai { border-color: var(--accent); }
+  @media (prefers-reduced-motion: reduce) { .ai-banner::before, .ai-banner::after, .wand { animation: none !important; } }
 
   .tabbar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--border);
     display: flex; z-index: 20; padding-bottom: env(safe-area-inset-bottom); }
@@ -88,8 +165,9 @@
   .view { display: none; } .view.active { display: block; }
   .section-label { font-size: var(--fs-sm); letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted);
     font-weight: 600; margin: 4px 2px 8px; display: flex; justify-content: space-between; align-items: center; }
-  .sort-sel { text-transform: none; letter-spacing: normal; font-size: 12px; font-weight: 600; padding: 5px 7px;
-    border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); font-family: inherit; }
+  .sort-sel { text-transform: none; letter-spacing: normal; font-size: 12px; font-weight: 600; padding: 6px 8px;
+    border: 1px solid var(--hair); border-radius: 9px; background: var(--card-grad); color: var(--text); font-family: inherit;
+    box-shadow: var(--e1); }
   .sort-controls { display: flex; align-items: center; gap: 6px; }
   .jiggle-done-btn { display: none; text-transform: none; letter-spacing: normal; font-size: 12px; font-weight: 600;
     padding: 5px 10px; border-radius: 7px; border: none; background: var(--accent); color: #fff; }
@@ -97,33 +175,41 @@
   .debt-hint { font-size: 11.5px; color: var(--text-muted); margin: -4px 2px 10px; }
   #view-debts.jiggling .debt-hint { display: none; }
 
-  /* 卡片保持默认touch-action(auto)——不锁touch-action，原生滚动全程可用、手感与卡片
-     间隙一致。长按拖拽和原生滚动的共存，靠的是touch事件那条路(onCardTouchStart)：平时
-     不preventDefault→原生滚动；确认拖拽后每次touchmove都preventDefault→挡掉滚动交给JS。
-     关键点：只有touch事件的touchmove.preventDefault()能逐次动态否决原生滚动，pointer
-     事件做不到(pointermove的preventDefault不影响滚动，滚不滚只由touch-action决定，且
-     touch-action手势中途改不了)——这是之前反复"要么拖不动、要么只能间隙滚"的根因，
-     所以触摸这条路必须用touch事件，不能用pointer事件。详见onCardTouchStart的注释。 */
-  .debt { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 13px 14px 11px;
-    margin-bottom: 9px; box-shadow: var(--shadow); border-left-width: 4px; }
-  .debt .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
-  .debt .nm { font-size: var(--fs-lg); font-weight: 600; }
-  .debt .amtbox { text-align: right; flex: none; }
-  .debt .bal { font-size: var(--fs-figure); font-weight: 700; display: block; }
-  .debt .ballab { font-size: 10.5px; color: var(--text-muted); }
-  .debt .orig { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
-  .debt .mid { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  /* .debt(外层，长按拖拽排序的直接list item，位置/抖动动画都作用在它身上)保持默认
+     touch-action(auto)——原因见onCardTouchStart的注释，不重复。
+     .debt-row是新加的内层横向flex行，左滑手势的translateX作用在它身上，跟外层.debt的
+     纵向拖拽位移(translateY)互不干扰，两套手势可以叠加在同一张卡片上而不用互相知道对方
+     的存在。⚠️.debt-swipe-btn必须是.debt-row里跟.debt-front并排的flex子项(挪到卡片右侧
+     屏幕外)，不能用position:absolute叠在.debt-front正后方——踩过坑：.debt-front是半透明
+     磨砂玻璃(backdrop-filter+50%透明度背景)，哪怕完全遮住了正后方的按钮，玻璃本身的透明度
+     还是会让按钮的颜色透出来（真机截图验证过，卡片右边缘常驻能看到一条蓝色"销这期"字样），
+     并排布局从根源上避免这个问题——关闭状态下按钮压根不在玻璃卡背后，没有任何东西可透。 */
+  .debt { position: relative; border-radius: 18px; margin-bottom: 11px; overflow: hidden; box-shadow: var(--e2); }
+  .debt-row { display: flex; align-items: stretch; }
+  .debt-swipe-btn { flex: 0 0 92px; border: none; background: var(--good); color: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12.5px; font-weight: 700; }
+  .debt-swipe-btn svg { width: 18px; height: 18px; }
+  .debt-front { flex: 0 0 100%; position: relative; z-index: 1; background: var(--glass); border: 1px solid var(--glass-border);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
+    border-radius: 18px; padding: 14px 16px; cursor: pointer; overflow: hidden; }
+  .debt-front::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
+  .debt.crit .debt-front::before { background: linear-gradient(135deg, rgba(190,58,58,.11), transparent 52%); }
+  .debt.warn .debt-front::before { background: linear-gradient(135deg, rgba(166,106,10,.11), transparent 52%); }
+  .debt.good .debt-front::before { background: linear-gradient(135deg, rgba(46,95,138,.10), transparent 52%); }
+  .debt-front::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    box-shadow: inset 0 1px 0 var(--glass-hi); }
+  .debt-top { position: relative; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .debt-nm { font-size: var(--fs-lg); font-weight: 600; }
+  .debt-meta { font-size: 11.5px; color: var(--text-faint); margin-top: 3px; }
+  .debt-amtbox { text-align: right; flex: none; position: relative; }
+  .debt-bal { font-size: var(--fs-figure); font-weight: 700; display: block; }
+  .debt-ballab { font-size: 10.5px; color: var(--text-muted); }
+  .debt-tags { position: relative; display: flex; gap: 6px; align-items: center; margin-top: 11px; flex-wrap: wrap; }
   .tag { font-size: var(--fs-sm); font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
   .tag.rate-hi { background: var(--critical-soft); color: var(--critical); }
   .tag.rate-mid { background: var(--warning-soft); color: var(--warning); }
   .tag.rate-lo { background: var(--good-soft); color: var(--good); }
-  .tag.dim { background: var(--accent-soft); color: var(--accent); }
-  .debt .meta { font-size: 12px; color: var(--text-muted); margin-top: 7px; }
-  .card-actions { display: flex; gap: 8px; margin-top: 11px; }
-  .act { flex: 1; border-radius: 9px; padding: 9px; font-size: 13px; font-weight: 600; border: 1px solid var(--border);
-    display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
-  .act.sale { background: var(--good); color: #fff; border-color: transparent; }
-  .act.detail { background: var(--surface-2); color: var(--text); }
+  .tag.neutral { background: var(--surface-2); color: var(--text-muted); }
 
   .debt.jiggle { animation: cardJiggle .26s ease-in-out infinite; animation-delay: var(--jd, 0s); will-change: transform; }
   .debt.dragging { animation: none !important; z-index: 5; box-shadow: 0 10px 26px rgba(30,40,60,.28); }
@@ -133,7 +219,8 @@
     50% { transform: rotate(calc(var(--jr, 0.45) * 1deg)); }
   }
   @media (prefers-reduced-motion: reduce) { .debt.jiggle { animation: none; } }
-  #view-debts.jiggling .card-actions { display: none; }
+  /* 编辑模式下左滑露出的"销这期"没有意义（这时手势全部让给拖拽排序），直接屏蔽点击。 */
+  #view-debts.jiggling .debt-swipe-btn { pointer-events: none; }
   #view-debts.jiggling #addBtn,
   #view-debts.jiggling .settled-item .restore { pointer-events: none; opacity: .45; }
 
@@ -141,10 +228,10 @@
     border-radius: 12px; padding: 13px; font-size: 14px; font-weight: 600; margin-top: 4px; }
 
   .settled-wrap { margin-top: 22px; }
-  .settled-item { display: flex; align-items: center; gap: 10px; padding: 10px 13px; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 16px; margin-bottom: 7px; box-shadow: var(--shadow); }
+  .settled-item { display: flex; align-items: center; gap: 10px; padding: 10px 13px; background: var(--card-grad);
+    border: 1px solid var(--hair); border-radius: 16px; margin-bottom: 7px; box-shadow: var(--e1); }
   .settled-item .sn { flex: 1; font-size: 13.5px; color: var(--text-muted); text-decoration: line-through; }
-  .settled-item .sd { font-size: 11.5px; color: var(--good); font-weight: 600; }
+  .settled-item .sd { font-size: 11.5px; color: var(--text-faint); font-weight: 600; }
   .settled-item .restore { background: none; border: 1px solid var(--border); color: var(--text-muted); border-radius: 8px; padding: 4px 9px; font-size: 11.5px; }
 
   .pay-row { position: relative; border-radius: 20px; overflow: hidden; margin-bottom: 8px; }
@@ -513,13 +600,22 @@
 
 <div class="app">
   <header id="topHeader">
-    <h1>债务管理</h1>
-    <div class="asof"><span id="count">—</span></div>
+    <div class="wordmark"><svg viewBox="-0.6 0 3704.5 885.7" fill="currentColor" aria-label="After Zero" role="img"><g transform="matrix(1,0,0,-1,0,728.1)"><path transform="translate(0.0,0)" d="M69 -33Q51 -23 49.5 -11.0Q48 1 63.0 31.0Q78 61 110 124Q134 169 146.5 194.5Q159 220 163.5 231.0Q168 242 168 245Q166 254 170.0 259.5Q174 265 183 269Q188 274 199.5 287.0Q211 300 221 318Q230 339 242.0 361.0Q254 383 274.0 416.5Q294 450 326 504Q346 539 370.0 575.5Q394 612 421 648Q432 662 441.0 670.5Q450 679 459 678Q471 678 486.5 670.0Q502 662 515.0 649.0Q528 636 534 621Q539 613 538.0 587.0Q537 561 534.0 524.0Q531 487 527 445Q524 404 518.0 348.0Q512 292 506.5 231.0Q501 170 498.0 113.5Q495 57 498 15Q499 6 498.0 -2.0Q497 -10 497 -15Q491 -21 477.5 -20.5Q464 -20 451.5 -14.0Q439 -8 437 1Q434 4 433.5 9.5Q433 15 434.0 33.0Q435 51 436 90L441 252L428 251Q419 251 394.0 249.0Q369 247 340.0 243.5Q311 240 286.5 236.5Q262 233 253 230Q244 230 231.5 218.0Q219 206 208 187Q204 173 193.5 157.5Q183 142 183 137Q176 132 171.5 125.0Q167 118 167 118Q167 112 157.5 88.5Q148 65 134.0 36.5Q120 8 106 -13L85 -45ZM276 289Q276 289 286.5 291.0Q297 293 311.5 295.5Q326 298 338 298Q380 308 399.0 311.5Q418 315 425.5 315.0Q433 315 439 312Q443 307 446.5 306.0Q450 305 450 305Q451 307 453.0 328.0Q455 349 458.5 380.0Q462 411 465.5 444.5Q469 478 471.0 506.5Q473 535 474 550Q475 569 476.0 584.5Q477 600 477 600Q471 600 451.5 578.0Q432 556 408.0 520.0Q384 484 363 443Q353 424 344.0 409.0Q335 394 330 394Q328 392 318.5 376.5Q309 361 298.0 341.5Q287 322 280.0 306.5Q273 291 276 289Z"/><path transform="translate(502.0,0)" d="M123 -106Q117 -110 109.5 -104.0Q102 -98 88 -82Q81 -74 79.0 -65.0Q77 -56 80 -31Q84 -20 84.5 -10.0Q85 0 85 4Q85 10 88.5 32.0Q92 54 96.0 78.5Q100 103 103 116Q103 117 104.0 121.0Q105 125 106 128Q108 137 111.5 152.0Q115 167 118 189Q126 214 131.5 238.5Q137 263 137 272Q137 290 151 298Q152 303 157.0 313.5Q162 324 166 331Q186 388 199.0 421.5Q212 455 226 480Q232 497 239.5 515.0Q247 533 255 543Q260 556 278.0 576.5Q296 597 316.0 616.5Q336 636 348 646Q370 657 383.0 661.0Q396 665 417 665Q436 665 442.5 660.5Q449 656 462 644Q476 629 478.0 624.0Q480 619 480 605Q478 592 469.5 571.5Q461 551 451.5 534.5Q442 518 436 517Q424 513 418.5 519.5Q413 526 413 541Q413 548 409.5 554.5Q406 561 406 561Q406 564 407.5 571.5Q409 579 413 586Q418 596 415.5 601.0Q413 606 402 603Q399 601 386.0 591.0Q373 581 358.5 568.5Q344 556 333.0 545.0Q322 534 322 531Q322 531 318.0 522.5Q314 514 303 501Q296 491 290.5 481.5Q285 472 285 470Q285 466 284.5 461.5Q284 457 279 457Q279 457 276.0 448.0Q273 439 265 425Q261 415 255.0 404.5Q249 394 245 390H246Q246 390 241.5 377.5Q237 365 232.0 351.5Q227 338 227 336Q227 332 241.5 332.0Q256 332 276.0 335.5Q296 339 312 343Q326 347 331.0 347.0Q336 347 351 343Q359 338 364.5 328.5Q370 319 372.5 310.5Q375 302 372 298Q371 294 350.0 287.0Q329 280 308 276Q290 272 264.0 267.0Q238 262 218.5 258.0Q199 254 199 251Q195 251 192.0 246.5Q189 242 189 239Q189 225 185 218Q183 212 178.0 194.0Q173 176 167.5 154.0Q162 132 158.5 114.0Q155 96 155 90Q149 83 148.0 72.5Q147 62 147 54Q143 46 142.0 39.5Q141 33 141 29Q141 28 141.0 25.0Q141 22 140 19Q139 9 137.5 -7.5Q136 -24 136 -40L133 -69Q132 -82 130.0 -91.5Q128 -101 123 -106Z"/><path transform="translate(793.0,0)" d="M179 7Q168 9 156.5 18.5Q145 28 136.5 40.5Q128 53 125 63Q125 65 122.5 68.0Q120 71 120 71Q116 74 115.5 97.5Q115 121 118.0 150.0Q121 179 125 196Q130 212 140.0 239.5Q150 267 157 289L184 347L144 358Q137 360 132.5 366.0Q128 372 128 376Q128 384 137.0 395.5Q146 407 150 407Q155 406 168.5 406.0Q182 406 195.0 407.0Q208 408 211 409Q215 411 219.0 414.5Q223 418 225 425Q230 436 234.0 445.5Q238 455 245 467Q252 480 256.5 489.0Q261 498 271 514Q276 521 282.0 531.0Q288 541 297 548Q306 556 315.5 555.5Q325 555 340 542Q348 532 349.0 527.0Q350 522 341 508Q333 491 322.5 474.0Q312 457 303 440Q287 418 297.0 415.0Q307 412 353 419Q382 424 395.0 416.5Q408 409 410 392Q413 368 405.0 363.0Q397 358 359 358Q335 354 318.0 353.5Q301 353 293 353Q280 352 276.0 352.0Q272 352 264 350Q256 348 252.5 343.5Q249 339 245 331Q241 327 233.0 310.0Q225 293 213 273Q199 231 189.0 189.5Q179 148 173 109Q169 84 174.0 74.5Q179 65 200 63Q211 62 235.5 63.5Q260 65 274 69Q285 74 297.0 79.5Q309 85 319 91Q328 96 337.0 101.5Q346 107 346 107Q351 115 357.0 112.0Q363 109 367 97Q367 85 362.0 72.0Q357 59 325 41Q280 13 242.5 7.5Q205 2 179 7Z"/><path transform="translate(1124.0,0)" d="M276 35Q255 17 227.5 14.0Q200 11 174.0 22.5Q148 34 131 58Q114 80 109.0 108.5Q104 137 108 183Q111 222 133.0 261.5Q155 301 186.5 332.0Q218 363 249 375Q264 385 274.5 384.5Q285 384 307 382Q330 379 341.5 373.0Q353 367 360 357Q375 342 380.0 327.5Q385 313 385 299Q381 277 355.5 245.5Q330 214 289 194Q267 187 241.0 188.0Q215 189 198 201Q179 209 173.0 198.5Q167 188 162 148Q158 110 168.0 92.5Q178 75 195 72Q215 68 226.5 66.5Q238 65 255 75Q271 85 275.0 86.5Q279 88 281.5 90.5Q284 93 294 103Q301 110 305.0 113.5Q309 117 314 117Q319 117 323.0 112.5Q327 108 331 106Q341 106 335.5 94.0Q330 82 314.0 65.5Q298 49 276 35ZM275 247Q286 252 298.0 261.5Q310 271 318.5 282.5Q327 294 327 302Q327 316 314.0 325.5Q301 335 275 328Q264 325 250.0 313.5Q236 302 223.5 288.0Q211 274 203.5 263.0Q196 252 198 250Q201 245 215.0 242.5Q229 240 246.5 241.0Q264 242 275 247Z"/><path transform="translate(1449.0,0)" d="M119 35Q110 42 106.5 49.0Q103 56 106 76Q109 104 114.0 125.5Q119 147 126 175Q128 187 137.5 216.0Q147 245 161.0 279.0Q175 313 189.0 343.5Q203 374 213 389Q221 395 232.5 394.0Q244 393 252 385Q263 376 255.5 353.5Q248 331 225 283Q213 256 207.0 242.5Q201 229 202.0 226.5Q203 224 211 229Q217 240 233.0 254.5Q249 269 267.0 283.0Q285 297 301.0 308.0Q317 319 323 322Q331 327 341.5 330.5Q352 334 356 336Q379 347 403.0 344.0Q427 341 433 326Q434 318 439.5 314.0Q445 310 445 310Q449 310 449.5 307.0Q450 304 450 304Q450 297 439.5 295.5Q429 294 413 293Q400 292 390.0 288.0Q380 284 366 278Q328 256 293.5 235.0Q259 214 227 179Q220 171 213.0 160.0Q206 149 198 136Q193 131 188.0 114.0Q183 97 179.5 81.5Q176 66 176 63Q176 63 173.0 53.5Q170 44 163 35Q151 19 143.0 19.0Q135 19 119 35Z"/><path transform="translate(2051.0,0)" d="M122 -36Q101 -34 84.0 -30.5Q67 -27 63 -7Q61 7 66.5 21.5Q72 36 82 46Q99 64 119.5 86.0Q140 108 168.5 136.0Q197 164 237.5 202.5Q278 241 336 292Q376 326 400.0 348.5Q424 371 443.0 390.0Q462 409 485 433Q520 469 546.5 503.0Q573 537 578 557Q584 577 575.5 585.5Q567 594 545.5 597.5Q524 601 489 603Q427 608 379.5 602.5Q332 597 288 589Q281 587 271.5 592.5Q262 598 262 602Q266 607 266.0 612.0Q266 617 258 623Q254 633 258.0 639.0Q262 645 266 649Q274 653 292.0 654.5Q310 656 333 660Q348 663 377.5 664.0Q407 665 437.5 665.0Q468 665 486 663Q522 660 555.0 656.5Q588 653 612.0 644.0Q636 635 645 613Q656 590 649.5 572.0Q643 554 632 524Q620 502 591.5 465.5Q563 429 526.5 389.5Q490 350 452 315Q396 263 351.5 222.5Q307 182 263 144Q235 120 207.0 94.5Q179 69 151 43Q141 30 147.5 23.5Q154 17 195 19Q218 20 231.0 23.0Q244 26 259.0 29.0Q274 32 301 33Q353 36 399.0 39.0Q445 42 473 42Q481 42 486.5 40.0Q492 38 502 24Q511 21 513.5 15.5Q516 10 513.0 4.0Q510 -2 501 -9Q494 -9 476.5 -12.5Q459 -16 438.5 -18.5Q418 -21 402 -20Q389 -19 352.5 -21.5Q316 -24 274 -29Q237 -35 193.0 -36.0Q149 -37 122 -36Z"/><path transform="translate(2573.0,0)" d="M276 35Q255 17 227.5 14.0Q200 11 174.0 22.5Q148 34 131 58Q114 80 109.0 108.5Q104 137 108 183Q111 222 133.0 261.5Q155 301 186.5 332.0Q218 363 249 375Q264 385 274.5 384.5Q285 384 307 382Q330 379 341.5 373.0Q353 367 360 357Q375 342 380.0 327.5Q385 313 385 299Q381 277 355.5 245.5Q330 214 289 194Q267 187 241.0 188.0Q215 189 198 201Q179 209 173.0 198.5Q167 188 162 148Q158 110 168.0 92.5Q178 75 195 72Q215 68 226.5 66.5Q238 65 255 75Q271 85 275.0 86.5Q279 88 281.5 90.5Q284 93 294 103Q301 110 305.0 113.5Q309 117 314 117Q319 117 323.0 112.5Q327 108 331 106Q341 106 335.5 94.0Q330 82 314.0 65.5Q298 49 276 35ZM275 247Q286 252 298.0 261.5Q310 271 318.5 282.5Q327 294 327 302Q327 316 314.0 325.5Q301 335 275 328Q264 325 250.0 313.5Q236 302 223.5 288.0Q211 274 203.5 263.0Q196 252 198 250Q201 245 215.0 242.5Q229 240 246.5 241.0Q264 242 275 247Z"/><path transform="translate(2898.0,0)" d="M119 35Q110 42 106.5 49.0Q103 56 106 76Q109 104 114.0 125.5Q119 147 126 175Q128 187 137.5 216.0Q147 245 161.0 279.0Q175 313 189.0 343.5Q203 374 213 389Q221 395 232.5 394.0Q244 393 252 385Q263 376 255.5 353.5Q248 331 225 283Q213 256 207.0 242.5Q201 229 202.0 226.5Q203 224 211 229Q217 240 233.0 254.5Q249 269 267.0 283.0Q285 297 301.0 308.0Q317 319 323 322Q331 327 341.5 330.5Q352 334 356 336Q379 347 403.0 344.0Q427 341 433 326Q434 318 439.5 314.0Q445 310 445 310Q449 310 449.5 307.0Q450 304 450 304Q450 297 439.5 295.5Q429 294 413 293Q400 292 390.0 288.0Q380 284 366 278Q328 256 293.5 235.0Q259 214 227 179Q220 171 213.0 160.0Q206 149 198 136Q193 131 188.0 114.0Q183 97 179.5 81.5Q176 66 176 63Q176 63 173.0 53.5Q170 44 163 35Q151 19 143.0 19.0Q135 19 119 35Z"/><path transform="translate(3258.0,0)" d="M169 15Q156 15 148.5 20.0Q141 25 130 34Q111 54 103.0 72.5Q95 91 98 108Q101 116 100.5 123.5Q100 131 100 131Q95 136 97.0 137.5Q99 139 101 143Q107 143 105 154Q103 162 113.0 189.0Q123 216 138 240Q144 250 156.0 266.5Q168 283 182.5 299.5Q197 316 209 326Q234 347 253.0 357.0Q272 367 294 372Q316 377 324.5 377.0Q333 377 348 361Q371 351 381.5 337.0Q392 323 395 296Q398 266 390.5 227.5Q383 189 343 132Q318 96 297.0 78.5Q276 61 247 44Q226 30 209.0 23.5Q192 17 169 15ZM265 121Q289 148 303.5 172.0Q318 196 331 233Q335 244 336.0 260.5Q337 277 335.5 291.5Q334 306 328 308Q316 315 299.0 312.5Q282 310 262 293Q231 267 208.0 228.5Q185 190 163 141Q148 105 156.5 83.5Q165 62 193.5 68.5Q222 75 265 121Z"/></g></svg></div>
+    <button type="button" class="avatar-btn" id="topAvatarBtn" aria-label="账户"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></button>
   </header>
+  <div class="asof"><span id="count">—</span></div>
   <div id="topSummary">
+    <div class="hero" id="heroCard"></div>
     <div class="summary" id="summary"></div>
     <button type="button" class="ai-banner" id="aiBannerBtn">
-      <div class="ai-banner-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></div>
+      <div class="ai-banner-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none">
+        <path d="M3 8A2.3 2.3 0 0 1 5.3 5.7h7A2.3 2.3 0 0 1 14.6 8v5.5A2.3 2.3 0 0 1 12.3 15.8H8.3l-3.6 2.7a.45.45 0 0 1-.72-.36V15.8A2.3 2.3 0 0 1 1.7 13.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        <g class="wand" fill="currentColor">
+          <path d="M21 7L10 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M10 -3.15L11.05 -1.05L13.15 0L11.05 1.05L10 3.15L8.95 1.05L6.85 0L8.95 -1.05Z"/>
+          <circle cx="12.6" cy="-2.4" r="0.75"/><circle cx="7.2" cy="1.8" r="0.6"/>
+        </g>
+      </svg></div>
       <div class="ai-banner-text">
         <div class="ai-banner-title" id="aiBannerTitle">AI 债务优化建议</div>
         <div class="ai-banner-sub" id="aiBannerSub">开通 AI 会员，获取雪球/雪崩法分析与更省钱的还款顺序</div>
@@ -1251,9 +1347,16 @@
       active++; total += +d.balance || 0; if (!d.oneTime) monthly += +d.monthly || 0;
       paidPrincipal += +d.paidPrincipal || 0; paidInterest += +d.paidInterest || 0;
     });
+    // "距归零"百分比 = 已还本金 / (已还本金+在还总负债)，零本零负债时兜底显示0%不除以0。
+    var zeroBase = paidPrincipal + total, pct = zeroBase > 0 ? Math.round(paidPrincipal / zeroBase * 100) : 0;
+    $("heroCard").innerHTML =
+      '<div class="hero-smoke" aria-hidden="true"><span class="hero-puff a"></span><span class="hero-puff b"></span><span class="hero-puff c"></span></div>' +
+      '<div class="hero-top"><div class="hero-label">在还总负债</div><div class="hero-pill">只算本金</div></div>' +
+      '<div class="hero-amt num"><span class="cur">¥</span>' + fmt(total) + '</div>' +
+      '<div class="hero-prog"><div class="hero-prog-track"><div class="hero-prog-fill" style="width:' + pct + '%"></div></div>' +
+      '<div class="hero-prog-row"><span class="l num">已归还本金 ¥' + fmt(paidPrincipal) + '</span><span class="r num">距归零 ' + pct + '%</span></div></div>';
     $("summary").innerHTML =
-      '<div class="kpi half"><div class="v num">¥' + fmt(total) + '</div><div class="k">在还总负债</div></div>' +
-      '<div class="kpi half"><div class="v num">¥' + fmt(paidPrincipal) + '</div><div class="k">已还金额</div><div class="kpi-sub">另付利息 ¥' + fmt(paidInterest) + '</div></div>' +
+      '<div class="kpi"><div class="v num">¥' + fmt(paidPrincipal) + '</div><div class="k">已还金额</div><div class="kpi-sub num">另付利息 ¥' + fmt(paidInterest) + '</div></div>' +
       '<div class="kpi"><div class="v num">¥' + fmt(monthly) + '</div><div class="k">经常性月供</div></div>' +
       '<div class="kpi"><div class="v num">' + active + '</div><div class="k">在还笔数</div></div>' +
       '<div class="kpi"><div class="v num" style="color:var(--good)">' + settled + '</div><div class="k">已结清</div></div>';
@@ -1283,23 +1386,36 @@
     }
     var list = $("debtList"); list.innerHTML = "";
     $("view-debts").classList.toggle("jiggling", jiggleMode);
+    debtSwipeOpen = null;
     sorted.forEach(function (o) {
-      var d = o.d, rc = rateClass(d.rate || 0), accent = d.rate >= 18 ? "var(--critical)" : (d.rate >= 10 ? "var(--warning)" : "var(--good)");
-      var el = document.createElement("div"); el.className = "debt"; el.style.borderLeftColor = accent;
+      var d = o.d, rc = rateClass(d.rate || 0), sevClass = d.rate >= 18 ? "crit" : (d.rate >= 10 ? "warn" : "good");
+      var el = document.createElement("div"); el.className = "debt " + sevClass;
       var rateTag = d.rate ? '<span class="tag ' + rc + '">' + Number(d.rate).toFixed(2) + '%</span>' : '';
       el.innerHTML =
-        '<div class="top"><span class="nm"></span><span class="amtbox"><span class="bal num">¥' + fmt(d.balance) + '</span><span class="ballab">剩余待还</span></span></div>' +
-        (d.original != null ? '<div class="orig">借款金额 ¥' + fmt(d.original) + '</div>' : '') +
-        '<div class="mid">' + rateTag + '<span class="tag dim">' + (d.oneTime ? '一次性 ¥' + fmt(d.monthly) : '下期 ¥' + fmt(d.monthly)) + '</span><span class="tag dim">剩 ' + (d.terms || 0) + '/' + (d.totalTerms || 0) + ' 期</span></div>' +
-        '<div class="meta"></div>' +
-        '<div class="card-actions"><button class="act detail">查看详情</button><button class="act sale"><svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>销这期</button></div>';
-      el.querySelector(".nm").textContent = d.name;
-      el.querySelector(".meta").textContent = (d.funder ? "出资方：" + d.funder : "") + (d.type ? " · " + d.type : "");
-      el.querySelector(".detail").addEventListener("click", function () { openDetail(o.i); });
-      el.querySelector(".sale").addEventListener("click", function () { payInstallment(o.i); });
+        '<div class="debt-row">' +
+          '<div class="debt-front">' +
+            '<div class="debt-top"><div><div class="debt-nm"></div><div class="debt-meta"></div></div>' +
+            '<span class="debt-amtbox"><span class="debt-bal num">¥' + fmt(d.balance) + '</span><span class="debt-ballab">剩余待还</span></span></div>' +
+            '<div class="debt-tags">' + rateTag + '<span class="tag neutral">' + (d.oneTime ? '一次性 ¥' + fmt(d.monthly) : '下期 ¥' + fmt(d.monthly)) + '</span><span class="tag neutral">剩 ' + (d.terms || 0) + '/' + (d.totalTerms || 0) + ' 期</span></div>' +
+          '</div>' +
+          '<button type="button" class="debt-swipe-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>销这期</button>' +
+        '</div>';
+      el.querySelector(".debt-nm").textContent = d.name;
+      el.querySelector(".debt-meta").textContent = (d.funder ? "出资方：" + d.funder : "") + (d.type ? " · " + d.type : "");
+      var row = el.querySelector(".debt-row"), cardFront = el.querySelector(".debt-front");
+      // 点卡片=查看详情，左滑=露出"销这期"；两者共用row.__justDragged这个标记做互斥
+      // (同一套写法照抄自还款提醒页的initPaySwipe，那边已经验证过的模式，见CLAUDE.md)。
+      // 滑动位移作用在.debt-row(front+按钮的flex容器)上，点击检测挂在.debt-front(可见卡面)上。
+      cardFront.addEventListener("click", function () {
+        if (row.__justDragged) { row.__justDragged = false; return; }
+        if (row.dataset.open === "1") { closeDebtSwipe(row); return; }
+        if (jiggleMode) return;
+        openDetail(o.i);
+      });
+      el.querySelector(".debt-swipe-btn").addEventListener("click", function () { closeDebtSwipe(row); payInstallment(o.i); });
       el.__o = o;
-      el.addEventListener("touchstart", function (e) { onCardTouchStart(e, el, o); }, { passive: true });
-      el.addEventListener("pointerdown", function (e) { onCardPointerDown(e, el, o); });
+      el.addEventListener("touchstart", function (e) { onCardTouchStart(e, el, o, row); }, { passive: true });
+      el.addEventListener("pointerdown", function (e) { onCardPointerDown(e, el, o, row); });
       applyJiggleStyle(el);
       if (jiggleMode) el.classList.add("jiggle");
       list.appendChild(el);
@@ -1320,6 +1436,24 @@
 
   // 自定义排序：长按进入iOS桌面式的抖动编辑模式，编辑模式下卡片可按住拖动重新排序。
   var jiggleMode = false, dragCtx = null;
+  // 左滑露出"销这期"，写法照抄还款提醒页的initPaySwipe(那套Touch Events+{passive:false}
+  // 的模式已经验证过)，唯一区别是这里没有独立的.pay-row容器——.debt本身就是拖拽排序的
+  // 直接list item，容不下再套一层，所以水平滑动只作用在内层.debt-front上(见CSS注释)。
+  var DEBT_REVEAL = 92, debtSwipeOpen = null;
+  function closeDebtSwipe(front) {
+    if (!front) return;
+    front.style.transition = "transform .18s ease"; front.style.transform = "translateX(0)"; front.dataset.open = "0";
+    if (debtSwipeOpen === front) debtSwipeOpen = null;
+  }
+  function openDebtSwipeTo(front) {
+    if (debtSwipeOpen && debtSwipeOpen !== front) closeDebtSwipe(debtSwipeOpen);
+    front.style.transition = "transform .18s ease"; front.style.transform = "translateX(-" + DEBT_REVEAL + "px)"; front.dataset.open = "1";
+    debtSwipeOpen = front;
+  }
+  function debtSwipeSettle(front, base, dx) {
+    var finalOffset = Math.min(0, Math.max(-DEBT_REVEAL, base + dx));
+    if (finalOffset < -DEBT_REVEAL / 2) openDebtSwipeTo(front); else closeDebtSwipe(front);
+  }
   // 只设置随机的--jr/--jd这两个自定义属性，不碰classList——是否真的抖动完全由
   // 调用方显式加/去.jiggle类决定，这里不能顺手加上，否则每次renderDebts()都会让
   // 卡片长期保持抖动态，跟jiggleMode这个状态变量脱节(之前踩过这个坑)。
@@ -1329,6 +1463,7 @@
   }
   function enterJiggle() {
     if (jiggleMode) return;
+    if (debtSwipeOpen) closeDebtSwipe(debtSwipeOpen);
     jiggleMode = true;
     $("view-debts").classList.add("jiggling");
     $("debtSortSel").disabled = true;
@@ -1351,9 +1486,16 @@
   // 之后每次touchmove都preventDefault挡掉滚动、由JS接管定位。用Pointer Events做不到
   // 这件事(pointermove的preventDefault不影响滚动，滚不滚只由touch-action决定，而
   // touch-action手势中途改不了)——这是之前反复"要么拖不动要么只能间隙滚"的根因。
-  function onCardTouchStart(e, el, o) {
+  // 这里同一个手势现在要在"长按拖拽排序"(纵向)和"左滑露出销这期"(横向)之间做判断——
+  // 移动方向以横/纵谁先超过10px阈值决定：横向优先判成swiping(编辑模式下禁用，这时
+  // 手势全部让给排序)，纵向则维持原来的"取消长按、交还原生滚动"逻辑不变。全程零位移
+  // 松手 = 真正的tap，不在这里处理，交给renderDebts()里挂在front上的click监听器接手
+  // (浏览器原生行为：有位移的手势结束后不会合成click，两边天然不会打架)。
+  function onCardTouchStart(e, el, o, front) {
     if (dragCtx || e.touches.length !== 1) return;
-    var t0 = e.touches[0], sx = t0.clientX, sy = t0.clientY, id = t0.identifier, timer, active = false;
+    front.__justDragged = false;
+    var t0 = e.touches[0], sx = t0.clientX, sy = t0.clientY, id = t0.identifier, timer, active = false, swiping = false;
+    var swipeBase = front.dataset.open === "1" ? -DEBT_REVEAL : 0;
     function tOf(ev) { for (var i = 0; i < ev.changedTouches.length; i++) if (ev.changedTouches[i].identifier === id) return ev.changedTouches[i]; return null; }
     function onMove(ev) {
       var t = tOf(ev); if (!t) return;
@@ -1363,13 +1505,26 @@
         dragCtx.lastClientY = t.clientY; applyDragFrame();
         return;
       }
-      // 还没进入拖拽：移动超过阈值 = 用户在滑动/滚动，放弃长按，交回原生滚动。
-      if (Math.abs(t.clientX - sx) > 10 || Math.abs(t.clientY - sy) > 10) cleanup();
+      if (swiping) {
+        ev.preventDefault();
+        front.style.transition = "none";
+        front.style.transform = "translateX(" + Math.min(0, Math.max(-DEBT_REVEAL, swipeBase + (t.clientX - sx))) + "px)";
+        return;
+      }
+      var dx = t.clientX - sx, dy = t.clientY - sy;
+      if (!jiggleMode && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) { swiping = true; clearTimeout(timer); onMove(ev); return; }
+      // 还没进入拖拽也不是横滑：移动超过阈值 = 用户在纵向滚动，放弃长按，交回原生滚动。
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) cleanup();
     }
-    function onEnd(ev) { if (!tOf(ev)) return; if (active) finishDrag(true); cleanup(); }
-    function onCancel(ev) { if (!tOf(ev)) return; if (active) finishDrag(false); cleanup(); }
+    function onEnd(ev) {
+      var t = tOf(ev); if (!t) return;
+      if (active) { finishDrag(true); cleanup(); return; }
+      if (swiping) { front.__justDragged = true; debtSwipeSettle(front, swipeBase, t.clientX - sx); cleanup(); return; }
+      cleanup();
+    }
+    function onCancel(ev) { if (!tOf(ev)) return; if (active) finishDrag(false); else if (swiping) closeDebtSwipe(front); cleanup(); }
     function cleanup() { clearTimeout(timer); el.removeEventListener("touchmove", onMove); el.removeEventListener("touchend", onEnd); el.removeEventListener("touchcancel", onCancel); }
-    timer = setTimeout(function () { active = true; if (!jiggleMode) enterJiggle(); beginDrag(el, o, sy); }, dragDelay());
+    timer = setTimeout(function () { if (swiping) return; active = true; if (!jiggleMode) enterJiggle(); beginDrag(el, o, sy); }, dragDelay());
     el.addEventListener("touchmove", onMove, { passive: false });
     el.addEventListener("touchend", onEnd);
     el.addEventListener("touchcancel", onCancel);
@@ -1377,18 +1532,32 @@
   // 桌面鼠标走这条路(Pointer Events)——鼠标不触发touch-action滚动，没有上面那个冲突，
   // 沿用简单的pointer逻辑即可，纯粹为了桌面浏览器还能测。触摸事件由上面的touchstart处理，
   // 这里遇到非鼠标指针直接return，避免真机上touchstart和pointerdown两边重复触发。
-  function onCardPointerDown(e, el, o) {
+  function onCardPointerDown(e, el, o, front) {
     if (e.pointerType !== "mouse" || dragCtx) return;
-    var sx = e.clientX, sy = e.clientY, pid = e.pointerId, timer, active = false;
+    front.__justDragged = false;
+    var sx = e.clientX, sy = e.clientY, pid = e.pointerId, timer, active = false, swiping = false;
+    var swipeBase = front.dataset.open === "1" ? -DEBT_REVEAL : 0;
     function onMove(ev) {
       if (ev.pointerId !== pid) return;
       if (active) { if (dragCtx) { dragCtx.lastClientY = ev.clientY; applyDragFrame(); } return; }
-      if (Math.abs(ev.clientX - sx) > 10 || Math.abs(ev.clientY - sy) > 10) cleanup();
+      if (swiping) {
+        front.style.transition = "none";
+        front.style.transform = "translateX(" + Math.min(0, Math.max(-DEBT_REVEAL, swipeBase + (ev.clientX - sx))) + "px)";
+        return;
+      }
+      var dx = ev.clientX - sx, dy = ev.clientY - sy;
+      if (!jiggleMode && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) { swiping = true; clearTimeout(timer); onMove(ev); return; }
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) cleanup();
     }
-    function onUp(ev) { if (ev.pointerId !== pid) return; if (active) finishDrag(true); cleanup(); }
-    function onCancelP(ev) { if (ev.pointerId !== pid) return; if (active) finishDrag(false); cleanup(); }
+    function onUp(ev) {
+      if (ev.pointerId !== pid) return;
+      if (active) { finishDrag(true); cleanup(); return; }
+      if (swiping) { front.__justDragged = true; debtSwipeSettle(front, swipeBase, ev.clientX - sx); cleanup(); return; }
+      cleanup();
+    }
+    function onCancelP(ev) { if (ev.pointerId !== pid) return; if (active) finishDrag(false); else if (swiping) closeDebtSwipe(front); cleanup(); }
     function cleanup() { clearTimeout(timer); el.removeEventListener("pointermove", onMove); el.removeEventListener("pointerup", onUp); el.removeEventListener("pointercancel", onCancelP); }
-    timer = setTimeout(function () { active = true; if (!jiggleMode) enterJiggle(); beginDrag(el, o, sy); }, dragDelay());
+    timer = setTimeout(function () { if (swiping) return; active = true; if (!jiggleMode) enterJiggle(); beginDrag(el, o, sy); }, dragDelay());
     el.addEventListener("pointermove", onMove);
     el.addEventListener("pointerup", onUp);
     el.addEventListener("pointercancel", onCancelP);
@@ -2826,6 +2995,7 @@
     b.addEventListener("click", function () {
       if (jiggleMode) exitJiggle();
       if (paySwipeOpen) closePaySwipe(paySwipeOpen);
+      if (debtSwipeOpen) closeDebtSwipe(debtSwipeOpen);
       document.querySelectorAll(".tabbar button").forEach(function (x) { x.setAttribute("aria-selected", "false"); });
       b.setAttribute("aria-selected", "true");
       b.classList.remove("bounce"); void b.offsetWidth; b.classList.add("bounce");
@@ -2894,6 +3064,7 @@
     return false;
   };
   $("accountAvatarBtn").addEventListener("click", openAccountScreen);
+  $("topAvatarBtn").addEventListener("click", openAccountScreen);
   $("accountBackBtn").addEventListener("click", closeAccountScreen);
   $("premiumEntryBtn").addEventListener("click", function () { openPremiumScreen(); });
   $("premiumBackBtn").addEventListener("click", closePremiumScreen);

@@ -155,6 +155,28 @@ npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
 
 **编辑模式期间`#addBtn`（新增一笔）、已结清区域的"恢复"按钮、`#debtSortSel`下拉框都会被禁用**（CSS靠`#view-debts.jiggling`这个类切换），目的是保证编辑模式期间不会有别的sheet被同时打开——这也是为什么`window.__handleBackButton`里`jiggleMode`的判断可以放在最前面、跟其余判断互斥（见上面"返回键处理"一节）。
 
+## 在还债务主页视觉改版：石墨hero卡 + 磨砂玻璃债务卡 + 灵动AI入口
+
+顶部区域（原来是"债务管理"标题+5张平级KPI+朴素AI banner）整体重做过一轮，目标是解决"没有设计感、像默认样式堆出来的"这条反馈。改动只在视觉/交互层，`renderSummary()`/`renderDebts()`算的数字、`openDetail`/`payInstallment`这些底层函数完全没动。
+
+**新增的一批CSS变量**（`--hair`/`--card-grad`/`--app-grad`/`--e1`/`--e2`/`--e3`/`--glass`/`--glass-border`/`--glass-hi`/`--graphite-a`/`--graphite-b`/`--graphite-text`/`--graphite-dim`/`--graphite-sheen`/`--text-faint`/`--accent-rgb`）——**三处都要同步加**（裸`:root`+`prefers-color-scheme:dark`媒体查询里的`:root`、`:root[data-theme="light"]`、`:root[data-theme="dark"]`），这是这个文件一直以来的既有模式（明暗色靠系统偏好和手动切换两条路都要覆盖到），别漏改其中一处。`--e1/e2/e3`是三档elevation阴影（列表最轻、卡片中等、hero最重），跟原有全局唯一的`--shadow`并存，`--shadow`继续给这轮没碰的其它组件（sheet、modal、价格卡等）用，不要把它们批量替换成新token。
+
+**顶部header**：原来的`<h1>债务管理</h1>`+`.asof`换成了手写"After Zero" wordmark + 圆形头像入口（`#topAvatarBtn`，点击复用"我的"页已有的`openAccountScreen()`）。**wordmark这个SVG是直接复用登录门`.gate-hw`那9个字母的`d`路径数据**（详见"登录门"一节），但渲染方式不同：登录门那份是`fill:none; stroke:currentColor`配合`stroke-dasharray`做逐笔画出的动画，这里是静态logo，去掉了`--i`/`--len`这两个动画专用属性和`hw-letter`class，直接`fill="currentColor"`把提取出的字形轮廓当实心字画——不用重新走一遍fontTools提取流程，两个地方的路径数据必须保持一致（以后如果改了登录门那份文案/字体，这里要跟着重新提取）。
+
+**KPI区改成"一个石墨hero + 4个降权小指标"**：`renderSummary()`现在会分别写两个容器——`#heroCard`（固定的`.hero`外壳+JS每次重灌内部HTML，同`#summary`这种"外层壳子在HTML里、内容每次innerHTML替换"的既有模式）放"在还总负债"这一个数字，配一条"距归零 N%"进度条（`N = 已还本金/(已还本金+在还总负债)`，`zeroBase`为0时兜底显示0%不做除法）；`#summary`降级成2×2的`已还金额/经常性月供/在还笔数/已结清`小卡片网格。hero卡内有三团用`radial-gradient`+`blur`+`mix-blend-mode:screen`做的`.hero-puff`色雾，`heroDrift1/2/3`三条不同周期(8s/10s/12.5s)的`@keyframes`错开漂移，色调不变、纯做材质层次，`prefers-reduced-motion`会关掉。
+
+**AI banner改成"灵动胶囊"**：`.ai-banner`从方角卡片改成全圆角胶囊，`::before`一圈用`background-size:220% 100%`+位移动画做的极淡描边扫光，`::after`一层`radial-gradient`呼吸光晕，图标从原来的"星芒"改成"对话气泡+魔法棒"组合（气泡是`stroke`路径，魔法棒是`.wand`一个`<g>`：一条`stroke`手柄+一个4角闪光菱形+两个小圆点"魔法尘"，`filter:drop-shadow`常驻微光+`wandGlow`呼吸透明度）。**没开通Premium时**（`.ai-banner:not(.is-ai)`）扫光/呼吸/魔法棒发光全部关掉，图标降级成中性灰色纯静态——发光本身被设计成一种"已解锁"的身份感，不是无条件的装饰。**⚠️`.wand`目前只做了常驻呼吸光晕这一种状态**——"进入AI页面时摇两下再定住转成呼吸闪烁"这个入场动效（`wandCast`那套keyframe，设计稿已经在Artifact预览里做出来过）还没有落地的地方用，因为`#aiScreen`这个页面本身这一轮还没有重做（详见`PROGRESS.md`最新一条，那是设计已定但代码还没搬进来的部分）。
+
+**债务卡改成磨砂玻璃 + 左滑露出"销这期"，去掉原来"查看详情/销这期"两个并排按钮**：
+
+- **⚠️踩过一个坑：玻璃卡的滑动按钮绝对不能用`position:absolute`叠在卡片正后方，必须跟卡片左右并排（flex sibling）**——`.debt-front`是`background:var(--glass)`（半透明，light下`rgba(255,255,255,.5)`）+`backdrop-filter:blur()`的磨砂玻璃，哪怕完全用它的不透明区域盖住正后方的东西，玻璃本身的透明度还是会让背后的颜色透出来（真机/截图都能看到卡片右边缘常驻一条蓝色"销这期"字样，不是间歇性的，是持续存在的）。修法是`.debt-row`（flex容器）里`.debt-front`（flex:0 0 100%）和`.debt-swipe-btn`（flex:0 0 92px）左右并排，关闭状态下按钮压根不在玻璃背后、没有任何东西可透；滑动只是把`.debt-row`整体`translateX`，把按钮从屏幕外移进来。**以后但凡是"半透明/玻璃质感容器 + 里面还要叠一层别的可交互内容"这种组合，先假设会透色，用并排/分层结构规避，不要想当然觉得"反正盖住了就行"。**
+- **`.debt`（外层，`#debtList`的直接子元素）没有变过**——长按拖拽排序那套代码（`beginDrag`/`applyDragFrame`/`enterJiggle`等，见上面"在还债务自定义排序"一节）深度假设`$("debtList").children`直接就是可拖拽的卡片、每张卡片直接被`el.style.transform`设置纵向位移，所以这轮**没有**在`.debt`外面再套一层wrapper——`.debt-row`/`.debt-front`/`.debt-swipe-btn`都是`.debt`内部新增的结构，纵向拖拽位移仍然打在`.debt`本身，横向滑动位移打在内层的`.debt-row`，两者作用在不同元素上天然不冲突。
+- **⚠️同一张卡片现在要同时支持"长按拖拽排序"(纵向)、"左滑露出销这期"(横向)、"点击进详情"(零位移)三种手势，靠一个统一的`onCardTouchStart`/`onCardPointerDown`（现在多接收一个`row`参数）里的"decided"状态机做判断，不是三套独立监听器**：横向位移先超10px阈值 → 判成`swiping`（这时会`clearTimeout`掉长按计时器，长按不会再触发）；纵向位移先超阈值、或者长按计时器先到点 → 维持原来的拖拽逻辑；全程零位移松手 → 两条路径都不`preventDefault`，交给浏览器原生合成的`click`事件，由`renderDebts()`里单独挂在`.debt-front`上的click监听器接手开详情。`jiggleMode`为true时横向位移不会被判成`swiping`（编辑模式下手势全部让给排序）。swipe结束用`row.__justDragged`标记防止紧接着的click把刚露出的按钮误关掉——这个模式**直接照抄自还款提醒页`initPaySwipe`那套已经验证过的写法**（见下面"还款提醒页"一节），没有发明新模式。
+- **卡片不再显示原来的"借款金额"这一行**（只保留"剩余待还"），是为了让卡片更短更精致，原始借款金额还留在"查看详情"里能看到，是有意的取舍不是漏了。
+- 卡片左侧原来的4px实色边框条（按利率红/黄/蓝区分严重度）换成了`.debt-front::before`一层同色系但极淡的`linear-gradient`色晕（`.debt.crit`/`.warn`/`.good`这三个class挂在外层`.debt`上，`sevClass`判断逻辑跟以前完全一样：`rate>=18`→crit，`>=10`→warn，否则good）。
+
+**已结清列表的日期文字颜色**从`var(--good)`（蓝色）改成了`var(--text-faint)`——蓝色在这个位置显得突兀，绿色对勾图标已经足够表达"已完成"这层意思，日期不需要再抢一个强色。
+
 ## 还款提醒页：hero卡片 + 左滑标记已还
 
 "还款日"标签页顶部有一张"最近还款日"卡片（`#payHero`，`renderPayHero()`），取所有在还债务里下一期还款日最近的那一笔，底色按急迫程度换色。下面`#payList`列表里每一条债务卡片支持向左滑动，滑出一个"标记已还"按钮（类似iOS/微信聊天列表左滑删除）。
