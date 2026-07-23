@@ -2,7 +2,9 @@
 
 一个记债务的个人工具，打包成了能真正安装的安卓app。名字的寓意：对债务归零之后生活的期待。
 
-app的主体是一个自包含的HTML文件（`www/index.html`——纯HTML/CSS/JS，不依赖任何框架，也不需要构建步骤），用 [Capacitor](https://capacitorjs.com/) 包成了原生安卓壳；另外有几段手写的原生插件代码：一段用于把档案库/备份文件真正存到用户自选的位置（点"下载"会弹系统"另存为"选择器，网页标准的下载方式在安卓WebView里不可靠），一段用于接入微信登录；还款提醒页支持本地推送通知（到期前提醒），用的是官方Capacitor插件。**打开App需要先微信登录**——账号体系目前是这个App唯一的准入方式。"我的"页有一个Premium/Premium+订阅入口（分级：Premium+包含Premium全部功能），目前只是UI占位（App还没上架应用商店，暂时接不了真实支付），为未来的付费功能铺路。Premium会员专属的三个功能已经实装：提前还款收益模拟器、高级统计报表（导出PDF/Excel）、云备份（手动创建备份记录，可随时恢复）。
+app的主体是一个自包含的HTML文件（`www/index.html`——纯HTML/CSS/JS，不依赖任何框架，也不需要构建步骤），用 [Capacitor](https://capacitorjs.com/) 包成了原生安卓壳；另外有几段手写的原生插件代码：一段用于把档案库/备份文件真正存到用户自选的位置（点"下载"会弹系统"另存为"选择器，网页标准的下载方式在安卓WebView里不可靠），一段用于接入微信登录；还款提醒页支持本地推送通知（到期前提醒），用的是官方Capacitor插件。**打开App需要先微信登录**——账号体系目前是这个App唯一的准入方式。
+
+"我的"页有一个**单一 Premium** 订阅入口，同时提供一次性买断和按月/按年订阅两种购买方式，目前只是UI占位（App还没上架应用商店，暂时接不了真实支付），为未来的付费功能铺路。免费/付费的边界是按"这个功能有没有真实服务器/算力成本"划的：图表查看、提前还款收益模拟器完全免费；高级统计报表**导出**PDF/Excel、云备份（手动创建备份记录，可随时恢复）、**AI债务顾问**（雪球/雪崩法分析生成优化报告 + 针对自己债务数据的多轮问答，服务端调用腾讯云开发内置大模型）是Premium会员专属功能。
 
 ## 环境要求
 
@@ -43,7 +45,7 @@ cd android
 
 - `www/index.html` —— app真身（改这个），`www/fonts/` 是它引用的本地字体文件，`www/img/` 是登录门用到的图标图片，`www/js/` 是本地打包的第三方库（jsPDF/SheetJS，用于高级统计报表导出 PDF/Excel——放本地是因为国内移动网络下相关 CDN 常加载失败，细节见 `CLAUDE.md`）
 - `android/` —— Capacitor/Gradle自动生成的原生工程，绝大部分别手动改，改完 `www/` 后重新跑 `npx cap sync android`；例外是 `android/app/src/main/java/io/github/jenkjyu/afterzero/` 下有手写的原生插件（`SaveFile` 负责把档案库/备份文件存到用户自选的位置；`WeChatLogin` 负责账号登录），这部分不会被sync覆盖，是真实源码
-- `cloudbase/` —— 腾讯云开发（CloudBase）云函数的服务端代码，配合微信登录（`wxLogin`换取登录票据、`deleteAccount`处理注销账户）和Premium会员的云备份功能（`backupCreate`/`backupList`/`backupRestore`/`backupDelete`/`backupUploadFile`）使用，不属于Capacitor/Android那套构建流程，需要单独部署，细节见 `CLAUDE.md`
+- `cloudbase/` —— 腾讯云开发（CloudBase）云函数的服务端代码，配合微信登录（`wxLogin`换取登录票据、`deleteAccount`处理注销账户）、Premium会员的云备份功能（`backupCreate`/`backupList`/`backupRestore`/`backupDelete`/`backupUploadFile`）、以及AI债务顾问（`aiAdvisor`，调用CloudBase内置大模型）使用，不属于Capacitor/Android那套构建流程，需要单独部署，细节见 `CLAUDE.md`
 - `resources/` —— App图标的设计源文件，改图标时改这里，然后跑 `npx @capacitor/assets generate --android` 重新生成 `android/app/src/main/res/mipmap-*/` 下的实际图标文件（细节和一个工具默认值的坑见 `CLAUDE.md`）
 - `capacitor.config.json` —— 包名、显示名、web目录配置
 

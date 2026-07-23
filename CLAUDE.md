@@ -183,7 +183,15 @@ npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
 
 **⚠️ 踩过一个坑：`#g-P`/`#g-rate`/`#g-n`/`#g-first`（公式生成tab专属的几个字段）不能带HTML5原生`required`属性**——它们跟"保存"提交按钮共用同一个`<form id="debtForm">`。只要用户当时停留在"公式生成"这个tab（`#genPanel`是`display:block`可见状态），哪怕根本没点"生成计划"，这几个字段只要有空的，点"保存"就会被浏览器原生表单校验拦截、`saveForm()`根本不会被调用——**而安卓WebView不会像桌面浏览器那样弹校验提示气泡，拦截后的观感就是"点保存彻底没反应"**，不关窗、不报错、不提示，非常难排查（一度真机反馈"编辑债务保存点不了"，查了很久才定位到是这几个`required`）。修法：去掉这几个字段的`required`（视觉星号`<span class="req">*</span>`保留），校验挪到`#doGen`（"生成计划"按钮，`type="button"`不是`submit`）自己的点击事件里手动toast提示。**以后如果再往`#genPanel`（或者任何跟主表单共用一个`<form>`、但靠`display:none`切换显隐的子面板）里加字段，一律不要用原生`required`，会有同样的隐形阻塞风险——校验都应该手动做、用`toast()`明确提示，不要依赖浏览器原生表单校验的可见反馈（WebView里没有）。**
 
-## 订阅UI基础设施：Premium(一次性买断) + Premium+(月付/年付，分级包含Premium)
+## 订阅UI基础设施：单一 Premium（买断 + 订阅两种购买方式）
+
+> **⚠️ 这一节的历史已翻篇：早期是 Premium / Premium+ 两级分级（正交产品线 → 后来改成分级），现在已经合并成"单一 Premium 一个 tier"。** 原 Premium+ 独有的 AI 功能全部并入 Premium。同时免费/付费边界也重划过一轮（见下）。下面正文里凡是还提到"Premium+ / 分级 / hasPremiumPlus / 两个tab"的描述都是**已作废的旧状态**，保留是为了让你读懂演进；当前真实状态以本框内和"AI 债务顾问"一节为准：
+> - **只有一个 Premium**：数据模型 `PREMIUM_KEY`（`after-zero-premium-v1`）存 `{ premium: {method:"onetime"|"monthly"|"yearly"|"redeemed", at:ISO} | null }`，单字段。`hasPremium()` = `!!premium.premium`。**`hasPremiumPlus()` 已删除**，全项目引用改成 `hasPremium()`。加载时有一次性兼容迁移（旧 `premiumPlus` 字段搬进 `premium`）。
+> - **两种购买方式并存**：¥98 永久买断 / ¥5.9 月 / ¥50 年，三张价卡共享一份互斥选中态（`premiumPlanSel` 是单个字符串 `"onetime"|"monthly"|"yearly"`）。订阅页 `#premiumScreen` 不再有 tab，一份功能列表 + 一个价格区（买断整行高亮 + 月/年两列）。价格仍是占位（用户已确认），接真实支付时再定。
+> - **免费/付费边界（重划后）**：图表查看、提前还款模拟器 → **免费**（零成本、桌面级、口碑引擎，删了门禁）；高级统计报表**导出 PDF/Excel**、云备份、AI → **付费**（导出在 `reportExportXlsxBtn`/`reportExportPdfBtn` 的 click handler 里判 `hasPremium()`，查看图表无门禁）。判断标准：有真实成本（服务器/算力）才收费，纯客户端零成本的不设障碍。
+> - **兑换码**：`REDEEM_CODES = {"0000":"premium"}`；`applyRedeemTier` 写 `premium.premium={method:"redeemed",at}`。`__debugPremium` 状态只剩 `"premium"`/`"none"`。
+
+## （以下为旧版分级设计的记录，多数已作废，读时对照上面的框）Premium(一次性买断) + Premium+(月付/年付，分级包含Premium)
 
 "我的"页"账户"卡片和"全部数据"卡片之间有一张Premium入口卡片（`#premiumEntryCard`），"在还债务"页顶部KPI卡片下方有一条低调的AI入口banner（`#aiBannerBtn`），两者都会跳到同一个新的整页浮层`#premiumScreen`（Premium/Premium+两个tab切换）。**这轮只做UI展示层，没有接真实支付**——App还没上架任何应用商店，接不了Google Play Billing/华为应用内购这类真实购买流程，"订阅并支付"按钮点了只会弹"暂未开放真实支付"的提示框（`ask()`, `onOk`传`null`）。以后App真正上架后，要把这个按钮换成真实购买流程，再决定`premium.premium`/`premium.premiumPlus`要不要补充到期时间等字段。
 
@@ -217,7 +225,7 @@ window.__debugPremium("none")         // 清空，恢复"普通用户"
 
 **"更大档案库空间"这条Premium功能文案已删除**：档案库文件存在设备本地，开发者没有服务器成本要摊销，人为设一个容量上限纯粹是为了逼氪制造障碍，经不起"这明明不花你一分钱为什么要限制我"的质疑，跟"云备份"（有真实服务器成本）、"OCR识别"/"智能问答"（有真实算力成本）这几条不是一回事。以后再给Premium/Premium+列功能点，先想清楚这条是不是有真实成本支撑，不要照抄"更大空间/无限XX"这类通用套路。
 
-**`__handleBackButton`那条"最上层先关"判断链，随着这轮新增的三个`.subpage`（`#simScreen`/`#reportScreen`/`#backupScreen`，见下面三节）又往前插了三条**：当前完整顺序是 `modalScrim` → `termsScreen` → `backupScreen` → `reportScreen` → `simScreen` → `premiumScreen` → `accountScreen` → `notifySheet` → `editSheet` → `detailSheet`。判断依据不变——这几个新增的`.subpage`在HTML里都插在`premiumScreen`之后（`simScreen`最先、`reportScreen`次之、`backupScreen`、`termsScreen`最后），DOM顺序更靠后的在同z-index下画在上层，返回键要先判视觉上在最上层的那个。以后再加新的`.subpage`，永远加在它在DOM里紧邻的"后一个已有subpage"判断之前，不要图省事加到链尾。（`termsScreen`=购买者服务条款页，是订阅页里"《购买者服务条款》"链接点开的整页浮层，DOM里插在`backupScreen`之后，所以判断排在`backupScreen`之前、`modalScrim`之后。）
+**`__handleBackButton`那条"最上层先关"判断链，当前完整顺序是** `modalScrim` → `termsScreen` → `aiScreen` → `backupScreen` → `reportScreen` → `simScreen` → `premiumScreen` → `accountScreen` → `notifySheet` → `editSheet` → `detailSheet`（`aiScreen`=AI 债务顾问整页浮层，DOM 里插在 `backupScreen` 之后、`termsScreen` 之前，所以判断排在 `backupScreen` 之前、`termsScreen` 之后）。判断依据不变——这几个新增的`.subpage`在HTML里都插在`premiumScreen`之后（`simScreen`最先、`reportScreen`次之、`backupScreen`、`termsScreen`最后），DOM顺序更靠后的在同z-index下画在上层，返回键要先判视觉上在最上层的那个。以后再加新的`.subpage`，永远加在它在DOM里紧邻的"后一个已有subpage"判断之前，不要图省事加到链尾。（`termsScreen`=购买者服务条款页，是订阅页里"《购买者服务条款》"链接点开的整页浮层，DOM里插在`backupScreen`之后，所以判断排在`backupScreen`之前、`modalScrim`之后。）
 
 ## 提前还款收益模拟器（Premium）
 
@@ -301,9 +309,25 @@ window.__debugPremium("none")         // 清空，恢复"普通用户"
 
 **踩过一个坑**：`@capacitor/assets` 默认会给 `mipmap-anydpi-v26/ic_launcher.xml`（自适应图标配置）里的 `<background>` 和 `<foreground>` 都套一层 `16.7%` 的内缩（`<inset>`）。这对本项目不对——`icon-background.png` 设计上就是要通栏铺满到边缘的（黑白对半分），内缩之后四周会露出一圈透明，实机上大概率透出桌面壁纸/系统默认色，很难看。所以 `<background>` 这层的inset已经手动去掉了（保留 `<foreground>` 的inset，因为 `icon-foreground.png` 里的图形本身上下几乎顶到画布边缘，需要靠内缩才不会被圆形/方形等不同launcher遮罩裁掉）——**以后如果重新跑 `@capacitor/assets generate`，它会把 `<background>` 的inset加回去，记得再删一次。**
 
+## AI 债务顾问（Premium）
+
+"在还债务"页顶部的 AI banner（`#aiBannerBtn`）现在是这个功能的入口（`hasPremium()` 门禁，未开通跳订阅页）。点开进整页浮层 `#aiScreen`：顶部"生成分析报告"按钮出一份一次性的雪球/雪崩法分析，下方是可多轮追问的问答框。**只做了"报告 + 智能问答"两件事，没做 OCR**（当初 Premium+ 列的三条 AI 功能之一，明确推迟）。
+
+**走"云函数调大模型"的正道，不是一木记账那种"导出 txt 让用户自己粘 AI"的假 AI**（这个反面教材是这次重构的直接动机）：`www/index.html` 里 `buildAiSummary()` 用 `computeReportData()` + 遍历 `debts` 拼出一份紧凑的结构化 JSON（条目少、token 便宜），`callAiAdvisor(mode, question)` 走 `ensureCbAuthReady().then(cbApp().callFunction({name:"aiAdvisor",...}))`。
+
+**云函数 `cloudbase/functions/aiAdvisor/` 用 CloudBase 自带的大模型能力**：`app.ai().createModel("cloudbase").generateText({model, messages})` 返回 `{text}`——**计费走 CloudBase 资源点，不需要第三方 API Key、不用往环境变量塞密钥**，这是它相比"云函数里直连 DeepSeek/通义 API"最省事的地方（贴合项目现有的 CloudBase 基建）。模型 id 是 `index.js` 顶部常量 `AI_MODEL`，用 `"hy3"`（混元）。**这是实机核对控制台后定的，不是随手填的**：这个环境是「体验版」套餐，控制台 AI→生文模型 里只有混元（`hy3` / `hy3-preview`）状态是「已开启」可用，**DeepSeek 全系被套餐锁住**（`deepseek-v4-*` 旁边有小皇冠图标=要升级套餐才能开、`deepseek-v3.2` 状态是「即将下线」）。`hy3` 是一方模型、最便宜、也是官方 Node SDK 文档示例用的 id。控制台 hy3 那行"免费额度剩余"显示的是"-"（不是具体数字），**别当成"免费"就默认无成本**——如果账单出现异常，先看这里而不是怀疑代码有 bug。控制台顶部曾有一条"报名小程序成长计划可获得 10 亿混元 Token"的活动横幅，是另一件事（需要单独报名），不是自动生效的额度，不能假设它已经在起作用。以后升级套餐解锁 DeepSeek 想换模型，改 `AI_MODEL` 这一行即可，但**只能填控制台里当时状态为「已开启」的 model id**，别填「即将下线/被锁」的。函数不需要 envVariables，也不需要具名"权限控制"例外（吃 `*` 安全默认值 `auth.loginType != 'ANONYMOUS' && auth != null` 即可，跟备份函数一样）。**照铁律先建了 `package.json`**（漏建=部署能过、一调用就 `Cannot find module`）。
+
+**部署状态：已完成，依赖已验证正常。** `cd cloudbase && npx --yes -p @cloudbase/cli tcb fn deploy aiAdvisor --force` 部署成功；`tcb fn invoke aiAdvisor` 返回 `{"ok":false,"error":"未登录，无法使用 AI 分析"}`——**不是 `Cannot find module`**，说明 `@cloudbase/node-sdk` 装上了、函数体正常执行到 `getUserInfo()` 这一步，invoke 本身没有终端用户会话所以拿不到 `customUserId` 属于预期。真实的"生成报告/追问"往返还没做真机验证（跟云备份一样，需要真实微信登录会话，桌面/CLI 都测不出）。
+
+**成本兜底：客户端每日用量软上限**。新增 localStorage 键 `AI_USAGE_KEY`（`after-zero-ai-usage-v1`）存 `{date, count}`，`AI_DAILY_LIMIT`（默认 20）次/天，跨天自动清零，超限 toast 拦截。**这是客户端软限、可绕过，beta 够用**；因为买断用户的 AI 是"一次付费、持续产生算力成本"，需要个上限兜底。正式上线要换服务端计数（放 `users` 文档或独立集合）才防得住。
+
+**问答上下文只存本次会话内存（`aiChatHistory` 数组），不落 localStorage**——跟提前还款模拟器"债务没稳定 id、不记是哪笔"同理，会话历史没必要跨重启持久化，且只留最近几轮控 token。
+
+**桌面浏览器测不了真实 AI 往返**：跟云备份完全一样——伪造 `account` 没有真实 CloudBase 已认证会话，`callFunction({name:"aiAdvisor"})` 在服务端 `getUserInfo().customUserId` 拿不到值被拒。免费/付费门禁、订阅页 UI、`__debugPremium` 切状态这些能在桌面验；**真实 AI 生成/追问必须真机（release 包 + 微信登录）**。
+
 ## 云函数源码：`cloudbase/`
 
-`cloudbase/functions/wxLogin/`是腾讯云开发（CloudBase）云函数的源码，服务端代码，负责微信登录时用`code`换`openid`、签发自定义登录票据（详见上面"原生插件：`WeChatLogin`"一节）。`cloudbase/functions/deleteAccount/`是配套的注销账户云函数，负责真正删除`users`集合里的用户文档，现在也负责联动清理云备份数据（详见上面"云备份（Premium）"一节）。`cloudbase/functions/backupCreate/`、`backupList/`、`backupRestore/`、`backupDelete/`、`backupUploadFile/`是云备份功能的5个云函数，读写`backups`集合+Storage文件，详见上面"云备份（Premium）"一节。**这个目录不属于Capacitor/Android那套构建流程，`npx cap sync android`不会碰它，也不会自动部署**——改完要手动同步到CloudBase控制台或用他们的CLI工具部署。AppSecret等敏感配置只存在CloudBase云函数的环境变量里，不存在这个目录任何文件里，也不能加进来。
+`cloudbase/functions/wxLogin/`是腾讯云开发（CloudBase）云函数的源码，服务端代码，负责微信登录时用`code`换`openid`、签发自定义登录票据（详见上面"原生插件：`WeChatLogin`"一节）。`cloudbase/functions/deleteAccount/`是配套的注销账户云函数，负责真正删除`users`集合里的用户文档，现在也负责联动清理云备份数据（详见上面"云备份（Premium）"一节）。`cloudbase/functions/backupCreate/`、`backupList/`、`backupRestore/`、`backupDelete/`、`backupUploadFile/`是云备份功能的5个云函数，读写`backups`集合+Storage文件，详见上面"云备份（Premium）"一节。`cloudbase/functions/aiAdvisor/`是 AI 债务顾问云函数，详见上面"AI 债务顾问（Premium）"一节。**这个目录不属于Capacitor/Android那套构建流程，`npx cap sync android`不会碰它，也不会自动部署**——改完要手动同步到CloudBase控制台或用他们的CLI工具部署。AppSecret等敏感配置只存在CloudBase云函数的环境变量里，不存在这个目录任何文件里，也不能加进来。
 
 ## 构建
 
@@ -347,7 +371,7 @@ localStorage.setItem("after-zero-account-v1", JSON.stringify({openid:"test",nick
 
 ## 硬性铁律，改代码前必看
 
-1. **`localStorage` 的 KEY（在`www/index.html`里搜 `debt-manager-v5`）永远不能改。** 这是用户设备上保存真实数据的键名，改了等于让已经装过的app找不到自己原来存的数据，直接清零。同理，`DKEY`（`debt-manager-docs-v5`）、账号登录状态用的`ACCOUNT_KEY`（`after-zero-account-v1`）、在还债务排序方式用的`SORT_KEY`（`debt-manager-sort-v1`）、还款提醒通知设置用的`NOTIF_KEY`（`after-zero-notify-v1`）、订阅状态用的`PREMIUM_KEY`（`after-zero-premium-v1`）、提前还款模拟器用的`SIM_KEY`（`after-zero-simulate-v1`）、云备份"上次备份时间"用的`BACKUP_KEY`（`after-zero-backup-meta-v1`）以后也不能改——八者是各自独立的键，不要以为加新功能可以复用或合并。
+1. **`localStorage` 的 KEY（在`www/index.html`里搜 `debt-manager-v5`）永远不能改。** 这是用户设备上保存真实数据的键名，改了等于让已经装过的app找不到自己原来存的数据，直接清零。同理，`DKEY`（`debt-manager-docs-v5`）、账号登录状态用的`ACCOUNT_KEY`（`after-zero-account-v1`）、在还债务排序方式用的`SORT_KEY`（`debt-manager-sort-v1`）、还款提醒通知设置用的`NOTIF_KEY`（`after-zero-notify-v1`）、订阅状态用的`PREMIUM_KEY`（`after-zero-premium-v1`）、提前还款模拟器用的`SIM_KEY`（`after-zero-simulate-v1`）、云备份"上次备份时间"用的`BACKUP_KEY`（`after-zero-backup-meta-v1`）、AI 债务顾问每日用量计数用的`AI_USAGE_KEY`（`after-zero-ai-usage-v1`）以后也不能改——九者是各自独立的键，不要以为加新功能可以复用或合并。
 2. **新安装必须是空数据。** `www/index.html` 里 `SEED`（债务种子数据）、`DOCS_SEED`（文档种子数据）这两个常量现在都是空值——这是故意的，因为这个app的定位是要发给别人用，任何人第一次打开都不能预装开发者自己的私人财务数据。**改代码时如果要放测试数据，改完记得清空再提交，别把私人内容（真实债务数字、个人反思文档、任何带真实姓名/金额的东西）带回默认值里。**
    **私人数据不止藏在这三个常量里。** 之前排查发现过一次：一个叫`cliff`的调试用标记字段，虽然完全没有UI能设置它（不是SEED、不是表单字段），但代码里直接写死了具体的还款日期和金额字符串（`"2027-05 起还本，月供跳至 ¥2,182"`这类）挂在渲染逻辑里，跟SEED是否清空无关。改代码时留意：不只是搜`SEED`/`DOCS_SEED`这两个变量名，任何看着像真实日期/金额/人名的硬编码字符串都要多看一眼是不是该删。（补：曾经还有个`POSTER`"愿景海报"常量，因为没有任何UI入口能往里填内容、属于永远激活不了的死代码，已整体删除，包括`fileItems()`/`renderDocContent()`里对应的分支，别再找它。）
    **"新安装=空数据"这个假设依赖 `AndroidManifest.xml` 里 `android:allowBackup="false"`。** 安卓系统默认（`allowBackup="true"`，Capacitor脚手架生成时的默认值）会把App数据自动云备份到用户的Google账号，卸载重装或者换新手机登录同一个Google账号时可能会自动把旧数据（包括`ACCOUNT_KEY`存的登录态）恢复回来，让"重装"变得不再可靠地等于"空白状态"。这个项目已经手动改成`allowBackup="false"`彻底关掉自动备份——以后如果看到这个值被改回`true`（比如重新跑`npx cap add android`之类的脚手架命令覆盖了手改的manifest），要记得改回`false`。
