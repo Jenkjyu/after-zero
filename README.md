@@ -43,7 +43,7 @@ cd android
 
 ## 项目结构
 
-- `www/index.html` —— app真身（改这个），`www/fonts/` 是它引用的本地字体文件，`www/img/` 是登录门用到的图标图片，`www/js/` 是本地打包的第三方库（jsPDF/SheetJS，用于"统计"页导出 PDF/Excel——放本地是因为国内移动网络下相关 CDN 常加载失败，细节见 `CLAUDE.md`）
+- `www/index.html` —— app真身（改这个），`www/fonts/` 是它引用的本地字体文件，`www/img/` 是登录门用到的图标图片，`www/js/` 是本地打包/拆分出去的 JS：`jspdf.umd.min.js`/`xlsx.full.min.js` 是第三方库（用于"统计"页导出 PDF/Excel，放本地是因为国内移动网络下相关 CDN 常加载失败），`calc.js` 是从 `index.html` 拆出来的纯计算函数（`recompute`/`genPlan`/`amortForward` 等，不碰 DOM），配 `test/` 下的 `node:test` 单元测试（`npm test` 运行），细节见 `CLAUDE.md`
 - `android/` —— Capacitor/Gradle自动生成的原生工程，绝大部分别手动改，改完 `www/` 后重新跑 `npx cap sync android`；例外是 `android/app/src/main/java/io/github/jenkjyu/afterzero/` 下有手写的原生插件（`SaveFile` 负责把档案库/备份文件存到用户自选的位置；`WeChatLogin` 负责账号登录），这部分不会被sync覆盖，是真实源码
 - `cloudbase/` —— 腾讯云开发（CloudBase）云函数的服务端代码，配合微信登录（`wxLogin`换取登录票据、`deleteAccount`处理注销账户）、Premium会员的云备份功能（`backupCreate`/`backupList`/`backupRestore`/`backupDelete`/`backupUploadFile`）、以及AI债务顾问（`aiAdvisor`，调用CloudBase内置大模型）使用，不属于Capacitor/Android那套构建流程，需要单独部署，细节见 `CLAUDE.md`
 - `resources/` —— App图标的设计源文件，改图标时改这里，然后跑 `npx @capacitor/assets generate --android` 重新生成 `android/app/src/main/res/mipmap-*/` 下的实际图标文件（细节和一个工具默认值的坑见 `CLAUDE.md`）

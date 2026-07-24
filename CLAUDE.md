@@ -12,6 +12,28 @@
 
 **例外：`android/app/src/main/java/io/github/jenkjyu/afterzero/` 下有手写的原生插件代码，不是sync产物。** 目前有 `SaveFilePlugin.java` 和 `WeChatLoginPlugin.java`（+ `wxapi/WXEntryActivity.java` + `MainActivity.java` 里几行注册代码），`npx cap sync android` 不会碰这些文件，是真正的项目源码，要跟着走版本控制，不要当成自动生成的东西误删或忽略。详见下面"原生插件"一节。
 
+## 纯计算函数：`www/js/calc.js` + `test/calc.test.js`
+
+这是"单文件无构建步骤"原则下第一次真正拆出去的一份代码——**39个函数**从`www/index.html`主`<script>`里搬到了独立文件`www/js/calc.js`。这是2026-07-24"六续"那轮讨论定的长期方向（React迁移+测试优先，三步走）的第一步，分三轮做完：第一轮先搬了`recompute`/`genPlan`/`impliedAPR`/`amortForward`/`simulatePrepay`/`detectMatchingSort`/`urgencyTier`/`relLabel`/`dueBucket`/`isActive`/`rateClass`/`r2`/`pad`/`parseDate`/`addMonths`/`fmtDate`/`today0`/`npv`/`markPaidThrough`/`normalize`这20个明确点名的核心计息/日期函数；用户追问"是不是还是第一步"确认后，第二轮扫描全文件把剩下没碰DOM/localStorage的纯函数也一并搬完：`isBadRepeatDay`/`offsetLabel`/`computeReportData`（统计报表的数据计算）、`clone`/`fmt`/`money`/`todayStr`/`baseName`/`extOf`（通用格式化/工具函数）、`esc`/`inline`/`isHr`/`mdToHtml`/`escSvg`/`truncateLabel`（HTML转义+极简markdown渲染器，档案库预览用）；第三轮用户追问"剩下没搬的是不是都在等React迁移"，藉此机会把"等迁移"和"低价值/有状态暂不搬"这两类原因拆清楚后，又补搬了`hasPremium`/`premiumLabel`/`findAiConv`/`bumpAiConvTop`这4个——它们原本被跟"等迁移"那批混着说，其实跟迁移完全无关，只是需要参数化改造，评估后发现值得现在就搬。这批函数全部不碰DOM/localStorage，纯粹是"给定输入算出确定输出"，不管以后切不切React都不受影响，现在拆、现在测，都不会是白费功夫。
+
+**拆分手法是`www/index.html`自己的原有原则的延伸，不是引入新范式**：`calc.js`是普通的`<script src="js/calc.js"></script>`（在主`<script>`之前引入），文件里的函数就是最普通的顶层`function`声明，**不是**ES module的`export`/也不是挂在某个命名空间对象下（比如`window.AZCalc={...}`）。经典的（非`type="module"`）`<script>`标签，不管有没有各自的`"use strict"`，彼此的顶层`function`声明天然共享同一个全局作用域——这一点这个项目其实早就在依赖（CloudBase那三个CDN脚本声明的全局`cloudbase`就是同样的机制），`calc.js`只是把这个既有机制又用了一次。**结果是`index.html`主脚本里调用`recompute(d)`/`dueBucket(diff)`这些的地方绝大多数一行都不用改**，只是把函数定义本身搬走、原地留一句注释指向`calc.js`——JS作用域链会自动从IIFE内部找到全局的同名函数。
+
+**几处不是"原样搬走"、动了函数签名的地方，都是同一类原因——原来直接读IIFE内部闭包变量，搬到独立的全局脚本里就看不到那个闭包了，只能改成显式传参**：
+- `detectMatchingSort`：原来读闭包变量`DEBT_SORTS`（`{排序名: 取值函数}`的映射），改成`detectMatchingSort(activeInOrder, sorts)`，调用处（`www/index.html`里`commitReorder`后面那行）加了`, DEBT_SORTS`第二个参数。
+- `computeReportData`：原来读闭包变量`debts`，改成`computeReportData(debts)`，4处调用处（`buildAiSummary`/`renderReportScreen`/`exportReportXlsx`/`exportReportPdf`附近）都加了这个参数。
+- `hasPremium`/`premiumLabel`：原来读闭包变量`premium`，改成`hasPremium(premium)`/`premiumLabel(premium)`，7+2处调用处都加了这个参数（"我的"页会员行、AI banner、报表导出按钮、云备份入口等所有判会员的地方）。
+- `findAiConv`/`bumpAiConvTop`：原来读/改闭包变量`aiConvos`，改成`findAiConv(aiConvos, id)`/`bumpAiConvTop(aiConvos, rec)`，2处调用处（`loadAiConversation`附近）都加了这个参数。**`bumpAiConvTop`会原地修改传入的数组**（`splice`+`unshift`），不是没有副作用的纯函数，但副作用只作用于传入的参数本身、不碰任何模块级/DOM状态，跟`Array.prototype.sort`这类原地方法是同一类，一样能用"调用后检查数组"的方式单测，不影响它归入这批"纯函数"。
+
+其余31个函数调用方式一个字符都没变。**`esc`跟`escSvg`现在实现内容完全相同**（都是转义`&`/`<`/`>`），但故意保留成两个独立的名字没有合并——一个给markdown渲染用、一个给PDF导出的SVG图表文字用，这次纯粹是"原样搬运"不做行为之外的重构，合并成一个是以后如果要做的话再单独决定的事，不在这轮里顺手做掉。
+
+**没有搬、且理由分两类，别混为一谈**：
+- **真的是"等React迁移"**：`renderBalanceBars`/`renderTypeStack`/`renderPayoffLine`/`renderReportTables`这些拼HTML字符串的展示函数——虽然本身也不碰DOM（只是拼字符串），但拼出来的结构是跟当前手写渲染方式绑死的，以后切JSX组件会整个重写，现在写测试锁定输出结构，切了框架就作废，白费功夫。这是六续讨论里明确划过的线，属于"跟着框架迁移到哪个页面就补到哪个页面"那一类。
+- **跟迁移完全无关，是别的原因**：`aiUsageToday`/`aiUsageLeft`——`aiUsageToday()`内部会在跨天时**重新赋值**闭包变量`aiUsage`（`aiUsage = {date:t, count:0}`），这是真实的状态变更（不是读一下就完事），要参数化成纯函数得改成"返回新值、调用方自己重新赋值"这种模式，属于状态更新方式的小重构，不是简单加个参数就行，评估后判断更适合等这个项目哪天要理清状态管理方式时一起处理，不是"因为要等框架"。
+
+**Node测试环境靠文件末尾的`module.exports`兼容，浏览器里这段代码不会执行**：`calc.js`末尾有一段`if (typeof module !== "undefined" && module.exports) { module.exports = {...} }`——`test/calc.test.js`用`node:test`（Node自带，不用额外装包，`package.json`的`"type":"commonjs"`决定了这里用`require`不是`import`）直接`require("../www/js/calc.js")`跑单元测试；浏览器加载这个文件时是普通`<script src>`，`typeof module`是`"undefined"`，这段代码整个跳过，不会往全局塞一个多余的`module`变量。**以后这批纯函数还要再增补的话**，加到`calc.js`时记得同步把新函数名加进这段`module.exports`，忘记加的话`require`拿到的对象里会缺这个函数，`test/calc.test.js`里`calc.xxx is not a function`会立刻暴露出来，不难查。
+
+跑测试：`npm test`（`package.json`的`"test"`脚本是`node --test`，Node自动发现`test/`目录下`*.test.js`文件，不需要额外配置测试框架）。**这批测试完全不需要真机/浏览器**——不像这个项目里大多数"必须真机验证"的功能（原生插件、云函数、WebView专属行为），纯计算函数是这个项目里少数能在CI/命令行里可靠验证、桌面和真机行为保证一致的部分，以后改这些函数、或者再往`calc.js`里加新函数，先把对应的`node:test`补上再改代码，比每次都指望真机走一遍划算得多。
+
 ## 原生插件：`SaveFile`
 
 档案库的"下载"按钮存文件到用户自己选的位置，用的是这个自定义原生插件（`android/app/src/main/java/io/github/jenkjyu/afterzero/SaveFilePlugin.java`），不是网页标准的`<a download>`。

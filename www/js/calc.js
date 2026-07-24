@@ -1,0 +1,232 @@
+// After Zero —— 纯计算函数（不碰DOM/localStorage），从 www/index.html 里抽出来的第一批。
+// 跟 index.html 主脚本共享全局作用域：普通 <script src>，不是 ES module 的 import/export
+// （项目"单文件无构建步骤"的既有原则，见 CLAUDE.md/PROGRESS.md 2026-07-24 六续的三步走计划）。
+// index.html 里必须在主 <script> 之前引入这个文件，主脚本内部不再重复声明同名函数，
+// 靠普通的JS作用域链找到这里的全局函数。
+//
+// 同一份代码也被 test/calc.test.js 用 node:test 直接 require（Node是CommonJS，见
+// package.json 的 "type":"commonjs"）——文件末尾的 module.exports 只在Node环境生效，
+// 浏览器里 <script src> 加载时 typeof module === "undefined"，那段代码不会执行、
+// 也不会污染全局，函数声明本身就已经是全局的，不需要额外的 window.xxx 挂载。
+"use strict";
+
+function clone(x) { return JSON.parse(JSON.stringify(x)); }
+function r2(x) { return Math.round((Number(x) || 0) * 100) / 100; }
+function fmt(n) { return Math.round(Number(n) || 0).toLocaleString("en-US"); }
+function money(n) { return (Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function todayStr() { var d = new Date(); return (d.getMonth() + 1) + "/" + d.getDate(); }
+function baseName(p) { return (p || "").split("/").pop(); }
+function extOf(name) { var m = /\.([a-z0-9]+)$/i.exec(name || ""); return m ? m[1].toLowerCase() : ""; }
+function pad(n) { return (n < 10 ? "0" : "") + n; }
+function parseDate(s) { if (!s) return null; var p = String(s).split("-"); return new Date(+p[0], (+p[1]) - 1, +p[2]); }
+function addMonths(d, m) { return new Date(d.getFullYear(), d.getMonth() + m, d.getDate()); }
+function fmtDate(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+function today0() { var t = new Date(); t.setHours(0, 0, 0, 0); return t; }
+function rateClass(r) { return r >= 18 ? "rate-hi" : (r >= 10 ? "rate-mid" : "rate-lo"); }
+function isActive(d) { return !d.settled; }
+
+// plan generation
+function genPlan(spec) {
+  var rows = [], start = spec.first ? parseDate(spec.first) : today0();
+  function push(k, amount, principal, interest) { rows.push({ date: fmtDate(addMonths(start, k)), amount: r2(amount), principal: r2(principal), interest: r2(interest), paid: false }); }
+  if (spec.kind === "amort") {
+    var P = +spec.P || 0, i = (+spec.rate || 0) / 1200, n = +spec.n || 0, bal = P, m = i > 0 ? P * i / (1 - Math.pow(1 + i, -n)) : (n ? P / n : 0);
+    for (var k = 0; k < n; k++) { var it = bal * i, pr = (k === n - 1) ? bal : (m - it), amt = (k === n - 1) ? bal + it : m; bal -= pr; push(k, amt, pr, it); }
+  } else if (spec.kind === "equalfee") {
+    var pp = +spec.pp || 0, pf = +spec.pf || 0, n2 = +spec.n || 0;
+    for (var j = 0; j < n2; j++) push(j, pp + pf, pp, pf);
+  } else if (spec.kind === "interestfirst") {
+    var P3 = +spec.P || 0, i3 = (+spec.rate || 0) / 1200, ni = +spec.ni || 0, np = +spec.np || 0, it3 = P3 * i3;
+    for (var a = 0; a < ni; a++) push(a, it3, 0, it3);
+    var m3 = i3 > 0 ? P3 * i3 / (1 - Math.pow(1 + i3, -np)) : (np ? P3 / np : 0), bal3 = P3;
+    for (var b = 0; b < np; b++) { var itb = bal3 * i3, prb = (b === np - 1) ? bal3 : (m3 - itb), amtb = (b === np - 1) ? bal3 + itb : m3; bal3 -= prb; push(ni + b, amtb, prb, itb); }
+  } else {
+    var nc = +spec.n || 0;
+    for (var c = 0; c < nc; c++) push(c, 0, 0, 0);
+  }
+  return rows;
+}
+
+// implied APR from full plan (IRR via bisection)
+function npv(r, borrow, plan) { var s = -borrow; for (var k = 0; k < plan.length; k++) s += (+plan[k].amount || 0) / Math.pow(1 + r, k + 1); return s; }
+function impliedAPR(plan) {
+  var borrow = 0; plan.forEach(function (p) { borrow += +p.principal || 0; });
+  if (!(borrow > 0) || !plan.length) return 0;
+  if (npv(0, borrow, plan) <= 0.0001) return 0;
+  var lo = 0, hi = 1;
+  for (var it = 0; it < 90; it++) { var mid = (lo + hi) / 2; if (npv(mid, borrow, plan) > 0) lo = mid; else hi = mid; }
+  return r2(((lo + hi) / 2) * 1200);
+}
+
+function recompute(d) {
+  var plan = d.plan || [];
+  var borrow = 0, remaining = 0, paidCount = 0, paidPrincipal = 0, paidInterest = 0;
+  plan.forEach(function (r) {
+    borrow += +r.principal || 0;
+    if (r.paid) { paidCount++; paidPrincipal += +r.principal || 0; paidInterest += +r.interest || 0; }
+    else remaining += +r.principal || 0;
+  });
+  d.original = plan.length ? r2(borrow) : null;
+  d.balance = r2(remaining);
+  d.paidPrincipal = r2(paidPrincipal);
+  d.paidInterest = r2(paidInterest);
+  d.totalTerms = plan.length; d.paidTerms = paidCount; d.terms = plan.length - paidCount;
+  var next = null; for (var k = 0; k < plan.length; k++) { if (!plan[k].paid) { next = plan[k]; break; } }
+  d.monthly = next ? (+next.amount || 0) : 0;
+  d.nextDate = next ? next.date : null;
+  d.rate = impliedAPR(plan);
+}
+function markPaidThrough(plan, n) { for (var k = 0; k < plan.length; k++) plan[k].paid = k < n; }
+function normalize(d) { if (!d.plan) { d.plan = genPlan(d.gen); markPaidThrough(d.plan, (d.gen && d.gen.paid) || 0); } recompute(d); }
+
+// 提前还款模拟器：4种计划生成器(等额本息/信用卡等本等费/先息后本/自定义)各自的逐行
+// 数学不统一(equalfee/custom没有良定义的"月利率"概念)，没法统一处理"注入一笔额外还款"。
+// 改用recompute()已经对所有债务统一算出的派生值(balance/monthly/rate)做标准等额本息
+// 模拟，不追各自生成器的原始逐行细节——这是一个明确的简化取舍。
+function amortForward(balance, i, M, extraAt) {
+  var bal = balance, months = 0, totalInterest = 0;
+  while (bal > 0.005 && months < 1200) {
+    var interest = bal * i;
+    if (M <= interest) return null; // 月供不足以覆盖利息，无法收敛
+    months++;
+    var principal = Math.min(M - interest, bal);
+    bal -= principal; totalInterest += interest;
+    var extra = extraAt ? (extraAt(months) || 0) : 0;
+    if (extra > 0) bal = Math.max(0, bal - Math.min(extra, bal));
+  }
+  return { months: months, totalInterest: r2(totalInterest) };
+}
+function simulatePrepay(d, mode, atPeriod, extra) {
+  var i = (+d.rate || 0) / 1200, M = +d.monthly || 0, balance = +d.balance || 0;
+  var baseline = amortForward(balance, i, M, null);
+  var scenario = mode === "recurring"
+    ? amortForward(balance, i, M, function (m) { return m >= atPeriod ? extra : 0; })
+    : amortForward(balance, i, M, function (m) { return m === atPeriod ? extra : 0; });
+  if (!baseline || !scenario) return null;
+  return { monthsSaved: baseline.months - scenario.months, interestSaved: r2(baseline.totalInterest - scenario.totalInterest), newMonths: scenario.months, baseMonths: baseline.months };
+}
+
+// Array.sort自ES2019起规范保证稳定；万一某个古早WebView不稳定，最坏结果只是多显示"自定义"，不会误配错的预设名。
+// sorts 是 {sortKey: function(d){return 排序用的数字}} 的映射——index.html 里是 DEBT_SORTS，
+// 作为参数传入而不是从闭包读取，这样这个函数不依赖任何模块级状态，可以直接单测。
+function detectMatchingSort(activeInOrder, sorts) {
+  var keys = Object.keys(sorts);
+  for (var k = 0; k < keys.length; k++) {
+    var cmp = sorts[keys[k]];
+    var candidate = activeInOrder.slice().sort(function (a, b) { return cmp(a) - cmp(b); });
+    var same = candidate.every(function (d, i) { return d === activeInOrder[i]; });
+    if (same) return keys[k];
+  }
+  return "custom";
+}
+
+// 29/30/31号不是每个月都有——批量设置还款日/公式生成的首期还款日投射的是"每月同一天"
+// 的重复规律，选这三天会导致还款日在不同月份间漂移，两个入口都靠这个判断拦截。
+// 还款计划表格里逐行手动填的具体日期不受这条限制(那是记录真实数据，见 CLAUDE.md)。
+function isBadRepeatDay(day) { return day >= 29 && day <= 31; }
+// 通知设置面板"提前N天"规则的展示文案。
+function offsetLabel(n) { return n === 0 ? "当天到期" : "提前" + n + "天"; }
+
+function urgencyTier(diff) { return diff < 0 ? "overdue" : (diff <= 3 ? "crit" : (diff <= 14 ? "warn" : "dim")); }
+function relLabel(diff) { return diff < 0 ? ("已逾期 " + (-diff) + " 天") : (diff === 0 ? "就在今天" : diff + " 天后"); }
+// 列表分组的时间桶，跟urgencyTier是两套独立阈值——urgencyTier管颜色(3/14天两档)，
+// 这套管列表怎么分段(7/30天两档)，两者语义不同没必要合并成一套。标签直接用"7天内"/"30天内"
+// 这种字面天数，不用"本周/本月"——后者暗示按自然周/月计算，实际是纯粹的滚动天数窗口，
+// 用"本月"这种词容易让人以为是"到本月底"，真机反馈过这个歧义，改成跟数字对得上的字面说法。
+function dueBucket(diff) { return diff < 0 ? "overdue" : (diff <= 7 ? "week" : (diff <= 30 ? "month" : "later")); }
+
+// ===== 高级统计报表（Premium）背后的数据计算 =====
+// 原来直接读 index.html 主脚本IIFE里的闭包变量 debts，搬到这里后没法再依赖那个闭包，
+// 改成显式传参 computeReportData(debts)——跟 detectMatchingSort 参数化的道理一样。
+// 图表本身怎么画成HTML/SVG(renderBalanceBars等)不在这里，那些是跟当前手写DOM绑死的
+// 展示逻辑，以后切React会整个重写，留在index.html里，不属于这批"纯计算"。
+function computeReportData(debts) {
+  var active = debts.filter(function (d) { return !d.settled; });
+  var totalBalance = 0, weightedRate = 0, payoffDate = null, byType = {};
+  var byName = [];
+  active.forEach(function (d) {
+    var bal = +d.balance || 0;
+    totalBalance += bal; weightedRate += (+d.rate || 0) * bal;
+    byName.push({ name: d.name, balance: bal });
+    var t = d.type || "未分类";
+    byType[t] = (byType[t] || 0) + bal;
+    var plan = d.plan || [];
+    for (var k = plan.length - 1; k >= 0; k--) { if (!plan[k].paid) { if (!payoffDate || plan[k].date > payoffDate) payoffDate = plan[k].date; break; } }
+  });
+  byName.sort(function (a, b) { return b.balance - a.balance; });
+  var typeList = Object.keys(byType).map(function (k) { return { name: k, value: byType[k] }; }).sort(function (a, b) { return b.value - a.value; });
+  if (typeList.length > 6) {
+    var restSum = typeList.slice(5).reduce(function (s, x) { return s + x.value; }, 0);
+    typeList = typeList.slice(0, 5).concat([{ name: "其他", value: restSum }]);
+  }
+  // 负债预测走势：把全部在还债务未来每一期的本金按日期汇总，从今天的总余额开始逐步递减
+  var byDate = {};
+  active.forEach(function (d) { (d.plan || []).forEach(function (r) { if (!r.paid) byDate[r.date] = (byDate[r.date] || 0) + (+r.principal || 0); }); });
+  var dates = Object.keys(byDate).sort();
+  var timeline = [{ date: fmtDate(today0()), balance: r2(totalBalance) }], running = totalBalance;
+  dates.forEach(function (dt) { running = Math.max(0, running - byDate[dt]); timeline.push({ date: dt, balance: r2(running) }); });
+  return { active: active, totalBalance: r2(totalBalance), avgRate: totalBalance > 0 ? weightedRate / totalBalance : 0, payoffDate: payoffDate, byName: byName, typeList: typeList, timeline: timeline };
+}
+
+// ===== 文本转换：HTML转义 + 极简markdown渲染器 =====
+// 都是纯字符串输入输出，不碰DOM——档案库预览用mdToHtml把.md文件内容转成HTML字符串，
+// 再由index.html里的调用方自己塞进innerHTML；这里只管"文本转文本"这一步。
+function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function inline(s) { s = esc(s); s = s.replace(/`([^`]+)`/g, "<code>$1</code>"); s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>"); s = s.replace(/\[\[([^\]]+)\]\]/g, "<em>$1</em>"); s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1"); return s; }
+function isHr(l) { return /^[-=─═_*]{3,}$/.test(l.replace(/\s/g, "")); }
+function mdToHtml(src) {
+  var lines = src.replace(/\r/g, "").split("\n"), out = [], i = 0;
+  while (i < lines.length) {
+    var t = lines[i].trim();
+    if (t === "") { i++; continue; }
+    if (/^```/.test(t)) { i++; var code = []; while (i < lines.length && !/^```/.test(lines[i].trim())) { code.push(esc(lines[i])); i++; } i++; out.push('<pre class="md-pre">' + code.join("\n") + "</pre>"); continue; }
+    var h = /^(#{1,6})\s+(.*)$/.exec(t);
+    if (h) { var lv = Math.min(h[1].length + 1, 6); out.push("<h" + lv + ">" + inline(h[2]) + "</h" + lv + ">"); i++; continue; }
+    if (isHr(t)) { out.push("<hr>"); i++; continue; }
+    if (/^>\s?/.test(t)) { var q = []; while (i < lines.length && /^>\s?/.test(lines[i].trim())) { q.push(inline(lines[i].trim().replace(/^>\s?/, ""))); i++; } out.push("<blockquote>" + q.join("<br>") + "</blockquote>"); continue; }
+    if (/^\|.*\|/.test(t) && i + 1 < lines.length && /-/.test(lines[i + 1]) && /^[\s|:-]+$/.test(lines[i + 1].trim())) {
+      var cut = function (row) { var c = row.trim().split("|"); if (c[0] === "") c.shift(); if (c.length && c[c.length - 1] === "") c.pop(); return c.map(function (x) { return x.trim(); }); };
+      var head = cut(t); i += 2; var rows = []; while (i < lines.length && /^\|.*\|/.test(lines[i].trim())) { rows.push(cut(lines[i])); i++; }
+      var th = "<tr>" + head.map(function (c) { return "<th>" + inline(c) + "</th>"; }).join("") + "</tr>";
+      var tb = rows.map(function (rr) { return "<tr>" + rr.map(function (c) { return "<td>" + inline(c) + "</td>"; }).join("") + "</tr>"; }).join("");
+      out.push('<div class="md-tbl"><table>' + th + tb + "</table></div>"); continue;
+    }
+    if (/^[-*]\s+/.test(t)) { var items = []; while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) { items.push("<li>" + inline(lines[i].replace(/^\s*[-*]\s+/, "")) + "</li>"); i++; } out.push("<ul>" + items.join("") + "</ul>"); continue; }
+    if (/^\d+\.\s+/.test(t)) { var oi = []; while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) { oi.push("<li>" + inline(lines[i].replace(/^\s*\d+\.\s+/, "")) + "</li>"); i++; } out.push("<ol>" + oi.join("") + "</ol>"); continue; }
+    var para = []; while (i < lines.length) { var lt = lines[i].trim(); if (lt === "" || /^(#{1,6})\s/.test(lt) || /^[-*]\s/.test(lt) || /^\d+\.\s/.test(lt) || /^>\s?/.test(lt) || /^```/.test(lt) || isHr(lt)) break; para.push(inline(lt)); i++; }
+    if (para.length) out.push("<p>" + para.join("<br>") + "</p>");
+  }
+  return out.join("\n");
+}
+// 会员判断：原来直接读闭包变量 premium，改成显式传参（跟 detectMatchingSort/computeReportData
+// 参数化的道理一样）。premium 的形状是 {premium: {method, at} | null}，见 index.html 里 PREMIUM_KEY
+// 的注释——这里不重新解释那份数据模型，只是把判断逻辑本身搬出来。
+function hasPremium(premium) { return !!(premium && premium.premium); }
+function premiumLabel(premium) { return hasPremium(premium) ? "Premium 会员" : null; }
+
+// AI历史对话列表操作：原来直接读/改闭包变量 aiConvos，改成显式传参。bumpAiConvTop 会原地
+// 修改传入的数组(splice+unshift)，不是没有副作用的纯函数，但副作用只作用于传入的参数本身
+// (不碰任何模块级/DOM状态)，行为跟 Array.prototype.sort 这类原地方法是同一类，一样可以
+// 用"调用后检查数组"的方式单测。
+function findAiConv(aiConvos, id) { for (var i = 0; i < aiConvos.length; i++) if (aiConvos[i].id === id) return aiConvos[i]; return null; }
+function bumpAiConvTop(aiConvos, rec) { var idx = aiConvos.indexOf(rec); if (idx > 0) { aiConvos.splice(idx, 1); aiConvos.unshift(rec); } }
+
+// escSvg跟esc实现内容目前相同，但是两个独立的调用点（esc给markdown渲染用，escSvg给
+// PDF导出的SVG图表文字用）——保留成两个名字，不合并，避免这次搬运顺带改变调用方式。
+function escSvg(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+// 报表图表/PDF导出用来截断过长的债务名/标签，后面补"…"。
+function truncateLabel(s, n) { s = String(s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    clone: clone, r2: r2, fmt: fmt, money: money, todayStr: todayStr, baseName: baseName, extOf: extOf,
+    pad: pad, parseDate: parseDate, addMonths: addMonths, fmtDate: fmtDate, today0: today0,
+    rateClass: rateClass, isActive: isActive, genPlan: genPlan, npv: npv, impliedAPR: impliedAPR,
+    recompute: recompute, markPaidThrough: markPaidThrough, normalize: normalize,
+    amortForward: amortForward, simulatePrepay: simulatePrepay, detectMatchingSort: detectMatchingSort,
+    urgencyTier: urgencyTier, relLabel: relLabel, dueBucket: dueBucket,
+    isBadRepeatDay: isBadRepeatDay, offsetLabel: offsetLabel, computeReportData: computeReportData,
+    esc: esc, inline: inline, isHr: isHr, mdToHtml: mdToHtml, escSvg: escSvg, truncateLabel: truncateLabel,
+    hasPremium: hasPremium, premiumLabel: premiumLabel, findAiConv: findAiConv, bumpAiConvTop: bumpAiConvTop
+  };
+}

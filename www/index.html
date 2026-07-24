@@ -1270,6 +1270,11 @@
      本地引入后随APK一起装机、离线可用，npx cap sync会把整个 www/ 打包进去。 -->
 <script src="js/jspdf.umd.min.js"></script>
 <script src="js/xlsx.full.min.js"></script>
+<!-- 纯计算函数（recompute/amortForward/dueBucket等，不碰DOM），从下面的主脚本里抽出来
+     独立成文件，好处是能被 node:test 单测直接require（见 test/calc.test.js）。跟主脚本
+     共享全局作用域的普通<script src>，不是ES module，主脚本里不再重复声明这些同名函数，
+     靠JS作用域链找到这里定义的全局函数——必须排在主<script>之前。 -->
+<script src="js/calc.js"></script>
 <script>
 (function () {
   "use strict";
@@ -1283,7 +1288,7 @@
   // 订阅状态：单一 Premium 会员（同时提供 ¥98 永久买断 与 ¥5.9/月·¥50/年 订阅，用户自选）。
   // 早期曾是 Premium/Premium+ 两级分级，已合并成一个 tier——原 Premium+ 的功能（AI）全并入
   // Premium。存 { premium: {method:"onetime"|"monthly"|"yearly"|"redeemed", at:ISO} | null }，
-  // 只剩单字段；hasPremium() 判 premium.premium 是否为空。独立于上面几个键。
+  // 只剩单字段；hasPremium(premium) 判 premium.premium 是否为空。独立于上面几个键。
   var PREMIUM_KEY = "after-zero-premium-v1";
   // AI 债务顾问的每日用量软上限（客户端计数，成本兜底）：存 {date:"YYYY-MM-DD", count}。
   // 客户端软限可绕过，beta 够用；正式上线要换服务端计数。独立于上面几个键。
@@ -1313,103 +1318,13 @@
   var ICON_DOC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l5 5v12.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M8.5 13h7M8.5 16.5h7"/></svg>';
 
   var $ = function (id) { return document.getElementById(id); };
-  function clone(x) { return JSON.parse(JSON.stringify(x)); }
-  function r2(x) { return Math.round((Number(x) || 0) * 100) / 100; }
-  function fmt(n) { return Math.round(Number(n) || 0).toLocaleString("en-US"); }
-  function money(n) { return (Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-  function pad(n) { return (n < 10 ? "0" : "") + n; }
-  function parseDate(s) { if (!s) return null; var p = String(s).split("-"); return new Date(+p[0], (+p[1]) - 1, +p[2]); }
-  function addMonths(d, m) { return new Date(d.getFullYear(), d.getMonth() + m, d.getDate()); }
-  function fmtDate(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
-  function rateClass(r) { return r >= 18 ? "rate-hi" : (r >= 10 ? "rate-mid" : "rate-lo"); }
-  function todayStr() { var d = new Date(); return (d.getMonth() + 1) + "/" + d.getDate(); }
-  function baseName(p) { return (p || "").split("/").pop(); }
+  // clone/r2/fmt/money/todayStr/baseName/extOf/pad/parseDate/addMonths/fmtDate/rateClass/today0/
+  // genPlan/npv/impliedAPR/recompute/normalize/markPaidThrough/amortForward/simulatePrepay/
+  // detectMatchingSort/urgencyTier/relLabel/dueBucket/isActive/isBadRepeatDay/offsetLabel/
+  // computeReportData 已搬进 www/js/calc.js（纯计算函数，不碰DOM，node:test单测见 test/calc.test.js）。
   // 只按扩展名判断，不按file.type/MIME——安卓有些文件选择器对.md这类不常见格式
   // 干脆不给MIME(空字符串)或者统一报成application/octet-stream，MIME不可靠。
   var UPLOAD_ALLOWED_EXT = ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "bmp", "pdf", "md", "markdown", "doc", "docx"];
-  function extOf(name) { var m = /\.([a-z0-9]+)$/i.exec(name || ""); return m ? m[1].toLowerCase() : ""; }
-  function today0() { var t = new Date(); t.setHours(0, 0, 0, 0); return t; }
-
-  // plan generation
-  function genPlan(spec) {
-    var rows = [], start = spec.first ? parseDate(spec.first) : today0();
-    function push(k, amount, principal, interest) { rows.push({ date: fmtDate(addMonths(start, k)), amount: r2(amount), principal: r2(principal), interest: r2(interest), paid: false }); }
-    if (spec.kind === "amort") {
-      var P = +spec.P || 0, i = (+spec.rate || 0) / 1200, n = +spec.n || 0, bal = P, m = i > 0 ? P * i / (1 - Math.pow(1 + i, -n)) : (n ? P / n : 0);
-      for (var k = 0; k < n; k++) { var it = bal * i, pr = (k === n - 1) ? bal : (m - it), amt = (k === n - 1) ? bal + it : m; bal -= pr; push(k, amt, pr, it); }
-    } else if (spec.kind === "equalfee") {
-      var pp = +spec.pp || 0, pf = +spec.pf || 0, n2 = +spec.n || 0;
-      for (var j = 0; j < n2; j++) push(j, pp + pf, pp, pf);
-    } else if (spec.kind === "interestfirst") {
-      var P3 = +spec.P || 0, i3 = (+spec.rate || 0) / 1200, ni = +spec.ni || 0, np = +spec.np || 0, it3 = P3 * i3;
-      for (var a = 0; a < ni; a++) push(a, it3, 0, it3);
-      var m3 = i3 > 0 ? P3 * i3 / (1 - Math.pow(1 + i3, -np)) : (np ? P3 / np : 0), bal3 = P3;
-      for (var b = 0; b < np; b++) { var itb = bal3 * i3, prb = (b === np - 1) ? bal3 : (m3 - itb), amtb = (b === np - 1) ? bal3 + itb : m3; bal3 -= prb; push(ni + b, amtb, prb, itb); }
-    } else {
-      var nc = +spec.n || 0;
-      for (var c = 0; c < nc; c++) push(c, 0, 0, 0);
-    }
-    return rows;
-  }
-
-  // implied APR from full plan (IRR via bisection)
-  function npv(r, borrow, plan) { var s = -borrow; for (var k = 0; k < plan.length; k++) s += (+plan[k].amount || 0) / Math.pow(1 + r, k + 1); return s; }
-  function impliedAPR(plan) {
-    var borrow = 0; plan.forEach(function (p) { borrow += +p.principal || 0; });
-    if (!(borrow > 0) || !plan.length) return 0;
-    if (npv(0, borrow, plan) <= 0.0001) return 0;
-    var lo = 0, hi = 1;
-    for (var it = 0; it < 90; it++) { var mid = (lo + hi) / 2; if (npv(mid, borrow, plan) > 0) lo = mid; else hi = mid; }
-    return r2(((lo + hi) / 2) * 1200);
-  }
-
-  function recompute(d) {
-    var plan = d.plan || [];
-    var borrow = 0, remaining = 0, paidCount = 0, paidPrincipal = 0, paidInterest = 0;
-    plan.forEach(function (r) {
-      borrow += +r.principal || 0;
-      if (r.paid) { paidCount++; paidPrincipal += +r.principal || 0; paidInterest += +r.interest || 0; }
-      else remaining += +r.principal || 0;
-    });
-    d.original = plan.length ? r2(borrow) : null;
-    d.balance = r2(remaining);
-    d.paidPrincipal = r2(paidPrincipal);
-    d.paidInterest = r2(paidInterest);
-    d.totalTerms = plan.length; d.paidTerms = paidCount; d.terms = plan.length - paidCount;
-    var next = null; for (var k = 0; k < plan.length; k++) { if (!plan[k].paid) { next = plan[k]; break; } }
-    d.monthly = next ? (+next.amount || 0) : 0;
-    d.nextDate = next ? next.date : null;
-    d.rate = impliedAPR(plan);
-  }
-  function normalize(d) { if (!d.plan) { d.plan = genPlan(d.gen); markPaidThrough(d.plan, (d.gen && d.gen.paid) || 0); } recompute(d); }
-  function markPaidThrough(plan, n) { for (var k = 0; k < plan.length; k++) plan[k].paid = k < n; }
-
-  // 提前还款模拟器：4种计划生成器(等额本息/信用卡等本等费/先息后本/自定义)各自的逐行
-  // 数学不统一(equalfee/custom没有良定义的"月利率"概念)，没法统一处理"注入一笔额外还款"。
-  // 改用recompute()已经对所有债务统一算出的派生值(balance/monthly/rate)做标准等额本息
-  // 模拟，不追各自生成器的原始逐行细节——这是一个明确的简化取舍。
-  function amortForward(balance, i, M, extraAt) {
-    var bal = balance, months = 0, totalInterest = 0;
-    while (bal > 0.005 && months < 1200) {
-      var interest = bal * i;
-      if (M <= interest) return null; // 月供不足以覆盖利息，无法收敛
-      months++;
-      var principal = Math.min(M - interest, bal);
-      bal -= principal; totalInterest += interest;
-      var extra = extraAt ? (extraAt(months) || 0) : 0;
-      if (extra > 0) bal = Math.max(0, bal - Math.min(extra, bal));
-    }
-    return { months: months, totalInterest: r2(totalInterest) };
-  }
-  function simulatePrepay(d, mode, atPeriod, extra) {
-    var i = (+d.rate || 0) / 1200, M = +d.monthly || 0, balance = +d.balance || 0;
-    var baseline = amortForward(balance, i, M, null);
-    var scenario = mode === "recurring"
-      ? amortForward(balance, i, M, function (m) { return m >= atPeriod ? extra : 0; })
-      : amortForward(balance, i, M, function (m) { return m === atPeriod ? extra : 0; });
-    if (!baseline || !scenario) return null;
-    return { monthsSaved: baseline.months - scenario.months, interestSaved: r2(baseline.totalInterest - scenario.totalInterest), newMonths: scenario.months, baseMonths: baseline.months };
-  }
 
   function loadJSON(k, seed) { try { var r = localStorage.getItem(k); if (r) return JSON.parse(r); } catch (e) {} return clone(seed); }
   function saveAll() { try { localStorage.setItem(KEY, JSON.stringify(debts)); localStorage.setItem(DKEY, JSON.stringify(docs)); } catch (e) {} }
@@ -1435,8 +1350,8 @@
   function saveLastBackupMeta() { try { localStorage.setItem(BACKUP_KEY, JSON.stringify(lastBackupMeta)); } catch (e) {} }
   var aiConvos = loadJSON(AI_CHATLOG_KEY, []);
   function saveAiConvos() { try { localStorage.setItem(AI_CHATLOG_KEY, JSON.stringify(aiConvos)); } catch (e) {} }
-  function hasPremium() { return !!(premium && premium.premium); }
-  function premiumLabel() { return hasPremium() ? "Premium 会员" : null; }
+  // hasPremium/premiumLabel 已搬进 www/js/calc.js（改成显式传参 hasPremium(premium)/
+  // premiumLabel(premium)，原来直接读闭包变量 premium，下面调用处都已经加了这个参数）。
   // AI 每日用量：读/加/判上限。date 用本地日期字符串，跨天自动清零。
   var aiUsage = loadJSON(AI_USAGE_KEY, { date: "", count: 0 });
   function aiUsageToday() { var t = fmtDate(today0()); if (aiUsage.date !== t) { aiUsage = { date: t, count: 0 }; } return aiUsage; }
@@ -1499,7 +1414,7 @@
 
   var flashTimer;
   function toast(msg) { var f = $("flash"); f.textContent = msg; f.classList.add("show"); clearTimeout(flashTimer); flashTimer = setTimeout(function () { f.classList.remove("show"); }, 1800); }
-  function isActive(d) { return !d.settled; }
+  // isActive 已搬进 www/js/calc.js。
   function nextDateObj(d) { return d.nextDate ? parseDate(d.nextDate) : null; }
 
   function renderSummary() {
@@ -1793,7 +1708,7 @@
     var newOrder = ctx.order.map(function (origIdx) { return ctx.cards[origIdx].__o.d; });
     commitReorder(newOrder);
     saveAll();
-    setDebtSort(detectMatchingSort(debts.filter(isActive)));
+    setDebtSort(detectMatchingSort(debts.filter(isActive), DEBT_SORTS));
     renderDebts();
   }
   // 稳定分区重建debts数组：原本"在还"的槽位依次填入新顺序，"已结清"的槽位原样不动。
@@ -1802,25 +1717,9 @@
     for (var k = 0; k < debts.length; k++) next.push(isActive(debts[k]) ? queue.shift() : debts[k]);
     debts = next;
   }
-  // Array.sort自ES2019起规范保证稳定；万一某个古早WebView不稳定，最坏结果只是多显示"自定义"，不会误配错的预设名。
-  function detectMatchingSort(activeInOrder) {
-    var keys = Object.keys(DEBT_SORTS);
-    for (var k = 0; k < keys.length; k++) {
-      var cmp = DEBT_SORTS[keys[k]];
-      var candidate = activeInOrder.slice().sort(function (a, b) { return cmp(a) - cmp(b); });
-      var same = candidate.every(function (d, i) { return d === activeInOrder[i]; });
-      if (same) return keys[k];
-    }
-    return "custom";
-  }
-
-  function urgencyTier(diff) { return diff < 0 ? "overdue" : (diff <= 3 ? "crit" : (diff <= 14 ? "warn" : "dim")); }
-  function relLabel(diff) { return diff < 0 ? ("已逾期 " + (-diff) + " 天") : (diff === 0 ? "就在今天" : diff + " 天后"); }
-  // 列表分组的时间桶，跟urgencyTier是两套独立阈值——urgencyTier管颜色(3/14天两档)，
-  // 这套管列表怎么分段(7/30天两档)，两者语义不同没必要合并成一套。标签直接用"7天内"/"30天内"
-  // 这种字面天数，不用"本周/本月"——后者暗示按自然周/月计算，实际是纯粹的滚动天数窗口，
-  // 用"本月"这种词容易让人以为是"到本月底"，真机反馈过这个歧义，改成跟数字对得上的字面说法。
-  function dueBucket(diff) { return diff < 0 ? "overdue" : (diff <= 7 ? "week" : (diff <= 30 ? "month" : "later")); }
+  // detectMatchingSort/urgencyTier/relLabel/dueBucket 已搬进 www/js/calc.js（纯计算函数）。
+  // detectMatchingSort 原来直接读闭包里的 DEBT_SORTS，搬出去后改成显式传参（见调用处），
+  // 这样它不依赖任何模块级状态，能被 node:test 直接单测。
   var DUE_BUCKET_LABEL = { overdue: "已逾期", week: "7天内", month: "30天内", later: "更晚" };
 
   // 通知铃铛：outline/filled两个svg叠放按状态类切换显示哪个，跟tabbar图标(.ic-outline/.ic-filled)
@@ -2262,7 +2161,7 @@
   // 还款日在不同月份之间漂移(有的月28号有的月31号)，所以批量工具+公式生成的首期还款日
   // 都不让选这三天；还款计划表格里逐行手动填的具体日期不受这条限制(那是真实数据，
   // 现实中贷款确实可能就是某个月的30号到期)。
-  function isBadRepeatDay(day) { return day >= 29 && day <= 31; }
+  // isBadRepeatDay 已搬进 www/js/calc.js。
   $("batchCol").addEventListener("change", function () {
     var v = $("batchVal");
     if (this.value === "date") { v.type = "number"; v.min = "1"; v.max = "28"; v.step = "1"; v.inputMode = "numeric"; v.placeholder = "几号（1-28）"; }
@@ -2332,7 +2231,7 @@
 
   // 还款提醒通知设置面板。规则全局共享(不按债务区分)，跟着每笔债务当下的nextDate
   // 自动滚动到下一期(syncNotifications里体现)，这里只管开关状态和规则的增删。
-  function offsetLabel(n) { return n === 0 ? "当天到期" : "提前" + n + "天"; }
+  // offsetLabel 已搬进 www/js/calc.js。
   function renderNotifyRules() {
     var list = $("notifyRuleList"); list.innerHTML = "";
     if (!notify.rules.length) { list.innerHTML = '<div class="footnote" style="margin:4px 2px 8px;text-align:left">还没有提醒规则，添加一条吧</div>'; return; }
@@ -2425,34 +2324,7 @@
   }
   function deleteDebt(i) { ask("删除债务", "彻底删除「" + debts[i].name + "」？\n这不是结清，是从记录里移除。", function () { debts.splice(i, 1); saveAll(); renderAll(); closeEdit(); closeDetail(); toast("已删除"); }); }
 
-  // markdown
-  function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-  function inline(s) { s = esc(s); s = s.replace(/`([^`]+)`/g, "<code>$1</code>"); s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>"); s = s.replace(/\[\[([^\]]+)\]\]/g, "<em>$1</em>"); s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1"); return s; }
-  function isHr(l) { return /^[-=─═_*]{3,}$/.test(l.replace(/\s/g, "")); }
-  function mdToHtml(src) {
-    var lines = src.replace(/\r/g, "").split("\n"), out = [], i = 0;
-    while (i < lines.length) {
-      var t = lines[i].trim();
-      if (t === "") { i++; continue; }
-      if (/^```/.test(t)) { i++; var code = []; while (i < lines.length && !/^```/.test(lines[i].trim())) { code.push(esc(lines[i])); i++; } i++; out.push('<pre class="md-pre">' + code.join("\n") + "</pre>"); continue; }
-      var h = /^(#{1,6})\s+(.*)$/.exec(t);
-      if (h) { var lv = Math.min(h[1].length + 1, 6); out.push("<h" + lv + ">" + inline(h[2]) + "</h" + lv + ">"); i++; continue; }
-      if (isHr(t)) { out.push("<hr>"); i++; continue; }
-      if (/^>\s?/.test(t)) { var q = []; while (i < lines.length && /^>\s?/.test(lines[i].trim())) { q.push(inline(lines[i].trim().replace(/^>\s?/, ""))); i++; } out.push("<blockquote>" + q.join("<br>") + "</blockquote>"); continue; }
-      if (/^\|.*\|/.test(t) && i + 1 < lines.length && /-/.test(lines[i + 1]) && /^[\s|:-]+$/.test(lines[i + 1].trim())) {
-        var cut = function (row) { var c = row.trim().split("|"); if (c[0] === "") c.shift(); if (c.length && c[c.length - 1] === "") c.pop(); return c.map(function (x) { return x.trim(); }); };
-        var head = cut(t); i += 2; var rows = []; while (i < lines.length && /^\|.*\|/.test(lines[i].trim())) { rows.push(cut(lines[i])); i++; }
-        var th = "<tr>" + head.map(function (c) { return "<th>" + inline(c) + "</th>"; }).join("") + "</tr>";
-        var tb = rows.map(function (rr) { return "<tr>" + rr.map(function (c) { return "<td>" + inline(c) + "</td>"; }).join("") + "</tr>"; }).join("");
-        out.push('<div class="md-tbl"><table>' + th + tb + "</table></div>"); continue;
-      }
-      if (/^[-*]\s+/.test(t)) { var items = []; while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) { items.push("<li>" + inline(lines[i].replace(/^\s*[-*]\s+/, "")) + "</li>"); i++; } out.push("<ul>" + items.join("") + "</ul>"); continue; }
-      if (/^\d+\.\s+/.test(t)) { var oi = []; while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) { oi.push("<li>" + inline(lines[i].replace(/^\s*\d+\.\s+/, "")) + "</li>"); i++; } out.push("<ol>" + oi.join("") + "</ol>"); continue; }
-      var para = []; while (i < lines.length) { var lt = lines[i].trim(); if (lt === "" || /^(#{1,6})\s/.test(lt) || /^[-*]\s/.test(lt) || /^\d+\.\s/.test(lt) || /^>\s?/.test(lt) || /^```/.test(lt) || isHr(lt)) break; para.push(inline(lt)); i++; }
-      if (para.length) out.push("<p>" + para.join("<br>") + "</p>");
-    }
-    return out.join("\n");
-  }
+  // esc/inline/isHr/mdToHtml 已搬进 www/js/calc.js（纯文本转换，不碰DOM）。
   function download(filename, content, mime) {
     try { var url = URL.createObjectURL(new Blob([content], { type: mime || "application/octet-stream" })); var a = document.createElement("a"); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100); }
     catch (e) { toast("此环境不支持下载，可长按内容复制"); }
@@ -2515,20 +2387,20 @@
   function renderAccountDetail() {
     $("acctDetailAvatar").src = (account && account.avatarUrl) || "";
     $("acctDetailNickname").textContent = (account && account.nickname) || "";
-    $("acctDetailMembership").textContent = premiumLabel() || "普通用户";
+    $("acctDetailMembership").textContent = premiumLabel(premium) || "普通用户";
   }
   function openAccountScreen() { renderAccountDetail(); $("accountScreen").classList.add("open"); lockScroll(); }
   function closeAccountScreen() { if (!$("accountScreen").classList.contains("open")) return; $("accountScreen").classList.remove("open"); unlockScroll(); }
 
   // 订阅页：单一 Premium，一份功能列表 + 三张价卡（买断/月/年）共享互斥选中态。
   function renderPremiumEntryCard() {
-    var label = premiumLabel();
+    var label = premiumLabel(premium);
     $("premiumEntryCard").classList.toggle("is-member", !!label);
     $("premiumEntryTitle").textContent = label || "升级 Premium";
     $("premiumEntrySub").textContent = label ? "查看会员详情" : "云备份 · 报表导出 · AI 债务顾问";
   }
   function renderAIBanner() {
-    var ai = hasPremium();
+    var ai = hasPremium(premium);
     $("aiBannerBtn").classList.toggle("is-ai", ai);
     $("aiBannerTitle").textContent = ai ? "AI 债务顾问" : "AI 债务优化报告";
     $("aiBannerSub").textContent = ai ? "雪球/雪崩法分析、优先还款建议，随问随答" : "开通 Premium，获取雪球/雪崩法分析与更省钱的还款顺序";
@@ -2555,14 +2427,14 @@
   var currentAiConvId = null;
   var aiBusy = false;
   function aiConvId() { return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-  function findAiConv(id) { for (var i = 0; i < aiConvos.length; i++) if (aiConvos[i].id === id) return aiConvos[i]; return null; }
-  function bumpAiConvTop(rec) { var idx = aiConvos.indexOf(rec); if (idx > 0) { aiConvos.splice(idx, 1); aiConvos.unshift(rec); } }
+  // findAiConv/bumpAiConvTop 已搬进 www/js/calc.js（改成显式传参，原来直接读/改闭包变量
+  // aiConvos，下面调用处都已经加了这个参数）。
   // 极轻量渲染：转义 + 保留换行 + **加粗**（不引 markdown 库）
   function aiRender(text) {
     return esc(text || "").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   }
   function buildAiSummary() {
-    var data = computeReportData();
+    var data = computeReportData(debts);
     var list = debts.filter(function (d) { return (+d.balance || 0) > 0.005; }).map(function (d) {
       return { 名称: d.name || "未命名", 类型: d.type || "其他", 债主: d.funder || "", 剩余本金: r2(d.balance),
         年化利率百分比: r2(d.rate), 月供: r2(d.monthly), 剩余期数: d.terms || 0, 总期数: d.totalTerms || 0,
@@ -2646,7 +2518,7 @@
     appendAiMsg("user", aiRender(displayQ));
     var pending = appendAiMsg("bot", "", true);
 
-    var rec = currentAiConvId ? findAiConv(currentAiConvId) : null;
+    var rec = currentAiConvId ? findAiConv(aiConvos, currentAiConvId) : null;
     var contextHistory = rec ? rec.messages.slice(-12).map(function (m) { return { role: m.role, content: m.content }; }) : [];
     if (!rec) {
       rec = { id: aiConvId(), title: displayQ, isReport: isReportMode, updatedAt: Date.now(), messages: [] };
@@ -2662,7 +2534,7 @@
       rec.messages.push({ role: "assistant", content: text });
       if (rec.messages.length > AI_CHATLOG_MAX_MSGS) rec.messages = rec.messages.slice(-AI_CHATLOG_MAX_MSGS);
       rec.updatedAt = Date.now();
-      bumpAiConvTop(rec);
+      bumpAiConvTop(aiConvos, rec);
       if (aiConvos.length > AI_CHATLOG_MAX_CONVOS) aiConvos = aiConvos.slice(0, AI_CHATLOG_MAX_CONVOS);
       saveAiConvos();
     }).catch(function (err) {
@@ -2763,34 +2635,8 @@
 
   // ===== 高级统计报表（Premium）=====
   // 三张图全部手写(条形图用div，堆叠条+折线用内联SVG)，配色见<style>里.viz-root那段注释。
-  function computeReportData() {
-    var active = debts.filter(function (d) { return !d.settled; });
-    var totalBalance = 0, weightedRate = 0, payoffDate = null, byType = {};
-    var byName = [];
-    active.forEach(function (d) {
-      var bal = +d.balance || 0;
-      totalBalance += bal; weightedRate += (+d.rate || 0) * bal;
-      byName.push({ name: d.name, balance: bal });
-      var t = d.type || "未分类";
-      byType[t] = (byType[t] || 0) + bal;
-      var plan = d.plan || [];
-      for (var k = plan.length - 1; k >= 0; k--) { if (!plan[k].paid) { if (!payoffDate || plan[k].date > payoffDate) payoffDate = plan[k].date; break; } }
-    });
-    byName.sort(function (a, b) { return b.balance - a.balance; });
-    var typeList = Object.keys(byType).map(function (k) { return { name: k, value: byType[k] }; }).sort(function (a, b) { return b.value - a.value; });
-    if (typeList.length > 6) {
-      var restSum = typeList.slice(5).reduce(function (s, x) { return s + x.value; }, 0);
-      typeList = typeList.slice(0, 5).concat([{ name: "其他", value: restSum }]);
-    }
-    // 负债预测走势：把全部在还债务未来每一期的本金按日期汇总，从今天的总余额开始逐步递减
-    var byDate = {};
-    active.forEach(function (d) { (d.plan || []).forEach(function (r) { if (!r.paid) byDate[r.date] = (byDate[r.date] || 0) + (+r.principal || 0); }); });
-    var dates = Object.keys(byDate).sort();
-    var timeline = [{ date: fmtDate(today0()), balance: r2(totalBalance) }], running = totalBalance;
-    dates.forEach(function (dt) { running = Math.max(0, running - byDate[dt]); timeline.push({ date: dt, balance: r2(running) }); });
-    return { active: active, totalBalance: r2(totalBalance), avgRate: totalBalance > 0 ? weightedRate / totalBalance : 0, payoffDate: payoffDate, byName: byName, typeList: typeList, timeline: timeline };
-  }
-  function truncateLabel(s, n) { s = String(s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+  // computeReportData 已搬进 www/js/calc.js（改成显式传参 computeReportData(debts)，
+  // 原来直接读闭包变量 debts，下面4处调用都已经加了这个参数）。truncateLabel 也搬进了那里。
   function renderBalanceBars(data) {
     if (!data.byName.length) return '<div class="viz-block"><div class="viz-title">各债务余额对比</div><div class="footnote" style="text-align:left">暂无在还债务</div></div>';
     var max = Math.max.apply(null, data.byName.map(function (x) { return x.balance; })) || 1;
@@ -2839,7 +2685,7 @@
       + '</div>';
   }
   function renderReportScreen() {
-    var data = computeReportData();
+    var data = computeReportData(debts);
     $("reportKpis").innerHTML =
       '<div class="kpi half"><div class="v num">' + (data.avgRate ? data.avgRate.toFixed(2) : "0.00") + '%</div><div class="k">加权平均利率</div></div>'
       + '<div class="kpi half"><div class="v num">' + (data.payoffDate || "—") + '</div><div class="k">预计全部还清日期</div></div>';
@@ -2849,7 +2695,7 @@
   function openDocsScreen() { $("docsScreen").classList.add("open"); lockScroll(); }
   function closeDocsScreen() { if (!$("docsScreen").classList.contains("open")) return; $("docsScreen").classList.remove("open"); unlockScroll(); }
 
-  function escSvg(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  // escSvg 已搬进 www/js/calc.js。
   // PDF导出用的图表是独立的、颜色写死的浅色版SVG(不是把屏幕上那份主题化的SVG克隆去截图)——
   // 屏幕上那份用CSS变量(var(--accent)等)取色，序列化成独立文档去光栅化时，CSS变量脱离了
   // 页面样式表的作用域会解析不出来(渲染出空/黑)，专门另建一份不依赖任何CSS变量的字面色版本
@@ -2928,7 +2774,7 @@
   }
   function exportReportXlsx() {
     if (typeof XLSX === "undefined") { toast("导出组件未就绪，请重启 App 后重试"); return; }
-    var data = computeReportData();
+    var data = computeReportData(debts);
     var wb = XLSX.utils.book_new();
     var debtRows = data.active.map(function (d) { return { 名称: d.name, 出资方: d.funder || "", 类型: d.type || "", 剩余待还: d.balance, 借款金额: d.original, 年化利率: d.rate, 下期还款日: d.nextDate, 已还期数: d.paidTerms, 总期数: d.totalTerms }; });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(debtRows), "债务明细");
@@ -2988,7 +2834,7 @@
   }
   function exportReportPdf() {
     if (typeof window.jspdf === "undefined") { toast("导出组件未就绪，请重启 App 后重试"); return; }
-    var data = computeReportData();
+    var data = computeReportData(debts);
     // 第1页：标题/KPI/三张图（写死浅色的栅格图）；随后若干页：数据明细表。
     var pages = [{ svg: buildExportChartsSVG(data), w: 640, h: 960 }].concat(buildTablePagesSVG(data));
     Promise.all(pages.map(function (pg) {
@@ -3086,7 +2932,7 @@
   }
   function createCloudBackup() {
     if (!account) { toast("请先登录"); return; }
-    if (!hasPremium()) { closeBackupScreen(); openPremiumScreen("premium"); return; }
+    if (!hasPremium(premium)) { closeBackupScreen(); openPremiumScreen("premium"); return; }
     var btn = $("backupCreateBtn"); btn.disabled = true;
     toast("正在打包备份…");
     var backupId = "b" + Date.now() + Math.random().toString(36).slice(2, 7);
@@ -3365,11 +3211,11 @@
   $("simModeRecurring").addEventListener("click", function () { setSimMode("recurring"); });
   $("simRunBtn").addEventListener("click", runSimulate);
   // "统计"现在是主tab（查看免费），导出 PDF/Excel 仍是 Premium 权益（查看免费、导出付费）
-  $("reportExportXlsxBtn").addEventListener("click", function () { if (!hasPremium()) { openPremiumScreen(); return; } exportReportXlsx(); });
-  $("reportExportPdfBtn").addEventListener("click", function () { if (!hasPremium()) { openPremiumScreen(); return; } exportReportPdf(); });
+  $("reportExportXlsxBtn").addEventListener("click", function () { if (!hasPremium(premium)) { openPremiumScreen(); return; } exportReportXlsx(); });
+  $("reportExportPdfBtn").addEventListener("click", function () { if (!hasPremium(premium)) { openPremiumScreen(); return; } exportReportPdf(); });
   $("docsEntryBtn").addEventListener("click", openDocsScreen);
   $("docsBackBtn").addEventListener("click", closeDocsScreen);
-  $("backupEntryBtn").addEventListener("click", function () { if (!hasPremium()) { openPremiumScreen(); return; } openBackupScreen(); });
+  $("backupEntryBtn").addEventListener("click", function () { if (!hasPremium(premium)) { openPremiumScreen(); return; } openBackupScreen(); });
   $("backupBackBtn").addEventListener("click", closeBackupScreen);
   $("backupCreateBtn").addEventListener("click", createCloudBackup);
   $("aiBackBtn").addEventListener("click", closeAiScreen);
@@ -3442,7 +3288,7 @@
     toast("兑换成功，已解锁 Premium");
   });
   $("aiBannerBtn").addEventListener("click", function () {
-    if (!hasPremium()) { openPremiumScreen(); return; }
+    if (!hasPremium(premium)) { openPremiumScreen(); return; }
     openAiScreen();
   });
   $("deleteAccountBtn").addEventListener("click", function () {
