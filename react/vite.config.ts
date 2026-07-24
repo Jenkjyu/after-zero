@@ -22,13 +22,17 @@ export default defineConfig(({ command }) => ({
     outDir: resolve(__dirname, "../www/js/react-debts"),
     emptyOutDir: true,
     lib: {
-      entry: resolve(__dirname, "src/debts/main.tsx"),
+      // 三个tab三个独立入口，各自产出main.js/pay.js/report.js，index.html里各配一个
+      // <script type="module">。inlineDynamicImports只支持单入口，多入口后必须去掉——
+      // Rollup对ES格式的多入口构建会自动把react/react-dom这类公共依赖拆成共享chunk，
+      // 三个入口各自import它，不会各自打包一份重复的react/react-dom。
+      entry: {
+        debts: resolve(__dirname, "src/debts/main.tsx"),
+        pay: resolve(__dirname, "src/pay/main.tsx"),
+        report: resolve(__dirname, "src/report/main.tsx"),
+      },
       formats: ["es"],
-      fileName: () => "main.js",
-    },
-    rollupOptions: {
-      // 单入口、不做代码分割——产出一个自包含的文件，index.html里只需要一个<script>标签。
-      output: { inlineDynamicImports: true },
+      fileName: (_format, entryName) => `${entryName}.js`,
     },
   },
   test: {

@@ -5,7 +5,7 @@
 import { Header } from "./Header";
 import { Summary } from "./Summary";
 import { DebtList } from "./DebtList";
-import { useAccount, useDebts, usePremium } from "./useDebts";
+import { useAccount, useDebts, usePremium } from "../shared/state";
 
 export function App() {
   const debts = useDebts();

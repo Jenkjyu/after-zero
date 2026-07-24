@@ -36,13 +36,17 @@
 
 **`summarizeDebts(debts)`是2026-07-24"React 迁移第二步"落地"在还债务"页时新增的第40个函数**：从vanilla`renderSummary()`内联的聚合逻辑（`total`/`monthly`/`paidPrincipal`/`paidInterest`/`active`/`settled`/`pct`）抽出来的纯函数——vanilla那份`renderSummary()`本身已经在这次迁移里整个删除（改由React调用这个函数），抽出来纯粹是为了同一份聚合数学被React组件复用，不是"这次批量整理31个函数"那一轮的产物，详见下面"React 迁移"一节。
 
-## React 迁移：`react/` + "在还债务"页（绞杀者模式第一站）
+## React 迁移：`react/` + "在还债务"页（绞杀者模式第一站）→ "还款日"+"统计"（第三步）
 
-"六续"定的三步走方向（React迁移+测试优先）第二步：**"在还债务" tab（app最核心、交互最复杂的页面——长按拖拽排序、左滑手势、玻璃卡片）整体由React接管，其余三个tab（还款日/统计/我的）和所有subpage/sheet（详情窗、编辑窗、账户页等）继续是现有vanilla JS**，两边共享同一份`localStorage`数据。走的是绞杀者模式（逐页面替换），这是第一站——之所以先啃最难的页面，是因为它风险和调试成本最高，但也是用户使用最频繁、出问题影响最大的页面，先做完这个，后面的页面都不算难。
+"六续"定的三步走方向（React迁移+测试优先）第二步：**"在还债务" tab（app最核心、交互最复杂的页面——长按拖拽排序、左滑手势、玻璃卡片）整体由React接管**，走的是绞杀者模式（逐页面替换），这是第一站——之所以先啃最难的页面，是因为它风险和调试成本最高，但也是用户使用最频繁、出问题影响最大的页面，先做完这个，后面的页面都不算难。
 
-### 目录结构：`react/`（源码）→ `www/js/react-debts/`（构建产物）
+**第三步：判断"还款日"（repayment reminders）和"统计"（stats/report）这两个tab都足够简单、且第二步已经把基础设施（桥接契约/构建工具/测试约定）搭好了，合并成一轮一起迁移。** 现在只剩"我的"tab和所有subpage/sheet（详情窗、编辑窗、账户页、通知设置面板等）继续是现有vanilla JS，其余三个tab（在还债务/还款日/统计）全部由React接管，两边共享同一份`localStorage`数据。
 
-新增顶层目录`react/`（跟`www/`/`android/`/`cloudbase/`/`resources/`平级），是这个项目第一次引入真正的JS构建工具（Vite）。`react/src/debts/`是"在还债务"页的React源码，`react/vite.config.ts`用Vite的**库模式**（`build.lib`，不是Vite默认的app模式——这次不是造一个独立SPA，是把一个React组件挂进现有`www/index.html`的某个节点，库模式产出一个可以直接`<script type="module">`引入的单文件bundle）构建成`www/js/react-debts/main.js`。
+### 目录结构：`react/`（源码）→ `www/js/react-debts/`（构建产物，Vite多入口）
+
+新增顶层目录`react/`（跟`www/`/`android/`/`cloudbase/`/`resources/`平级），是这个项目第一次引入真正的JS构建工具（Vite）。`react/src/debts/`/`react/src/pay/`/`react/src/report/`分别是三个已迁移tab的React源码，`react/src/shared/`是三者共用的状态订阅hook（见下面"vanilla ↔ React 桥接契约"）。`react/vite.config.ts`用Vite的**库模式**（`build.lib`，不是Vite默认的app模式——这次不是造一个独立SPA，是把React组件挂进现有`www/index.html`的某几个节点，库模式产出可以直接`<script type="module">`引入的bundle）。
+
+**第三步把`build.lib.entry`从单一路径改成了一个map**（`{debts:"src/debts/main.tsx", pay:"src/pay/main.tsx", report:"src/report/main.tsx"}`，`fileName:(format,name)=>`${name}.js``），一次`vite build`产出`www/js/react-debts/{debts,pay,report}.js`三个文件——**同时必须删掉`rollupOptions.output.inlineDynamicImports:true`这一行**（该选项只支持单入口，多入口配置下Rollup会报错）。删掉之后Rollup对多入口ES输出的默认行为是**自动把三个入口共享的依赖（react/react-dom/`shared/state.ts`）拆成独立的chunk文件**（`state-<hash>.mjs`这种命名），三个入口各自`import`这个共享chunk，不会各打包一份重复的react/react-dom——实测验证过：单入口时`debts.js`是292KB（react/react-dom内联），改多入口后`debts.js`降到33KB+一份~260KB的共享chunk，`pay.js`/`report.js`各自几KB到十几KB，三者总大小基本不变，没有因为拆分而膨胀。**`www/index.html`里debts入口的产物文件名也从`main.js`变成了`debts.js`（因为文件名现在跟入口的key走，不再是硬编码的`"main.js"`）**，对应的`<script type="module">`标签要跟着改，这是这次改配置时容易漏掉、导致404的一个点。
 
 **`www/js/react-debts/`是构建产物，已加进`.gitignore`（跟`android/app/src/main/assets/public/`同一类"可重新生成的东西不进git"）**，`react/src/**`源码该进git。改了`react/`下的代码后，**必须先`npm run build:react`再`npx cap sync android`**——这是继"改了`www/index.html`要`npx cap sync android`"之后，这个项目第一次出现"先构建、再同步"两步走的场景，别漏了第一步。
 
@@ -56,7 +60,7 @@
 
 现状：vanilla主脚本是一个大IIFE，`debts`/`saveAll`/`renderAll`/`openDetail`/`payInstallment`/`commitReorder`等全部是IIFE内部私有的，不在`window`上（跟已经全局的`calc.js`函数、跟`window.__handleBackButton`这种刻意暴露的例外都不一样）。要让React调用这些，必须显式暴露。
 
-**`window.__azBridge`**（定义在主IIFE末尾，`})();`之前）是唯一的暴露点，只包含"在还债务"React页面实际需要调用的这几个：
+**`window.__azBridge`**（定义在主IIFE末尾，`})();`之前）是唯一的暴露点，只包含已迁移React页面实际需要调用的这几个，第三步新增了`getNotify`/`openNotifySheet`/`exportReportXlsx`/`exportReportPdf`这4个：
 ```js
 window.__azBridge = {
   getDebts: function () { return debts; },   // 每次调用现读，见下面"为什么是函数"
@@ -64,27 +68,35 @@ window.__azBridge = {
   getAccount: function () { return account; },
   openDetail: openDetail, openEdit: openEdit, payInstallment: payInstallment, unsettle: unsettle,
   commitReorder: commitReorder, saveAll: saveAll, renderAll: renderAll,
-  openPremiumScreen: openPremiumScreen, openAiScreen: openAiScreen, openAccountScreen: openAccountScreen
+  openPremiumScreen: openPremiumScreen, openAiScreen: openAiScreen, openAccountScreen: openAccountScreen,
+  getNotify: function () { return notify; },
+  openNotifySheet: openNotifySheet,
+  exportReportXlsx: exportReportXlsx,
+  exportReportPdf: exportReportPdf
 };
 ```
-其余（`saveForm`/公式生成器/`ask()`确认弹窗等）继续保持private，后续阶段再迁移到别的页面时才按需加进这个对象。**详情窗`#detailSheet`、新增/编辑表单`#editSheet`这次完全没有重新实现**——React只是调用`__azBridge.openDetail(i)`/`__azBridge.openEdit(i)`，这两个sheet的全部逻辑（含公式生成器、批量设置还款日等）继续100%由vanilla负责，这两个sheet同时被"还款日"tab复用，工作量本身也大到应该独立成后续阶段。
+其余（`saveForm`/公式生成器/`ask()`确认弹窗等）继续保持private，后续迁移"我的"tab时才按需加进这个对象。**详情窗`#detailSheet`、新增/编辑表单`#editSheet`、通知设置面板`#notifySheet`这三个sheet完全没有重新实现**——React只是调用`__azBridge.openDetail(i)`/`__azBridge.openEdit(i)`/`__azBridge.openNotifySheet()`，这几个sheet的全部逻辑（含公式生成器、批量设置还款日、通知规则增删等）继续100%由vanilla负责，`#detailSheet`/`#editSheet`同时被"还款日"tab复用，`#notifySheet`只有"还款日"tab的铃铛按钮会打开，工作量本身也大到应该独立成后续阶段（迁移"我的"tab时）再碰。
+
+**`exportReportXlsx`/`exportReportPdf`两个函数虽然桥接给了React调用，但函数本身继续100%vanilla、原封不动**——它们已经确认是零DOM依赖的纯函数（只读`debts`、拼Excel/PDF的Blob、调用`window.XLSX`/`window.jspdf`/`saveToDeviceDownloads()`），React这边`ExportActions.tsx`只是原样复刻了vanilla原来两个按钮click handler里的`hasPremium(premium)`门禁判断，然后调用桥接函数触发真正的导出，不是把导出逻辑本身搬进React。
 
 **为什么`getDebts`是函数不是直接暴露变量**：`debts`在`commitReorder`/`applyBackupData`/导入JSON三处会被**整体重新赋值**（`debts = next;`），不是原地mutate。如果React捕获了某一次的数组引用，重新赋值后这个引用就是旧的。用函数包一层，每次调用都读到当前最新的那个引用，避免这个陷阱。
 
-**`az:state-changed`事件**：替代原来`renderAll()`里对`renderSummary()`/`renderAIBanner()`/`renderDebts()`三个函数的调用（这三个函数连同其余纯"在还债务"渲染/手势代码整体删除）——
+**`az:state-changed`事件**：替代原来`renderAll()`里对各tab渲染函数的调用（`renderSummary`/`renderAIBanner`/`renderDebts`随第二步删除，`renderPay`/`renderReportScreen`随第三步删除）——`renderAll()`现在只剩：
 ```js
-function renderAll() { debts.forEach(recompute); window.dispatchEvent(new CustomEvent("az:state-changed")); renderPay(); renderReportScreen(); syncNotifications(); }
+function renderAll() { debts.forEach(recompute); window.dispatchEvent(new CustomEvent("az:state-changed")); syncNotifications(); }
 ```
-`renderAll()`之外还有几处单独修改`premium`/`account`的地方（兑换码成功回调`applyRedeemTier`、`__debugPremium()`、`renderAccountUI()`——登录/退出登录都会调到这个函数）也各自补了一行`window.dispatchEvent(new CustomEvent("az:state-changed"))`，让React（AI banner的premium门禁、头像的account）能感知到这类不经过`renderAll()`的状态变化。**这是vanilla↔React之间唯一的"数据变了"通知机制**——这个项目在此之前**完全没有**`CustomEvent`/`dispatchEvent`这套模式，是这次迁移引入的第一次。
+`renderAll()`之外还有几处单独修改`premium`/`account`的地方（兑换码成功回调`applyRedeemTier`、`__debugPremium()`、`renderAccountUI()`——登录/退出登录都会调到这个函数）也各自补了一行`window.dispatchEvent(new CustomEvent("az:state-changed"))`，让React（AI banner的premium门禁、头像的account）能感知到这类不经过`renderAll()`的状态变化。**第三步又补了一处**：`saveNotify()`原来完全没有dispatch这个事件（只是`localStorage.setItem`），导致"还款日"页铃铛图标的`.on`状态在`#notifySheet`里改完通知设置后不会响应式更新——这是真实的功能缺口，不是可选优化，已经补上。**这是vanilla↔React之间唯一的"数据变了"通知机制**——这个项目在此之前**完全没有**`CustomEvent`/`dispatchEvent`这套模式，是第二步迁移引入的第一次。
 
-**React端订阅方式：`useSyncExternalStore`**（`react/src/debts/useDebts.ts`）——React 18内置、专门为"订阅一个React外部的可变数据源"设计的官方API，不手写容易出错的订阅/取消订阅+强制重渲染逻辑：
+**React端订阅方式：`useSyncExternalStore`**（`react/src/shared/state.ts`——第三步从`react/src/debts/useDebts.ts`搬到了这个共享目录，因为"还款日"/"统计"两个新tab都要用，不再是"在还债务"专属）：
 ```ts
 function subscribe(cb) { window.addEventListener("az:state-changed", cb); return () => window.removeEventListener("az:state-changed", cb); }
 export function useDebts() { return useSyncExternalStore(subscribe, () => window.__azBridge.getDebts()); }
 ```
 `usePremium()`/`useAccount()`是同一个模式的另外两份，全部订阅同一个事件（不需要给"debts变了"/"premium变了"/"account变了"分别发明不同的事件名——统一收到通知后，各自的`getSnapshot`回调自己决定读什么）。
 
-**`az:tab-changed`事件**：vanilla的tabbar点击处理原来直接调`exitJiggle()`/`closeDebtSwipe(debtSwipeOpen)`来清理"在还债务"页的手势状态，这两个函数现在已经不在vanilla作用域了——改成每次点击tab都派发`window.dispatchEvent(new CustomEvent("az:tab-changed", {detail:{view}}))`，React的`DebtList.tsx`监听这个事件，`detail.view !== "debts"`时自己退出编辑模式/收起滑块。
+**⚠️`useNotify()`踩了`useSyncExternalStore`的一个不算冷门的坑，真实复现过"Maximum update depth exceeded"**：`notify`这个vanilla模块变量是**原地mutate**的（`saveNotify()`改的是`notify.enabled`/`notify.rules`这些字段本身，`notify`对象引用永远不变，不像`debts`那样在`commitReorder`等几处会整体重新赋值）。第一次实现`useNotify()`时，为了让"引用总是不同、好让React认为变了"，让`getSnapshot`每次都返回一个新的浅拷贝对象字面量`{...notify}`——这直接触发了React的另一个已知限制：`useSyncExternalStore`不只在订阅事件触发时调`getSnapshot`，每次渲染/commit后都会再调一次做"有没有撕裂"一致性检查，每次都拿到不同引用会被判定成"还在变"，陷入无限重渲染循环。**正确做法是按值(fingerprint)比较**：只有`enabled`/`rules`的实际内容真的变了才生成一个新的缓存对象返回，没变就返回上一次缓存的**同一个引用**——`react/src/shared/state.ts`的`useNotify()`用一个模块级`notifyCache`+`notifyFingerprint`字符串（`enabled + "|" + rules.map(r=>r.offsetDays+":"+r.time).join(",")`）实现这个比较。**以后如果要给别的"原地mutate、不整体重新赋值"的vanilla状态（`notify`不会是最后一个）接`useSyncExternalStore`，直接抄这个fingerprint比较模式，不要直接返回浅拷贝。**
+
+**`az:tab-changed`事件**：vanilla的tabbar点击处理原来直接调`exitJiggle()`/`closeDebtSwipe(debtSwipeOpen)`（第二步）、`closePaySwipe(paySwipeOpen)`（第三步）来清理各tab的手势状态，这几个函数现在都已经不在vanilla作用域了——改成每次点击tab都派发`window.dispatchEvent(new CustomEvent("az:tab-changed", {detail:{view}}))`，`DebtList.tsx`/`pay/App.tsx`各自监听这个事件，`detail.view`不是自己的tab时自己收起手势状态（"在还债务"退出编辑模式，"还款日"收起左滑的卡片）。"统计"tab没有任何手势状态，不需要监听这个事件。
 
 **反向桥接：`window.__azDebtsBack`**——硬件/手势返回键"最上层先关"优先级链（`window.__handleBackButton`）原来第一条判断就是`if (jiggleMode) { exitJiggle(); return true; }`，`jiggleMode`现在是React状态，vanilla看不到。React的`DebtList.tsx`挂载时把这个判断注册成`window.__azDebtsBack = function(){...}`，`__handleBackButton`第一条判断改成`if (window.__azDebtsBack && window.__azDebtsBack()) return true;`。**这是这个项目第一次出现"React反过来向vanilla暴露一个函数"的方向**（跟`__azBridge`的方向相反），命名上刻意跟`__azBridge`区分开，避免以后误以为它们是同一个对象的不同字段。
 
@@ -102,6 +114,8 @@ export function useDebts() { return useSyncExternalStore(subscribe, () => window
 
 长按拖拽排序（`beginDrag`/`applyDragFrame`/`autoScrollTick`/`finishDrag`）和左滑露出"销这期"，全部原样照抄进`react/src/debts/gestures.ts`（一堆跟vanilla逐行对照的普通函数，不是React hook），是这个app里真机反复踩坑才验证正确的代码（见"在还债务自定义排序"一节"必须用Touch Events不能用Pointer Events"那条教训）——移植原则是**逻辑原样照抄，不借机"用更React的方式重写"**：手势期间的视觉位移依然是通过`ref`拿到真实DOM节点直接`el.style.transform=...`，只有手势**结束提交**的那一刻才调用`ctx.onCommitReorder(newOrder)`（`DebtList.tsx`里实现，桥接回`window.__azBridge.commitReorder`）。
 
+**"还款日"页的左滑手势（`react/src/pay/gestures.ts`）是第三步独立照抄vanilla的`initPaySwipe`写出来的一份新代码，不是从`debts/gestures.ts`里拆出来的**——两者虽然都在做"左滑露出按钮"这件事，但`debts/gestures.ts`的触摸状态机把长按拖拽排序和左滑判断耦合在同一套`onCardTouchStart`/`onCardPointerDown`里（靠`dx`/`dy`哪个先超阈值+`jiggleModeRef`分支），试图从里面干净地拆出"纯滑动"这部分风险不小、且没有实际收益，而且历史上是vanilla的`initPaySwipe`先有、`debts`当年的左滑判断是照抄`initPaySwipe`定的模式（不是反过来，见"还款提醒页"一节）——所以这次port直接从vanilla的`initPaySwipe`往`react/src/pay/gestures.ts`搬，逻辑更简单（没有长按/`jiggleMode`分支），跟`debts/gestures.ts`是两份独立但同构的代码，`PayGestureCtx`（只有`openSwipeRowRef`一个字段）也比`GestureCtx`小得多。
+
 **⚠️ React的合成触摸事件（JSX的`onTouchMove`等）默认是passive的，合成事件里调`preventDefault()`不会真正阻止原生滚动**——这是React本身的一个众所周知的限制，正好是vanilla当年"长按拖拽必须用Touch Events + `{passive:false}`"那条教训在React下的对应体现。所以`react/src/debts/DebtCard.tsx`里**没有用任何JSX的`onTouchStart`/`onTouchMove`prop**，而是在`useEffect`里用`ref`拿到真实DOM节点，手动`addEventListener("touchstart", ..., {passive:true})`（`touchmove`则在手势内部动态`{passive:false}`挂载，逻辑跟vanilla一模一样）——这个`useEffect`只在挂载时跑一次（`[]`依赖），因为`gestures.ts`里的函数不依赖任何会随渲染变化的闭包变量（全部通过`ctx`里的ref/稳定的`window.__azBridge`调用），不会有闭包过期的风险。
 
 **`el.__o = {d, i}`这个"把数据直接挂在DOM节点上"的技巧原样保留**（`gestures.ts`的`CardEl`接口）——`finishDrag`提交时从DOM子节点顺序反查每张卡片对应哪个债务对象，这是vanilla原有的做法，React版本没有改用"查React state"之类的替代方案，因为这段代码本来就是直接操作真实DOM几何位置（`getBoundingClientRect`等），跟数据挂在DOM节点上是同一类"跳出React声明式模型"的必要操作，混用React state反而更容易出错。
@@ -112,19 +126,30 @@ export function useDebts() { return useSyncExternalStore(subscribe, () => window
 
 React组件挂载在同一份`index.html`文档里（不是iframe/独立页面），`.debt`/`.hero`/`.kpi`/`.ai-banner`等类名和它们依赖的`:root` CSS变量都定义在现有全局`<style>`块里，且这个`<style>`块没有删除（其余三个tab还要用）——**React组件的JSX直接写`className="debt-front"`等现有类名就拿到完全一致的样式，没有做任何CSS Module化/样式迁移工作**。唯一手工搬的是wordmark SVG路径数据（`react/src/debts/Header.tsx`，用`dangerouslySetInnerHTML`原样内嵌，这段SVG本身就是固定的、不含任何用户输入的静态标记，不是XSS风险）。
 
-### HTML结构变化：`#topHeader`/`#topSummary`/`#view-debts`三个容器折叠成一个挂载点
+### HTML结构变化：每个已迁移tab的旧容器折叠成一个挂载点
 
-原来`#topHeader`（wordmark+头像）和`#topSummary`（hero+KPI+AI banner+口径说明）是独立于`.view`机制之外的两个容器，靠tabbar点击时的`showTop`特例代码（`$("topHeader").style.display=...`）手动显隐；`#view-debts`才是真正的`.view.active`容器。这次迁移把前两者的特例显隐代码整个删除，`www/index.html`现在只有：
+原来`#topHeader`（wordmark+头像）和`#topSummary`（hero+KPI+AI banner+口径说明）是独立于`.view`机制之外的两个容器，靠tabbar点击时的`showTop`特例代码（`$("topHeader").style.display=...`）手动显隐；`#view-debts`才是真正的`.view.active`容器。第二步迁移把前两者的特例显隐代码整个删除，第三步"还款日"/"统计"两个tab延续同一手法——`www/index.html`现在是：
 ```html
 <section class="view active" id="view-debts"><div id="react-debts-root"></div></section>
+<section class="view" id="view-pay"><div id="react-pay-root"></div></section>
+<section class="view" id="view-report"><div id="react-report-root"></div></section>
 ```
-React的`App.tsx`在`#react-debts-root`内部渲染Header+Summary+DebtList全部内容，跟其它三个tab统一走普通的`.view.active`机制——这是本次迁移顺带完成的一处简化，不是必须的，但消除了一处特例代码。
+各自的`App.tsx`在自己的挂载点内部渲染全部内容，跟"我的"tab统一走普通的`.view.active`机制——这是迁移顺带完成的简化，不是必须的，但消除了特例代码。
+
+**⚠️ 折叠HTML结构时，`$("旧容器id").addEventListener(...)`这类挂在旧DOM节点上的vanilla事件监听器必须和HTML结构替换在同一次改动里一起删掉，不能分两步**——第三步真的踩到过这个坑：`#payHero`折进`#react-pay-root`挂载点后，如果漏删原来`$("payHero").addEventListener("click", ...)`这行（铃铛点击委托），`$("payHero")`会返回`null`，`.addEventListener`在主IIFE**顶层执行时同步抛异常**，导致整个vanilla脚本崩溃——不止"还款日"页出问题，IIFE末尾`renderFiles()`/`renderAll()`等其余初始化代码全部不会执行，是"改一行、崩全站"级别的错误，且不会有任何toast/报错提示只会体现为"App整个不工作"。**以后但凡要把某个vanilla容器折进React挂载点，第一步就该搜一遍这个容器id有没有被`$("xxx").addEventListener`直接引用过，跟删函数定义本身同等优先级，不能等"最后再检查一遍"。**
+
+### "统计"tab：纯`data → JSX`翻译，零手势，导出逻辑保持vanilla
+
+跟"在还债务"/"还款日"不同，"统计"tab完全没有手势代码，也没有任何tab内部状态（`payFilter`/`jiggleMode`这类）——`renderBalanceBars`/`renderTypeStack`/`renderPayoffLine`/`renderReportTables`这4个vanilla函数原本就是纯粹的"给定`data`（`computeReportData(debts)`的返回值）拼出HTML字符串"，翻译成`react/src/report/`下同名的`.tsx`组件（`BalanceBars.tsx`/`TypeStack.tsx`/`PayoffLine.tsx`/`ReportTables.tsx`）只是把字符串拼接换成JSX，数学/条件分支逻辑一行没改，是这三步迁移里风险最低、最接近"机械翻译"的一次。**JSX的文本插值天然转义，字符串拼接版本里手动调用的`esc()`在JSX版本里不需要了**（不是行为变化，是JSX本身的固有安全特性替代了手动转义这一步）。**导出按钮（`exportReportXlsx`/`exportReportPdf`）本身没有搬进React**——已确认这两个函数零DOM依赖（只读`debts`造Blob），继续100%vanilla，只是新增桥接给React的`ExportActions.tsx`调用，premium门禁判断原样复刻。
 
 ### 已完成的验证 & 还没做的验证
 
-**已验证（桌面Chromium + Playwright，一次性临时`npm install playwright`验证完就`npm uninstall`了，不是这个项目的常驻依赖）**：登录门跳过、hero/KPI数字、3档严重度色晕、点卡片开详情、左滑露出+点击"销这期"触发确认弹窗、长按500ms进入抖动编辑模式("保存"按钮出现)、退出编辑模式、排序下拉框切换、"+新增一笔"打开编辑表单、`__debugPremium()`切换AI banner发光态、点头像打开账户页、tab来回切换后债务列表内容不丢、切到"还款日"/"统计"tab确认它们读到的还是同一份`debts`数据（hero卡/加权利率/走势图数字都对得上）——全程浏览器console **零JS报错**，light/dark两种主题都截图核对过。
+**已验证（桌面Chromium + Playwright，一次性临时`npm install playwright`验证完就`npm uninstall`了，不是这个项目的常驻依赖）**：
+- 第二步（"在还债务"）：登录门跳过、hero/KPI数字、3档严重度色晕、点卡片开详情、左滑露出+点击"销这期"触发确认弹窗、长按500ms进入抖动编辑模式("保存"按钮出现)、退出编辑模式、排序下拉框切换、"+新增一笔"打开编辑表单、`__debugPremium()`切换AI banner发光态、点头像打开账户页、tab来回切换后债务列表内容不丢。
+- 第三步（"还款日"+"统计"）：还款日hero卡+空状态、按`dueBucket`分组的4档section-label及计数、渲染的卡片数、点铃铛打开`#notifySheet`、**切通知开关后铃铛`.on`状态响应式更新（验证了`saveNotify()`新增的`az:state-changed`派发确实生效）**、筛选按钮切换后列表变化、鼠标模拟左滑露出"标记已还"按钮、点该按钮触发确认弹窗、点卡片（非滑动状态）打开`#detailSheet`；统计tab的KPI/三张图/数据明细表渲染、`hasPremium()`门禁两个方向（未开通跳订阅页/已开通直接触发导出）；跨tab一致性（"在还债务"tab切换后仍正常读同一份`debts`数据）。
+- 全程浏览器console **零JS报错**，light/dark两种主题都截图核对过。
 
-**还没验证（老限制，这个项目一贯如此）**：**真机上的长按拖拽/左滑手势**——桌面Playwright用鼠标模拟的Pointer Events路径验证了"能触发swiping/dragging分支、不报错"，但真实手指触摸的手感、多点触控边界情况、安卓WebView的触摸事件时序，历史上这个项目的教训是"必须真机验证"（见"在还债务自定义排序"一节），这次移植代码逻辑上是逐行照抄，但没有免除真机验证这一步。下次编译release包装真机时，这是重点要过一遍的地方。
+**还没验证（老限制，这个项目一贯如此）**：**真机上"还款日"的左滑手势**——桌面Playwright用鼠标模拟的Pointer Events路径验证了"能触发swiping分支、不报错"，但真实手指触摸的手感、多点触控边界情况、安卓WebView的触摸事件时序，历史上这个项目的教训是"必须真机验证"（见"在还债务自定义排序"一节），这次移植代码逻辑上是逐行照抄，但没有免除真机验证这一步。**"统计"tab零手势，不需要真机验证**，桌面Playwright覆盖已经足够（跟第二步Summary/AiBanner这类纯视觉组件判定为无需真机是同一个理由）。下次编译release包装真机时，还款日的滑动手势是重点要过一遍的地方。
 
 ## 原生插件：`SaveFile`
 
@@ -314,6 +339,8 @@ npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
 **后来又删掉了`#count`（header下面那行"N笔在还 · M笔已清"）**：这行文字跟它正下方`.summary`网格里的"在还笔数"/"已结清"两张`.kpi`卡片说的是同一件事，是真实的信息冗余，删掉`#count`/`.asof`这个DOM节点，`renderSummary()`里也去掉了对应的`$("count").textContent=...`赋值。**同一时间点，"计算口径说明"（`#sumNote`，那三行"在还总负债=...；已还金额=...；经常性月供=..."的公式）改成了默认折叠**：这段文字之所以能收起，是因为三条公式现在都已经在各自的KPI卡片上有了轻量提示（hero卡"只算本金"角标对应第一条、"已还金额"卡的"另付利息¥Y"子行对应第二条、"经常性月供"卡新加的"不含一次性还清"子行对应第三条），公式说明本身降级成给较真用户看的补充细则，不需要默认占屏幕。折叠靠新增的`.note-toggle`（一个纯文字+chevron的小按钮，`#sumNoteToggle`）手动切换`display`，**没有用`<details>`/`<summary>`**——这个项目在"统计"页数据明细表那次已经明确弃用过原生`<details>`（见"统计"一节），这里延续同一个偏好，不要在类似场景里重新引入。
 ## 还款提醒页：hero卡片 + 左滑标记已还
 
+> **⚠️ 这一节记录的是这个页面视觉/交互设计的历史由来（为什么是4档急迫程度、为什么筛选和分组都叫"7天内/30天内"但语义不同、为什么手势要用Touch Events等），这些设计决定依然成立、依然是当前实现的依据。但"渲染方式"本身已经翻篇：这个页面（连同`#payHero`/`#payList`/`#payFilter`等vanilla DOM结构和`renderPayHero()`/`renderPay()`等函数）已经整体由React接管，见上面"React 迁移"一节"第三步"。CSS类名（`.pay-hero`/`.pay-row`等）全部原样复用，下面提到的具体函数名/DOM id仅作历史参照，不代表当前代码里还存在。**
+
 "还款日"标签页顶部有一张"最近还款日"卡片（`#payHero`，`renderPayHero()`），取所有在还债务里下一期还款日最近的那一笔，底色按急迫程度换色。下面`#payList`列表里每一条债务卡片支持向左滑动，滑出一个"标记已还"按钮（类似iOS/微信聊天列表左滑删除）。
 
 **急迫程度现在是4档阈值，卡片底色和列表圆点共用同一套`urgencyTier(diff)`**（`diff`=距还款日的天数）：`diff<0`=逾期(`overdue`)、≤3天=红(`crit`)、≤14天=黄(`warn`)、其余=绿(`dim`)。**逾期是后来单独从`crit`拆出来的一档**——早期逾期和"3天内到期"共享同一个`crit`视觉，都是淡色底；逾期这一档现在故意用`--critical`实心底+白字（比其它三档的淡色底更强烈），列表圆点也加了`dotPulse`脉冲动画（`box-shadow`用`--critical-soft`做呼吸圈），因为逾期没还的实际代价（利息/信用）比"还没到但快了"更高，需要更抢眼的提示，不能被当成同一档忽略掉。`relLabel(diff)`对应也从含糊的"已到期"改成"已逾期 N 天"。**`dim`档一开始用的是`--accent`（品牌绿），浅色模式下这个绿是`#18453B`深墨绿，9px小圆点尺寸下几乎看着像黑色**——已经改成`--good`（这个项目里"已结清"/"低利率"这些正面信号一直用的蓝色），清晰可辨。以后再调这类小尺寸状态色，先拿实际渲染尺寸眼看一遍，不要只看色值本身是不是"绿色"就假设够用。
@@ -431,6 +458,8 @@ window.__debugPremium("none")         // 清空，恢复"普通用户"
 - 债务卡片长按有蓝色底色一闪——`.debt`/`.debt-row`/`.debt-front`都是`<div>`不是`<button>`，接不到全局`button{-webkit-tap-highlight-color:transparent}`那条规则，安卓WebView默认的原生"点按高亮"（半透明蓝）在长按触发拖拽排序手势时会闪一下。三层都单独加了`-webkit-tap-highlight-color:transparent`。**这类"某个自定义可点击的`<div>`没有tap-highlight"的问题，以后遇到同样表现（长按/点击后有一闪而过的原生高亮色），先检查它是不是div/非button元素，没接`button{}`规则这个大概率就是根因，别先怀疑是自己写的CSS/JS有冲突。**
 
 ## 统计（原"高级统计报表"，已从"我的"页Premium子页升级成主tab）
+
+> **⚠️ 渲染层已经再翻篇一次：`#view-report`内部这次（React迁移第三步）已经整体由React接管（`react/src/report/`），下文提到的`renderReportScreen()`/`renderBalanceBars()`等vanilla函数、`#reportKpis`/`#reportCharts`等DOM id都已经是历史记录，不是当前代码。这一节记录的"tab化"这个架构决定（免费查看/付费导出边界、`renderAll()`管线触发渲染）依然成立，是理解"为什么现在这样设计"的背景，但具体实现细节以"React 迁移"一节的"统计"子节为准。**
 
 **这里的历史已经翻篇：早期是"我的"页里`hasPremium()`门禁的一张入口卡片、点开是整页浮层`#reportScreen`——现在是底部tabbar第3个主tab（`data-view="report"` → `#view-report`），不再是子页面，也不再有任何门禁。** 这次改动是"导航重排"那轮的一部分（详见下面"导航重排"一节），动机是图表查看本来就已经改成免费（见上面"订阅UI基础设施"一节的免费/付费边界），既然免费又是这个app除债务列表外最值得看的东西，直接提到主tab比藏在"我的"页一张卡片后面曝光率高得多。**导出PDF/Excel依然是Premium权益，没变**——门禁在`reportExportXlsxBtn`/`reportExportPdfBtn`各自的click handler上，未开通直接跳订阅页（不再需要先"关掉当前子页面"这一步，因为现在就在主tab上，没有子页面要关）。
 

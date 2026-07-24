@@ -3,7 +3,7 @@
 // 这条设计的核心断言，值得单独测，不能只靠组件测试间接覆盖。
 import { describe, expect, it } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { keyFor, useAccount, useDebts, usePremium } from "../src/debts/useDebts";
+import { keyFor, useAccount, useDebts, usePremium } from "../src/shared/state";
 import { makeMockBridge, makeDebt } from "./mockBridge";
 
 describe("useDebts / usePremium / useAccount", () => {

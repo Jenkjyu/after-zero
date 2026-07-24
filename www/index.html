@@ -718,27 +718,25 @@
   <!-- "在还债务"这个tab整体由React接管(React迁移绞杀者模式第一站)——原来独立于.view机制的
        #topHeader/#topSummary(靠tabbar点击时的showTop特例代码手动显隐)这次一并折进#view-debts
        内部，改用普通的.view.active机制统一处理，不再需要那段特例代码。React组件树见
-       react/src/debts/App.tsx，构建产物是下面script标签引入的js/react-debts/main.js，
-       两者的契约(window.__azBridge/az:state-changed等事件)见CLAUDE.md"React 迁移"一节。 -->
+       react/src/debts/App.tsx，构建产物是下面script标签引入的js/react-debts/debts.js
+       (Vite多入口构建，debts/pay/report三个tab各自一个入口，各自产出同名js文件，
+       共享一个自动拆分出来的react/react-dom chunk)，两者的契约(window.__azBridge/
+       az:state-changed等事件)见CLAUDE.md"React 迁移"一节。 -->
   <section class="view active" id="view-debts">
     <div id="react-debts-root"></div>
   </section>
 
+  <!-- "还款日"/"统计"这两个tab这次(React迁移第三步)一起交给React接管，原来的
+       #payHero/#payStats/#payFilter/#payList、#reportKpis/#report-actions/#reportCharts
+       全部折进各自一个挂载点，跟"在还债务"折#topHeader/#topSummary/#view-debts是同一手法。
+       React组件树见react/src/pay/App.tsx、react/src/report/App.tsx，构建产物是下面
+       script标签引入的js/react-debts/pay.js、report.js。 -->
   <section class="view" id="view-pay">
-    <div class="pay-hero" id="payHero"></div>
-    <div class="pay-stats" id="payStats"></div>
-    <div class="pay-filter" id="payFilter"></div>
-    <div id="payList"></div>
+    <div id="react-pay-root"></div>
   </section>
 
   <section class="view" id="view-report">
-    <div class="section-label"><span>统计</span></div>
-    <div class="summary" id="reportKpis" style="margin-bottom:18px"></div>
-    <div class="report-actions">
-      <button type="button" class="btn ghost" id="reportExportXlsxBtn">导出 Excel</button>
-      <button type="button" class="btn ghost" id="reportExportPdfBtn">导出 PDF</button>
-    </div>
-    <div class="viz-root" id="reportCharts"></div>
+    <div id="react-report-root"></div>
   </section>
 
   <section class="view" id="view-data">
@@ -1238,10 +1236,12 @@
 <script src="js/calc.js"></script>
 <!-- "在还债务"页的React实现(react/src/debts/，Vite库模式打包，见react/vite.config.ts)。
      type="module"脚本天然延迟到文档解析完、且晚于它之前所有阻塞性classic script执行完才运行，
-     所以不需要手动保证"main.js跑的时候window.__azBridge/calc.js全局函数都已就绪"这件事——
+     所以不需要手动保证"下面这几个React入口跑的时候window.__azBridge/calc.js全局函数都已就绪"这件事——
      calc.js和下面的主<script>(定义window.__azBridge)都是阻塞性classic script，必然先跑完。
      详见CLAUDE.md"React 迁移"一节。 -->
-<script type="module" src="js/react-debts/main.js"></script>
+<script type="module" src="js/react-debts/debts.js"></script>
+<script type="module" src="js/react-debts/pay.js"></script>
+<script type="module" src="js/react-debts/report.js"></script>
 <script>
 (function () {
   "use strict";
@@ -1301,7 +1301,7 @@
   var docs = loadJSON(DKEY, DOCS_SEED);
   var account = loadJSON(ACCOUNT_KEY, null);
   var notify = loadJSON(NOTIF_KEY, { enabled: false, rules: [] });
-  function saveNotify() { try { localStorage.setItem(NOTIF_KEY, JSON.stringify(notify)); } catch (e) {} }
+  function saveNotify() { try { localStorage.setItem(NOTIF_KEY, JSON.stringify(notify)); } catch (e) {} window.dispatchEvent(new CustomEvent("az:state-changed")); }
   // 新装必须是空数据：默认 premium 为 null，即"普通用户"。
   // 单一 Premium tier；兼容迁移：旧调试数据里若残留 premiumPlus 字段，搬进 premium。
   var premium = loadJSON(PREMIUM_KEY, { premium: null });
@@ -1401,208 +1401,24 @@
     for (var k = 0; k < debts.length; k++) next.push(isActive(debts[k]) ? queue.shift() : debts[k]);
     debts = next;
   }
-  // detectMatchingSort/urgencyTier/relLabel/dueBucket 已搬进 www/js/calc.js（纯计算函数）。
-  // detectMatchingSort 原来直接读闭包里的 DEBT_SORTS，搬出去后改成显式传参（见调用处），
-  // 这样它不依赖任何模块级状态，能被 node:test 直接单测。
-  var DUE_BUCKET_LABEL = { overdue: "已逾期", week: "7天内", month: "30天内", later: "更晚" };
+  // detectMatchingSort/urgencyTier/relLabel/dueBucket/offsetLabel 已搬进 www/js/calc.js
+  // （纯计算函数）。detectMatchingSort 原来直接读闭包里的 DEBT_SORTS，搬出去后改成显式
+  // 传参（见调用处），这样它不依赖任何模块级状态，能被 node:test 直接单测。
+  //
+  // "还款日"页(hero/筛选/分组列表/左滑手势)这次(React迁移第三步)整体搬进React
+  // (react/src/pay/)，原来这里的DUE_BUCKET_LABEL/bellHtml/renderPayHero/updateBellUI/
+  // PAY_REVEAL/paySwipeOpen/closePaySwipe/openPaySwipeTo/paySwipeSettle/initPaySwipe/
+  // payFilter/PAY_FILTERS/renderPayFilterBar/renderPay全部删除，逻辑原样搬到
+  // react/src/pay/gestures.ts、Hero.tsx、FilterBar.tsx、PayList.tsx、App.tsx。
+  // #notifySheet本身继续100%vanilla(跟#detailSheet/#editSheet同一类处理)，只是
+  // openNotifySheet/getNotify两个函数新加进了window.__azBridge给React调用。
 
-  // 通知铃铛：outline/filled两个svg叠放按状态类切换显示哪个，跟tabbar图标(.ic-outline/.ic-filled)
-  // 同一套手法。renderPayHero()每次整个重写#payHero的innerHTML(含空状态分支)，铃铛按钮本身
-  // 每次都是全新DOM节点，点击事件靠委托绑在#payHero这个父容器上(见initPaySwipe附近的绑定)，
-  // 不需要每次渲染重新bind。
-  function bellHtml() {
-    return '<button type="button" class="pay-hero-bell' + (notify.enabled ? ' on' : '') + '" id="notifyBellBtn" aria-label="还款提醒通知设置">' +
-      '<svg class="ic-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
-      '<svg class="ic-filled" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a6 6 0 0 0-6 6c0 7-3 9-3 9h18s-3-2-3-9a6 6 0 0 0-6-6z"/><path fill="currentColor" d="M9.5 21a2.5 2.5 0 0 0 5 0h-5z"/></svg>' +
-      '</button>';
-  }
-  function renderPayHero(o) {
-    var hero = $("payHero");
-    if (!o) {
-      hero.className = "pay-hero empty";
-      hero.innerHTML = '<div class="pay-hero-top"><div class="pay-hero-label">最近还款日</div>' + bellHtml() + '</div>' +
-        '<div class="pay-hero-empty"><div class="pay-hero-empty-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>' +
-        '<div class="pay-hero-empty-title">全部结清</div><div class="pay-hero-empty-sub">暂无待还款项</div></div>';
-      return;
-    }
-    hero.className = "pay-hero " + urgencyTier(o.diff);
-    hero.innerHTML =
-      '<div class="pay-hero-top"><div class="pay-hero-label">最近还款日</div>' + bellHtml() + '</div>' +
-      '<div class="pay-hero-row">' +
-        '<div class="pay-hero-date"><span class="pay-hero-daynum num">' + (o.next.getMonth() + 1) + '月' + o.next.getDate() + '日</span><span class="pay-hero-rel"></span></div>' +
-        '<div class="pay-hero-amt num">¥' + fmt(o.d.monthly) + '</div>' +
-      '</div>' +
-      '<div class="pay-hero-name"></div>';
-    hero.querySelector(".pay-hero-rel").textContent = relLabel(o.diff);
-    hero.querySelector(".pay-hero-name").textContent = o.d.name;
-  }
-  function updateBellUI() {
-    var b = document.getElementById("notifyBellBtn");
-    if (b) b.classList.toggle("on", notify.enabled);
-  }
-  $("payHero").addEventListener("click", function (e) {
-    if (e.target.closest("#notifyBellBtn")) openNotifySheet();
-  });
-
-  // 还款提醒卡片左滑：类似iOS/微信聊天列表左滑出删除按钮，这里滑出"标记已还"。
-  // 手势本身沿用"在还债务"长按拖拽那套已验证的教训——触摸设备必须用Touch Events
-  // + {passive:false}才能逐次动态否决原生滚动，Pointer Events做不到。但这里的场景
-  // 比拖拽排序简单：只需要接管水平轴，垂直滚动完全交给原生（不用像拖拽那样连垂直也
-  // 自己接管），所以额外用touch-action:pan-y提前告诉浏览器"水平不归你管"，减少和原生
-  // 手势(比如安卓边缘返回)抢的可能，JS里对水平方向再补一层preventDefault保险。
-  // .pay-row外层不动，.pay-swipe-row这个内层flex行才是真正被translateX的对象(.pay和
-  // .pay-swipe-btn是它的flex子项)——玻璃质感改版时从"transform打在.pay/绝对定位按钮"
-  // 换成的结构，理由见上面CSS注释区那条。
-  var PAY_REVEAL = 92, paySwipeOpen = null;
-  function closePaySwipe(row) {
-    if (!row) return;
-    row.style.transition = "transform .18s ease"; row.style.transform = "translateX(0)"; row.dataset.open = "0";
-    if (paySwipeOpen === row) paySwipeOpen = null;
-  }
-  function openPaySwipeTo(row) {
-    if (paySwipeOpen && paySwipeOpen !== row) closePaySwipe(paySwipeOpen);
-    row.style.transition = "transform .18s ease"; row.style.transform = "translateX(-" + PAY_REVEAL + "px)"; row.dataset.open = "1";
-    paySwipeOpen = row;
-  }
-  function paySwipeSettle(row, base, dx) {
-    var finalOffset = Math.min(0, Math.max(-PAY_REVEAL, base + dx));
-    if (finalOffset < -PAY_REVEAL / 2) openPaySwipeTo(row); else closePaySwipe(row);
-  }
-  // 点卡片=查看详情，左滑=露出"标记已还"；两者用swipeRow.__justDragged这个标记做互斥——
-  // "在还债务"卡片点击/左滑共存那套写法就是照抄这里定的模式，见CLAUDE.md。
-  function initPaySwipe(outer, swipeRow, front, idx) {
-    front.addEventListener("click", function () {
-      if (swipeRow.__justDragged) { swipeRow.__justDragged = false; return; }
-      if (swipeRow.dataset.open === "1") { closePaySwipe(swipeRow); return; }
-      if (paySwipeOpen && paySwipeOpen !== swipeRow) { closePaySwipe(paySwipeOpen); return; }
-      openDetail(idx);
-    });
-    outer.addEventListener("touchstart", function (e) {
-      if (e.touches.length !== 1) return;
-      // 每次新手势开始都先清掉上一次留下的标记——真正的拖拽(有位移)不会触发浏览器的
-      // click合成，所以__justDragged不会被"消费"掉，留着不清的话会误伤下一次正常点击。
-      swipeRow.__justDragged = false;
-      var t0 = e.touches[0], sx = t0.clientX, sy = t0.clientY, id = t0.identifier;
-      var base = swipeRow.dataset.open === "1" ? -PAY_REVEAL : 0, axis = null;
-      function tOf(ev) { for (var k = 0; k < ev.changedTouches.length; k++) if (ev.changedTouches[k].identifier === id) return ev.changedTouches[k]; return null; }
-      function onMove(ev) {
-        var t = tOf(ev); if (!t) return;
-        var dx = t.clientX - sx, dy = t.clientY - sy;
-        if (axis === null) {
-          if (Math.abs(dy) > 8 && Math.abs(dy) >= Math.abs(dx)) { axis = "y"; cleanup(); return; }
-          if (Math.abs(dx) > 8) axis = "x"; else return;
-        }
-        ev.preventDefault();
-        swipeRow.style.transition = "none";
-        swipeRow.style.transform = "translateX(" + Math.min(0, Math.max(-PAY_REVEAL, base + dx)) + "px)";
-      }
-      function onEnd(ev) { var t = tOf(ev); if (!t) return; if (axis === "x") { swipeRow.__justDragged = true; paySwipeSettle(swipeRow, base, t.clientX - sx); } cleanup(); }
-      function onCancel(ev) { if (!tOf(ev)) return; if (axis === "x") closePaySwipe(swipeRow); cleanup(); }
-      function cleanup() { outer.removeEventListener("touchmove", onMove); outer.removeEventListener("touchend", onEnd); outer.removeEventListener("touchcancel", onCancel); }
-      outer.addEventListener("touchmove", onMove, { passive: false });
-      outer.addEventListener("touchend", onEnd);
-      outer.addEventListener("touchcancel", onCancel);
-    }, { passive: true });
-    // 桌面鼠标：Pointer Events没有和原生滚动抢的问题，纯粹为了桌面浏览器也能测。
-    outer.addEventListener("pointerdown", function (e) {
-      if (e.pointerType !== "mouse") return;
-      swipeRow.__justDragged = false;
-      var sx = e.clientX, pid = e.pointerId, base = swipeRow.dataset.open === "1" ? -PAY_REVEAL : 0, moved = false;
-      function onMove(ev) {
-        if (ev.pointerId !== pid) return;
-        var dx = ev.clientX - sx; if (Math.abs(dx) > 4) moved = true;
-        swipeRow.style.transition = "none";
-        swipeRow.style.transform = "translateX(" + Math.min(0, Math.max(-PAY_REVEAL, base + dx)) + "px)";
-      }
-      function onUp(ev) { if (ev.pointerId !== pid) return; if (moved) { swipeRow.__justDragged = true; paySwipeSettle(swipeRow, base, ev.clientX - sx); } cleanup(); }
-      function cleanup() { outer.removeEventListener("pointermove", onMove); outer.removeEventListener("pointerup", onUp); outer.removeEventListener("pointercancel", onUp); }
-      outer.addEventListener("pointermove", onMove);
-      outer.addEventListener("pointerup", onUp);
-      outer.addEventListener("pointercancel", onUp);
-    });
-  }
-
-  // 筛选跟下面列表分组是两套不同的语义，都用"7天内"/"30天内"这两个词但不冲突：
-  // 分组(dueBucket)是给"全部"视图做互斥分段用的，每笔债务只属于一个组；筛选是"看更窄的
-  // 范围"，7天内/30天内筛选都是从今天起累计(0~7天/0~30天)，30天内天然包含7天内的那些——
-  // 这才是用户点"30天内"筛选时的直觉预期(看接下来30天要还的全部，不是只看第8~30天那一段)。
-  var payFilter = "all";
-  var PAY_FILTERS = [["all", "全部"], ["overdue", "已逾期"], ["week", "7天内"], ["month", "30天内"]];
-  function renderPayFilterBar() {
-    var wrap = $("payFilter"); wrap.innerHTML = "";
-    PAY_FILTERS.forEach(function (f) {
-      var b = document.createElement("button");
-      b.type = "button"; b.className = "pf-btn" + (payFilter === f[0] ? " active" : ""); b.textContent = f[1];
-      b.addEventListener("click", function () { if (payFilter !== f[0]) { payFilter = f[0]; renderPay(); } });
-      wrap.appendChild(b);
-    });
-  }
-  function renderPay() {
-    var t0 = today0();
-    paySwipeOpen = null;
-    var items = debts.map(function (d, i) { return { d: d, i: i }; }).filter(function (o) { return isActive(o.d) && o.d.nextDate; })
-      .map(function (o) { var n = parseDate(o.d.nextDate); return { d: o.d, i: o.i, next: n, diff: Math.round((n - t0) / 86400000) }; })
-      .sort(function (a, b) { return a.diff - b.diff; });
-    renderPayHero(items[0] || null);
-    renderPayFilterBar();
-
-    // 7天内/30天内待还小指标：累计口径(30天内包含7天内那些)，逾期不计入——它是"已经错过"
-    // 的一类，跟"即将要还"的"待还"语义不是一回事，逾期笔数在下面列表分组里单独强调。
-    var stats = $("payStats"); stats.innerHTML = "";
-    if (items.length) {
-      var weekN = 0, weekAmt = 0, monthN = 0, monthAmt = 0;
-      items.forEach(function (o) {
-        if (o.diff < 0 || o.diff > 30) return;
-        monthN++; monthAmt += +o.d.monthly || 0;
-        if (o.diff <= 7) { weekN++; weekAmt += +o.d.monthly || 0; }
-      });
-      stats.innerHTML =
-        '<div class="kpi"><div class="v num">¥' + fmt(weekAmt) + '</div><div class="k">7天内待还</div><div class="kpi-sub num">共 ' + weekN + ' 笔</div></div>' +
-        '<div class="kpi"><div class="v num">¥' + fmt(monthAmt) + '</div><div class="k">30天内待还</div><div class="kpi-sub num">共 ' + monthN + ' 笔</div></div>';
-    }
-
-    var list = $("payList"); list.innerHTML = "";
-    if (!items.length) return;
-    var visible = items.filter(function (o) {
-      if (payFilter === "overdue") return o.diff < 0;
-      if (payFilter === "week") return o.diff >= 0 && o.diff <= 7;
-      if (payFilter === "month") return o.diff >= 0 && o.diff <= 30;
-      return true;
-    });
-    if (!visible.length) { list.innerHTML = '<div class="footnote">该分类下暂无待还款项</div>'; return; }
-    var bucketCounts = {};
-    visible.forEach(function (o) { var b = dueBucket(o.diff); bucketCounts[b] = (bucketCounts[b] || 0) + 1; });
-    var lastBucket = null;
-    visible.forEach(function (o) {
-      var bucket = dueBucket(o.diff);
-      if (bucket !== lastBucket) {
-        var lab = document.createElement("div");
-        lab.className = "section-label" + (bucket === "overdue" ? " overdue" : "");
-        lab.textContent = DUE_BUCKET_LABEL[bucket] + " · " + bucketCounts[bucket] + " 笔";
-        list.appendChild(lab);
-        lastBucket = bucket;
-      }
-      var row = document.createElement("div"); row.className = "pay-row " + urgencyTier(o.diff);
-      row.innerHTML =
-        '<div class="pay-swipe-row">' +
-          '<div class="pay">' +
-            '<div class="d"><div class="day num">' + (o.next.getMonth() + 1) + '/' + o.next.getDate() + '</div><div class="rel">' + relLabel(o.diff) + '</div></div>' +
-            '<div class="w"></div><div class="a num">¥' + fmt(o.d.monthly) + '</div>' +
-          '</div>' +
-          '<button type="button" class="pay-swipe-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>标记已还</button>' +
-        '</div>';
-      var swipeRow = row.querySelector(".pay-swipe-row"), front = row.querySelector(".pay");
-      front.querySelector(".w").textContent = o.d.name;
-      row.querySelector(".pay-swipe-btn").addEventListener("click", function () { closePaySwipe(swipeRow); payInstallment(o.i); });
-      initPaySwipe(row, swipeRow, front, o.i);
-      list.appendChild(row);
-    });
-  }
-  // "在还债务"页(hero/KPI/AI banner/卡片列表)已经整体搬进React，原来这里对renderSummary()/
-  // renderAIBanner()/renderDebts()的调用换成派发一个通用事件——React那边(useDebts.ts的
-  // useSyncExternalStore)监听这个事件、重新读取window.__azBridge.getDebts()等状态、自己
-  // 重渲染。这是vanilla↔React之间唯一的"数据变了"通知机制，详见CLAUDE.md"React 迁移"一节。
-  function renderAll() { debts.forEach(recompute); window.dispatchEvent(new CustomEvent("az:state-changed")); renderPay(); renderReportScreen(); syncNotifications(); }
+  // "在还债务"/"还款日"/"统计"三个tab都已经整体搬进React，原来这里对各tab渲染函数
+  // (renderSummary/renderAIBanner/renderDebts/renderPay/renderReportScreen)的调用
+  // 全部换成派发一个通用事件——React那边(shared/state.ts的useSyncExternalStore)监听
+  // 这个事件、重新读取window.__azBridge.getDebts()等状态、自己重渲染。这是vanilla↔React
+  // 之间唯一的"数据变了"通知机制，详见CLAUDE.md"React 迁移"一节。
+  function renderAll() { debts.forEach(recompute); window.dispatchEvent(new CustomEvent("az:state-changed")); syncNotifications(); }
 
   // 通知调度：每次都是"全清再重排"——这个App里没有别的功能用本地通知，全量重算最简单可靠，
   // 不需要给每条通知发明持久稳定的ID去做增量diff。只排每笔在还债务"下一期"的提醒(不是整条
@@ -1943,7 +1759,10 @@
     // 开了通知但一条规则都没加就退出：兜底成"当天到期 09:00"，不能让用户开了开关却什么都收不到。
     if (notify.enabled && !notify.rules.length) { notify.rules.push({ offsetDays: 0, time: "09:00" }); saveNotify(); }
     $("scrimNotify").classList.remove("open"); $("notifySheet").classList.remove("open"); unlockScroll();
-    updateBellUI(); syncNotifications();
+    // 铃铛的.on状态现在由React(还款日页Hero.tsx)响应式读取notify.enabled驱动，
+    // 不再需要这里手动调用一个incremental的updateBellUI()——saveNotify()新增的
+    // az:state-changed派发(见上面"硬性铁律"附近)已经能让React那边自动跟上最新状态。
+    syncNotifications();
   }
   $("notifyToggle").addEventListener("change", function () {
     var cb = $("notifyToggle");
@@ -2320,64 +2139,13 @@
       + (simMode === "recurring" ? '从第 ' + atPeriod + ' 期起每期多还' : '第 ' + atPeriod + ' 期多还一次') + ' ¥' + fmt(extra) + ' 后，约 ' + r.newMonths + ' 个月还清。</div>';
   }
 
-  // ===== 高级统计报表（Premium）=====
-  // 三张图全部手写(条形图用div，堆叠条+折线用内联SVG)，配色见<style>里.viz-root那段注释。
-  // computeReportData 已搬进 www/js/calc.js（改成显式传参 computeReportData(debts)，
-  // 原来直接读闭包变量 debts，下面4处调用都已经加了这个参数）。truncateLabel 也搬进了那里。
-  function renderBalanceBars(data) {
-    if (!data.byName.length) return '<div class="viz-block"><div class="viz-title">各债务余额对比</div><div class="footnote" style="text-align:left">暂无在还债务</div></div>';
-    var max = Math.max.apply(null, data.byName.map(function (x) { return x.balance; })) || 1;
-    var rows = data.byName.map(function (x) {
-      var pct = Math.max(2, Math.round(x.balance / max * 100));
-      return '<div class="viz-bar-row"><div class="viz-bar-name">' + esc(truncateLabel(x.name, 10)) + '</div>'
-        + '<div class="viz-bar-track"><div class="viz-bar-fill" style="width:' + pct + '%"></div></div>'
-        + '<div class="viz-bar-val num">¥' + fmt(x.balance) + '</div></div>';
-    }).join("");
-    return '<div class="viz-block"><div class="viz-title">各债务余额对比</div>' + rows + '</div>';
-  }
-  function renderTypeStack(data) {
-    if (!data.typeList.length) return "";
-    var total = data.typeList.reduce(function (s, x) { return s + x.value; }, 0) || 1;
-    var segs = data.typeList.map(function (x, i) { return '<div class="viz-stack-seg" style="width:' + (x.value / total * 100).toFixed(2) + '%;background:var(--series-' + (i + 1) + ')"></div>'; }).join("");
-    var legend = data.typeList.map(function (x, i) {
-      return '<div class="viz-legend-item"><span class="viz-legend-swatch" style="background:var(--series-' + (i + 1) + ')"></span>' + esc(x.name) + ' ' + Math.round(x.value / total * 100) + '%</div>';
-    }).join("");
-    return '<div class="viz-block"><div class="viz-title">债务类型占比</div><div class="viz-stack">' + segs + '</div><div class="viz-legend">' + legend + '</div></div>';
-  }
-  function renderPayoffLine(data) {
-    var pts = data.timeline, n = pts.length;
-    if (n < 2 || data.totalBalance <= 0) return '<div class="viz-block"><div class="viz-title">负债预测走势</div><div class="footnote" style="text-align:left">暂无足够数据（没有在还债务或还款计划）</div></div>';
-    var W = 300, H = 110, padT = 10, padB = 18, maxBal = pts[0].balance || 1;
-    var coords = pts.map(function (p, i) { return [(i / (n - 1)) * W, padT + (1 - p.balance / maxBal) * (H - padT - padB)]; });
-    var line = coords.map(function (c, i) { return (i === 0 ? "M" : "L") + c[0].toFixed(1) + "," + c[1].toFixed(1); }).join(" ");
-    var area = line + " L" + coords[n - 1][0].toFixed(1) + "," + (H - padB) + " L0," + (H - padB) + " Z";
-    return '<div class="viz-block"><div class="viz-title">负债预测走势（按现有还款计划推算）</div>'
-      + '<svg class="viz-line-svg" viewBox="0 0 ' + W + ' ' + H + '">'
-      + '<path d="' + area + '" fill="var(--accent-soft)"></path>'
-      + '<path d="' + line + '" fill="none" stroke="var(--accent)" stroke-width="2"></path>'
-      + '<circle cx="' + coords[n - 1][0].toFixed(1) + '" cy="' + coords[n - 1][1].toFixed(1) + '" r="3" fill="var(--accent)"></circle>'
-      + '<text class="viz-line-label" x="4" y="' + (H - 4) + '">今天 ¥' + fmt(pts[0].balance) + '</text>'
-      + '<text class="viz-line-label" x="' + W + '" y="' + (H - 4) + '" text-anchor="end">' + pts[n - 1].date + ' 还清</text>'
-      + '</svg></div>';
-  }
-  function renderReportTables(data) {
-    var balRows = data.byName.map(function (x) { return '<tr><td>' + esc(x.name) + '</td><td class="num">¥' + fmt(x.balance) + '</td></tr>'; }).join("");
-    var typeRows = data.typeList.map(function (x) { return '<tr><td>' + esc(x.name) + '</td><td class="num">¥' + fmt(x.value) + '</td></tr>'; }).join("");
-    var lineRows = data.timeline.map(function (p) { return '<tr><td>' + p.date + '</td><td class="num">¥' + fmt(p.balance) + '</td></tr>'; }).join("");
-    // 数据明细表默认直接展开、不做折叠（用户要求）——不再用<details>/<summary>。
-    return '<div class="viz-block"><div class="viz-title">数据明细表</div>'
-      + '<div class="preview-label" style="margin:10px 2px 4px">各债务余额</div><table><tbody>' + balRows + '</tbody></table>'
-      + '<div class="preview-label" style="margin:14px 2px 4px">债务类型占比</div><table><tbody>' + typeRows + '</tbody></table>'
-      + '<div class="preview-label" style="margin:14px 2px 4px">负债预测走势</div><table><tbody>' + lineRows + '</tbody></table>'
-      + '</div>';
-  }
-  function renderReportScreen() {
-    var data = computeReportData(debts);
-    $("reportKpis").innerHTML =
-      '<div class="kpi half"><div class="v num">' + (data.avgRate ? data.avgRate.toFixed(2) : "0.00") + '%</div><div class="k">加权平均利率</div></div>'
-      + '<div class="kpi half"><div class="v num">' + (data.payoffDate || "—") + '</div><div class="k">预计全部还清日期</div></div>';
-    $("reportCharts").innerHTML = renderBalanceBars(data) + renderTypeStack(data) + renderPayoffLine(data) + renderReportTables(data);
-  }
+  // "统计"页(2个KPI+3张图+数据明细表)这次(React迁移第三步)整体搬进React(react/src/report/)，
+  // 原来这里的renderBalanceBars/renderTypeStack/renderPayoffLine/renderReportTables/
+  // renderReportScreen全部删除，逻辑原样搬到对应同名的.tsx文件，配色沿用同一套.viz-root
+  // CSS变量(--series-1..8)，不用改。computeReportData/esc/truncateLabel/fmt这几个calc.js
+  // 全局函数继续被别处使用(AI聊天渲染、备份列表错误提示等)，不受这次删除影响。
+  // 两个导出按钮(exportReportXlsx/exportReportPdf，零DOM依赖，见下方定义处)已加进
+  // window.__azBridge，premium门禁判断原样复刻进了React的ExportActions.tsx。
   // 档案库：从"我的"页打开的整页浮层，跟accountScreen/backupScreen同一套subpage模式。
   function openDocsScreen() { $("docsScreen").classList.add("open"); lockScroll(); }
   function closeDocsScreen() { if (!$("docsScreen").classList.contains("open")) return; $("docsScreen").classList.remove("open"); unlockScroll(); }
@@ -2849,17 +2617,16 @@
 
   document.querySelectorAll(".tabbar button").forEach(function (b) {
     b.addEventListener("click", function () {
-      if (paySwipeOpen) closePaySwipe(paySwipeOpen);
       document.querySelectorAll(".tabbar button").forEach(function (x) { x.setAttribute("aria-selected", "false"); });
       b.setAttribute("aria-selected", "true");
       b.classList.remove("bounce"); void b.offsetWidth; b.classList.add("bounce");
       document.querySelectorAll(".view").forEach(function (v) { v.classList.remove("active"); });
       var view = b.getAttribute("data-view");
       $("view-" + view).classList.add("active"); window.scrollTo(0, 0);
-      // "在还债务"这个tab现在整体是React接管的(见#view-debts里的#react-debts-root)，
-      // jiggleMode/debtSwipeOpen这些手势状态已经不在vanilla这边了——切走时改成派发一个
-      // 事件，让React那边(DebtList.tsx里的az:tab-changed监听)自己决定要不要收起长按拖拽/
-      // 左滑手势，隔着这层边界没法再直接调用exitJiggle()/closeDebtSwipe()。
+      // "在还债务"/"还款日"/"统计"三个tab现在都整体是React接管的(各自的#react-*-root)，
+      // jiggleMode/debtSwipeOpen/paySwipeOpen这些手势状态已经不在vanilla这边了——切走时
+      // 改成派发一个事件，让React那边(各自的az:tab-changed监听)自己决定要不要收起长按
+      // 拖拽/左滑手势，隔着这层边界没法再直接调用exitJiggle()/closeDebtSwipe()/closePaySwipe()。
       window.dispatchEvent(new CustomEvent("az:tab-changed", { detail: { view: view } }));
     });
   });
@@ -2889,9 +2656,9 @@
   $("simModeOnce").addEventListener("click", function () { setSimMode("once"); });
   $("simModeRecurring").addEventListener("click", function () { setSimMode("recurring"); });
   $("simRunBtn").addEventListener("click", runSimulate);
-  // "统计"现在是主tab（查看免费），导出 PDF/Excel 仍是 Premium 权益（查看免费、导出付费）
-  $("reportExportXlsxBtn").addEventListener("click", function () { if (!hasPremium(premium)) { openPremiumScreen(); return; } exportReportXlsx(); });
-  $("reportExportPdfBtn").addEventListener("click", function () { if (!hasPremium(premium)) { openPremiumScreen(); return; } exportReportPdf(); });
+  // 两个导出按钮的premium门禁+click逻辑已经原样搬进了React的ExportActions.tsx
+  // (通过window.__azBridge.exportReportXlsx/exportReportPdf调用)，这两个id对应的
+  // <button>也已经不在vanilla渲染的DOM里了，这里不再需要重复绑一份监听器。
   $("docsEntryBtn").addEventListener("click", openDocsScreen);
   $("docsBackBtn").addEventListener("click", closeDocsScreen);
   $("backupEntryBtn").addEventListener("click", function () { if (!hasPremium(premium)) { openPremiumScreen(); return; } openBackupScreen(); });
@@ -3073,7 +2840,11 @@
     renderAll: renderAll,
     openPremiumScreen: openPremiumScreen,
     openAiScreen: openAiScreen,
-    openAccountScreen: openAccountScreen
+    openAccountScreen: openAccountScreen,
+    getNotify: function () { return notify; },
+    openNotifySheet: openNotifySheet,
+    exportReportXlsx: exportReportXlsx,
+    exportReportPdf: exportReportPdf
   };
 
   renderFiles(); renderDocContent(); renderAll(); loadUploads(); renderAccountUI(); renderPremiumEntryCard();

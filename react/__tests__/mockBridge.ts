@@ -1,16 +1,18 @@
 // 测试用的window.__azBridge假实现——用vitest的vi.fn()包一层，方便断言"React调用了正确的
 // vanilla桥接函数"，不需要真的挂载一整个vanilla index.html环境。
 import { vi } from "vitest";
-import type { Account, AzBridge, Debt, Premium } from "../src/types";
+import type { Account, AzBridge, Debt, NotifySettings, Premium } from "../src/types";
 
 export function makeMockBridge(overrides?: {
   debts?: Debt[];
   premium?: Premium;
   account?: Account | null;
+  notify?: NotifySettings;
 }): AzBridge {
   const debts = overrides?.debts ?? [];
   const premium = overrides?.premium ?? { premium: null };
   const account = overrides?.account ?? null;
+  const notify = overrides?.notify ?? { enabled: false, rules: [] };
   return {
     getDebts: vi.fn(() => debts),
     getPremium: vi.fn(() => premium),
@@ -25,6 +27,10 @@ export function makeMockBridge(overrides?: {
     openPremiumScreen: vi.fn(),
     openAiScreen: vi.fn(),
     openAccountScreen: vi.fn(),
+    getNotify: vi.fn(() => notify),
+    openNotifySheet: vi.fn(),
+    exportReportXlsx: vi.fn(),
+    exportReportPdf: vi.fn(),
   };
 }
 
