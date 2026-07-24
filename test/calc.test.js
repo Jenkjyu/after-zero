@@ -241,6 +241,29 @@ test("computeReportData: 没有在还债务时返回空结构而不是抛异常"
   assert.equal(data.timeline.length, 1); // 只有"今天"这一个起点
 });
 
+test("summarizeDebts: 已结清债务只计入settled计数，不计入本金/月供聚合", () => {
+  const d1 = { settled: false, oneTime: false, balance: 1000, monthly: 200, paidPrincipal: 500, paidInterest: 50 };
+  const d2 = { settled: false, oneTime: true, balance: 2000, monthly: 2000, paidPrincipal: 0, paidInterest: 0 }; // 一次性还清不计入monthly
+  const d3 = { settled: true, oneTime: false, balance: 0, monthly: 0, paidPrincipal: 3000, paidInterest: 300 }; // 已结清，被排除在外
+  const s = calc.summarizeDebts([d1, d2, d3]);
+  assert.equal(s.active, 2);
+  assert.equal(s.settled, 1);
+  assert.equal(s.total, 3000); // 只算未结清的balance: 1000+2000
+  assert.equal(s.monthly, 200); // d2是oneTime不计入
+  assert.equal(s.paidPrincipal, 500); // 只算未结清的，d3的3000被排除
+  assert.equal(s.paidInterest, 50);
+});
+
+test("summarizeDebts: 完成度百分比 = 已还本金/(已还本金+在还总负债)，零本零负债兜底0%", () => {
+  const s1 = calc.summarizeDebts([{ settled: false, balance: 1000, paidPrincipal: 1000, monthly: 0, paidInterest: 0 }]);
+  assert.equal(s1.pct, 50); // 1000/(1000+1000)
+  const s2 = calc.summarizeDebts([]);
+  assert.equal(s2.pct, 0); // zeroBase为0时兜底，不做除0
+  assert.equal(s2.total, 0);
+  assert.equal(s2.active, 0);
+  assert.equal(s2.settled, 0);
+});
+
 test("isActive / rateClass: 简单谓词", () => {
   assert.equal(calc.isActive({ settled: false }), true);
   assert.equal(calc.isActive({ settled: true }), false);

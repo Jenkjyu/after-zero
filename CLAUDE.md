@@ -32,7 +32,99 @@
 
 **Node测试环境靠文件末尾的`module.exports`兼容，浏览器里这段代码不会执行**：`calc.js`末尾有一段`if (typeof module !== "undefined" && module.exports) { module.exports = {...} }`——`test/calc.test.js`用`node:test`（Node自带，不用额外装包，`package.json`的`"type":"commonjs"`决定了这里用`require`不是`import`）直接`require("../www/js/calc.js")`跑单元测试；浏览器加载这个文件时是普通`<script src>`，`typeof module`是`"undefined"`，这段代码整个跳过，不会往全局塞一个多余的`module`变量。**以后这批纯函数还要再增补的话**，加到`calc.js`时记得同步把新函数名加进这段`module.exports`，忘记加的话`require`拿到的对象里会缺这个函数，`test/calc.test.js`里`calc.xxx is not a function`会立刻暴露出来，不难查。
 
-跑测试：`npm test`（`package.json`的`"test"`脚本是`node --test`，Node自动发现`test/`目录下`*.test.js`文件，不需要额外配置测试框架）。**这批测试完全不需要真机/浏览器**——不像这个项目里大多数"必须真机验证"的功能（原生插件、云函数、WebView专属行为），纯计算函数是这个项目里少数能在CI/命令行里可靠验证、桌面和真机行为保证一致的部分，以后改这些函数、或者再往`calc.js`里加新函数，先把对应的`node:test`补上再改代码，比每次都指望真机走一遍划算得多。
+跑测试：`npm test`（`package.json`的`"test"`脚本是`node --test 'test/*.test.js'`，**注意这个glob是显式写死的，不是裸的`node --test`**——见下面"React 迁移"一节的坑：`react/__tests__/`目录下也有`*.test.ts`文件是给Vitest用的，Node自带的`node:test`默认会递归扫描整个项目找测试文件，连`react/__tests__/`里那些`.ts`/`.tsx`都会被当成自己的测试用例尝试去跑（失败），显式限定glob只看根目录`test/`下的`.js`文件，两套测试工具（`node --test`测`calc.js`，`vitest`测React组件）才能互不干扰）。**这批测试完全不需要真机/浏览器**——不像这个项目里大多数"必须真机验证"的功能（原生插件、云函数、WebView专属行为），纯计算函数是这个项目里少数能在CI/命令行里可靠验证、桌面和真机行为保证一致的部分，以后改这些函数、或者再往`calc.js`里加新函数，先把对应的`node:test`补上再改代码，比每次都指望真机走一遍划算得多。
+
+**`summarizeDebts(debts)`是2026-07-24"React 迁移第二步"落地"在还债务"页时新增的第40个函数**：从vanilla`renderSummary()`内联的聚合逻辑（`total`/`monthly`/`paidPrincipal`/`paidInterest`/`active`/`settled`/`pct`）抽出来的纯函数——vanilla那份`renderSummary()`本身已经在这次迁移里整个删除（改由React调用这个函数），抽出来纯粹是为了同一份聚合数学被React组件复用，不是"这次批量整理31个函数"那一轮的产物，详见下面"React 迁移"一节。
+
+## React 迁移：`react/` + "在还债务"页（绞杀者模式第一站）
+
+"六续"定的三步走方向（React迁移+测试优先）第二步：**"在还债务" tab（app最核心、交互最复杂的页面——长按拖拽排序、左滑手势、玻璃卡片）整体由React接管，其余三个tab（还款日/统计/我的）和所有subpage/sheet（详情窗、编辑窗、账户页等）继续是现有vanilla JS**，两边共享同一份`localStorage`数据。走的是绞杀者模式（逐页面替换），这是第一站——之所以先啃最难的页面，是因为它风险和调试成本最高，但也是用户使用最频繁、出问题影响最大的页面，先做完这个，后面的页面都不算难。
+
+### 目录结构：`react/`（源码）→ `www/js/react-debts/`（构建产物）
+
+新增顶层目录`react/`（跟`www/`/`android/`/`cloudbase/`/`resources/`平级），是这个项目第一次引入真正的JS构建工具（Vite）。`react/src/debts/`是"在还债务"页的React源码，`react/vite.config.ts`用Vite的**库模式**（`build.lib`，不是Vite默认的app模式——这次不是造一个独立SPA，是把一个React组件挂进现有`www/index.html`的某个节点，库模式产出一个可以直接`<script type="module">`引入的单文件bundle）构建成`www/js/react-debts/main.js`。
+
+**`www/js/react-debts/`是构建产物，已加进`.gitignore`（跟`android/app/src/main/assets/public/`同一类"可重新生成的东西不进git"）**，`react/src/**`源码该进git。改了`react/`下的代码后，**必须先`npm run build:react`再`npx cap sync android`**——这是继"改了`www/index.html`要`npx cap sync android`"之后，这个项目第一次出现"先构建、再同步"两步走的场景，别漏了第一步。
+
+`package.json`新增脚本：`build:react`（`vite build`）、`test:react`（`vitest run`）——**`npm test`（跑`calc.js`的`node:test`）语义完全没变**，两套测试工具彻底独立（见下面"两个坑"）。
+
+**⚠️ 库模式构建配置里`define: {"process.env.NODE_ENV": ...}`只能在`command === "build"`时生效，不能对`vitest`也生效**——这是真机（其实是本地）踩过的坑：`react/vite.config.ts`用`vitest/config`的`defineConfig`把build配置和test配置合并在一个文件里，一开始图省事把`process.env.NODE_ENV`写死成`"production"`放在顶层（是为了让`react`/`react-dom`被摇树摇掉开发版分支，构建产物从802KB砍到292KB），结果导致`npm run test:react`全灭，报`TypeError: React.act is not a function`——因为`vitest run`复用同一份config，也被这条`define`影响，把`react-dom`测试专用的`act()`等API一起摇没了。修法：`defineConfig(({command}) => ({..., define: command==="build" ? {...} : {}, ...}))`，只在真正跑`vite build`时生效。**以后这份配置文件里任何"只应该影响构建产物、不该影响测试环境"的设置，都要照这个模式用`command`判断，不要写在顶层。**
+
+**⚠️ `react/__tests__/`目录不能叫`react/test/`（哪怕只是想跟这个项目`test/`目录同名图方便）**——这也是真踩过的坑：`node --test`（`calc.js`的测试工具）默认会递归扫描整个项目找测试文件，Node这个版本的默认发现规则不只是"文件名匹配`*.test.js`"，连**目录名叫`test`**、以及**扩展名是`.ts`**（Node这个版本的`--test`已经原生支持轻量TS类型剥离，不需要额外loader）的文件都会被当成自己的用例尝试去跑——曾经真实复现过：目录改名成`react/__tests__/`后，`.tsx`文件不再被误抓，但**`.ts`文件（`gestures.test.ts`/`useDebts.test.ts`）依然被`node --test`抓到、报"test failed"**，因为触发条件是文件名匹配`*.test.ts`这条规则，跟目录名无关。最终修法是两层防御都要——目录改名`__tests__`（避免"目录名叫test"这条规则）+ `package.json`里`"test"`脚本显式写成`node --test 'test/*.test.js'`（把glob锁死在根目录`test/`下的`.js`文件，从根本上排除任何`.ts`/`.tsx`被误抓的可能）。**以后如果只改一处、不改另一处，这个坑会复发。**
+
+### vanilla ↔ React 桥接契约（整个迁移的核心）
+
+现状：vanilla主脚本是一个大IIFE，`debts`/`saveAll`/`renderAll`/`openDetail`/`payInstallment`/`commitReorder`等全部是IIFE内部私有的，不在`window`上（跟已经全局的`calc.js`函数、跟`window.__handleBackButton`这种刻意暴露的例外都不一样）。要让React调用这些，必须显式暴露。
+
+**`window.__azBridge`**（定义在主IIFE末尾，`})();`之前）是唯一的暴露点，只包含"在还债务"React页面实际需要调用的这几个：
+```js
+window.__azBridge = {
+  getDebts: function () { return debts; },   // 每次调用现读，见下面"为什么是函数"
+  getPremium: function () { return premium; },
+  getAccount: function () { return account; },
+  openDetail: openDetail, openEdit: openEdit, payInstallment: payInstallment, unsettle: unsettle,
+  commitReorder: commitReorder, saveAll: saveAll, renderAll: renderAll,
+  openPremiumScreen: openPremiumScreen, openAiScreen: openAiScreen, openAccountScreen: openAccountScreen
+};
+```
+其余（`saveForm`/公式生成器/`ask()`确认弹窗等）继续保持private，后续阶段再迁移到别的页面时才按需加进这个对象。**详情窗`#detailSheet`、新增/编辑表单`#editSheet`这次完全没有重新实现**——React只是调用`__azBridge.openDetail(i)`/`__azBridge.openEdit(i)`，这两个sheet的全部逻辑（含公式生成器、批量设置还款日等）继续100%由vanilla负责，这两个sheet同时被"还款日"tab复用，工作量本身也大到应该独立成后续阶段。
+
+**为什么`getDebts`是函数不是直接暴露变量**：`debts`在`commitReorder`/`applyBackupData`/导入JSON三处会被**整体重新赋值**（`debts = next;`），不是原地mutate。如果React捕获了某一次的数组引用，重新赋值后这个引用就是旧的。用函数包一层，每次调用都读到当前最新的那个引用，避免这个陷阱。
+
+**`az:state-changed`事件**：替代原来`renderAll()`里对`renderSummary()`/`renderAIBanner()`/`renderDebts()`三个函数的调用（这三个函数连同其余纯"在还债务"渲染/手势代码整体删除）——
+```js
+function renderAll() { debts.forEach(recompute); window.dispatchEvent(new CustomEvent("az:state-changed")); renderPay(); renderReportScreen(); syncNotifications(); }
+```
+`renderAll()`之外还有几处单独修改`premium`/`account`的地方（兑换码成功回调`applyRedeemTier`、`__debugPremium()`、`renderAccountUI()`——登录/退出登录都会调到这个函数）也各自补了一行`window.dispatchEvent(new CustomEvent("az:state-changed"))`，让React（AI banner的premium门禁、头像的account）能感知到这类不经过`renderAll()`的状态变化。**这是vanilla↔React之间唯一的"数据变了"通知机制**——这个项目在此之前**完全没有**`CustomEvent`/`dispatchEvent`这套模式，是这次迁移引入的第一次。
+
+**React端订阅方式：`useSyncExternalStore`**（`react/src/debts/useDebts.ts`）——React 18内置、专门为"订阅一个React外部的可变数据源"设计的官方API，不手写容易出错的订阅/取消订阅+强制重渲染逻辑：
+```ts
+function subscribe(cb) { window.addEventListener("az:state-changed", cb); return () => window.removeEventListener("az:state-changed", cb); }
+export function useDebts() { return useSyncExternalStore(subscribe, () => window.__azBridge.getDebts()); }
+```
+`usePremium()`/`useAccount()`是同一个模式的另外两份，全部订阅同一个事件（不需要给"debts变了"/"premium变了"/"account变了"分别发明不同的事件名——统一收到通知后，各自的`getSnapshot`回调自己决定读什么）。
+
+**`az:tab-changed`事件**：vanilla的tabbar点击处理原来直接调`exitJiggle()`/`closeDebtSwipe(debtSwipeOpen)`来清理"在还债务"页的手势状态，这两个函数现在已经不在vanilla作用域了——改成每次点击tab都派发`window.dispatchEvent(new CustomEvent("az:tab-changed", {detail:{view}}))`，React的`DebtList.tsx`监听这个事件，`detail.view !== "debts"`时自己退出编辑模式/收起滑块。
+
+**反向桥接：`window.__azDebtsBack`**——硬件/手势返回键"最上层先关"优先级链（`window.__handleBackButton`）原来第一条判断就是`if (jiggleMode) { exitJiggle(); return true; }`，`jiggleMode`现在是React状态，vanilla看不到。React的`DebtList.tsx`挂载时把这个判断注册成`window.__azDebtsBack = function(){...}`，`__handleBackButton`第一条判断改成`if (window.__azDebtsBack && window.__azDebtsBack()) return true;`。**这是这个项目第一次出现"React反过来向vanilla暴露一个函数"的方向**（跟`__azBridge`的方向相反），命名上刻意跟`__azBridge`区分开，避免以后误以为它们是同一个对象的不同字段。
+
+**为什么`calc.js`的全局函数在React里能直接用`window.recompute(d)`这样调用**：`calc.js`是不在任何IIFE里的顶层`function`声明（见上面"纯计算函数"一节），加载后自然挂到`window`上，跟React是不是ES module、有没有自己的作用域完全无关——`<script src="js/calc.js">`（classic script）保证在`<script type="module" src="js/react-debts/main.js">`运行之前就已经执行完（HTML规范：`type="module"`脚本天然延迟到文档解析完、且晚于它之前所有阻塞性classic script执行完才运行，不需要手动保证顺序）。`react/src/calcGlobals.d.ts`给这几个用到的全局函数（`recompute`/`summarizeDebts`/`hasPremium`/`premiumLabel`/`detectMatchingSort`/`isActive`/`rateClass`/`fmt`）补了环境类型声明，纯粹是给TypeScript用的，不影响运行时行为。**React代码里显式写`window.recompute(d)`而不是裸调用`recompute(d)`**（虽然裸调用也能工作，标识符解析会自动落到全局对象）——显式`window.`前缀更清楚地标出"这是跨越到vanilla全局作用域的调用"这条边界。
+
+### `debtSort`所有权整体移交React，不再经过vanilla
+
+排序方式（含"自定义"）这次**整体归`react/src/debts/useDebtSort.ts`所有**，直接读写`localStorage["debt-manager-sort-v1"]`（`SORT_KEY`这个键名依然不能改，硬性铁律第1条），不经过桥接。这样做是因为现有代码里没有其它tab读`debtSort`（还款日用`dueBucket`分组，统计不依赖它）——vanilla原来的`DEBT_SORTS`/`debtSort`/`setDebtSort`/`SORT_KEY`变量已随这次迁移整体删除，不留一份不再被使用的死代码。`DEBT_SORTS`（10个预设排序的取值函数映射）在React这边（`useDebtSort.ts`）原样重新声明了一份，跟vanilla原来那份逐字对照过。
+
+### 债务对象没有id——React列表key靠`WeakMap`懒生成
+
+这个项目的债务对象一直没有稳定id字段（纯靠数组下标寻址，见"在还债务自定义排序"一节），这对React的`key` prop是个问题——如果用数组下标当key，`commitReorder`重排后同一个下标可能对应"不同"的债务，容易导致状态/DOM节点复用错乱。`react/src/debts/useDebts.ts`的`keyFor(d)`用一个模块级`WeakMap<Debt, string>`给每个债务对象懒生成一个稳定key：**只要对象引用不变（`commitReorder`只是重排同一批对象的顺序，不克隆），key就稳定跨越拖拽重排**；`debts`被整体替换成新对象时（备份恢复、导入JSON），`WeakMap`查不到旧key会自然生成新key——这正是这种情况下应有的行为（恢复备份后本来就没有"这还是同一笔债务"的意义）。这个方案完全没有碰数据模型本身，不是给债务加了个真正的id字段（那是一个更大的架构决定，不在这次范围内）。
+
+### 手势代码：原样移植，不重新设计
+
+长按拖拽排序（`beginDrag`/`applyDragFrame`/`autoScrollTick`/`finishDrag`）和左滑露出"销这期"，全部原样照抄进`react/src/debts/gestures.ts`（一堆跟vanilla逐行对照的普通函数，不是React hook），是这个app里真机反复踩坑才验证正确的代码（见"在还债务自定义排序"一节"必须用Touch Events不能用Pointer Events"那条教训）——移植原则是**逻辑原样照抄，不借机"用更React的方式重写"**：手势期间的视觉位移依然是通过`ref`拿到真实DOM节点直接`el.style.transform=...`，只有手势**结束提交**的那一刻才调用`ctx.onCommitReorder(newOrder)`（`DebtList.tsx`里实现，桥接回`window.__azBridge.commitReorder`）。
+
+**⚠️ React的合成触摸事件（JSX的`onTouchMove`等）默认是passive的，合成事件里调`preventDefault()`不会真正阻止原生滚动**——这是React本身的一个众所周知的限制，正好是vanilla当年"长按拖拽必须用Touch Events + `{passive:false}`"那条教训在React下的对应体现。所以`react/src/debts/DebtCard.tsx`里**没有用任何JSX的`onTouchStart`/`onTouchMove`prop**，而是在`useEffect`里用`ref`拿到真实DOM节点，手动`addEventListener("touchstart", ..., {passive:true})`（`touchmove`则在手势内部动态`{passive:false}`挂载，逻辑跟vanilla一模一样）——这个`useEffect`只在挂载时跑一次（`[]`依赖），因为`gestures.ts`里的函数不依赖任何会随渲染变化的闭包变量（全部通过`ctx`里的ref/稳定的`window.__azBridge`调用），不会有闭包过期的风险。
+
+**`el.__o = {d, i}`这个"把数据直接挂在DOM节点上"的技巧原样保留**（`gestures.ts`的`CardEl`接口）——`finishDrag`提交时从DOM子节点顺序反查每张卡片对应哪个债务对象，这是vanilla原有的做法，React版本没有改用"查React state"之类的替代方案，因为这段代码本来就是直接操作真实DOM几何位置（`getBoundingClientRect`等），跟数据挂在DOM节点上是同一类"跳出React声明式模型"的必要操作，混用React state反而更容易出错。
+
+**`.jiggle`/`.dragging`/`.shifting`这几个CSS类的应用方式，React版本做了一处经过分析确认安全的简化**：`.jiggle`（是否处于抖动动画）现在由React的`className`声明式驱动（读`jiggleMode` prop），不像vanilla那样手动遍历`children`挨个`classList.add/remove`；`.dragging`/`.shifting`（拖拽过程中的瞬时视觉状态）依然由`gestures.ts`直接操作DOM（这两个class从不出现在任何组件的`className`计算里）。**这不会跟React的重渲染打架**：React只在某次渲染计算出的`className`字符串**真的变化**时才会写DOM的`class`属性；由于拖拽期间`jiggleMode`/严重度都不会变化（唯一能触发debts数据变化的操作都需要用户手指忙于拖拽，不可能同时发生），同一张卡片的`className`字符串在整个拖拽期间保持不变，React会跳过写入，不会覆盖掉`gestures.ts`加上去的`dragging`/`shifting`。
+
+### CSS：不需要迁移，直接复用
+
+React组件挂载在同一份`index.html`文档里（不是iframe/独立页面），`.debt`/`.hero`/`.kpi`/`.ai-banner`等类名和它们依赖的`:root` CSS变量都定义在现有全局`<style>`块里，且这个`<style>`块没有删除（其余三个tab还要用）——**React组件的JSX直接写`className="debt-front"`等现有类名就拿到完全一致的样式，没有做任何CSS Module化/样式迁移工作**。唯一手工搬的是wordmark SVG路径数据（`react/src/debts/Header.tsx`，用`dangerouslySetInnerHTML`原样内嵌，这段SVG本身就是固定的、不含任何用户输入的静态标记，不是XSS风险）。
+
+### HTML结构变化：`#topHeader`/`#topSummary`/`#view-debts`三个容器折叠成一个挂载点
+
+原来`#topHeader`（wordmark+头像）和`#topSummary`（hero+KPI+AI banner+口径说明）是独立于`.view`机制之外的两个容器，靠tabbar点击时的`showTop`特例代码（`$("topHeader").style.display=...`）手动显隐；`#view-debts`才是真正的`.view.active`容器。这次迁移把前两者的特例显隐代码整个删除，`www/index.html`现在只有：
+```html
+<section class="view active" id="view-debts"><div id="react-debts-root"></div></section>
+```
+React的`App.tsx`在`#react-debts-root`内部渲染Header+Summary+DebtList全部内容，跟其它三个tab统一走普通的`.view.active`机制——这是本次迁移顺带完成的一处简化，不是必须的，但消除了一处特例代码。
+
+### 已完成的验证 & 还没做的验证
+
+**已验证（桌面Chromium + Playwright，一次性临时`npm install playwright`验证完就`npm uninstall`了，不是这个项目的常驻依赖）**：登录门跳过、hero/KPI数字、3档严重度色晕、点卡片开详情、左滑露出+点击"销这期"触发确认弹窗、长按500ms进入抖动编辑模式("保存"按钮出现)、退出编辑模式、排序下拉框切换、"+新增一笔"打开编辑表单、`__debugPremium()`切换AI banner发光态、点头像打开账户页、tab来回切换后债务列表内容不丢、切到"还款日"/"统计"tab确认它们读到的还是同一份`debts`数据（hero卡/加权利率/走势图数字都对得上）——全程浏览器console **零JS报错**，light/dark两种主题都截图核对过。
+
+**还没验证（老限制，这个项目一贯如此）**：**真机上的长按拖拽/左滑手势**——桌面Playwright用鼠标模拟的Pointer Events路径验证了"能触发swiping/dragging分支、不报错"，但真实手指触摸的手感、多点触控边界情况、安卓WebView的触摸事件时序，历史上这个项目的教训是"必须真机验证"（见"在还债务自定义排序"一节），这次移植代码逻辑上是逐行照抄，但没有免除真机验证这一步。下次编译release包装真机时，这是重点要过一遍的地方。
 
 ## 原生插件：`SaveFile`
 

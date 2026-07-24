@@ -198,6 +198,20 @@ function mdToHtml(src) {
   }
   return out.join("\n");
 }
+// 在还债务主页hero/KPI的聚合数字：从 renderSummary() 内联的聚合逻辑抽出来的纯函数——
+// vanilla侧renderSummary()本身已经在React迁移里被删除，抽出来纯粹是为了给React组件复用，
+// 避免同一份"total/monthly/paidPrincipal/paidInterest累加"逻辑在两处各写一份、以后改一处忘了改另一处。
+function summarizeDebts(debts) {
+  var total = 0, monthly = 0, active = 0, settled = 0, paidPrincipal = 0, paidInterest = 0;
+  debts.forEach(function (d) {
+    if (d.settled) { settled++; return; }
+    active++; total += +d.balance || 0; if (!d.oneTime) monthly += +d.monthly || 0;
+    paidPrincipal += +d.paidPrincipal || 0; paidInterest += +d.paidInterest || 0;
+  });
+  var zeroBase = paidPrincipal + total, pct = zeroBase > 0 ? Math.round(paidPrincipal / zeroBase * 100) : 0;
+  return { total: r2(total), monthly: r2(monthly), active: active, settled: settled, paidPrincipal: r2(paidPrincipal), paidInterest: r2(paidInterest), pct: pct };
+}
+
 // 会员判断：原来直接读闭包变量 premium，改成显式传参（跟 detectMatchingSort/computeReportData
 // 参数化的道理一样）。premium 的形状是 {premium: {method, at} | null}，见 index.html 里 PREMIUM_KEY
 // 的注释——这里不重新解释那份数据模型，只是把判断逻辑本身搬出来。
@@ -225,7 +239,7 @@ if (typeof module !== "undefined" && module.exports) {
     recompute: recompute, markPaidThrough: markPaidThrough, normalize: normalize,
     amortForward: amortForward, simulatePrepay: simulatePrepay, detectMatchingSort: detectMatchingSort,
     urgencyTier: urgencyTier, relLabel: relLabel, dueBucket: dueBucket,
-    isBadRepeatDay: isBadRepeatDay, offsetLabel: offsetLabel, computeReportData: computeReportData,
+    isBadRepeatDay: isBadRepeatDay, offsetLabel: offsetLabel, computeReportData: computeReportData, summarizeDebts: summarizeDebts,
     esc: esc, inline: inline, isHr: isHr, mdToHtml: mdToHtml, escSvg: escSvg, truncateLabel: truncateLabel,
     hasPremium: hasPremium, premiumLabel: premiumLabel, findAiConv: findAiConv, bumpAiConvTop: bumpAiConvTop
   };
