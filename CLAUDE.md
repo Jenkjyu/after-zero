@@ -32,7 +32,7 @@
 
 ## 原生插件：`WeChatLogin`（账号登录基础设施）
 
-"我的"标签页里的"微信登录"入口，用的是这个自定义原生插件（`android/app/src/main/java/io/github/jenkjyu/afterzero/WeChatLoginPlugin.java` + `wxapi/WXEntryActivity.java`）。**登录现在是全局强制的，不再是可选的基础设施**——`www/index.html`里的`#loginGate`是一个不可关闭的全屏浮层，`account`（localStorage的`ACCOUNT_KEY`）为空时会盖住整个App（含底部tabbar），四个标签页（债务列表/待还提醒/档案库/我的）全部进不去，必须先微信登录成功才能看到任何内容。这是一次明确的架构决定（不是回归/bug）：原本能完全离线使用的四个标签页，现在都需要联网+装微信+登录成功才能用。
+"我的"标签页里的"微信登录"入口，用的是这个自定义原生插件（`android/app/src/main/java/io/github/jenkjyu/afterzero/WeChatLoginPlugin.java` + `wxapi/WXEntryActivity.java`）。**登录现在是全局强制的，不再是可选的基础设施**——`www/index.html`里的`#loginGate`是一个不可关闭的全屏浮层，`account`（localStorage的`ACCOUNT_KEY`）为空时会盖住整个App（含底部tabbar），四个标签页全部进不去，必须先微信登录成功才能看到任何内容（具体是哪四个tab见下面"导航重排"一节，早期是债务列表/待还提醒/档案库/我的，现在档案库已经从tabbar撤下）。这是一次明确的架构决定（不是回归/bug）：原本能完全离线使用的四个标签页，现在都需要联网+装微信+登录成功才能用。
 
 **登录门是"默认可见、fail-closed"设计，别改回"默认隐藏、靠JS显示"**：`.login-gate` 的 CSS 默认就是 `display:flex`（可见），只有确认已登录后才用 `.authed` 类把它 `display:none` 隐藏。这是踩过"一闪而过"坑之后刻意反过来的——早期是默认 `display:none`、靠 JS 判断未登录再显示，但那几个 CloudBase CDN `<script src>` 是阻塞解析的，首屏 JS 要等它们跑完才执行，这段空档里登录门还没显示、底下的 App 内容会闪出来一帧。现在反过来：默认永远盖着，哪怕 JS 完全没执行也不会露馅。两个地方负责加 `.authed`：`<body>` 顶部一段极早的内联脚本（在那几个 CDN script 之前、同步读一次 localStorage 就决定），以及主脚本里的 `renderAccountUI()`（冷启动、登录成功、退出登录、注销账户后都会调，`account`有值就加`.authed`隐藏、没有就去掉并加`.open`触发手写动画）。
 
@@ -165,7 +165,7 @@ npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
 
 **KPI区改成"一个石墨hero + 4个降权小指标"**：`renderSummary()`现在会分别写两个容器——`#heroCard`（固定的`.hero`外壳+JS每次重灌内部HTML，同`#summary`这种"外层壳子在HTML里、内容每次innerHTML替换"的既有模式）放"在还总负债"这一个数字，配一条"距归零 N%"进度条（`N = 已还本金/(已还本金+在还总负债)`，`zeroBase`为0时兜底显示0%不做除法）；`#summary`降级成2×2的`已还金额/经常性月供/在还笔数/已结清`小卡片网格。hero卡内有三团用`radial-gradient`+`blur`+`mix-blend-mode:screen`做的`.hero-puff`色雾，`heroDrift1/2/3`三条不同周期(8s/10s/12.5s)的`@keyframes`错开漂移，色调不变、纯做材质层次，`prefers-reduced-motion`会关掉。
 
-**AI banner改成"灵动胶囊"**：`.ai-banner`从方角卡片改成全圆角胶囊，`::before`一圈用`background-size:220% 100%`+位移动画做的极淡描边扫光，`::after`一层`radial-gradient`呼吸光晕，图标从原来的"星芒"改成"对话气泡+魔法棒"组合（气泡是`stroke`路径，魔法棒是`.wand`一个`<g>`：一条`stroke`手柄+一个4角闪光菱形+两个小圆点"魔法尘"，`filter:drop-shadow`常驻微光+`wandGlow`呼吸透明度）。**没开通Premium时**（`.ai-banner:not(.is-ai)`）扫光/呼吸/魔法棒发光全部关掉，图标降级成中性灰色纯静态——发光本身被设计成一种"已解锁"的身份感，不是无条件的装饰。**⚠️`.wand`目前只做了常驻呼吸光晕这一种状态**——"进入AI页面时摇两下再定住转成呼吸闪烁"这个入场动效（`wandCast`那套keyframe，设计稿已经在Artifact预览里做出来过）还没有落地的地方用，因为`#aiScreen`这个页面本身这一轮还没有重做（详见`PROGRESS.md`最新一条，那是设计已定但代码还没搬进来的部分）。
+**AI banner改成"灵动胶囊"**：`.ai-banner`从方角卡片改成全圆角胶囊，`::before`一圈用`background-size:220% 100%`+位移动画做的极淡描边扫光，`::after`一层`radial-gradient`呼吸光晕，图标从原来的"星芒"改成"对话气泡+魔法棒"组合（气泡是`stroke`路径，魔法棒是`.wand`一个`<g>`：一条`stroke`手柄+一个4角闪光菱形+两个小圆点"魔法尘"，`filter:drop-shadow`常驻微光+`wandGlow`呼吸透明度）。**没开通Premium时**（`.ai-banner:not(.is-ai)`）扫光/呼吸/魔法棒发光全部关掉，图标降级成中性灰色纯静态——发光本身被设计成一种"已解锁"的身份感，不是无条件的装饰。`.wand`的入场动效（"进入AI页面时摇两下再定住转成呼吸闪烁"，`.wand.cast`+`@keyframes wandCast`）已经在`#aiScreen`聊天式改版里接上，详见下面"AI 债务顾问"一节——这里的`.wand`只是静态图标，跟`#aiWelcomeWand`共用同一份CSS规则（同一个class名），两处图标路径数据也保持一致，改了一处要记得另一处同步。
 
 **债务卡改成磨砂玻璃 + 左滑露出"销这期"，去掉原来"查看详情/销这期"两个并排按钮**：
 
@@ -247,7 +247,7 @@ window.__debugPremium("none")         // 清空，恢复"普通用户"
 
 **"更大档案库空间"这条Premium功能文案已删除**：档案库文件存在设备本地，开发者没有服务器成本要摊销，人为设一个容量上限纯粹是为了逼氪制造障碍，经不起"这明明不花你一分钱为什么要限制我"的质疑，跟"云备份"（有真实服务器成本）、"OCR识别"/"智能问答"（有真实算力成本）这几条不是一回事。以后再给Premium/Premium+列功能点，先想清楚这条是不是有真实成本支撑，不要照抄"更大空间/无限XX"这类通用套路。
 
-**`__handleBackButton`那条"最上层先关"判断链，当前完整顺序是** `modalScrim` → `termsScreen` → `aiScreen` → `backupScreen` → `reportScreen` → `simScreen` → `premiumScreen` → `accountScreen` → `notifySheet` → `editSheet` → `detailSheet`（`aiScreen`=AI 债务顾问整页浮层，DOM 里插在 `backupScreen` 之后、`termsScreen` 之前，所以判断排在 `backupScreen` 之前、`termsScreen` 之后）。判断依据不变——这几个新增的`.subpage`在HTML里都插在`premiumScreen`之后（`simScreen`最先、`reportScreen`次之、`backupScreen`、`termsScreen`最后），DOM顺序更靠后的在同z-index下画在上层，返回键要先判视觉上在最上层的那个。以后再加新的`.subpage`，永远加在它在DOM里紧邻的"后一个已有subpage"判断之前，不要图省事加到链尾。（`termsScreen`=购买者服务条款页，是订阅页里"《购买者服务条款》"链接点开的整页浮层，DOM里插在`backupScreen`之后，所以判断排在`backupScreen`之前、`modalScrim`之后。）
+**`__handleBackButton`那条"最上层先关"判断链，当前完整顺序是** `modalScrim` → `termsScreen` → `aiHistorySheet` → `aiScreen` → `backupScreen` → `docsScreen` → `simScreen` → `premiumScreen` → `accountScreen` → `notifySheet` → `editSheet` → `detailSheet`（`aiScreen`=AI 债务顾问整页浮层，DOM 里插在 `backupScreen` 之后、`termsScreen` 之前，所以判断排在 `backupScreen` 之前、`termsScreen` 之后；`aiHistorySheet`=从`aiScreen`内部打开的历史对话sheet，必须排在`aiScreen`判断**之前**，因为它视觉上盖在`aiScreen`上层——这是"最上层先关"规则第一次出现在"sheet挂在subpage内部"这种场景，不是简单按DOM先后顺序套用，而是按实际视觉层级：`aiHistorySheet`的z-index被手动提到36、比`aiScreen`所在的35更高，见上面"AI 债务顾问"一节）。**`docsScreen`（档案库，见下面"导航重排"一节）是"高级统计报表"升级成主tab之后腾出来的subpage槽位——原来这个DOM位置是`reportScreen`，`reportScreen`已经不再是subpage，`docsScreen`原样占了它的位置和链上的判断顺序，没有引入新的DOM排序问题。** 判断依据不变——这几个`.subpage`在HTML里都插在`premiumScreen`之后（`simScreen`最先、`docsScreen`次之、`backupScreen`、`termsScreen`最后），DOM顺序更靠后的在同z-index下画在上层，返回键要先判视觉上在最上层的那个。以后再加新的`.subpage`，永远加在它在DOM里紧邻的"后一个已有subpage"判断之前，不要图省事加到链尾。（`termsScreen`=购买者服务条款页，是订阅页里"《购买者服务条款》"链接点开的整页浮层，DOM里插在`backupScreen`之后，所以判断排在`backupScreen`之前、`modalScrim`之后。）
 
 ## 提前还款收益模拟器（Premium）
 
@@ -259,9 +259,27 @@ window.__debugPremium("none")         // 清空，恢复"普通用户"
 
 **只持久化`{mode, extra}`（上次用的模式+金额），不记是哪笔债务/哪一期**：新增localStorage键`after-zero-simulate-v1`（`SIM_KEY`）。这个项目的债务没有稳定id（纯靠数组下标寻址，见"在还债务自定义排序"一节），记"哪笔债务"这类信息在债务被删除/拖拽重排后就会失效或指错对象，只记用户的数值习惯（模式+金额）更稳妥。
 
-## 高级统计报表（Premium）
+## 导航重排：tabbar从"债务/还款日/档案库/我的"改成"债务/还款日/统计/我的"
 
-"我的"页新增"高级统计报表"入口卡片（`hasPremium()`门禁），打开整页浮层`#reportScreen`：2个KPI（加权平均利率、预计全部还清日期）+ 3张图（各债务余额对比的横向条形图、债务类型占比的堆叠条形图+图例、负债预测走势折线图）+ 一个`<details>`折叠的原始数据表，支持导出真正的`.xlsx`和`.pdf`文件。
+**这轮只做了大方向的结构调整，细节（比如统计tab要不要重新设计视觉、档案库子页面要不要单独打磨）明确留到下一轮**，别把这轮的实现当成"已经定稿的最终视觉"去精修。
+
+**改动内容**：底部tabbar第3个位置从"档案库"换成新的"统计"（`data-view="report"`，把原来"我的"页里Premium门禁的"高级统计报表"整页浮层内容直接搬过来，详见下面"统计"一节）；"档案库"从tabbar撤下，改成"我的"页里的一张入口卡片（`#docsEntryBtn`），点开是新的整页浮层`#docsScreen`——内容（上传/文件列表/预览）跟以前一模一样，只是从"tab切换显隐的`.view`"换成了"点入口卡片推入的`.subpage`"，`renderFiles()`/`renderDocContent()`等函数完全没动，纯粹是外层容器换了一层。
+
+**`.view`↔`.subpage`互换是这次改动的核心手法，值得记住**：这个项目原来有两套完全独立的"内容容器"机制——`.view`（4个tab之一，靠`data-view`属性 + JS给`.view.active`加/去class切换显隐，横向切换、没有返回箭头）和`.subpage`（从某处点进去、推入一个整页浮层，靠`.open`class控制、右上角没有但左上角有返回箭头、要接进`__handleBackButton`链）。**升级成主tab（报表：subpage→view）和降级成子页面（档案库：view→subpage）本质上是同一种操作反过来做**：只需要换外层容器的标签/class，内部子元素的id和JS逻辑完全不用动——`renderReportScreen()`不管自己挂在`#reportScreen`(subpage)还是`#view-report`(tab)下面，只要`#reportKpis`/`#reportCharts`这两个id还在，代码原封不动能跑。以后如果要"把某个入口从tab降级/从子页面升级"，直接照这个模式做：搬内容、换外层容器类型、接/摘`__handleBackButton`链、调整事件监听器（tab不需要back按钮监听器，subpage需要）。
+
+**统计tab因为是"常驻可见"而不是"点开才存在"，触发渲染的时机必须从"点击入口时渲染一次"改成"数据变化时渲染"**：原来`openReportScreen()`点开时才调`renderReportScreen()`；现在挂进了`renderAll()`管线（`debts`数据一变就跟着重渲染），不然会出现"改了债务、切到统计tab却看到旧数据"这种问题。**这是"tab"和"subpage"两种容器在渲染时机上的本质区别，以后但凡把什么东西从subpage升级成tab，都要检查它原来是不是"打开时才渲染"，是的话必须挪进某个数据变化就会跑的公共渲染管线。**
+
+**导出按钮的premium门禁逻辑也要跟着简化**：原来`reportExportXlsxBtn`点击时未开通会先`closeReportScreen()`再`openPremiumScreen()`（因为要先关掉自己这层subpage，不然订阅页会叠在报表页上面）；现在统计tab不是subpage、没有"关掉"这个概念，未开通直接`openPremiumScreen()`，订阅页作为新的subpage会正常叠在tab之上，返回时自动回到统计tab（tab本身不需要被关闭，也关不掉）。
+
+**顺手一起修的两个真机反馈bug（跟导航重排本身无关，但是同一轮改的）**：
+- 排序方式下拉框（`.sort-sel`/`#debtSortSel`）长按会选中文字+弹出`:focus-visible`的绿色描边——`user-select:none`对`<select>`这类原生表单控件在安卓WebView里不完全可靠（浏览器把它当"原生chrome"处理），必须显式在`select`自己身上再设一遍`-webkit-user-select:none`/`-webkit-touch-callout:none`才压得住；绿色描边是全局`:focus-visible`规则被WebView判定"这个控件需要可见焦点"触发的，这个控件是纯点按操作、不存在键盘导航场景，单独给它加`:focus-visible{outline:none}`关掉，不动全局规则（全局规则还要留给真正靠键盘/外接设备导航的场景用）。
+- 债务卡片长按有蓝色底色一闪——`.debt`/`.debt-row`/`.debt-front`都是`<div>`不是`<button>`，接不到全局`button{-webkit-tap-highlight-color:transparent}`那条规则，安卓WebView默认的原生"点按高亮"（半透明蓝）在长按触发拖拽排序手势时会闪一下。三层都单独加了`-webkit-tap-highlight-color:transparent`。**这类"某个自定义可点击的`<div>`没有tap-highlight"的问题，以后遇到同样表现（长按/点击后有一闪而过的原生高亮色），先检查它是不是div/非button元素，没接`button{}`规则这个大概率就是根因，别先怀疑是自己写的CSS/JS有冲突。**
+
+## 统计（原"高级统计报表"，已从"我的"页Premium子页升级成主tab）
+
+**这里的历史已经翻篇：早期是"我的"页里`hasPremium()`门禁的一张入口卡片、点开是整页浮层`#reportScreen`——现在是底部tabbar第3个主tab（`data-view="report"` → `#view-report`），不再是子页面，也不再有任何门禁。** 这次改动是"导航重排"那轮的一部分（详见下面"导航重排"一节），动机是图表查看本来就已经改成免费（见上面"订阅UI基础设施"一节的免费/付费边界），既然免费又是这个app除债务列表外最值得看的东西，直接提到主tab比藏在"我的"页一张卡片后面曝光率高得多。**导出PDF/Excel依然是Premium权益，没变**——门禁在`reportExportXlsxBtn`/`reportExportPdfBtn`各自的click handler上，未开通直接跳订阅页（不再需要先"关掉当前子页面"这一步，因为现在就在主tab上，没有子页面要关）。
+
+内容本身没变：2个KPI（加权平均利率、预计全部还清日期）+ 3张图（各债务余额对比的横向条形图、债务类型占比的堆叠条形图+图例、负债预测走势折线图）+ 数据明细表（默认直接展开，不折叠），支持导出真正的`.xlsx`和`.pdf`文件。**`renderReportScreen()`函数名字没跟着改**（还叫"Screen"不叫"View"，是历史遗留，不影响功能，以后大改这块时可以顺手改名）——现在挂在`renderAll()`管线里跟`renderSummary()`/`renderDebts()`等一起调用，债务数据一变，统计tab的内容自动跟着刷新，不需要"进入tab时才渲染"这种额外逻辑（因为它不再是"打开"的东西，是常驻的tab）。
 
 **这是这个项目第一批图表，配色套用了`dataviz` skill的默认8色类别色板**（`.viz-root`里的`--series-1`..`--series-8`，明暗双模式都定义了），**已经用skill自带的`validate_palette.js`对着本项目实际的浅色`#FFFFFF`/深色`#191D24`底色重新验证过**（全部PASS，只有浅色模式下3个色阶低于3:1对比度触发"relief rule"——用可见的图例文字+数据表满足，不单靠颜色）——不是直接照抄skill文档里参考色`#fcfcfb`/`#1a1a19`的验证结果，那个底色跟这个项目不是一回事，swap配色后必须重新跑一遍验证脚本，这条以后加新图表也适用。三张图全部手写（条形图用普通div+百分比宽度，堆叠条+折线图用内联SVG），没有引入任何图表库。
 
@@ -333,7 +351,11 @@ window.__debugPremium("none")         // 清空，恢复"普通用户"
 
 ## AI 债务顾问（Premium）
 
-"在还债务"页顶部的 AI banner（`#aiBannerBtn`）现在是这个功能的入口（`hasPremium()` 门禁，未开通跳订阅页）。点开进整页浮层 `#aiScreen`：顶部"生成分析报告"按钮出一份一次性的雪球/雪崩法分析，下方是可多轮追问的问答框。**只做了"报告 + 智能问答"两件事，没做 OCR**（当初 Premium+ 列的三条 AI 功能之一，明确推迟）。
+"在还债务"页顶部的 AI banner（`#aiBannerBtn`）现在是这个功能的入口（`hasPremium()` 门禁，未开通跳订阅页）。点开进整页浮层 `#aiScreen`——**这是聊天式界面，不是"大按钮生成报告+底部迷你问答框"那种三段拼接**（那是第一版的做法，已经推翻重做）。**只做了"报告 + 智能问答"两件事，没做 OCR**（当初 Premium+ 列的三条 AI 功能之一，明确推迟）。
+
+**空状态是欢迎语+3个快捷芯片，不是常驻的"生成分析报告"按钮**：打开页面（或点"新对话"）看到的是欢迎语（"有什么想聊的？"）+ 魔法棒图标 + 3个芯片（`#aiChipReport`"生成分析报告"、另两个是常见问题"我该先还哪一笔？"/"怎样最快还清所有债务？"，`data-q`属性存问题原文）。点任意一个都走同一条统一消息流（`aiComposeAndSend(displayQ, isReportMode)`），报告和问答不再是两套UI、两套渲染逻辑——报告只是"isReportMode=true"时调云函数用`mode:"report"`（`question`传空串，服务端会忽略它），但气泡里仍然显示"生成分析报告"这句话，视觉上跟用户真提了这个问题一致。
+
+**魔法棒入场动效已经接上**：打开这个页面或点"新对话"回到欢迎态时，`#aiWelcomeWand`（跟主页AI banner同一份图标标记，见"在还债务主页视觉改版"一节）会临时加`.cast`类摇两下再定住，动画结束后`.cast`类被JS移除，`.wand`基础规则本来就一直在播的`wandGlow`呼吸光晕自动接续——这是当年在别处Artifact预览定过稿、但因为AI页面这轮才真正重做所以一直没接上的效果（`castAiWand()`函数，`prefers-reduced-motion`时直接跳过整个流程，不加`.cast`类，否则`animation:none`会让`animationend`永远不触发、`.cast`类卡住摘不掉）。
 
 **走"云函数调大模型"的正道，不是一木记账那种"导出 txt 让用户自己粘 AI"的假 AI**（这个反面教材是这次重构的直接动机）：`www/index.html` 里 `buildAiSummary()` 用 `computeReportData()` + 遍历 `debts` 拼出一份紧凑的结构化 JSON（条目少、token 便宜），`callAiAdvisor(mode, question)` 走 `ensureCbAuthReady().then(cbApp().callFunction({name:"aiAdvisor",...}))`。
 
@@ -343,7 +365,13 @@ window.__debugPremium("none")         // 清空，恢复"普通用户"
 
 **成本兜底：客户端每日用量软上限**。新增 localStorage 键 `AI_USAGE_KEY`（`after-zero-ai-usage-v1`）存 `{date, count}`，`AI_DAILY_LIMIT`（默认 20）次/天，跨天自动清零，超限 toast 拦截。**这是客户端软限、可绕过，beta 够用**；因为买断用户的 AI 是"一次付费、持续产生算力成本"，需要个上限兜底。正式上线要换服务端计数（放 `users` 文档或独立集合）才防得住。
 
-**问答上下文只存本次会话内存（`aiChatHistory` 数组），不落 localStorage**——跟提前还款模拟器"债务没稳定 id、不记是哪笔"同理，会话历史没必要跨重启持久化，且只留最近几轮控 token。
+**历史对话真实持久化、可继续追问，不是只读快照**：右上角图标（`#aiHistoryBtn`）打开历史对话sheet（`#aiHistorySheet`，从`#aiScreen`这个`.subpage`内部打开，见下面z-index那条），存进新增的`AI_CHATLOG_KEY`（`after-zero-ai-chatlog-v1`，见"硬性铁律"第1条）——`aiConvos`数组，每条`{id, title, isReport, updatedAt, messages:[{role,content}]}`，最新的排最前。**任何时候只有一个"当前会话"，不区分"只读历史"和"进行中"**：点历史列表里某一条（`loadAiConversation(rec)`）= 把它整个加载回当前会话（消息+上下文都恢复），之后可以直接在输入框继续追问，新的问答会**追加**进这条记录、把它顶到列表最上面，不会产生重复记录；"新对话"按钮（`#aiNewConvBtn`/`startNewAiConversation()`）才会真正清空当前内容、开始一条全新记录。`currentAiConvId`（模块级变量，null=还没产生过消息的全新会话）是这套状态机的核心，第一次成功收到AI回复时才会真正创建并写入`aiConvos`。**这是产品决策上明确纠正过的一版**：最初设计过"点历史=只读快照，追问必须新开对话"，用户当场指出"所有chatbot都是能在旧对话里继续追问的"，改成了现在这套——以后再碰到"要不要限制用户在历史记录上做某个操作"这类设计，默认先假设标准聊天应用的心智模型，不要凭直觉发明限制。
+
+**每条对话的消息数、以及对话总条数都各自封顶**（`AI_CHATLOG_MAX_MSGS`=40、`AI_CHATLOG_MAX_CONVOS`=50，都是`www/index.html`里的常量），防止长期高频使用后localStorage无限增长——这两个数字没有跟用户对齐过具体值，纯粹是防御性上限，不是像备份配额那样讨论出来的数字，以后如果用户反馈"历史对话动不动就被吞了"，先看是不是撞了这两个数字。**失败的对话不会留下"僵尸记录"**：如果一次调用失败发生在这条对话还从没成功回复过（`rec.messages.length<=1`，即只有用户这一句、AI还没真正答过），会把这条刚创建的空壳记录从`aiConvos`里撤销掉，不会在历史列表里出现一条"只有提问、AI从没答过"的死记录。
+
+**发给云函数的`history`参数，是"这次提问之前的上下文"，不含这次提问本身**——`callAiAdvisor(mode, question, history)`签名从两参数改成三参数，`history`由调用方（`aiComposeAndSend`）显式传入：`rec.messages.slice(-12)`（在把这次的`user`消息push进`rec.messages`之前取的快照），这样服务端`aiAdvisor/index.js`里"先塞`history`、再把`question`接在最后"这套拼接逻辑才不会把同一句问题发送两次。`report`模式不需要`history`（服务端对`report`模式压根不读`history`字段），传空数组即可。
+
+**历史对话sheet的z-index是手动提高过的，不能沿用其它`.sheet`默认的31**：`.sheet`默认z-index是31、`.subpage`是35（见下面"返回键处理"一节的z-index分层表），这个历史sheet是从`#aiScreen`（一个`.subpage`）内部打开的，如果沿用默认31会被35的`#aiScreen`本身盖住、点开跟没点一样——`#aiHistorySheet, #scrimAiHistory { z-index: 36; }`这条CSS专门覆盖，这是这个项目第一次出现"从subpage内部打开sheet"的场景，以后如果再有类似场景（sheet挂在某个subpage下面），记得同样需要手动把z-index提到35以上（但别超过`.login-gate`的40）。`__handleBackButton`链里这个sheet的判断插在`aiScreen`判断**之前**（"最上层先关"），`closeAiScreen()`内部也会先调一次`closeAiHistorySheet()`，防止用户点页面自带的返回箭头（不是硬件返回键）关闭`#aiScreen`时把历史sheet晾在半空。
 
 **桌面浏览器测不了真实 AI 往返**：跟云备份完全一样——伪造 `account` 没有真实 CloudBase 已认证会话，`callFunction({name:"aiAdvisor"})` 在服务端 `getUserInfo().customUserId` 拿不到值被拒。免费/付费门禁、订阅页 UI、`__debugPremium` 切状态这些能在桌面验；**真实 AI 生成/追问必须真机（release 包 + 微信登录）**。
 
@@ -393,7 +421,7 @@ localStorage.setItem("after-zero-account-v1", JSON.stringify({openid:"test",nick
 
 ## 硬性铁律，改代码前必看
 
-1. **`localStorage` 的 KEY（在`www/index.html`里搜 `debt-manager-v5`）永远不能改。** 这是用户设备上保存真实数据的键名，改了等于让已经装过的app找不到自己原来存的数据，直接清零。同理，`DKEY`（`debt-manager-docs-v5`）、账号登录状态用的`ACCOUNT_KEY`（`after-zero-account-v1`）、在还债务排序方式用的`SORT_KEY`（`debt-manager-sort-v1`）、还款提醒通知设置用的`NOTIF_KEY`（`after-zero-notify-v1`）、订阅状态用的`PREMIUM_KEY`（`after-zero-premium-v1`）、提前还款模拟器用的`SIM_KEY`（`after-zero-simulate-v1`）、云备份"上次备份时间"用的`BACKUP_KEY`（`after-zero-backup-meta-v1`）、AI 债务顾问每日用量计数用的`AI_USAGE_KEY`（`after-zero-ai-usage-v1`）以后也不能改——九者是各自独立的键，不要以为加新功能可以复用或合并。
+1. **`localStorage` 的 KEY（在`www/index.html`里搜 `debt-manager-v5`）永远不能改。** 这是用户设备上保存真实数据的键名，改了等于让已经装过的app找不到自己原来存的数据，直接清零。同理，`DKEY`（`debt-manager-docs-v5`）、账号登录状态用的`ACCOUNT_KEY`（`after-zero-account-v1`）、在还债务排序方式用的`SORT_KEY`（`debt-manager-sort-v1`）、还款提醒通知设置用的`NOTIF_KEY`（`after-zero-notify-v1`）、订阅状态用的`PREMIUM_KEY`（`after-zero-premium-v1`）、提前还款模拟器用的`SIM_KEY`（`after-zero-simulate-v1`）、云备份"上次备份时间"用的`BACKUP_KEY`（`after-zero-backup-meta-v1`）、AI 债务顾问每日用量计数用的`AI_USAGE_KEY`（`after-zero-ai-usage-v1`）、AI 债务顾问历史对话记录用的`AI_CHATLOG_KEY`（`after-zero-ai-chatlog-v1`）以后也不能改——十者是各自独立的键，不要以为加新功能可以复用或合并。
 2. **新安装必须是空数据。** `www/index.html` 里 `SEED`（债务种子数据）、`DOCS_SEED`（文档种子数据）这两个常量现在都是空值——这是故意的，因为这个app的定位是要发给别人用，任何人第一次打开都不能预装开发者自己的私人财务数据。**改代码时如果要放测试数据，改完记得清空再提交，别把私人内容（真实债务数字、个人反思文档、任何带真实姓名/金额的东西）带回默认值里。**
    **私人数据不止藏在这三个常量里。** 之前排查发现过一次：一个叫`cliff`的调试用标记字段，虽然完全没有UI能设置它（不是SEED、不是表单字段），但代码里直接写死了具体的还款日期和金额字符串（`"2027-05 起还本，月供跳至 ¥2,182"`这类）挂在渲染逻辑里，跟SEED是否清空无关。改代码时留意：不只是搜`SEED`/`DOCS_SEED`这两个变量名，任何看着像真实日期/金额/人名的硬编码字符串都要多看一眼是不是该删。（补：曾经还有个`POSTER`"愿景海报"常量，因为没有任何UI入口能往里填内容、属于永远激活不了的死代码，已整体删除，包括`fileItems()`/`renderDocContent()`里对应的分支，别再找它。）
    **"新安装=空数据"这个假设依赖 `AndroidManifest.xml` 里 `android:allowBackup="false"`。** 安卓系统默认（`allowBackup="true"`，Capacitor脚手架生成时的默认值）会把App数据自动云备份到用户的Google账号，卸载重装或者换新手机登录同一个Google账号时可能会自动把旧数据（包括`ACCOUNT_KEY`存的登录态）恢复回来，让"重装"变得不再可靠地等于"空白状态"。这个项目已经手动改成`allowBackup="false"`彻底关掉自动备份——以后如果看到这个值被改回`true`（比如重新跑`npx cap add android`之类的脚手架命令覆盖了手改的manifest），要记得改回`false`。
