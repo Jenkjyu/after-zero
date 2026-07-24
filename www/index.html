@@ -1,4 +1,5 @@
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>债务管理</title>
 <style>
   @font-face {
@@ -76,7 +77,7 @@
   button:disabled { opacity: .5; pointer-events: none; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 
-  .app { max-width: 560px; margin: 0 auto; padding: 18px 14px 100px; background: var(--app-grad); min-height: 100vh; }
+  .app { max-width: 560px; margin: 0 auto; padding: max(18px, env(safe-area-inset-top)) 14px 100px; background: var(--app-grad); min-height: 100vh; }
 
   /* ===== 顶部：手写 wordmark + 头像入口（替代原来的"债务管理"标题） ===== */
   header#topHeader { padding: 4px 3px 4px; display: flex; align-items: center; justify-content: space-between; min-height: 36px; }
@@ -86,7 +87,11 @@
     box-shadow: var(--e1); display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; flex: none; }
   .avatar-btn svg { width: 21px; height: 21px; color: var(--text-muted); }
   .avatar-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .asof { color: var(--text-muted); font-size: 12.5px; margin: 0 3px 14px; }
+  .note-toggle { background: none; border: none; color: var(--accent); font-size: 12px; font-weight: 600;
+    padding: 2px; margin: -6px 2px 8px; display: flex; align-items: center; gap: 3px; font-family: inherit;
+    -webkit-tap-highlight-color: transparent; }
+  .note-toggle svg { width: 12px; height: 12px; transition: transform .15s ease; }
+  .note-toggle.open svg { transform: rotate(180deg); }
 
   /* ===== 石墨主角卡：唯一的"在还总负债"焦点 ===== */
   .hero { position: relative; border-radius: 24px; padding: 20px 20px 18px; margin-bottom: 13px; overflow: hidden;
@@ -264,23 +269,43 @@
   .settled-item .sd { font-size: 11.5px; color: var(--text-faint); font-weight: 600; }
   .settled-item .restore { background: none; border: 1px solid var(--border); color: var(--text-muted); border-radius: 8px; padding: 4px 9px; font-size: 11.5px; }
 
-  .pay-row { position: relative; border-radius: 20px; overflow: hidden; margin-bottom: 8px; }
-  .pay { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow);
-    position: relative; z-index: 1; touch-action: pan-y; }
-  .pay-swipe-btn { position: absolute; top: 0; right: 0; bottom: 0; width: 92px; z-index: 0;
-    border: none; background: var(--good); color: #fff; font-size: 13px; font-weight: 700; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
-  .dot.crit { background: var(--critical); } .dot.warn { background: var(--warning); } .dot.dim { background: var(--good); }
-  .dot.overdue { background: var(--critical); animation: dotPulse 1.6s ease-in-out infinite; }
-  @keyframes dotPulse { 0%, 100% { box-shadow: 0 0 0 0 var(--critical-soft); } 50% { box-shadow: 0 0 0 4px var(--critical-soft); } }
+  /* .pay-row(外层list item，overflow:hidden+box-shadow)/.pay-swipe-row(内层横向flex行，左滑
+     手势的translateX作用在它身上)/.pay(可见卡面，磨砂玻璃)/.pay-swipe-btn(并排flex子项)——
+     跟"在还债务"卡片左滑同一套结构、同样的理由：.pay是半透明玻璃(backdrop-filter+部分透明
+     背景)，.pay-swipe-btn绝不能用position:absolute叠在它正后方(会透色，见.debt-front那条
+     注释)，必须并排放进.pay-swipe-row，关闭状态下靠外层.pay-row的overflow:hidden裁掉。 */
+  .pay-row { border-radius: 18px; overflow: hidden; margin-bottom: 8px; box-shadow: var(--e2);
+    -webkit-tap-highlight-color: transparent; }
+  .pay-swipe-row { display: flex; align-items: stretch; touch-action: pan-y; -webkit-tap-highlight-color: transparent; }
+  .pay { display: flex; align-items: center; gap: 12px; padding: 12px 14px; flex: 0 0 100%; position: relative;
+    background: var(--glass); border: 1px solid var(--glass-border);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
+    border-radius: 18px; cursor: pointer; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+  .pay::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
+  .pay-row.crit .pay::before { background: linear-gradient(135deg, rgba(190,58,58,.11), transparent 52%); }
+  .pay-row.warn .pay::before { background: linear-gradient(135deg, rgba(166,106,10,.11), transparent 52%); }
+  .pay-row.dim .pay::before { background: linear-gradient(135deg, rgba(46,95,138,.10), transparent 52%); }
+  .pay-row.overdue .pay::before { background: linear-gradient(135deg, rgba(190,58,58,.2), transparent 52%); }
+  .pay::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    box-shadow: inset 0 1px 0 var(--glass-hi); }
+  .pay-swipe-btn { flex: 0 0 92px; border: none; background: var(--good); color: #fff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12.5px; font-weight: 700;
+    -webkit-tap-highlight-color: transparent; }
+  .pay-swipe-btn svg { width: 18px; height: 18px; }
   .pay .d { width: 62px; flex: none; }
   .pay .d .day { font-weight: 700; font-size: 15px; }
   .pay .d .rel { font-size: 11px; color: var(--text-muted); }
   .pay .w { flex: 1; font-size: 14px; }
   .pay .a { font-weight: 700; font-size: 15px; }
 
-  .pay-hero { border-radius: 22px; padding: 16px 18px 15px; margin-bottom: 16px; box-shadow: var(--shadow); }
+  .pay-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 16px; }
+
+  .pay-filter { display: flex; gap: 8px; margin-bottom: 12px; }
+  .pf-btn { flex: 1; padding: 8px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-2);
+    color: var(--text-muted); font-size: 12.5px; font-weight: 600; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+  .pf-btn.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+  .pay-hero { border-radius: 22px; padding: 16px 18px 15px; margin-bottom: 16px; box-shadow: var(--e3); }
   .pay-hero-top { display: flex; align-items: center; justify-content: space-between; }
   .pay-hero-label { font-size: 12px; font-weight: 600; letter-spacing: .06em; color: var(--text-muted); }
   .pay-hero-bell { background: none; border: none; padding: 2px; margin: -2px; color: var(--text-muted); display: flex; }
@@ -295,20 +320,31 @@
   .pay-hero-rel { font-size: 13px; font-weight: 700; }
   .pay-hero-amt { font-size: 21px; font-weight: 700; }
   .pay-hero-name { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
-  .pay-hero-empty-msg { font-size: 14px; color: var(--text-muted); margin-top: 8px; }
   .pay-hero.crit { background: var(--critical-soft); }
   .pay-hero.crit .pay-hero-rel, .pay-hero.crit .pay-hero-amt { color: var(--critical); }
   .pay-hero.warn { background: var(--warning-soft); }
   .pay-hero.warn .pay-hero-rel, .pay-hero.warn .pay-hero-amt { color: var(--warning); }
   .pay-hero.dim { background: var(--good-soft); }
   .pay-hero.dim .pay-hero-rel, .pay-hero.dim .pay-hero-amt { color: var(--good); }
-  .pay-hero.empty { background: var(--surface); border: 1px solid var(--border); }
+  /* 空状态(没有在还债务)跟.dim档共用"平静的好消息"底色——"全部结清"本来就是这个App想要
+     的终点状态，不需要另设中性灰底把它当成"什么都没有"处理。 */
+  .pay-hero.empty { background: var(--good-soft); }
+  .pay-hero-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 8px 0 2px; }
+  .pay-hero-empty-ic { width: 42px; height: 42px; border-radius: 50%; background: var(--good); color: #fff;
+    display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
+  .pay-hero-empty-ic svg { width: 21px; height: 21px; }
+  .pay-hero-empty-title { font-size: 16px; font-weight: 700; color: var(--good); }
+  .pay-hero-empty-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 3px; }
   /* 逾期比crit(临期)更严重，用实心红底而不是淡色底，跟"还没到期但快了"拉开视觉差距 */
   .pay-hero.overdue { background: var(--critical); }
   .pay-hero.overdue .pay-hero-label, .pay-hero.overdue .pay-hero-name { color: rgba(255,255,255,.78); }
   .pay-hero.overdue .pay-hero-daynum, .pay-hero.overdue .pay-hero-rel, .pay-hero.overdue .pay-hero-amt { color: #fff; }
   .pay-hero.overdue .pay-hero-bell { color: rgba(255,255,255,.78); }
   .pay-hero.overdue .pay-hero-bell.on { color: #fff; }
+
+  /* 还款列表按"已逾期/本周内/本月内/更晚"分组，逾期单独强调(红字加粗)，不只是排序靠前——
+     逾期的实际代价比"还没到但快了"更高，值得从列表里摘出来单独一档(呼应urgencyTier的判断)。 */
+  .section-label.overdue { color: var(--critical); font-weight: 700; }
 
   .file-row { display: flex; align-items: center; gap: 11px; padding: 12px 14px; background: var(--surface);
     border: 1px solid var(--border); border-radius: 18px; margin-bottom: 7px; box-shadow: var(--shadow); width: 100%; text-align: left; color: inherit;
@@ -450,7 +486,8 @@
      以前默认display:none、靠JS抢在CDN脚本网络等待之前把它设成可见，真机上仍然偶发"一闪而过"，
      根源是"默认可见"这件事本身不该依赖JS能不能跑赢一段网络请求。现在反过来：默认永远可见，
      只有真正确认登录后才用.authed隐藏它——哪怕JS完全没执行，也不可能露出底下的App内容。 */
-  .login-gate { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .login-gate { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: flex; align-items: center; justify-content: center;
+    padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); }
   .login-gate.authed { display: none; }
   .login-gate-inner { max-width: 340px; width: 100%; text-align: center; }
 
@@ -476,7 +513,7 @@
     transition: transform .28s cubic-bezier(.2,.7,.3,1); overflow-y: auto; }
   .subpage.open { transform: translateX(0); }
   @media (prefers-reduced-motion: reduce) { .subpage { transition: none; } }
-  .subpage-header { display: flex; align-items: center; gap: 4px; padding: 14px 6px; position: sticky; top: 0;
+  .subpage-header { display: flex; align-items: center; gap: 4px; padding: max(14px, env(safe-area-inset-top)) 6px 14px; position: sticky; top: 0;
     background: var(--bg); border-bottom: 1px solid var(--border); }
   .subpage-back { background: none; border: none; padding: 8px; color: var(--text); display: flex; width: 40px; flex: none; }
   .subpage-back svg { width: 22px; height: 22px; }
@@ -682,7 +719,6 @@
     <div class="wordmark"><svg viewBox="-0.6 0 3704.5 885.7" fill="currentColor" aria-label="After Zero" role="img"><g transform="matrix(1,0,0,-1,0,728.1)"><path transform="translate(0.0,0)" d="M69 -33Q51 -23 49.5 -11.0Q48 1 63.0 31.0Q78 61 110 124Q134 169 146.5 194.5Q159 220 163.5 231.0Q168 242 168 245Q166 254 170.0 259.5Q174 265 183 269Q188 274 199.5 287.0Q211 300 221 318Q230 339 242.0 361.0Q254 383 274.0 416.5Q294 450 326 504Q346 539 370.0 575.5Q394 612 421 648Q432 662 441.0 670.5Q450 679 459 678Q471 678 486.5 670.0Q502 662 515.0 649.0Q528 636 534 621Q539 613 538.0 587.0Q537 561 534.0 524.0Q531 487 527 445Q524 404 518.0 348.0Q512 292 506.5 231.0Q501 170 498.0 113.5Q495 57 498 15Q499 6 498.0 -2.0Q497 -10 497 -15Q491 -21 477.5 -20.5Q464 -20 451.5 -14.0Q439 -8 437 1Q434 4 433.5 9.5Q433 15 434.0 33.0Q435 51 436 90L441 252L428 251Q419 251 394.0 249.0Q369 247 340.0 243.5Q311 240 286.5 236.5Q262 233 253 230Q244 230 231.5 218.0Q219 206 208 187Q204 173 193.5 157.5Q183 142 183 137Q176 132 171.5 125.0Q167 118 167 118Q167 112 157.5 88.5Q148 65 134.0 36.5Q120 8 106 -13L85 -45ZM276 289Q276 289 286.5 291.0Q297 293 311.5 295.5Q326 298 338 298Q380 308 399.0 311.5Q418 315 425.5 315.0Q433 315 439 312Q443 307 446.5 306.0Q450 305 450 305Q451 307 453.0 328.0Q455 349 458.5 380.0Q462 411 465.5 444.5Q469 478 471.0 506.5Q473 535 474 550Q475 569 476.0 584.5Q477 600 477 600Q471 600 451.5 578.0Q432 556 408.0 520.0Q384 484 363 443Q353 424 344.0 409.0Q335 394 330 394Q328 392 318.5 376.5Q309 361 298.0 341.5Q287 322 280.0 306.5Q273 291 276 289Z"/><path transform="translate(502.0,0)" d="M123 -106Q117 -110 109.5 -104.0Q102 -98 88 -82Q81 -74 79.0 -65.0Q77 -56 80 -31Q84 -20 84.5 -10.0Q85 0 85 4Q85 10 88.5 32.0Q92 54 96.0 78.5Q100 103 103 116Q103 117 104.0 121.0Q105 125 106 128Q108 137 111.5 152.0Q115 167 118 189Q126 214 131.5 238.5Q137 263 137 272Q137 290 151 298Q152 303 157.0 313.5Q162 324 166 331Q186 388 199.0 421.5Q212 455 226 480Q232 497 239.5 515.0Q247 533 255 543Q260 556 278.0 576.5Q296 597 316.0 616.5Q336 636 348 646Q370 657 383.0 661.0Q396 665 417 665Q436 665 442.5 660.5Q449 656 462 644Q476 629 478.0 624.0Q480 619 480 605Q478 592 469.5 571.5Q461 551 451.5 534.5Q442 518 436 517Q424 513 418.5 519.5Q413 526 413 541Q413 548 409.5 554.5Q406 561 406 561Q406 564 407.5 571.5Q409 579 413 586Q418 596 415.5 601.0Q413 606 402 603Q399 601 386.0 591.0Q373 581 358.5 568.5Q344 556 333.0 545.0Q322 534 322 531Q322 531 318.0 522.5Q314 514 303 501Q296 491 290.5 481.5Q285 472 285 470Q285 466 284.5 461.5Q284 457 279 457Q279 457 276.0 448.0Q273 439 265 425Q261 415 255.0 404.5Q249 394 245 390H246Q246 390 241.5 377.5Q237 365 232.0 351.5Q227 338 227 336Q227 332 241.5 332.0Q256 332 276.0 335.5Q296 339 312 343Q326 347 331.0 347.0Q336 347 351 343Q359 338 364.5 328.5Q370 319 372.5 310.5Q375 302 372 298Q371 294 350.0 287.0Q329 280 308 276Q290 272 264.0 267.0Q238 262 218.5 258.0Q199 254 199 251Q195 251 192.0 246.5Q189 242 189 239Q189 225 185 218Q183 212 178.0 194.0Q173 176 167.5 154.0Q162 132 158.5 114.0Q155 96 155 90Q149 83 148.0 72.5Q147 62 147 54Q143 46 142.0 39.5Q141 33 141 29Q141 28 141.0 25.0Q141 22 140 19Q139 9 137.5 -7.5Q136 -24 136 -40L133 -69Q132 -82 130.0 -91.5Q128 -101 123 -106Z"/><path transform="translate(793.0,0)" d="M179 7Q168 9 156.5 18.5Q145 28 136.5 40.5Q128 53 125 63Q125 65 122.5 68.0Q120 71 120 71Q116 74 115.5 97.5Q115 121 118.0 150.0Q121 179 125 196Q130 212 140.0 239.5Q150 267 157 289L184 347L144 358Q137 360 132.5 366.0Q128 372 128 376Q128 384 137.0 395.5Q146 407 150 407Q155 406 168.5 406.0Q182 406 195.0 407.0Q208 408 211 409Q215 411 219.0 414.5Q223 418 225 425Q230 436 234.0 445.5Q238 455 245 467Q252 480 256.5 489.0Q261 498 271 514Q276 521 282.0 531.0Q288 541 297 548Q306 556 315.5 555.5Q325 555 340 542Q348 532 349.0 527.0Q350 522 341 508Q333 491 322.5 474.0Q312 457 303 440Q287 418 297.0 415.0Q307 412 353 419Q382 424 395.0 416.5Q408 409 410 392Q413 368 405.0 363.0Q397 358 359 358Q335 354 318.0 353.5Q301 353 293 353Q280 352 276.0 352.0Q272 352 264 350Q256 348 252.5 343.5Q249 339 245 331Q241 327 233.0 310.0Q225 293 213 273Q199 231 189.0 189.5Q179 148 173 109Q169 84 174.0 74.5Q179 65 200 63Q211 62 235.5 63.5Q260 65 274 69Q285 74 297.0 79.5Q309 85 319 91Q328 96 337.0 101.5Q346 107 346 107Q351 115 357.0 112.0Q363 109 367 97Q367 85 362.0 72.0Q357 59 325 41Q280 13 242.5 7.5Q205 2 179 7Z"/><path transform="translate(1124.0,0)" d="M276 35Q255 17 227.5 14.0Q200 11 174.0 22.5Q148 34 131 58Q114 80 109.0 108.5Q104 137 108 183Q111 222 133.0 261.5Q155 301 186.5 332.0Q218 363 249 375Q264 385 274.5 384.5Q285 384 307 382Q330 379 341.5 373.0Q353 367 360 357Q375 342 380.0 327.5Q385 313 385 299Q381 277 355.5 245.5Q330 214 289 194Q267 187 241.0 188.0Q215 189 198 201Q179 209 173.0 198.5Q167 188 162 148Q158 110 168.0 92.5Q178 75 195 72Q215 68 226.5 66.5Q238 65 255 75Q271 85 275.0 86.5Q279 88 281.5 90.5Q284 93 294 103Q301 110 305.0 113.5Q309 117 314 117Q319 117 323.0 112.5Q327 108 331 106Q341 106 335.5 94.0Q330 82 314.0 65.5Q298 49 276 35ZM275 247Q286 252 298.0 261.5Q310 271 318.5 282.5Q327 294 327 302Q327 316 314.0 325.5Q301 335 275 328Q264 325 250.0 313.5Q236 302 223.5 288.0Q211 274 203.5 263.0Q196 252 198 250Q201 245 215.0 242.5Q229 240 246.5 241.0Q264 242 275 247Z"/><path transform="translate(1449.0,0)" d="M119 35Q110 42 106.5 49.0Q103 56 106 76Q109 104 114.0 125.5Q119 147 126 175Q128 187 137.5 216.0Q147 245 161.0 279.0Q175 313 189.0 343.5Q203 374 213 389Q221 395 232.5 394.0Q244 393 252 385Q263 376 255.5 353.5Q248 331 225 283Q213 256 207.0 242.5Q201 229 202.0 226.5Q203 224 211 229Q217 240 233.0 254.5Q249 269 267.0 283.0Q285 297 301.0 308.0Q317 319 323 322Q331 327 341.5 330.5Q352 334 356 336Q379 347 403.0 344.0Q427 341 433 326Q434 318 439.5 314.0Q445 310 445 310Q449 310 449.5 307.0Q450 304 450 304Q450 297 439.5 295.5Q429 294 413 293Q400 292 390.0 288.0Q380 284 366 278Q328 256 293.5 235.0Q259 214 227 179Q220 171 213.0 160.0Q206 149 198 136Q193 131 188.0 114.0Q183 97 179.5 81.5Q176 66 176 63Q176 63 173.0 53.5Q170 44 163 35Q151 19 143.0 19.0Q135 19 119 35Z"/><path transform="translate(2051.0,0)" d="M122 -36Q101 -34 84.0 -30.5Q67 -27 63 -7Q61 7 66.5 21.5Q72 36 82 46Q99 64 119.5 86.0Q140 108 168.5 136.0Q197 164 237.5 202.5Q278 241 336 292Q376 326 400.0 348.5Q424 371 443.0 390.0Q462 409 485 433Q520 469 546.5 503.0Q573 537 578 557Q584 577 575.5 585.5Q567 594 545.5 597.5Q524 601 489 603Q427 608 379.5 602.5Q332 597 288 589Q281 587 271.5 592.5Q262 598 262 602Q266 607 266.0 612.0Q266 617 258 623Q254 633 258.0 639.0Q262 645 266 649Q274 653 292.0 654.5Q310 656 333 660Q348 663 377.5 664.0Q407 665 437.5 665.0Q468 665 486 663Q522 660 555.0 656.5Q588 653 612.0 644.0Q636 635 645 613Q656 590 649.5 572.0Q643 554 632 524Q620 502 591.5 465.5Q563 429 526.5 389.5Q490 350 452 315Q396 263 351.5 222.5Q307 182 263 144Q235 120 207.0 94.5Q179 69 151 43Q141 30 147.5 23.5Q154 17 195 19Q218 20 231.0 23.0Q244 26 259.0 29.0Q274 32 301 33Q353 36 399.0 39.0Q445 42 473 42Q481 42 486.5 40.0Q492 38 502 24Q511 21 513.5 15.5Q516 10 513.0 4.0Q510 -2 501 -9Q494 -9 476.5 -12.5Q459 -16 438.5 -18.5Q418 -21 402 -20Q389 -19 352.5 -21.5Q316 -24 274 -29Q237 -35 193.0 -36.0Q149 -37 122 -36Z"/><path transform="translate(2573.0,0)" d="M276 35Q255 17 227.5 14.0Q200 11 174.0 22.5Q148 34 131 58Q114 80 109.0 108.5Q104 137 108 183Q111 222 133.0 261.5Q155 301 186.5 332.0Q218 363 249 375Q264 385 274.5 384.5Q285 384 307 382Q330 379 341.5 373.0Q353 367 360 357Q375 342 380.0 327.5Q385 313 385 299Q381 277 355.5 245.5Q330 214 289 194Q267 187 241.0 188.0Q215 189 198 201Q179 209 173.0 198.5Q167 188 162 148Q158 110 168.0 92.5Q178 75 195 72Q215 68 226.5 66.5Q238 65 255 75Q271 85 275.0 86.5Q279 88 281.5 90.5Q284 93 294 103Q301 110 305.0 113.5Q309 117 314 117Q319 117 323.0 112.5Q327 108 331 106Q341 106 335.5 94.0Q330 82 314.0 65.5Q298 49 276 35ZM275 247Q286 252 298.0 261.5Q310 271 318.5 282.5Q327 294 327 302Q327 316 314.0 325.5Q301 335 275 328Q264 325 250.0 313.5Q236 302 223.5 288.0Q211 274 203.5 263.0Q196 252 198 250Q201 245 215.0 242.5Q229 240 246.5 241.0Q264 242 275 247Z"/><path transform="translate(2898.0,0)" d="M119 35Q110 42 106.5 49.0Q103 56 106 76Q109 104 114.0 125.5Q119 147 126 175Q128 187 137.5 216.0Q147 245 161.0 279.0Q175 313 189.0 343.5Q203 374 213 389Q221 395 232.5 394.0Q244 393 252 385Q263 376 255.5 353.5Q248 331 225 283Q213 256 207.0 242.5Q201 229 202.0 226.5Q203 224 211 229Q217 240 233.0 254.5Q249 269 267.0 283.0Q285 297 301.0 308.0Q317 319 323 322Q331 327 341.5 330.5Q352 334 356 336Q379 347 403.0 344.0Q427 341 433 326Q434 318 439.5 314.0Q445 310 445 310Q449 310 449.5 307.0Q450 304 450 304Q450 297 439.5 295.5Q429 294 413 293Q400 292 390.0 288.0Q380 284 366 278Q328 256 293.5 235.0Q259 214 227 179Q220 171 213.0 160.0Q206 149 198 136Q193 131 188.0 114.0Q183 97 179.5 81.5Q176 66 176 63Q176 63 173.0 53.5Q170 44 163 35Q151 19 143.0 19.0Q135 19 119 35Z"/><path transform="translate(3258.0,0)" d="M169 15Q156 15 148.5 20.0Q141 25 130 34Q111 54 103.0 72.5Q95 91 98 108Q101 116 100.5 123.5Q100 131 100 131Q95 136 97.0 137.5Q99 139 101 143Q107 143 105 154Q103 162 113.0 189.0Q123 216 138 240Q144 250 156.0 266.5Q168 283 182.5 299.5Q197 316 209 326Q234 347 253.0 357.0Q272 367 294 372Q316 377 324.5 377.0Q333 377 348 361Q371 351 381.5 337.0Q392 323 395 296Q398 266 390.5 227.5Q383 189 343 132Q318 96 297.0 78.5Q276 61 247 44Q226 30 209.0 23.5Q192 17 169 15ZM265 121Q289 148 303.5 172.0Q318 196 331 233Q335 244 336.0 260.5Q337 277 335.5 291.5Q334 306 328 308Q316 315 299.0 312.5Q282 310 262 293Q231 267 208.0 228.5Q185 190 163 141Q148 105 156.5 83.5Q165 62 193.5 68.5Q222 75 265 121Z"/></g></svg></div>
     <button type="button" class="avatar-btn" id="topAvatarBtn" aria-label="账户"><img id="topAvatarImg" alt=""></button>
   </header>
-  <div class="asof"><span id="count">—</span></div>
   <div id="topSummary">
     <div class="hero" id="heroCard"></div>
     <div class="summary" id="summary"></div>
@@ -701,7 +737,8 @@
       </div>
       <svg class="account-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
     </button>
-    <div class="footnote" id="sumNote" style="margin-top:-8px;margin-bottom:16px;text-align:left;padding:0 2px">在还总负债 = 各未结清债务「未还本金」之和（只算本金、不含未来利息/手续费）。<br>已还金额 = 各未结清债务「已还期数」的本金之和；另付利息 = 这些已还期数对应的利息/手续费之和（两者都不含已结清的债务）。<br>经常性月供 = 各笔下一期应还之和（不含标记为「一次性还清」的借款）。</div>
+    <button type="button" class="note-toggle" id="sumNoteToggle">计算口径说明<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="footnote" id="sumNote" style="display:none;margin-top:-2px;margin-bottom:16px;text-align:left;padding:0 2px">在还总负债 = 各未结清债务「未还本金」之和（只算本金、不含未来利息/手续费）。<br>已还金额 = 各未结清债务「已还期数」的本金之和；另付利息 = 这些已还期数对应的利息/手续费之和（两者都不含已结清的债务）。<br>经常性月供 = 各笔下一期应还之和（不含标记为「一次性还清」的借款）。</div>
   </div>
 
   <section class="view active" id="view-debts">
@@ -728,7 +765,8 @@
 
   <section class="view" id="view-pay">
     <div class="pay-hero" id="payHero"></div>
-    <div class="section-label">接下来的还款日（按今天自动排序）</div>
+    <div class="pay-stats" id="payStats"></div>
+    <div class="pay-filter" id="payFilter"></div>
     <div id="payList"></div>
   </section>
 
@@ -1483,10 +1521,9 @@
       '<div class="hero-prog-row"><span class="l num">已归还本金 ¥' + fmt(paidPrincipal) + '</span><span class="r num">已完成 ' + pct + '%</span></div></div>';
     $("summary").innerHTML =
       '<div class="kpi"><div class="v num">¥' + fmt(paidPrincipal) + '</div><div class="k">已还金额</div><div class="kpi-sub num">另付利息 ¥' + fmt(paidInterest) + '</div></div>' +
-      '<div class="kpi"><div class="v num">¥' + fmt(monthly) + '</div><div class="k">经常性月供</div></div>' +
+      '<div class="kpi"><div class="v num">¥' + fmt(monthly) + '</div><div class="k">经常性月供</div><div class="kpi-sub">不含一次性还清</div></div>' +
       '<div class="kpi"><div class="v num">' + active + '</div><div class="k">在还笔数</div></div>' +
       '<div class="kpi"><div class="v num" style="color:var(--good)">' + settled + '</div><div class="k">已结清</div></div>';
-    $("count").textContent = active + " 笔在还" + (settled ? " · " + settled + " 笔已清" : "");
   }
   var DEBT_SORTS = {
     "rate-desc": function (d) { return -(+d.rate || 0); }, "rate-asc": function (d) { return +d.rate || 0; },
@@ -1779,6 +1816,12 @@
 
   function urgencyTier(diff) { return diff < 0 ? "overdue" : (diff <= 3 ? "crit" : (diff <= 14 ? "warn" : "dim")); }
   function relLabel(diff) { return diff < 0 ? ("已逾期 " + (-diff) + " 天") : (diff === 0 ? "就在今天" : diff + " 天后"); }
+  // 列表分组的时间桶，跟urgencyTier是两套独立阈值——urgencyTier管颜色(3/14天两档)，
+  // 这套管列表怎么分段(7/30天两档)，两者语义不同没必要合并成一套。标签直接用"7天内"/"30天内"
+  // 这种字面天数，不用"本周/本月"——后者暗示按自然周/月计算，实际是纯粹的滚动天数窗口，
+  // 用"本月"这种词容易让人以为是"到本月底"，真机反馈过这个歧义，改成跟数字对得上的字面说法。
+  function dueBucket(diff) { return diff < 0 ? "overdue" : (diff <= 7 ? "week" : (diff <= 30 ? "month" : "later")); }
+  var DUE_BUCKET_LABEL = { overdue: "已逾期", week: "7天内", month: "30天内", later: "更晚" };
 
   // 通知铃铛：outline/filled两个svg叠放按状态类切换显示哪个，跟tabbar图标(.ic-outline/.ic-filled)
   // 同一套手法。renderPayHero()每次整个重写#payHero的innerHTML(含空状态分支)，铃铛按钮本身
@@ -1794,7 +1837,9 @@
     var hero = $("payHero");
     if (!o) {
       hero.className = "pay-hero empty";
-      hero.innerHTML = '<div class="pay-hero-top"><div class="pay-hero-label">最近还款日</div>' + bellHtml() + '</div><div class="pay-hero-empty-msg">没有在还债务</div>';
+      hero.innerHTML = '<div class="pay-hero-top"><div class="pay-hero-label">最近还款日</div>' + bellHtml() + '</div>' +
+        '<div class="pay-hero-empty"><div class="pay-hero-empty-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>' +
+        '<div class="pay-hero-empty-title">全部结清</div><div class="pay-hero-empty-sub">暂无待还款项</div></div>';
       return;
     }
     hero.className = "pay-hero " + urgencyTier(o.diff);
@@ -1822,34 +1867,40 @@
   // 比拖拽排序简单：只需要接管水平轴，垂直滚动完全交给原生（不用像拖拽那样连垂直也
   // 自己接管），所以额外用touch-action:pan-y提前告诉浏览器"水平不归你管"，减少和原生
   // 手势(比如安卓边缘返回)抢的可能，JS里对水平方向再补一层preventDefault保险。
+  // .pay-row外层不动，.pay-swipe-row这个内层flex行才是真正被translateX的对象(.pay和
+  // .pay-swipe-btn是它的flex子项)——玻璃质感改版时从"transform打在.pay/绝对定位按钮"
+  // 换成的结构，理由见上面CSS注释区那条。
   var PAY_REVEAL = 92, paySwipeOpen = null;
-  function closePaySwipe(front) {
-    if (!front) return;
-    front.style.transition = "transform .18s ease"; front.style.transform = "translateX(0)"; front.dataset.open = "0";
-    if (paySwipeOpen === front) paySwipeOpen = null;
+  function closePaySwipe(row) {
+    if (!row) return;
+    row.style.transition = "transform .18s ease"; row.style.transform = "translateX(0)"; row.dataset.open = "0";
+    if (paySwipeOpen === row) paySwipeOpen = null;
   }
-  function openPaySwipeTo(front) {
-    if (paySwipeOpen && paySwipeOpen !== front) closePaySwipe(paySwipeOpen);
-    front.style.transition = "transform .18s ease"; front.style.transform = "translateX(-" + PAY_REVEAL + "px)"; front.dataset.open = "1";
-    paySwipeOpen = front;
+  function openPaySwipeTo(row) {
+    if (paySwipeOpen && paySwipeOpen !== row) closePaySwipe(paySwipeOpen);
+    row.style.transition = "transform .18s ease"; row.style.transform = "translateX(-" + PAY_REVEAL + "px)"; row.dataset.open = "1";
+    paySwipeOpen = row;
   }
-  function paySwipeSettle(front, base, dx) {
+  function paySwipeSettle(row, base, dx) {
     var finalOffset = Math.min(0, Math.max(-PAY_REVEAL, base + dx));
-    if (finalOffset < -PAY_REVEAL / 2) openPaySwipeTo(front); else closePaySwipe(front);
+    if (finalOffset < -PAY_REVEAL / 2) openPaySwipeTo(row); else closePaySwipe(row);
   }
-  function initPaySwipe(row, front) {
+  // 点卡片=查看详情，左滑=露出"标记已还"；两者用swipeRow.__justDragged这个标记做互斥——
+  // "在还债务"卡片点击/左滑共存那套写法就是照抄这里定的模式，见CLAUDE.md。
+  function initPaySwipe(outer, swipeRow, front, idx) {
     front.addEventListener("click", function () {
-      if (front.__justDragged) { front.__justDragged = false; return; }
-      if (front.dataset.open === "1") { closePaySwipe(front); return; }
-      if (paySwipeOpen && paySwipeOpen !== front) closePaySwipe(paySwipeOpen);
+      if (swipeRow.__justDragged) { swipeRow.__justDragged = false; return; }
+      if (swipeRow.dataset.open === "1") { closePaySwipe(swipeRow); return; }
+      if (paySwipeOpen && paySwipeOpen !== swipeRow) { closePaySwipe(paySwipeOpen); return; }
+      openDetail(idx);
     });
-    row.addEventListener("touchstart", function (e) {
+    outer.addEventListener("touchstart", function (e) {
       if (e.touches.length !== 1) return;
       // 每次新手势开始都先清掉上一次留下的标记——真正的拖拽(有位移)不会触发浏览器的
       // click合成，所以__justDragged不会被"消费"掉，留着不清的话会误伤下一次正常点击。
-      front.__justDragged = false;
+      swipeRow.__justDragged = false;
       var t0 = e.touches[0], sx = t0.clientX, sy = t0.clientY, id = t0.identifier;
-      var base = front.dataset.open === "1" ? -PAY_REVEAL : 0, axis = null;
+      var base = swipeRow.dataset.open === "1" ? -PAY_REVEAL : 0, axis = null;
       function tOf(ev) { for (var k = 0; k < ev.changedTouches.length; k++) if (ev.changedTouches[k].identifier === id) return ev.changedTouches[k]; return null; }
       function onMove(ev) {
         var t = tOf(ev); if (!t) return;
@@ -1859,35 +1910,50 @@
           if (Math.abs(dx) > 8) axis = "x"; else return;
         }
         ev.preventDefault();
-        front.style.transition = "none";
-        front.style.transform = "translateX(" + Math.min(0, Math.max(-PAY_REVEAL, base + dx)) + "px)";
+        swipeRow.style.transition = "none";
+        swipeRow.style.transform = "translateX(" + Math.min(0, Math.max(-PAY_REVEAL, base + dx)) + "px)";
       }
-      function onEnd(ev) { var t = tOf(ev); if (!t) return; if (axis === "x") { front.__justDragged = true; paySwipeSettle(front, base, t.clientX - sx); } cleanup(); }
-      function onCancel(ev) { if (!tOf(ev)) return; if (axis === "x") closePaySwipe(front); cleanup(); }
-      function cleanup() { row.removeEventListener("touchmove", onMove); row.removeEventListener("touchend", onEnd); row.removeEventListener("touchcancel", onCancel); }
-      row.addEventListener("touchmove", onMove, { passive: false });
-      row.addEventListener("touchend", onEnd);
-      row.addEventListener("touchcancel", onCancel);
+      function onEnd(ev) { var t = tOf(ev); if (!t) return; if (axis === "x") { swipeRow.__justDragged = true; paySwipeSettle(swipeRow, base, t.clientX - sx); } cleanup(); }
+      function onCancel(ev) { if (!tOf(ev)) return; if (axis === "x") closePaySwipe(swipeRow); cleanup(); }
+      function cleanup() { outer.removeEventListener("touchmove", onMove); outer.removeEventListener("touchend", onEnd); outer.removeEventListener("touchcancel", onCancel); }
+      outer.addEventListener("touchmove", onMove, { passive: false });
+      outer.addEventListener("touchend", onEnd);
+      outer.addEventListener("touchcancel", onCancel);
     }, { passive: true });
     // 桌面鼠标：Pointer Events没有和原生滚动抢的问题，纯粹为了桌面浏览器也能测。
-    row.addEventListener("pointerdown", function (e) {
+    outer.addEventListener("pointerdown", function (e) {
       if (e.pointerType !== "mouse") return;
-      front.__justDragged = false;
-      var sx = e.clientX, pid = e.pointerId, base = front.dataset.open === "1" ? -PAY_REVEAL : 0, moved = false;
+      swipeRow.__justDragged = false;
+      var sx = e.clientX, pid = e.pointerId, base = swipeRow.dataset.open === "1" ? -PAY_REVEAL : 0, moved = false;
       function onMove(ev) {
         if (ev.pointerId !== pid) return;
         var dx = ev.clientX - sx; if (Math.abs(dx) > 4) moved = true;
-        front.style.transition = "none";
-        front.style.transform = "translateX(" + Math.min(0, Math.max(-PAY_REVEAL, base + dx)) + "px)";
+        swipeRow.style.transition = "none";
+        swipeRow.style.transform = "translateX(" + Math.min(0, Math.max(-PAY_REVEAL, base + dx)) + "px)";
       }
-      function onUp(ev) { if (ev.pointerId !== pid) return; if (moved) { front.__justDragged = true; paySwipeSettle(front, base, ev.clientX - sx); } cleanup(); }
-      function cleanup() { row.removeEventListener("pointermove", onMove); row.removeEventListener("pointerup", onUp); row.removeEventListener("pointercancel", onUp); }
-      row.addEventListener("pointermove", onMove);
-      row.addEventListener("pointerup", onUp);
-      row.addEventListener("pointercancel", onUp);
+      function onUp(ev) { if (ev.pointerId !== pid) return; if (moved) { swipeRow.__justDragged = true; paySwipeSettle(swipeRow, base, ev.clientX - sx); } cleanup(); }
+      function cleanup() { outer.removeEventListener("pointermove", onMove); outer.removeEventListener("pointerup", onUp); outer.removeEventListener("pointercancel", onUp); }
+      outer.addEventListener("pointermove", onMove);
+      outer.addEventListener("pointerup", onUp);
+      outer.addEventListener("pointercancel", onUp);
     });
   }
 
+  // 筛选跟下面列表分组是两套不同的语义，都用"7天内"/"30天内"这两个词但不冲突：
+  // 分组(dueBucket)是给"全部"视图做互斥分段用的，每笔债务只属于一个组；筛选是"看更窄的
+  // 范围"，7天内/30天内筛选都是从今天起累计(0~7天/0~30天)，30天内天然包含7天内的那些——
+  // 这才是用户点"30天内"筛选时的直觉预期(看接下来30天要还的全部，不是只看第8~30天那一段)。
+  var payFilter = "all";
+  var PAY_FILTERS = [["all", "全部"], ["overdue", "已逾期"], ["week", "7天内"], ["month", "30天内"]];
+  function renderPayFilterBar() {
+    var wrap = $("payFilter"); wrap.innerHTML = "";
+    PAY_FILTERS.forEach(function (f) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "pf-btn" + (payFilter === f[0] ? " active" : ""); b.textContent = f[1];
+      b.addEventListener("click", function () { if (payFilter !== f[0]) { payFilter = f[0]; renderPay(); } });
+      wrap.appendChild(b);
+    });
+  }
   function renderPay() {
     var t0 = today0();
     paySwipeOpen = null;
@@ -1895,15 +1961,57 @@
       .map(function (o) { var n = parseDate(o.d.nextDate); return { d: o.d, i: o.i, next: n, diff: Math.round((n - t0) / 86400000) }; })
       .sort(function (a, b) { return a.diff - b.diff; });
     renderPayHero(items[0] || null);
+    renderPayFilterBar();
+
+    // 7天内/30天内待还小指标：累计口径(30天内包含7天内那些)，逾期不计入——它是"已经错过"
+    // 的一类，跟"即将要还"的"待还"语义不是一回事，逾期笔数在下面列表分组里单独强调。
+    var stats = $("payStats"); stats.innerHTML = "";
+    if (items.length) {
+      var weekN = 0, weekAmt = 0, monthN = 0, monthAmt = 0;
+      items.forEach(function (o) {
+        if (o.diff < 0 || o.diff > 30) return;
+        monthN++; monthAmt += +o.d.monthly || 0;
+        if (o.diff <= 7) { weekN++; weekAmt += +o.d.monthly || 0; }
+      });
+      stats.innerHTML =
+        '<div class="kpi"><div class="v num">¥' + fmt(weekAmt) + '</div><div class="k">7天内待还</div><div class="kpi-sub num">共 ' + weekN + ' 笔</div></div>' +
+        '<div class="kpi"><div class="v num">¥' + fmt(monthAmt) + '</div><div class="k">30天内待还</div><div class="kpi-sub num">共 ' + monthN + ' 笔</div></div>';
+    }
+
     var list = $("payList"); list.innerHTML = "";
-    if (!items.length) { list.innerHTML = '<div class="footnote">没有在还债务</div>'; return; }
-    items.forEach(function (o) {
-      var row = document.createElement("div"); row.className = "pay-row";
-      row.innerHTML = '<button type="button" class="pay-swipe-btn">标记已还</button><div class="pay"><span class="dot ' + urgencyTier(o.diff) + '"></span><div class="d"><div class="day num">' + (o.next.getMonth() + 1) + '/' + o.next.getDate() + '</div><div class="rel">' + relLabel(o.diff) + '</div></div><div class="w"></div><div class="a num">¥' + fmt(o.d.monthly) + '</div></div>';
-      var front = row.querySelector(".pay");
+    if (!items.length) return;
+    var visible = items.filter(function (o) {
+      if (payFilter === "overdue") return o.diff < 0;
+      if (payFilter === "week") return o.diff >= 0 && o.diff <= 7;
+      if (payFilter === "month") return o.diff >= 0 && o.diff <= 30;
+      return true;
+    });
+    if (!visible.length) { list.innerHTML = '<div class="footnote">该分类下暂无待还款项</div>'; return; }
+    var bucketCounts = {};
+    visible.forEach(function (o) { var b = dueBucket(o.diff); bucketCounts[b] = (bucketCounts[b] || 0) + 1; });
+    var lastBucket = null;
+    visible.forEach(function (o) {
+      var bucket = dueBucket(o.diff);
+      if (bucket !== lastBucket) {
+        var lab = document.createElement("div");
+        lab.className = "section-label" + (bucket === "overdue" ? " overdue" : "");
+        lab.textContent = DUE_BUCKET_LABEL[bucket] + " · " + bucketCounts[bucket] + " 笔";
+        list.appendChild(lab);
+        lastBucket = bucket;
+      }
+      var row = document.createElement("div"); row.className = "pay-row " + urgencyTier(o.diff);
+      row.innerHTML =
+        '<div class="pay-swipe-row">' +
+          '<div class="pay">' +
+            '<div class="d"><div class="day num">' + (o.next.getMonth() + 1) + '/' + o.next.getDate() + '</div><div class="rel">' + relLabel(o.diff) + '</div></div>' +
+            '<div class="w"></div><div class="a num">¥' + fmt(o.d.monthly) + '</div>' +
+          '</div>' +
+          '<button type="button" class="pay-swipe-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>标记已还</button>' +
+        '</div>';
+      var swipeRow = row.querySelector(".pay-swipe-row"), front = row.querySelector(".pay");
       front.querySelector(".w").textContent = o.d.name;
-      row.querySelector(".pay-swipe-btn").addEventListener("click", function () { payInstallment(o.i); });
-      initPaySwipe(row, front);
+      row.querySelector(".pay-swipe-btn").addEventListener("click", function () { closePaySwipe(swipeRow); payInstallment(o.i); });
+      initPaySwipe(row, swipeRow, front, o.i);
       list.appendChild(row);
     });
   }
@@ -3225,6 +3333,14 @@
   $("debtSortSel").value = debtSort;
   $("debtSortSel").addEventListener("change", function () { setDebtSort(this.value); renderDebts(); });
   $("jiggleDoneBtn").addEventListener("click", exitJiggle);
+  // 计算口径说明默认折叠——三条公式现在大多已经在KPI卡片本身交代清楚了（hero的"只算本金"角标、
+  // 已还金额的"另付利息"子行、经常性月供的"不含一次性还清"子行），这段文字变成了给较真用户看的
+  // 补充细则，不需要默认占位置。
+  $("sumNoteToggle").addEventListener("click", function () {
+    var open = $("sumNote").style.display !== "none";
+    $("sumNote").style.display = open ? "none" : "";
+    this.classList.toggle("open", !open);
+  });
   // 安卓WebView长按默认会触发系统级"上下文菜单"手势(震动反馈+可能弹出菜单)，
   // 这是独立于文字选中(user-select)的另一套原生手势，且一旦被判定触发，
   // 常常会把整个touch序列在原生层面"劫走"，导致我们自己长按拖拽逻辑收不到

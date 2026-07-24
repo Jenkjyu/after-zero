@@ -121,6 +121,26 @@ npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
 
 **已实测确认一个真实坑：华为/荣耀（EMUI/HarmonyOS）把"从最近任务卡片划掉App"当成对这个App的软性强制停止处理**，会连带撤销它的后台唤醒权限，导致App在前台时测试通知能收到、划掉最近任务后同一条测试通知就再也收不到——这不是`syncNotifications()`调度逻辑的bug（AlarmManager本身是系统级的，不依赖App进程存活），是系统限制。**排查"通知到点收不到"类反馈，先问两件事：手机品牌/系统是什么、用户是怎么"关闭"App的（划掉最近任务 vs 单纯回到桌面 vs 系统设置里手动强制停止）**——这两个变量决定了是要去"应用启动管理"里放行，还是真的要去查调度代码。华为/荣耀这台上的解法：**手机管家→应用启动管理**，找到这个App把"自动管理"关掉，手动打开"自启动/关联启动/后台活动"三个开关；小米/OPPO/vivo等其他国产系统大概率有同类限制，只是入口页面名字不同，遇到报告先按这个思路查对应设置页，不要先怀疑代码。
 
+## Edge-to-edge（状态栏/导航栏透明，内容延伸到全屏）——⚠️第一版没做对，真机效果不对，还在修
+
+**真机反馈"App不是全屏的，顶部明显有一截不属于App"，第一版理解成"顶部有个空隙没铺满"去修的，修完真机效果依然不对**——用户原话反馈更精确的诉求是"状态栏那一整条也应该显示App的背景，而不是现在这样直接加了一个不知道啥玩意在上面"：意思是修完之后状态栏那块区域出现了一个**具体的、看得出来的异物**（不是单纯的空白/间隙），跟App当前实际背景对不上，用户也说不清那是什么。**这一条到目前为止还没有定位到真正原因，下面记的是已经排除的猜测和还没验证的疑点，不是确认过的结论，下一轮从这里接着查。**
+
+### 已经做的改动（原理上是对的，但显然没有解决真机症状，别急着推翻重来，先定位到底哪一步没生效）
+1. `www/index.html`头部加了`<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">`（原来完全没有viewport标签，`env(safe-area-inset-*)`一直解析成0）。
+2. `MainActivity.java`的`onCreate()`里调用`WindowCompat.setDecorFitsSystemWindows(getWindow(), false)` + `getWindow().setStatusBarColor(Color.TRANSPARENT)` + `setNavigationBarColor(Color.TRANSPARENT)` + 状态栏图标深浅跟系统日夜间模式走。
+3. CSS给`.app`/`.login-gate`/`.subpage-header`三处共享容器的padding-top换成了`max(原值, env(safe-area-inset-top))`。
+
+### 排查过、大概率不是根因的猜测
+- **`capacitor_bridge_layout_main.xml`（Capacitor官方WebView容器布局，`node_modules/@capacitor/android/capacitor/src/main/res/layout/`）没有设置`fitsSystemWindows`**，`CoordinatorLayout`和`CapacitorWebView`都是`match_parent`——排除了"Capacitor自己的布局在悄悄吃掉状态栏空间"这个猜测。
+- `body { margin:0; background: var(--bg); }`已经是既有代码（这轮没动），理论上body的背景应该天然铺到视口最顶端，不需要额外处理——如果真机上状态栏那块区域显示的不是`var(--bg)`而是别的东西，说明问题出在**WebView这块Surface本身有没有真的画到状态栏后面**，而不是CSS背景色选错。
+
+### 还没验证、下一轮应该先查的疑点（怀疑度从高到低）
+- **`AppTheme.NoActionBarLaunch`（`android/app/src/main/res/values/styles.xml`）目前直接当成`MainActivity`的运行时主题在用**（`AndroidManifest.xml`里`android:theme="@style/AppTheme.NoActionBarLaunch"`），而这个主题继承自`Theme.SplashScreen`、`android:background`指向`@drawable/splash`（启动图，内容是App图标，不是App实际的渐变背景）。**这个项目里没有任何代码把主题从"启动态"切换成"运行态"**（没有调用`SplashScreen.installSplashScreen()`，也没有`postSplashScreenTheme`声明）。在旧的非edge-to-edge世界这不是问题——WebView铺满整个非系统栏区域，主题背景图只在WebView画出第一帧之前的一瞬间可能露一下，之后彻底看不见。**但开了edge-to-edge之后，如果WebView这块Surface因为某种原因没有严丝合缝地铺到状态栏正后方那几个像素（哪怕只是极小的合成/时序缝隙），透出来的就是这张启动图/`windowBackground`，而不是App的CSS背景**——用户反馈的"不知道啥玩意"跟"一小条不相关的启动图/图标"这个描述能对上。**这是目前怀疑度最高、但还没验证的一条**，下一轮直接查：把`android:background`换成纯色（比如跟`--bg`色值一致的一个新drawable/color），或者干脆研究一下要不要用`androidx.core:core-splashscreen`这个库（`variables.gradle`里`coreSplashScreenVersion='1.2.0'`已经是依赖但目前压根没被调用）规范地做一次真正的启动屏转场，而不是像现在这样直接把启动主题常驻当运行时主题用。
+- 需要用`chrome://inspect`/`edge://inspect`（真机release包+无线adb，参考"环境要求"里已经记过的调试方式）配合真机截图，肉眼确认状态栏那块区域的**颜色/内容到底是什么**——目前只有用户一句话描述，没有截图/录屏，排查效率有限，下一轮第一件事应该是先拿到一张真机截图。
+- 也要确认这不是某个具体手机品牌的ROM定制行为（参考本项目已经踩过的华为/荣耀通知权限那类"先怀疑系统限制、再查代码"的教训）——但目前信息不够排除代码本身的问题，不能跳过上面两条直接归咎于ROM。
+
+**这类改动没法在桌面浏览器验证**——状态栏、显示安全区这些概念桌面浏览器压根不存在，`env(safe-area-inset-*)`桌面上恒等于0，跟真机行为不是一回事，必须编译release包装真机看，而且这次的教训是：光凭代码审查+编译通过不足以确认"做对了"，这轮就是编译成功、逻辑看起来没错，但真机效果依然不对，必须要有真机截图/录屏才能真正验证。
+
 ## 返回键处理（安卓硬件/手势返回）
 
 弹窗关闭 + 退出App这两件事，走的是"原生问JS，JS说了算"的桥接，两头都有各自的坑：
@@ -177,6 +197,7 @@ npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
 
 **已结清列表的日期文字颜色**从`var(--good)`（蓝色）改成了`var(--text-faint)`——蓝色在这个位置显得突兀，绿色对勾图标已经足够表达"已完成"这层意思，日期不需要再抢一个强色。
 
+**后来又删掉了`#count`（header下面那行"N笔在还 · M笔已清"）**：这行文字跟它正下方`.summary`网格里的"在还笔数"/"已结清"两张`.kpi`卡片说的是同一件事，是真实的信息冗余，删掉`#count`/`.asof`这个DOM节点，`renderSummary()`里也去掉了对应的`$("count").textContent=...`赋值。**同一时间点，"计算口径说明"（`#sumNote`，那三行"在还总负债=...；已还金额=...；经常性月供=..."的公式）改成了默认折叠**：这段文字之所以能收起，是因为三条公式现在都已经在各自的KPI卡片上有了轻量提示（hero卡"只算本金"角标对应第一条、"已还金额"卡的"另付利息¥Y"子行对应第二条、"经常性月供"卡新加的"不含一次性还清"子行对应第三条），公式说明本身降级成给较真用户看的补充细则，不需要默认占屏幕。折叠靠新增的`.note-toggle`（一个纯文字+chevron的小按钮，`#sumNoteToggle`）手动切换`display`，**没有用`<details>`/`<summary>`**——这个项目在"统计"页数据明细表那次已经明确弃用过原生`<details>`（见"统计"一节），这里延续同一个偏好，不要在类似场景里重新引入。
 ## 还款提醒页：hero卡片 + 左滑标记已还
 
 "还款日"标签页顶部有一张"最近还款日"卡片（`#payHero`，`renderPayHero()`），取所有在还债务里下一期还款日最近的那一笔，底色按急迫程度换色。下面`#payList`列表里每一条债务卡片支持向左滑动，滑出一个"标记已还"按钮（类似iOS/微信聊天列表左滑删除）。
@@ -188,6 +209,26 @@ npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
 **⚠️ 踩过一个坑：`__justDragged`这个"防止拖拽结束后紧接着的click把刚展开的滑块关掉"的标记位，必须在每次新手势开始时重置，不能只靠点击去消费它**——真正带位移的拖拽/滑动手势结束后，浏览器**不会**触发click事件（只有原地无位移的tap才会），所以如果只在click handler里"用一次就清空"，这个标记位在一次真实拖拽后会一直是`true`、永远等不到click来消费它，直到很久以后一次完全独立、毫不相关的正常点击也被这个陈旧的标记位误伤（表现是"点开着的滑块想关掉它，点了没反应"）。修法：`touchstart`/`pointerdown`一开始就先重置`front.__justDragged = false`，而不是只寄希望于click阶段清空。以后写类似"拖拽后抑制紧跟着的一次click"的逻辑，先确认这次手势结束后浏览器到底会不会补发click，别想当然。
 
 **同一时间只允许一条卡片保持展开**（`paySwipeOpen`模块级变量），展开新的会自动收起旧的；点开着的卡片本身会收起它；切到别的tab会强制收起（`closePaySwipe`）。滑出的"标记已还"按钮直接复用`payInstallment(i)`（债务详情页"销这期"背后的同一个函数），确认弹窗、结清判断、toast提示全部保持一致，没有另写一套逻辑。
+
+**这轮跟"在还债务主页视觉改版"对齐风格时，`.pay`卡片也改成了磨砂玻璃质感，连带把左滑结构从"绝对定位叠层"换成了"flex并排"**——这是补上`.debt-front`那次已经踩过、写进CLAUDE.md的坑：`.pay-swipe-btn`原来是`position:absolute`叠在`.pay`正后方，`.pay`当时是不透明的`var(--surface)`所以不出问题；改玻璃质感后如果不动结构就会重蹈"按钮颜色透过玻璃常驻可见"的老坑。现在结构是`.pay-row`（外层，`overflow:hidden`+`box-shadow:var(--e2)`）→`.pay-swipe-row`（内层flex行，左滑的`translateX`打在它身上）→`.pay`（`flex:0 0 100%`，玻璃卡面）+`.pay-swipe-btn`（`flex:0 0 92px`，卡片右侧屏幕外），跟`.debt-row`/`.debt-front`/`.debt-swipe-btn`同一套模式。`initPaySwipe(outer, swipeRow, front, idx)`签名也跟着改了，`transform`统一打在`swipeRow`（即`.pay-swipe-row`）上，不再是`front`。
+
+**点卡片（非滑动状态）现在会打开债务详情（`openDetail(idx)`）**——早期版本卡片点击只处理"收起已展开的滑块"，没有导航效果，是一个功能缺口（跟"在还债务"卡片"点击开详情"的心智模型不一致）。`initPaySwipe`新增第4个参数`idx`就是为了接这个。
+
+**Hero下方新增`#payStats`两个小指标卡（本周待还/本月待还，金额+笔数）**，跟主页`#summary`共用`.kpi`视觉语言。**周/月是累计口径（月⊇周，`diff`0~6算周、0~29算月）且都不含逾期**——逾期是"已经错过"的，跟"即将要还"的"待还"语义不是一回事，逾期笔数只在下面列表分组里出现，不在这两个小指标里重复计。
+
+**`#payList`现在按`dueBucket(diff)`（已逾期/7天内/30天内/更晚，四档，注意阈值跟`urgencyTier`的3/14天不是同一套）分组显示，组间插入`.section-label`小节标题（"7天内 · 3笔"这种格式）**，不再是一条纯排序的flat list。**逾期分组的`.section-label`额外加`.overdue`（红字加粗），单独摘出来强调**——逾期的实际代价比"还没到但快了"更高，之前只体现在hero和圆点颜色上，列表本身没有单独强调过。
+
+**⚠️分组标签最早叫"本周内/本月内"，真机反馈后改成了"7天内/30天内"**——"本月"这种说法暗示按自然月计算（比如"到本月底"），但`dueBucket`实际是纯滚动天数窗口（`diff<=7`/`diff<=30`），标签数字和逻辑边界能对上才不会误导人，以后这类"相对时间窗口"分组，标签直接用字面天数，不要用"周/月"这种容易被读成日历语义的词。
+
+**列表上方新增`#payFilter`筛选条（全部/已逾期/7天内/30天内四个`.pf-btn`），跟分组用的是同一个"7天内/30天内"说法但语义不同，注意别混淆**：分组（`dueBucket`）是给"全部"视图做互斥分段用的，每笔债务只属于一个组，避免同一条在列表里出现两次；筛选是"看更窄范围"，`payFilter`的`week`/`month`两档判定用的是**累计**口径（`diff 0~7`/`diff 0~30`，`month`天然包含`week`那些），不是从`dueBucket`的互斥边界复用逻辑——这是刻意的：点"30天内"筛选时用户想看的是"接下来30天要还的全部"，不是"只看第8~30天那一段"，如果照搬互斥分组的判定会让这周就要还的那几笔从"30天内"筛选结果里消失，违反直觉。`payFilter`是模块级变量（不持久化，纯会话内状态），`renderPay()`每次都重新渲染筛选条+按当前`payFilter`过滤`items`得到`visible`，hero和`#payStats`两个小指标卡不受筛选影响，永远基于全量`items`算——它们是总览widget，不是"当前筛选视图"的一部分。
+
+**Hero下方两个小指标卡的标签也从"本周待还/本月待还"改成了"7天内待还/30天内待还"**，跟分组标签统一说辞。这两个卡的口径本身没变，仍然是累计（0~7/0~30，`month`≥`week`），因为一个KPI headline("7天内待还¥X")本来就该是"接下来7天内全部要还的钱"这种累计语义，跟分组labels面对的问题（互斥分段被误读成累计）不是同一类风险，不需要跟着分组改成互斥。
+
+**卡片左边那个9px小圆点(`.dot`)已经删掉**：改磨砂玻璃质感这轮给卡片本身加了`.pay-row.crit/.warn/.dim/.overdue`驱动的`::before`色晕，已经能传达同一份严重度信息，小圆点变成纯粹的信息冗余，删掉了`.dot`相关的CSS（含`dotPulse`那个逾期呼吸动画）和HTML。
+
+**`.pay-row`/`.pay`的圆角从20px改成了18px，跟"在还债务"卡片的`.debt`/`.debt-front`对齐**——这两套左滑卡片结构是同一套模式抄出来的两份实现，圆角数值当初没有互相核对，一个20px一个18px，视觉上两个页面来回切换能看出差异。统一成18px（以`.debt`那份为准，它是更早定下来的）。
+
+**空状态（没有在还债务）从一行灰字改成了带图标的正向反馈**：`.pay-hero.empty`背景从中性灰改成`--good-soft`（跟`dim`档共用"平静的好消息"语义），配一个绿底白色对勾图标（复用"销这期"按钮同一条`M20 6 9 17l-5-5`路径，不是新画的）+"全部结清"标题+"暂无待还款项"副标题。**没有用emoji**——这个App别的地方（比如`payInstallment`成功后的toast）历史上用过🎉，但这次空状态刻意选了更克制的纯图标+文字方案。
 
 ## 新增/编辑债务表单（`#editSheet`）
 
