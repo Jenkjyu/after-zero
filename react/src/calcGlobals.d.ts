@@ -5,7 +5,7 @@
 //
 // 只声明已迁移的React页面实际会调用的几个，不是calc.js全部39个——够用即可，见CLAUDE.md
 // "React 迁移"一节。
-import type { Debt, DebtSummary, Premium, ReportData, SortKey } from "./types";
+import type { Debt, DebtSummary, GenSpec, PlanRow, Premium, ReportData, SortKey } from "./types";
 
 declare global {
   interface Window {
@@ -21,6 +21,9 @@ declare global {
     isActive(d: Debt): boolean;
     rateClass(r: number): string;
     fmt(n: number): string;
+    // detailSheet用：money是还款计划表格专用的2位小数格式化(fmt是0位小数、千分位分组，
+    // 两者不是同一个函数，见calc.js)。
+    money(n: number): string;
     // 还款日tab用：dueBucket是互斥分段(给"全部"视图分组用)，urgencyTier/relLabel是hero卡+
     // 列表卡片的严重度/相对时间文案，offsetLabel是通知规则列表里"提前N天"这种文案，
     // parseDate/today0是日期计算。
@@ -34,9 +37,28 @@ declare global {
     // 余额对比条形图的债务名做截断。
     computeReportData(debts: Debt[]): ReportData;
     truncateLabel(s: string, n: number): string;
+    // editSheet(react/src/sheets/EditSheet.tsx等)用：genPlan是公式生成器4种计息方式共用的
+    // 生成函数，impliedAPR从还款计划反推年化利率(#planSum摘要用)，isBadRepeatDay拒绝
+    // 29/30/31号(批量设置还款日/公式生成器首期还款日都要拒)，r2是两位小数四舍五入
+    // (逐行编辑本金/利息联动金额时用)，clone是深拷贝(openEditSheet时复制debts[i].plan，
+    // 保存时复制editingPlan写回debts，避免引用共享)，addMonths/fmtDate是"加一期"按钮
+    // 推算下一期默认日期用。
+    genPlan(spec: GenSpec): PlanRow[];
+    impliedAPR(plan: PlanRow[]): number;
+    isBadRepeatDay(day: number): boolean;
+    r2(x: number): number;
+    clone<T>(x: T): T;
+    addMonths(d: Date, m: number): Date;
+    fmtDate(d: Date): string;
     // 反向桥接：vanilla的__handleBackButton硬件返回键"最上层先关"优先级链第一条检查这个——
     // React挂载"在还债务"页时注册，卸载时删除，见 react/src/debts/DebtList.tsx。
     __azDebtsBack?: () => boolean;
+    // 同上，detailSheet迁移React后新增的一条——见 react/src/sheets/DetailSheet.tsx，
+    // 硬件/手势返回键"最上层先关"链里排在最后一项(detailSheet优先级最低)。
+    __azDetailSheetBack?: () => boolean;
+    // 同上，editSheet(第六步)新增的一条——见 react/src/sheets/EditSheet.tsx，链里排在
+    // notifySheet和detailSheet之间(沿用原来#editSheet在DOM里的位置)。
+    __azEditSheetBack?: () => boolean;
   }
 }
 

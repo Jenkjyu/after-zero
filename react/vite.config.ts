@@ -22,14 +22,18 @@ export default defineConfig(({ command }) => ({
     outDir: resolve(__dirname, "../www/js/react-debts"),
     emptyOutDir: true,
     lib: {
-      // 三个tab三个独立入口，各自产出main.js/pay.js/report.js，index.html里各配一个
-      // <script type="module">。inlineDynamicImports只支持单入口，多入口后必须去掉——
-      // Rollup对ES格式的多入口构建会自动把react/react-dom这类公共依赖拆成共享chunk，
-      // 三个入口各自import它，不会各自打包一份重复的react/react-dom。
+      // 四个tab+一个常驻共享sheet入口，各自产出debts.js/pay.js/report.js/mine.js/sheets.js，
+      // index.html里各配一个<script type="module">。sheets.js挂的#react-sheets-root不属于
+      // 任何tab，是DetailSheet(以及以后EditSheet迁移进来后)常驻的地方，见CLAUDE.md
+      // "React 迁移"一节。inlineDynamicImports只支持单入口，多入口后必须去掉——Rollup对ES
+      // 格式的多入口构建会自动把react/react-dom这类公共依赖拆成共享chunk，各入口各自
+      // import它，不会各自打包一份重复的react/react-dom。
       entry: {
         debts: resolve(__dirname, "src/debts/main.tsx"),
         pay: resolve(__dirname, "src/pay/main.tsx"),
         report: resolve(__dirname, "src/report/main.tsx"),
+        mine: resolve(__dirname, "src/mine/main.tsx"),
+        sheets: resolve(__dirname, "src/sheets/main.tsx"),
       },
       formats: ["es"],
       fileName: (_format, entryName) => `${entryName}.js`,

@@ -7,10 +7,11 @@ import type { CSSProperties } from "react";
 import type { Debt } from "../types";
 import type { CardEl, GestureCtx } from "./gestures";
 import { closeDebtSwipe, onCardPointerDown, onCardTouchStart } from "./gestures";
+import { openDetailSheet } from "../shared/state";
 
 export interface DebtCardProps {
   d: Debt;
-  i: number; // 在debts数组里的下标——openDetail/payInstallment都是按下标寻址(见CLAUDE.md
+  i: number; // 在debts数组里的下标——openDetailSheet/payInstallment都是按下标寻址(见CLAUDE.md
   // "在还债务自定义排序"一节"没有id字段"这条已知架构缺口)
   jiggleMode: boolean;
   ctx: GestureCtx;
@@ -48,7 +49,7 @@ export function DebtCard({ d, i, jiggleMode, ctx }: DebtCardProps) {
     if (row.__justDragged) { row.__justDragged = false; return; }
     if (row.dataset.open === "1") { closeDebtSwipe(ctx, row); return; }
     if (jiggleMode) return;
-    window.__azBridge.openDetail(i);
+    openDetailSheet(i);
   }
 
   function onSwipeBtnClick() {

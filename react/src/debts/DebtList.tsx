@@ -12,7 +12,7 @@ import type { GestureCtx } from "./gestures";
 import { closeDebtSwipe, finishDrag } from "./gestures";
 import { DebtCard } from "./DebtCard";
 import { SettledList } from "./SettledList";
-import { keyFor } from "../shared/state";
+import { keyFor, openEditSheet } from "../shared/state";
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "rate-desc", label: "利率 高→低" },
@@ -141,7 +141,7 @@ export function DebtList({ debts }: DebtListProps) {
           <DebtCard key={keyFor(d)} d={d} i={i} jiggleMode={jiggleMode} ctx={ctx} />
         ))}
       </div>
-      <button type="button" className="add-btn" id="addBtn" onClick={() => window.__azBridge.openEdit(-1)}>＋ 新增一笔</button>
+      <button type="button" className="add-btn" id="addBtn" onClick={() => openEditSheet(-1)}>＋ 新增一笔</button>
       <SettledList items={settled} />
     </>
   );

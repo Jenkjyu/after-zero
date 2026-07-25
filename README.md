@@ -4,7 +4,7 @@
 
 app的主体是一个自包含的HTML文件（`www/index.html`——纯HTML/CSS/JS，不依赖框架/不需要构建步骤），用 [Capacitor](https://capacitorjs.com/) 包成了原生安卓壳；另外有几段手写的原生插件代码：一段用于把档案库/备份文件真正存到用户自选的位置（点"下载"会弹系统"另存为"选择器，网页标准的下载方式在安卓WebView里不可靠），一段用于接入微信登录；还款提醒页支持本地推送通知（到期前提醒），用的是官方Capacitor插件。**打开App需要先微信登录**——账号体系目前是这个App唯一的准入方式。
 
-**底部"债务"/"还款日"/"统计"三个tab正在向React迁移（绞杀者模式，逐页面替换），"我的"tab和所有弹窗/子页面依然是vanilla JS**：`react/`下是这三个tab的React+TypeScript源码，用Vite（多入口库模式）构建成`www/js/react-debts/{debts,pay,report}.js`三个文件各自嵌入`index.html`，跟vanilla那份共享同一份数据（细节见`CLAUDE.md`"React 迁移"一节）。这部分需要额外的构建步骤（`npm run build:react`），"我的"tab和所有弹窗/子页面依然是原来"改`index.html`就完事"的纯前端。
+**底部"债务"/"还款日"/"统计"/"我的"四个tab已经全部由React接管（绞杀者模式，逐页面替换，已完成），债务详情窗、新增/编辑债务表单这两个不属于任何tab的常驻React入口也已经迁移，其余弹窗/子页面（账户页、订阅页、云备份页、档案库、通知设置面板等）依然是vanilla JS**：`react/`下是这六个入口（四个tab+详情窗+编辑表单）的React+TypeScript源码，用Vite（多入口库模式）构建成`www/js/react-debts/{debts,pay,report,mine,sheets}.js`五个文件各自嵌入`index.html`（详情窗+编辑表单共用同一个`sheets.js`入口，不是各自一个），跟vanilla那份共享同一份数据（细节见`CLAUDE.md`"React 迁移"一节）。这部分需要额外的构建步骤（`npm run build:react`），其余弹窗/子页面依然是原来"改`index.html`就完事"的纯前端。
 
 "我的"页有一个**单一 Premium** 订阅入口，同时提供一次性买断和按月/按年订阅两种购买方式，目前只是UI占位（App还没上架应用商店，暂时接不了真实支付），为未来的付费功能铺路。免费/付费的边界是按"这个功能有没有真实服务器/算力成本"划的：底部"统计"tab查看图表、提前还款收益模拟器完全免费；统计页面**导出**PDF/Excel、云备份（手动创建备份记录，可随时恢复）、**AI债务顾问**（雪球/雪崩法分析生成优化报告 + 针对自己债务数据的多轮问答，服务端调用腾讯云开发内置大模型）是Premium会员专属功能。
 
@@ -48,8 +48,8 @@ cd android
 
 ## 项目结构
 
-- `www/index.html` —— app真身（改这个），`www/fonts/` 是它引用的本地字体文件，`www/img/` 是登录门用到的图标图片，`www/js/` 是本地打包/拆分出去的 JS：`jspdf.umd.min.js`/`xlsx.full.min.js` 是第三方库（用于"统计"页导出 PDF/Excel，放本地是因为国内移动网络下相关 CDN 常加载失败），`calc.js` 是从 `index.html` 拆出来的纯计算函数（`recompute`/`genPlan`/`amortForward` 等，不碰 DOM），配 `test/` 下的 `node:test` 单元测试（`npm test` 运行），`react-debts/` 是下面`react/`目录构建出来的产物（不进git，`npm run build:react` 生成，多入口产出`debts.js`/`pay.js`/`report.js`三个文件），细节见 `CLAUDE.md`
-- `react/` —— "债务"/"还款日"/"统计"三个tab的React+TypeScript源码（`src/debts/`/`src/pay/`/`src/report/`，`src/shared/`是三者共用的状态订阅hook），Vite多入口库模式构建（`npm run build:react`）成 `www/js/react-debts/{debts,pay,report}.js` 三个文件各自嵌入`index.html`；组件测试用Vitest+React Testing Library（`__tests__/`，`npm run test:react` 运行，跟`test/`下`calc.js`的`node:test`套件完全独立），细节（vanilla↔React怎么桥接共享数据、手势怎么移植过来）见 `CLAUDE.md`"React 迁移"一节
+- `www/index.html` —— app真身（改这个），`www/fonts/` 是它引用的本地字体文件，`www/img/` 是登录门用到的图标图片，`www/js/` 是本地打包/拆分出去的 JS：`jspdf.umd.min.js`/`xlsx.full.min.js` 是第三方库（用于"统计"页导出 PDF/Excel，放本地是因为国内移动网络下相关 CDN 常加载失败），`calc.js` 是从 `index.html` 拆出来的纯计算函数（`recompute`/`genPlan`/`amortForward` 等，不碰 DOM），配 `test/` 下的 `node:test` 单元测试（`npm test` 运行），`react-debts/` 是下面`react/`目录构建出来的产物（不进git，`npm run build:react` 生成，多入口产出`debts.js`/`pay.js`/`report.js`/`mine.js`/`sheets.js`五个文件），细节见 `CLAUDE.md`
+- `react/` —— "债务"/"还款日"/"统计"/"我的"四个tab（全部tab）+ 债务详情窗/编辑表单（两个不属于任何tab、常驻挂载的入口，共用同一个`sheets`入口）的React+TypeScript源码（`src/debts/`/`src/pay/`/`src/report/`/`src/mine/`/`src/sheets/`，`src/shared/`是这几者共用的状态订阅hook），Vite多入口库模式构建（`npm run build:react`）成 `www/js/react-debts/{debts,pay,report,mine,sheets}.js` 五个文件各自嵌入`index.html`；组件测试用Vitest+React Testing Library（`__tests__/`，`npm run test:react` 运行，跟`test/`下`calc.js`的`node:test`套件完全独立），细节（vanilla↔React怎么桥接共享数据、手势怎么移植过来）见 `CLAUDE.md`"React 迁移"一节
 - `android/` —— Capacitor/Gradle自动生成的原生工程，绝大部分别手动改，改完 `www/` 后重新跑 `npx cap sync android`；例外是 `android/app/src/main/java/io/github/jenkjyu/afterzero/` 下有手写的原生插件（`SaveFile` 负责把档案库/备份文件存到用户自选的位置；`WeChatLogin` 负责账号登录），这部分不会被sync覆盖，是真实源码
 - `cloudbase/` —— 腾讯云开发（CloudBase）云函数的服务端代码，配合微信登录（`wxLogin`换取登录票据、`deleteAccount`处理注销账户）、Premium会员的云备份功能（`backupCreate`/`backupList`/`backupRestore`/`backupDelete`/`backupUploadFile`）、以及AI债务顾问（`aiAdvisor`，调用CloudBase内置大模型）使用，不属于Capacitor/Android那套构建流程，需要单独部署，细节见 `CLAUDE.md`
 - `resources/` —— App图标的设计源文件，改图标时改这里，然后跑 `npx @capacitor/assets generate --android` 重新生成 `android/app/src/main/res/mipmap-*/` 下的实际图标文件（细节和一个工具默认值的坑见 `CLAUDE.md`）

@@ -740,44 +740,13 @@
   </section>
 
   <section class="view" id="view-data">
-    <div class="account-head">
-      <button type="button" class="account-avatar-btn" id="accountAvatarBtn" aria-label="账户">
-        <img class="account-avatar-lg" id="accountAvatarImg" alt="">
-      </button>
-      <div class="account-name-c" id="accountNameText"></div>
-    </div>
-    <div class="data-card premium-entry-card" id="premiumEntryCard">
-      <button type="button" class="premium-entry" id="premiumEntryBtn">
-        <div class="premium-entry-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3L21.5 9l-4.8 4.5 1.3 6.7L12 17l-6 3.2 1.3-6.7L2.5 9l6.6-.7L12 2z"/></svg></div>
-        <div class="premium-entry-text">
-          <div class="premium-entry-title" id="premiumEntryTitle">升级 Premium</div>
-          <div class="premium-entry-sub" id="premiumEntrySub">云备份 · 提前还款模拟器 · 高级报表 · AI债务顾问</div>
-        </div>
-        <svg class="account-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
-      </button>
-    </div>
-    <div class="data-card">
-      <h3>云备份</h3>
-      <p>Premium 会员专属：手动创建云端备份，每条记录都能单独恢复，换手机也能找回数据。</p>
-      <div class="data-actions"><button class="btn ghost" id="backupEntryBtn">打开云备份</button></div>
-    </div>
-    <div class="data-card">
-      <h3>档案库</h3>
-      <p>保存借款合同、还款回执等文档和图片，仅存本设备。</p>
-      <div class="data-actions"><button class="btn ghost" id="docsEntryBtn">打开档案库</button></div>
-    </div>
-    <div class="data-card">
-      <h3>全部数据（债务 + 档案，导出/备份）</h3>
-      <p>换手机、清缓存前，下载这份备份存好。含全部债务计划、档案文档和上传的文件。</p>
-      <div class="data-actions"><button class="btn primary" id="dlBackupBtn">下载备份文件</button></div>
-    </div>
-    <div class="data-card">
-      <h3>导入数据（覆盖当前）</h3>
-      <p>选一份之前下载的备份文件，恢复债务、档案和上传的文件。</p>
-      <input type="file" id="importFileInput" accept=".json,application/json" style="display:none">
-      <div class="data-actions"><button class="btn ghost" id="importFileBtn">上传备份文件</button></div>
-    </div>
+    <div id="react-mine-root"></div>
   </section>
+  <!-- #importFileInput原来在#view-data里面，那个section折叠成React挂载点后，这个隐藏的
+       文件选择器搬到这里独立存在——它的change监听器(主脚本里)完全没变，React只是通过
+       window.__azBridge.triggerImportFilePicker()间接点它，跟#uploadInput那种游离在
+       具体卡片外的隐藏文件输入是同一类处理，见CLAUDE.md"React 迁移"一节"我的"tab部分。 -->
+  <input type="file" id="importFileInput" accept=".json,application/json" style="display:none">
 </div>
 
 <nav class="tabbar" role="tablist">
@@ -1093,88 +1062,12 @@
   </div>
 </div>
 
-<div class="scrim" id="scrimDetail"></div>
-<div class="sheet" id="detailSheet" role="dialog" aria-modal="true" aria-labelledby="dTitle">
-  <div class="grip"></div>
-  <h2 id="dTitle"></h2>
-  <div class="subh" id="dSub"></div>
-  <div id="dInfo"></div>
-  <div class="sheet-actions">
-    <button type="button" class="btn ghost" id="dEdit"><svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>编辑</button>
-    <button type="button" class="btn primary" id="dSale"><svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span id="dSaleLabel">销这期</span></button>
-  </div>
-  <div class="sheet-actions" style="margin-top:10px">
-    <button type="button" class="btn ghost" id="dSimulate">提前还款模拟</button>
-  </div>
-  <div class="sheet-actions" style="margin-top:10px">
-    <button type="button" class="btn danger" id="dSettle">提前结清</button>
-    <button type="button" class="btn ghost" id="dClose">关闭</button>
-  </div>
-</div>
-
-<div class="scrim" id="scrimEdit"></div>
-<div class="sheet" id="editSheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
-  <div class="grip"></div>
-  <h2 id="sheetTitle">编辑债务</h2>
-  <form id="debtForm">
-    <div class="field"><label for="f-name">贷款产品 <span class="req">*</span></label><input id="f-name" required></div>
-    <div class="field two">
-      <div class="field"><label for="f-funder">出资方</label><input id="f-funder"></div>
-      <div class="field"><label for="f-type">借款类型</label><select id="f-type">
-        <option>银行贷</option><option>信用卡分期</option><option>网贷</option><option>私人借款</option>
-      </select></div>
-    </div>
-    <div class="field two">
-      <div class="field"><label for="f-opened">借款日 <span class="req">*</span></label><input id="f-opened" type="date" required></div>
-      <div class="field"><label for="f-day">还款日（几号）</label><input id="f-day" type="number" min="1" max="31" inputmode="numeric" readonly class="f-day-auto"></div>
-    </div>
-    <label class="checkline"><input type="checkbox" id="f-oneTime">一次性还清（不计入经常性月供，销项即结清）</label>
-    <div class="field"><label for="f-notes">备注</label><textarea id="f-notes"></textarea></div>
-
-    <hr class="sheet-divider">
-    <div class="subhead">还款计划（这是源头，其它自动推算）</div>
-    <div class="plan-sum" id="planSum"></div>
-    <div class="plan-mode-toggle" id="planModeToggle">
-      <button type="button" class="pm-btn active" id="planModeManual">手动添加</button>
-      <button type="button" class="pm-btn" id="planModeGen">公式生成</button>
-    </div>
-    <div class="gen-panel" id="genPanel" style="display:none">
-      <div class="field"><label for="g-kind">计息方式</label><select id="g-kind">
-        <option value="amort">等额本息（银行贷/网贷/金条）</option>
-        <option value="equalfee">信用卡等本等费（每期本金相同）</option>
-        <option value="interestfirst">先息后本（前 N 期利息、后 M 期本金）</option>
-        <option value="custom">自定义（生成空白行自己填）</option>
-      </select></div>
-      <div data-gg="amort">
-        <div class="field two"><div class="field"><label for="g-P">借款金额 ¥ <span class="req">*</span></label><input id="g-P" type="number" step="0.01" inputmode="decimal"></div><div class="field"><label for="g-rate">年化 % <span class="req">*</span></label><input id="g-rate" type="number" step="0.01" inputmode="decimal"></div></div>
-        <div class="field two" id="amortPeriodRow"><div class="field"><label for="g-n">期数 <span class="req">*</span></label><input id="g-n" type="number" min="1" inputmode="numeric"></div></div>
-      </div>
-      <div data-gg="equalfee">
-        <div class="field two"><div class="field"><label for="g-pp">每期本金 ¥</label><input id="g-pp" type="number" step="0.01" inputmode="decimal"></div><div class="field"><label for="g-pf">每期手续费 ¥</label><input id="g-pf" type="number" step="0.01" inputmode="decimal"></div></div>
-        <div class="field"><label for="g-n2">期数</label><input id="g-n2" type="number" min="1" inputmode="numeric"></div>
-      </div>
-      <div data-gg="interestfirst">
-        <div class="field two"><div class="field"><label for="g-P3">借款本金 ¥</label><input id="g-P3" type="number" step="0.01" inputmode="decimal"></div><div class="field"><label for="g-rate3">年化 %</label><input id="g-rate3" type="number" step="0.01" inputmode="decimal"></div></div>
-        <div class="field two"><div class="field"><label for="g-ni">利息期数</label><input id="g-ni" type="number" min="0" inputmode="numeric"></div><div class="field"><label for="g-np">还本期数</label><input id="g-np" type="number" min="1" inputmode="numeric"></div></div>
-      </div>
-      <div data-gg="custom">
-        <div class="field"><label for="g-nc">生成几期空白行</label><input id="g-nc" type="number" min="1" inputmode="numeric"></div>
-      </div>
-      <div class="field" id="gFirstField"><label for="g-first">首期还款日 <span class="req">*</span></label><input id="g-first" type="date"></div>
-      <button type="button" class="btn primary" id="doGen">生成计划</button>
-    </div>
-
-    <div class="batch" id="batchBlock">批量把每期<select id="batchCol"><option value="principal">本金</option><option value="interest">利息/费</option><option value="amount">金额</option><option value="date">还款日</option></select>设为<input id="batchVal" type="number" step="0.01" min="0" inputmode="decimal" placeholder="数值"><button type="button" id="batchApply">应用到全部</button></div>
-    <div class="plan-rows" id="planRows"></div>
-    <button type="button" class="btn ghost" id="addRow" style="margin-bottom:14px">＋ 加一期</button>
-
-    <div class="sheet-actions">
-      <button type="button" class="btn danger" id="deleteBtn">删除</button>
-      <button type="button" class="btn ghost" id="cancelBtn">取消</button>
-      <button type="submit" class="btn primary">保存</button>
-    </div>
-  </form>
-</div>
+<!-- 债务详情窗(原#scrimDetail+#detailSheet)+编辑表单(原#scrimEdit+#editSheet)都已由React接管
+     (react/src/sheets/DetailSheet.tsx、react/src/sheets/EditSheet.tsx)——这是第一个不属于任何
+     tab、常驻挂载的React入口，被"在还债务"/"还款日"两棵独立React树共同触发打开(见shared/state.ts
+     的openDetailSheet/closeDetailSheet/openEditSheet/closeEditSheet，不再经过window.__azBridge)。
+     详见CLAUDE.md"React 迁移"一节。 -->
+<div id="react-sheets-root"></div>
 
 <div class="scrim" id="scrimNotify"></div>
 <div class="sheet" id="notifySheet" role="dialog" aria-modal="true" aria-labelledby="notifyTitle">
@@ -1242,6 +1135,8 @@
 <script type="module" src="js/react-debts/debts.js"></script>
 <script type="module" src="js/react-debts/pay.js"></script>
 <script type="module" src="js/react-debts/report.js"></script>
+<script type="module" src="js/react-debts/mine.js"></script>
+<script type="module" src="js/react-debts/sheets.js"></script>
 <script>
 (function () {
   "use strict";
@@ -1333,7 +1228,7 @@
     if (tier === "premium") {
       premium.premium = premium.premium || { method: "redeemed", at: new Date().toISOString() };
     }
-    savePremium(); renderAccountDetail(); renderPremiumEntryCard();
+    savePremium(); renderAccountDetail();
     // AI banner现在归React管(见window.__azBridge.getPremium())，这里改成派发事件通知它重读premium。
     window.dispatchEvent(new CustomEvent("az:state-changed"));
   }
@@ -1346,19 +1241,16 @@
   window.__debugPremium = function (state) {
     if (state === "none") { premium = { premium: null }; }
     else if (state === "premium") { premium = { premium: { method: "onetime", at: new Date().toISOString() } }; }
-    savePremium(); renderAccountDetail(); renderPremiumEntryCard();
+    savePremium(); renderAccountDetail();
     // AI banner现在归React管(见window.__azBridge.getPremium())，这里改成派发事件通知它重读premium。
     window.dispatchEvent(new CustomEvent("az:state-changed"));
     toast("（调试）订阅状态已设为：" + state);
   };
   debts.forEach(normalize);
-  var editIndex = -1, detailIndex = -1, docSel = -1, editingPlan = [];
-  // 勾选"一次性还清"时，第2期起被暂存到这里（不是丢弃）；取消勾选时原样放回editingPlan，
-  // 这样来回勾选不会丢手动加过的期数。每次openEdit()都要清空，不能跨debt残留。
-  var oneTimeStash = [];
-  // 还款计划"手动添加"/"公式生成"两种录入方式的当前选中模式，二选一互斥显示，
-  // 不是同时把两套UI都堆在页面上（那样太乱）。每次openEdit()重置成"manual"。
-  var planMode = "manual";
+  // editIndex/editingPlan/oneTimeStash/planMode(手动添加/公式生成二选一)这几个模块变量已经
+  // 删除——#editSheet的实际内容整体搬进了React(react/src/sheets/EditSheet.tsx等)，这些状态
+  // 现在是React组件自己的useState，见CLAUDE.md"React 迁移"一节"第六步"。
+  var docSel = -1;
 
   // background scroll lock while any sheet/modal is open (counted, since the confirm modal can stack on top of the edit sheet)
   var scrollLockCount = 0;
@@ -1366,20 +1258,38 @@
   function unlockScroll() { if (scrollLockCount > 0 && --scrollLockCount === 0) document.body.style.overflow = ""; }
 
   // custom confirm
-  var _onOk = null;
+  var _onOk = null, _onCancel = null, _confirmed = false;
   // ask()第4个可选参数{month:"YYYY-MM"}：需要额外收集"哪年哪月"时用(比如批量设置还款日
   // 要知道首期年月)，不传就是普通的纯文字确认框。onOk回调收到的参数是选中的年月字符串
   // (没用到month input时是undefined，其它调用方原本就是零参函数，多传一个不影响)。
   function ask(title, body, onOk, opts) {
-    $("mTitle").textContent = title; $("mBody").textContent = body; _onOk = onOk;
+    $("mTitle").textContent = title; $("mBody").textContent = body; _onOk = onOk; _onCancel = null; _confirmed = false;
     var mi = $("mMonthInput");
     if (opts && opts.month !== undefined) { mi.style.display = ""; mi.value = opts.month || ""; } else { mi.style.display = "none"; mi.value = ""; }
     $("modalScrim").classList.add("open"); lockScroll();
   }
-  function closeModal() { if (!$("modalScrim").classList.contains("open")) return; $("modalScrim").classList.remove("open"); _onOk = null; $("mMonthInput").style.display = "none"; unlockScroll(); }
+  // ask()的Promise外壳，给React用(#editSheet批量设置还款日/金额需要在纯React状态上await结果，
+  // 不能再用callback风格)。不改变ask()本身任何行为——_onCancel只在这里被设置，老的callback风格
+  // 调用点(注销账户/销这期/删除债务等十几处)从不碰这个变量，closeModal()里那条新增分支对它们
+  // 永远是空操作。opts.month有值时：确认返回选中的月份字符串，取消返回null；没有opts.month时：
+  // 确认返回true，取消返回false。
+  function askAsync(title, body, opts) {
+    return new Promise(function (resolve) {
+      _onCancel = function () { resolve(opts && opts.month !== undefined ? null : false); };
+      ask(title, body, function (monthVal) {
+        resolve(opts && opts.month !== undefined ? monthVal : true);
+      }, opts);
+    });
+  }
+  function closeModal() {
+    if (!$("modalScrim").classList.contains("open")) return;
+    $("modalScrim").classList.remove("open");
+    if (!_confirmed && _onCancel) { var c = _onCancel; _onCancel = null; c(); }
+    _onOk = null; _onCancel = null; $("mMonthInput").style.display = "none"; unlockScroll();
+  }
   $("mOk").addEventListener("click", function () {
     var f = _onOk, monthVal = $("mMonthInput").style.display !== "none" ? $("mMonthInput").value : undefined;
-    closeModal(); if (f) f(monthVal);
+    _confirmed = true; closeModal(); if (f) f(monthVal);
   });
   $("mCancel").addEventListener("click", closeModal);
   $("modalScrim").addEventListener("click", function (e) { if (e.target === $("modalScrim")) closeModal(); });
@@ -1410,8 +1320,8 @@
   // PAY_REVEAL/paySwipeOpen/closePaySwipe/openPaySwipeTo/paySwipeSettle/initPaySwipe/
   // payFilter/PAY_FILTERS/renderPayFilterBar/renderPay全部删除，逻辑原样搬到
   // react/src/pay/gestures.ts、Hero.tsx、FilterBar.tsx、PayList.tsx、App.tsx。
-  // #notifySheet本身继续100%vanilla(跟#detailSheet/#editSheet同一类处理)，只是
-  // openNotifySheet/getNotify两个函数新加进了window.__azBridge给React调用。
+  // #notifySheet本身继续100%vanilla(跟#editSheet同一类处理，detailSheet已经迁移React了)，
+  // 只是openNotifySheet/getNotify两个函数新加进了window.__azBridge给React调用。
 
   // "在还债务"/"还款日"/"统计"三个tab都已经整体搬进React，原来这里对各tab渲染函数
   // (renderSummary/renderAIBanner/renderDebts/renderPay/renderReportScreen)的调用
@@ -1453,42 +1363,9 @@
     }).catch(function (e) { console.error("syncNotifications failed", e); });
   }
 
-  function kv(k, v) { return '<div><div class="k">' + k + '</div><div class="v num">' + v + '</div></div>'; }
-  function openDetail(i) {
-    $("detailSheet").style.height = "";
-    detailIndex = i; var d = debts[i], plan = d.plan || [];
-    $("dTitle").textContent = d.name;
-    $("dSub").textContent = (d.funder ? d.funder + " · " : "") + (d.type || "");
-    var nextNo = -1; for (var k = 0; k < plan.length; k++) { if (!plan[k].paid) { nextNo = k; break; } }
-    var info = '<div class="dl-grid">'
-      + kv("借款金额", d.original != null ? "¥" + fmt(d.original) : "—")
-      + kv("剩余待还", "¥" + fmt(d.balance))
-      + kv("年化利率(推算)", d.rate ? Number(d.rate).toFixed(2) + "%" : "无息")
-      + kv(d.oneTime ? "应还" : "下期月供", "¥" + fmt(d.monthly))
-      + kv("下个还款日", d.nextDate || "—")
-      + kv("借款日", d.opened || "—")
-      + kv("进度", d.paidTerms + " / " + d.totalTerms + " 期已还")
-      + kv("出资方", d.funder || "—")
-      + (d.notes ? '<div class="full"><div class="k">备注</div><div class="v" style="font-size:13px;font-weight:400"></div></div>' : '')
-      + '</div>';
-    $("dInfo").innerHTML = info;
-    if (d.notes) $("dInfo").querySelector(".full .v").textContent = d.notes;
-    if (plan.length) {
-      var html = '<div class="preview-label" style="margin-top:0">完整还款计划（含已还，✓ 为已还）</div><div class="sch-wrap"><table class="sch"><thead><tr><th>期次</th><th>日期</th><th>金额</th><th>本金</th><th>利息/费</th><th>剩余本金</th></tr></thead><tbody>';
-      var rembal = d.original || 0;
-      plan.forEach(function (r, idx) {
-        rembal -= (+r.principal || 0);
-        var cls = r.paid ? "paidrow" : (idx === nextNo ? "nextrow" : "");
-        html += '<tr class="' + cls + '"><td class="per">' + (r.paid ? "✓ " : "") + (idx + 1) + '/' + plan.length + '</td><td class="num">' + r.date + '</td><td class="num">' + money(r.amount) + '</td><td class="num">' + money(r.principal) + '</td><td class="num">' + money(r.interest) + '</td><td class="num">' + fmt(Math.max(rembal, 0)) + '</td></tr>';
-      });
-      html += '</tbody></table></div>';
-      var sc = document.createElement("div"); sc.innerHTML = html; $("dInfo").appendChild(sc);
-    }
-    $("dSaleLabel").textContent = d.oneTime ? "一次性结清" : "销这期";
-    $("dSale").style.display = d.terms > 0 ? "block" : "none";
-    $("scrimDetail").classList.add("open"); $("detailSheet").classList.add("open"); lockScroll();
-  }
-  function closeDetail() { if (!$("detailSheet").classList.contains("open")) return; $("scrimDetail").classList.remove("open"); $("detailSheet").classList.remove("open"); detailIndex = -1; unlockScroll(); }
+  // kv()/openDetail(i)/closeDetail()已删除——详情窗内容+开关状态整个搬进了
+  // react/src/sheets/DetailSheet.tsx，逻辑原样复刻(kv()对应组件里的同名JSX辅助函数)。
+  // 见CLAUDE.md"React 迁移"一节。
 
   // 顶部横杠拖拽：下拖超过阈值关闭，resizable=true 时上拖可把窗口拉高（用于查看详情）
   function initGripDrag(sheet, grip, closeFn, resizable) {
@@ -1532,210 +1409,36 @@
     ask(title, body, function () {
       r.paid = true; recompute(d);
       if (d.terms <= 0) { d.settled = true; d.settledDate = todayStr(); }
-      saveAll(); renderAll(); if (d.settled) closeDetail(); else if (detailIndex === i) openDetail(i);
+      // 原来这里还有"结清就closeDetail()、没结清就openDetail(i)原地刷新"这行——详情窗迁移
+      // React后不再需要：React的DetailSheet组件订阅同一份debts数据，renderAll()派发的
+      // az:state-changed会让它自动重渲染(没结清=原地看到新数据)，结清时也有自己的effect
+      // 自动关闭(见react/src/sheets/DetailSheet.tsx)，vanilla这边不用再操心detailSheet。
+      saveAll(); renderAll();
       toast(d.settled ? d.name + " 已还清 🎉" : "已销第 " + (idx + 1) + " 期 · 本金 -¥" + fmt(r.principal));
     });
   }
   function settleFull(i) {
     var d = debts[i];
     ask("提前结清", "把「" + d.name + "」标记为已结清？\n不再计入在还总债（可在列表底部恢复）。", function () {
-      d.settled = true; d.settledDate = todayStr(); saveAll(); renderAll(); closeDetail(); closeEdit(); toast(d.name + " 已结清 🎉");
+      // closeDetail()/closeEdit()都已删除——detailSheet/editSheet现在都是React拥有的sheet，
+      // 各自靠自己的effect监听debts变化自动关闭(结清/被删除)，vanilla不需要再显式回调。
+      d.settled = true; d.settledDate = todayStr(); saveAll(); renderAll(); toast(d.name + " 已结清 🎉");
     });
   }
   function unsettle(i) { debts[i].settled = false; recompute(debts[i]); saveAll(); renderAll(); toast("已恢复到在还"); }
 
   // ===== edit + plan editor =====
-  function setGenUI(k) {
-    document.querySelectorAll("[data-gg]").forEach(function (g) { g.style.display = g.getAttribute("data-gg") === k ? "block" : "none"; });
-    // 首期还款日只有一份DOM，物理挪到当前生效的计息方式区块里——amort时和"期数"拼成一行
-    // (用户要求的布局)，其它三种计息方式各自单独成一行(位置跟以前一样，功能不受影响)。
-    var mount = k === "amort" ? $("amortPeriodRow") : document.querySelector('[data-gg="' + k + '"]');
-    if (mount) mount.appendChild($("gFirstField"));
-  }
-  $("g-kind").addEventListener("change", function () { setGenUI(this.value); });
-  $("g-first").addEventListener("change", function () {
-    var d = parseDate(this.value);
-    if (d && isBadRepeatDay(d.getDate())) {
-      this.value = "";
-      toast("首期还款日不支持29/30/31号（不是每个月都有），请选1-28号；这几天到期的话，生成后到下面还款计划里逐期手动改第1期日期");
-    }
-  });
-  // 手动添加/公式生成二选一：点哪个就显示哪个的UI，不再是两套入口同时堆在页面上。
-  function setPlanMode(mode) {
-    planMode = mode;
-    $("planModeManual").classList.toggle("active", mode === "manual");
-    $("planModeGen").classList.toggle("active", mode === "gen");
-    $("genPanel").style.display = mode === "gen" ? "block" : "none";
-    renderPlanRows();
-  }
-  $("planModeManual").addEventListener("click", function () { setPlanMode("manual"); });
-  $("planModeGen").addEventListener("click", function () { setPlanMode("gen"); });
-  function syncOneTimeUI() {
-    var isOne = $("f-oneTime").checked;
-    // 勾上：把第2期起真正挪出editingPlan(暂存)，不能只在renderPlanRows()里视觉隐藏——
-    // 之前的bug就是隐藏归隐藏，保存时那几期还在editingPlan里，导致"一次性¥X"(只显示第1期)
-    // 和"借款金额"(全部期数本金相加)对不上。取消勾选：把暂存的期数原样放回来。
-    if (isOne) {
-      if (editingPlan.length > 1) { oneTimeStash = editingPlan.slice(1); editingPlan = editingPlan.slice(0, 1); }
-    } else if (oneTimeStash.length) {
-      editingPlan = editingPlan.concat(oneTimeStash); oneTimeStash = [];
-    }
-    // 一次性还清只会有1期，"手动/公式"二选一的切换器整个不适用（公式是生成一整套多期计划）——
-    // 隐藏切换器，只留addRow按钮自己的显隐逻辑(renderPlanRows里)决定要不要露出"加一期"。
-    $("planModeToggle").style.display = isOne ? "none" : "";
-    if (isOne) {
-      planMode = "manual";
-      $("planModeManual").classList.add("active"); $("planModeGen").classList.remove("active");
-      $("genPanel").style.display = "none";
-    }
-    renderPlanRows(); refreshPlanSum();
-  }
-  $("f-oneTime").addEventListener("change", syncOneTimeUI);
-  // 这几个"公式生成"专属字段不用HTML5原生required（它们跟#debtForm共用一个form，如果
-  // 停留在"公式生成"这个tab时点"保存"，原生表单校验会连带拦下主表单的提交——安卓WebView
-  // 又不会像桌面浏览器那样弹校验提示气泡，拦下之后就是彻底的"点了保存没反应"，很难排查。
-  // 校验改成这里手动做、用toast提示，不会有这个副作用。
-  $("doGen").addEventListener("click", function () {
-    var k = $("g-kind").value, first = $("g-first").value, spec = { kind: k, first: first };
-    if (!first) { toast("首期还款日必填"); return; }
-    if (k === "amort") {
-      spec.P = +$("g-P").value; spec.rate = +$("g-rate").value; spec.n = +$("g-n").value;
-      if (!spec.P || !$("g-rate").value || !spec.n) { toast("借款金额/年化/期数必填"); return; }
-    } else if (k === "equalfee") { spec.pp = +$("g-pp").value; spec.pf = +$("g-pf").value; spec.n = +$("g-n2").value; }
-    else if (k === "interestfirst") { spec.P = +$("g-P3").value; spec.rate = +$("g-rate3").value; spec.ni = +$("g-ni").value; spec.np = +$("g-np").value; }
-    else { spec.n = +$("g-nc").value; }
-    editingPlan = genPlan(spec);
-    setPlanMode("manual"); refreshPlanSum();
-    toast("已生成 " + editingPlan.length + " 期，可再逐行改");
-  });
-  $("addRow").addEventListener("click", function () {
-    if ($("f-oneTime").checked && editingPlan.length >= 1) return;
-    var last = editingPlan[editingPlan.length - 1]; var nd = (last && last.date) ? fmtDate(addMonths(parseDate(last.date), 1)) : "";
-    editingPlan.push({ date: nd, amount: 0, principal: 0, interest: 0, paid: false }); renderPlanRows(); refreshPlanSum();
-  });
-
-  function refreshPlanSum() {
-    var borrow = 0, remaining = 0, paidc = 0;
-    editingPlan.forEach(function (r) { borrow += +r.principal || 0; if (r.paid) paidc++; else remaining += +r.principal || 0; });
-    var apr = impliedAPR(editingPlan);
-    $("planSum").innerHTML = '<span class="c">借款金额 <b>¥' + fmt(borrow) + '</b></span><span class="c">剩余待还 <b>¥' + fmt(remaining) + '</b></span><span class="c">年化 <b>' + (apr ? apr.toFixed(2) + '%' : '0%') + '</b></span><span class="c">共 <b>' + editingPlan.length + '</b> 期 · 已还 <b>' + paidc + '</b></span>';
-  }
-  function linkRow(r) {
-    r.principal = +r.principal || 0; r.interest = +r.interest || 0;
-    r.amount = r2(r.principal + r.interest);
-  }
-  // "还款日（几号）"不再手动填，从还款计划第1期的日期里自动推出来——两者本来就该一致，
-  // 手动填一个跟计划对不上的数字没有意义。第1期还没填日期时留空。
-  function updateFDayFromPlan() {
-    var first = editingPlan[0], d = first && first.date ? parseDate(first.date) : null;
-    $("f-day").value = d ? d.getDate() : "";
-  }
-  function renderPlanRows() {
-    var box = $("planRows"); box.innerHTML = "";
-    updateFDayFromPlan();
-    var isOne = $("f-oneTime").checked;
-    var rows = isOne ? editingPlan.slice(0, 1) : editingPlan;
-    // 一次性还清时addRow的显隐跟以前一样只看是否已有那唯一1期；否则跟着手动/公式的切换器走。
-    $("addRow").style.display = isOne ? ((editingPlan.length >= 1) ? "none" : "") : (planMode === "manual" ? "" : "none");
-    $("batchBlock").style.display = isOne ? "none" : "";
-    rows.forEach(function (r, idx) {
-      var row = document.createElement("div"); row.className = "prow" + (r.paid ? " paid" : "");
-      row.innerHTML =
-        '<div class="r1"><span class="pn">第' + (idx + 1) + '期</span><input type="date" data-f="date">' +
-        '<label class="chk"><input type="checkbox" data-f="paid">已还</label>' +
-        '<button type="button" class="del">✕</button></div>' +
-        '<div class="r2">' +
-        '<div><span>金额</span><input type="number" step="0.01" min="0" inputmode="decimal" data-f="amount"></div>' +
-        '<div><span>本金</span><input type="number" step="0.01" min="0" inputmode="decimal" data-f="principal"></div>' +
-        '<div><span>利息/费</span><input type="number" step="0.01" min="0" inputmode="decimal" data-f="interest"></div>' +
-        '</div>';
-      var dEl = row.querySelector('[data-f="date"]'), aEl = row.querySelector('[data-f="amount"]'), pEl = row.querySelector('[data-f="principal"]'), iEl = row.querySelector('[data-f="interest"]'), cEl = row.querySelector('[data-f="paid"]');
-      dEl.value = r.date || ""; aEl.value = r.amount != null ? r.amount : ""; pEl.value = r.principal != null ? r.principal : ""; iEl.value = r.interest != null ? r.interest : ""; cEl.checked = !!r.paid;
-      dEl.addEventListener("change", function () { r.date = this.value; updateFDayFromPlan(); });
-      pEl.addEventListener("input", function () { r.principal = parseFloat(this.value) || 0; linkRow(r); aEl.value = r.amount; refreshPlanSum(); });
-      iEl.addEventListener("input", function () { r.interest = parseFloat(this.value) || 0; linkRow(r); aEl.value = r.amount; refreshPlanSum(); });
-      aEl.addEventListener("input", function () { r.amount = parseFloat(this.value) || 0; refreshPlanSum(); });
-      cEl.addEventListener("change", function () { r.paid = this.checked; row.classList.toggle("paid", r.paid); refreshPlanSum(); });
-      row.querySelector(".del").addEventListener("click", function () { editingPlan.splice(idx, 1); renderPlanRows(); refreshPlanSum(); });
-      box.appendChild(row);
-    });
-  }
-  // 批量设置"数值"框：选"还款日"时切换成"几号"(1-31整数)，选别的列切回普通金额输入。
-  // 29/30/31号不是每个月都有——批量工具投射的是"每月同一天"的重复规律，选这三天会导致
-  // 还款日在不同月份之间漂移(有的月28号有的月31号)，所以批量工具+公式生成的首期还款日
-  // 都不让选这三天；还款计划表格里逐行手动填的具体日期不受这条限制(那是真实数据，
-  // 现实中贷款确实可能就是某个月的30号到期)。
-  // isBadRepeatDay 已搬进 www/js/calc.js。
-  $("batchCol").addEventListener("change", function () {
-    var v = $("batchVal");
-    if (this.value === "date") { v.type = "number"; v.min = "1"; v.max = "28"; v.step = "1"; v.inputMode = "numeric"; v.placeholder = "几号（1-28）"; }
-    else { v.type = "number"; v.min = "0"; v.max = ""; v.step = "0.01"; v.inputMode = "decimal"; v.placeholder = "数值"; }
-    v.value = "";
-  });
-  // 按"几号"+"首期年月"批量铺日期：每期在首期基础上顺延一个月，日期统一为指定的几号。
-  function applyBatchDate(day, monthVal) {
-    var parts = monthVal.split("-"), y = +parts[0], m = +parts[1] - 1;
-    editingPlan.forEach(function (r, idx) {
-      var dt = new Date(y, m + idx, 1);
-      var lastDay = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate();
-      dt.setDate(Math.min(day, lastDay));
-      r.date = fmtDate(dt);
-    });
-    renderPlanRows(); refreshPlanSum();
-    toast("已批量设置还款日");
-  }
-  $("batchApply").addEventListener("click", function () {
-    var col = $("batchCol").value;
-    if (!editingPlan.length) { toast("还没有还款期，先加一期"); return; }
-    if (col === "date") {
-      var day = parseInt($("batchVal").value, 10);
-      if (!day || day < 1 || day > 31) { toast("先填几号（1-28）"); return; }
-      if (isBadRepeatDay(day)) { toast("29/30/31号不是每个月都有，批量设置只支持1-28号；这几天到期的话，请到下面还款计划里逐期手动填具体日期"); return; }
-      var defaultMonth = editingPlan[0].date ? editingPlan[0].date.slice(0, 7) : "";
-      ask("批量设置还款日", "首期是哪年哪月还？后续每期顺延一个月，日期统一为" + day + "号。", function (monthVal) {
-        if (!monthVal) { toast("请选择首期年月"); return; }
-        applyBatchDate(day, monthVal);
-      }, { month: defaultMonth });
-      return;
-    }
-    var val = parseFloat($("batchVal").value);
-    if (isNaN(val)) { toast("先填一个数值"); return; }
-    if (val < 0) { toast("数值不能是负数"); return; }
-    function apply() {
-      editingPlan.forEach(function (r) {
-        if (col === "amount") { r.principal = 0; r.interest = 0; r.amount = r2(val); }
-        else { r[col] = r2(val); linkRow(r); }
-      });
-      renderPlanRows(); refreshPlanSum();
-      toast("每期" + ({ amount: "金额", principal: "本金", interest: "利息" }[col]) + "已设为 " + val);
-    }
-    if (col === "amount") { ask("批量设置金额", "金额由本金+利息自动算出，直接批量设金额会把每期的本金和利息清空为 0，之后需要自己重新填。确定继续？", apply); }
-    else { apply(); }
-  });
-  function openEdit(i) {
-    editIndex = i; var d = i >= 0 ? debts[i] : {};
-    $("sheetTitle").textContent = i >= 0 ? "编辑债务" : "新增债务";
-    $("f-name").value = d.name || ""; $("f-funder").value = d.funder || ""; $("f-type").value = d.type || "银行贷";
-    $("f-opened").value = d.opened || ""; $("f-notes").value = d.notes || ""; $("f-oneTime").checked = !!d.oneTime;
-    editingPlan = clone(d.plan || []);
-    oneTimeStash = [];
-    var g = d.gen || {}; $("g-kind").value = g.kind || "amort"; setGenUI($("g-kind").value);
-    $("g-P").value = g.P || ""; $("g-rate").value = g.rate || ""; $("g-n").value = g.n || "";
-    $("g-pp").value = g.pp || ""; $("g-pf").value = g.pf || ""; $("g-n2").value = g.n || "";
-    $("g-P3").value = g.P || ""; $("g-rate3").value = g.rate || ""; $("g-ni").value = g.ni || ""; $("g-np").value = g.np || "";
-    $("g-nc").value = ""; $("g-first").value = g.first || d.opened || "";
-    setPlanMode("manual");
-    syncOneTimeUI();
-    $("deleteBtn").style.display = i >= 0 ? "block" : "none";
-    $("scrimEdit").classList.add("open"); $("editSheet").classList.add("open");
-    $("editSheet").scrollTop = 0;
-    lockScroll();
-  }
-  function closeEdit() { if (!$("editSheet").classList.contains("open")) return; $("scrimEdit").classList.remove("open"); $("editSheet").classList.remove("open"); editIndex = -1; unlockScroll(); }
+  // setGenUI/setPlanMode/syncOneTimeUI/doGen点击handler/addRow点击handler/refreshPlanSum/
+  // linkRow/updateFDayFromPlan/renderPlanRows/batchCol change handler/applyBatchDate/
+  // batchApply点击handler/saveForm——这一整块(#editSheet的实际内容：表单字段/公式生成器/
+  // 批量设置/oneTimeStash状态机)已经整体搬进React(react/src/sheets/EditSheet.tsx、
+  // GenPanel.tsx、PlanRows.tsx、BatchBlock.tsx)，逻辑原样复刻，vanilla这边只留setDebt(i,obj)
+  // 这一个narrow的写入函数(定义在deleteDebt旁边)。见CLAUDE.md"React 迁移"一节"第六步"。
 
   // 还款提醒通知设置面板。规则全局共享(不按债务区分)，跟着每笔债务当下的nextDate
   // 自动滚动到下一期(syncNotifications里体现)，这里只管开关状态和规则的增删。
-  // offsetLabel 已搬进 www/js/calc.js。
+  // offsetLabel 已搬进 www/js/calc.js。#notifySheet本身继续100%vanilla，跟这次
+  // #editSheet的React迁移无关。
   function renderNotifyRules() {
     var list = $("notifyRuleList"); list.innerHTML = "";
     if (!notify.rules.length) { list.innerHTML = '<div class="footnote" style="margin:4px 2px 8px;text-align:left">还没有提醒规则，添加一条吧</div>'; return; }
@@ -1803,33 +1506,28 @@
   });
   $("notifyDoneBtn").addEventListener("click", closeNotifySheet);
   $("scrimNotify").addEventListener("click", closeNotifySheet);
-  function saveForm(e) {
-    e.preventDefault();
-    var name = $("f-name").value.trim(); if (!name) return;
-    if (!$("f-opened").value) { toast("借款日必填"); return; }
-    if (!editingPlan.length) { toast("至少要有一期还款计划才能保存"); return; }
-    // 还款日(几号)不再单独校验用户是否手填了1-31——它现在完全由第1期的实际日期推出来，
-    // 只要第1期日期填了(下面这个循环会连带校验)，这里就一定有值。
-    var firstDateObj = parseDate(editingPlan[0].date);
-    if (!firstDateObj) { toast("第 1 期的还款日期必须填写"); return; }
-    var fday = firstDateObj.getDate();
-    for (var k = 0; k < editingPlan.length; k++) {
-      var r = editingPlan[k];
-      if (r.amount < 0 || r.principal < 0 || r.interest < 0) { toast("第 " + (k + 1) + " 期的金额/本金/利息不能是负数"); return; }
-      if (r.principal === 0 && r.interest === 0) { toast("第 " + (k + 1) + " 期的本金和利息不能同时为0"); return; }
+
+  // closeDetail()/closeEdit()都已删除——这个函数现在直接桥接给React的EditSheet"删除"按钮调用
+  // (window.__azBridge.deleteDebt)，确认+删除逻辑保持100%vanilla不变；EditSheet自己有一个
+  // effect监听debts变化，发现正在编辑的这条已经不在数组里了就自动关闭，不需要这里显式回调。
+  function deleteDebt(i) { ask("删除债务", "彻底删除「" + debts[i].name + "」？\n这不是结清，是从记录里移除。", function () { debts.splice(i, 1); saveAll(); renderAll(); toast("已删除"); }); }
+
+  // #editSheet的实际内容(表单/公式生成器/批量设置/oneTimeStash状态机)已经整体搬进React
+  // (react/src/sheets/EditSheet.tsx等，见CLAUDE.md"React 迁移"一节)，vanilla这边只保留
+  // setDebt(i,obj)这一个narrow的写入函数——i>=0覆盖debts[i](沿用原saveForm()的做法，
+  // 合并old.settled/old.settledDate，不让"编辑一条已结清的债务"意外把它变回在还状态)，
+  // i<0是新增(push)。故意不在这里顺带调用saveAll()/renderAll()——保持跟commitReorder一样的
+  // 细粒度调用惯例，React保存时自己依次调setDebt→saveAll→renderAll三个桥接函数。
+  function setDebt(i, obj) {
+    if (i >= 0) {
+      var old = debts[i];
+      obj.settled = old.settled; obj.settledDate = old.settledDate;
+      debts[i] = obj;
+    } else {
+      debts.push(obj);
     }
-    var obj = { name: name, funder: $("f-funder").value.trim(), type: $("f-type").value, opened: $("f-opened").value, day: fday, notes: $("f-notes").value.trim(), oneTime: $("f-oneTime").checked || editingPlan.length === 1, plan: clone(editingPlan) };
-    var gk = $("g-kind").value, g = { kind: gk, first: $("g-first").value };
-    if (gk === "amort") { g.P = +$("g-P").value; g.rate = +$("g-rate").value; g.n = +$("g-n").value; }
-    else if (gk === "equalfee") { g.pp = +$("g-pp").value; g.pf = +$("g-pf").value; g.n = +$("g-n2").value; }
-    else if (gk === "interestfirst") { g.P = +$("g-P3").value; g.rate = +$("g-rate3").value; g.ni = +$("g-ni").value; g.np = +$("g-np").value; }
-    else { g.n = +$("g-nc").value; }
-    obj.gen = g;
-    if (editIndex >= 0) { var old = debts[editIndex]; obj.settled = old.settled; obj.settledDate = old.settledDate; debts[editIndex] = obj; }
-    else { debts.push(obj); }
-    recompute(obj); saveAll(); renderAll(); closeEdit(); toast("已保存 ✓");
+    recompute(obj);
   }
-  function deleteDebt(i) { ask("删除债务", "彻底删除「" + debts[i].name + "」？\n这不是结清，是从记录里移除。", function () { debts.splice(i, 1); saveAll(); renderAll(); closeEdit(); closeDetail(); toast("已删除"); }); }
 
   // esc/inline/isHr/mdToHtml 已搬进 www/js/calc.js（纯文本转换，不碰DOM）。
   function download(filename, content, mime) {
@@ -1881,15 +1579,13 @@
   }
 
   function renderAccountUI() {
-    if (account) {
-      $("accountAvatarImg").src = account.avatarUrl || "";
-      $("accountNameText").textContent = account.nickname || "";
-    }
     var gate = $("loginGate");
     gate.classList.toggle("authed", !!account);
     if (!account) gate.classList.add("open");
-    // #topAvatarImg(头像入口)现在归React的Header组件渲染(见window.__azBridge.getAccount())，
-    // 这里不再直接操作那个DOM节点，改成派发通用状态变化事件让React自己重新读取account。
+    // 头像/昵称(在还债务页的#topAvatarImg、"我的"页的头像区)现在都归React渲染(分别是
+    // react/src/debts/Header.tsx、react/src/mine/AccountHeader.tsx，都读
+    // window.__azBridge.getAccount())，这里不再直接操作那两处DOM节点，改成派发通用
+    // 状态变化事件让React自己重新读取account。
     window.dispatchEvent(new CustomEvent("az:state-changed"));
   }
 
@@ -1901,16 +1597,13 @@
   function openAccountScreen() { renderAccountDetail(); $("accountScreen").classList.add("open"); lockScroll(); }
   function closeAccountScreen() { if (!$("accountScreen").classList.contains("open")) return; $("accountScreen").classList.remove("open"); unlockScroll(); }
 
-  // 订阅页：单一 Premium，一份功能列表 + 三张价卡（买断/月/年）共享互斥选中态。
-  function renderPremiumEntryCard() {
-    var label = premiumLabel(premium);
-    $("premiumEntryCard").classList.toggle("is-member", !!label);
-    $("premiumEntryTitle").textContent = label || "升级 Premium";
-    $("premiumEntrySub").textContent = label ? "查看会员详情" : "云备份 · 报表导出 · AI 债务顾问";
-  }
   // renderAIBanner()已经搬进React(react/src/debts/AiBanner.tsx)，判断逻辑没变
   // (还是调用calc.js的hasPremium(premium))，只是渲染目标从vanilla的#aiBannerBtn
-  // 变成了React组件。
+  // 变成了React组件。renderPremiumEntryCard()同理已经搬进
+  // react/src/mine/PremiumEntryCard.tsx(逻辑原样复刻，同样调用calc.js的
+  // premiumLabel(premium))，vanilla这份连同各处调用点一并删除，premium变化时
+  // 已有的az:state-changed派发足够让React的usePremium()自动跟上，不需要vanilla
+  // 再单独渲染。
   // 单一 Premium：三张价卡（买断/月/年）共享一份互斥选中态。
   var premiumPlanSel = "onetime";
   function openPremiumScreen() {
@@ -2483,7 +2176,7 @@
         }).catch(function () {});
       }));
     }).then(function () { loadUploads(); }).then(function () {
-      renderFiles(); docSel = -1; renderDocContent(); renderAll(); renderAccountDetail(); renderPremiumEntryCard();
+      renderFiles(); docSel = -1; renderDocContent(); renderAll(); renderAccountDetail();
     });
   }
   function confirmDeleteBackup(id) {
@@ -2526,6 +2219,19 @@
         return blobToDataURL(it.blob).then(function (dataURL) { return { id: it.id, name: it.name, title: it.title, mime: it.mime, addedAt: it.addedAt, dataURL: dataURL }; });
       }));
     }).catch(function () { return []; });
+  }
+  // "下载备份文件"按钮原来的inline click handler，抽成具名函数是为了桥接给React
+  // (react/src/mine/DataCards.tsx通过window.__azBridge.downloadBackupFile()调用)——
+  // 零DOM依赖(只读debts/docs+uploadsForBackup()造Blob)，逻辑本身继续100%vanilla，
+  // 跟exportReportXlsx/exportReportPdf是同一类"抽函数+桥接触发点"的处理。
+  function downloadBackupFile() {
+    toast("正在打包备份…");
+    uploadsForBackup().then(function (uploadsBackup) {
+      var payload = { version: 6, exportedAt: new Date().toISOString(), debts: debts, docs: docs, uploads: uploadsBackup };
+      var d = new Date(), yymmdd = String(d.getFullYear() % 100).padStart(2, "0") + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
+      var blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+      saveToDeviceDownloads(blob, "AfterZero备份" + yymmdd + ".json", "application/json");
+    });
   }
   function restoreUploads(list) {
     if (!window.indexedDB) return Promise.reject(new Error("no indexedDB"));
@@ -2640,18 +2346,11 @@
   // 后续的pointermove。全局阻止contextmenu是让自定义长按手势能正常收到
   // 后续事件的关键一步，跟上面的user-select是两回事，缺一不可。
   document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
-  $("cancelBtn").addEventListener("click", closeEdit);
-  $("deleteBtn").addEventListener("click", function () { if (editIndex >= 0) deleteDebt(editIndex); });
-  $("debtForm").addEventListener("submit", saveForm);
-  $("scrimEdit").addEventListener("click", closeEdit);
-  $("dEdit").addEventListener("click", function () { var i = detailIndex; closeDetail(); openEdit(i); });
-  $("dSale").addEventListener("click", function () { if (detailIndex >= 0) payInstallment(detailIndex); });
-  $("dSimulate").addEventListener("click", function () {
-    var i = detailIndex; if (i < 0) return;
-    closeDetail(); openSimScreen(i); // 提前还款模拟器已改免费，无门禁
-  });
-  $("dSettle").addEventListener("click", function () { if (detailIndex >= 0) settleFull(detailIndex); });
-  $("dClose").addEventListener("click", closeDetail);
+  // cancelBtn/deleteBtn/debtForm submit/scrimEdit(编辑表单按钮+背景)、dEdit/dSale/dSimulate/
+  // dSettle/dClose/scrimDetail(详情窗按钮+背景)都已经不在vanilla DOM里了(react/src/sheets/
+  // EditSheet.tsx、DetailSheet.tsx整个接管)，这里不再需要重复绑监听器——setDebt/deleteDebt/
+  // settleFull/openSimScreen这几个函数改成通过window.__azBridge桥接给React调用(见下面桥接
+  // 对象定义)，payInstallment本来就已经桥接过。
   $("simBackBtn").addEventListener("click", closeSimScreen);
   $("simModeOnce").addEventListener("click", function () { setSimMode("once"); });
   $("simModeRecurring").addEventListener("click", function () { setSimMode("recurring"); });
@@ -2659,9 +2358,10 @@
   // 两个导出按钮的premium门禁+click逻辑已经原样搬进了React的ExportActions.tsx
   // (通过window.__azBridge.exportReportXlsx/exportReportPdf调用)，这两个id对应的
   // <button>也已经不在vanilla渲染的DOM里了，这里不再需要重复绑一份监听器。
-  $("docsEntryBtn").addEventListener("click", openDocsScreen);
+  // "我的"tab整体React化后(react/src/mine/)，docsEntryBtn/backupEntryBtn同理不再在
+  // vanilla DOM里，门禁+跳转逻辑原样复刻进了DataCards.tsx，通过window.__azBridge.
+  // openDocsScreen/openBackupScreen调用，这里不再需要重复绑监听器。
   $("docsBackBtn").addEventListener("click", closeDocsScreen);
-  $("backupEntryBtn").addEventListener("click", function () { if (!hasPremium(premium)) { openPremiumScreen(); return; } openBackupScreen(); });
   $("backupBackBtn").addEventListener("click", closeBackupScreen);
   $("backupCreateBtn").addEventListener("click", createCloudBackup);
   $("aiBackBtn").addEventListener("click", closeAiScreen);
@@ -2679,9 +2379,6 @@
     this.style.height = "auto";
     this.style.height = Math.min(this.scrollHeight, 90) + "px";
   });
-  $("scrimDetail").addEventListener("click", closeDetail);
-  initGripDrag($("editSheet"), $("editSheet").querySelector(".grip"), closeEdit, false);
-  initGripDrag($("detailSheet"), $("detailSheet").querySelector(".grip"), closeDetail, true);
   window.__handleBackButton = function () {
     // 抖动编辑模式(jiggleMode)现在是React状态(react/src/debts/DebtList.tsx)，vanilla这边
     // 看不到——React挂载时会把这个判断以window.__azDebtsBack的形式注册回来，同一个"最上层
@@ -2697,15 +2394,18 @@
     if ($("premiumScreen").classList.contains("open")) { closePremiumScreen(); return true; }
     if ($("accountScreen").classList.contains("open")) { closeAccountScreen(); return true; }
     if ($("notifySheet").classList.contains("open")) { closeNotifySheet(); return true; }
-    if ($("editSheet").classList.contains("open")) { closeEdit(); return true; }
-    if ($("detailSheet").classList.contains("open")) { closeDetail(); return true; }
+    // editSheet/detailSheet同理已经是React状态(react/src/sheets/EditSheet.tsx、DetailSheet.tsx)，
+    // vanilla看不到，判断逻辑物理上也不在这个文件里了——跟jiggleMode那条(window.__azDebtsBack)
+    // 是同一个模式。editSheet排在detailSheet之前(位置沿用原来#editSheet在DOM里的顺序)。
+    if (window.__azEditSheetBack && window.__azEditSheetBack()) return true;
+    if (window.__azDetailSheetBack && window.__azDetailSheetBack()) return true;
     return false;
   };
-  $("accountAvatarBtn").addEventListener("click", openAccountScreen);
-  // #topAvatarBtn的点击现在由React的Header组件直接处理(调用桥接的openAccountScreen，
-  // 见window.__azBridge)，这里不用再挂一份监听器——那个DOM节点已经不存在于vanilla里了。
+  // #topAvatarBtn(在还债务页头像)的点击由React的Header组件直接处理(调用桥接的
+  // openAccountScreen，见window.__azBridge)；"我的"页自己的accountAvatarBtn/
+  // premiumEntryBtn同理已经是react/src/mine/(AccountHeader.tsx/PremiumEntryCard.tsx)
+  // 的地盘，这几个DOM节点都已经不存在于vanilla里了，这里不再需要重复绑监听器。
   $("accountBackBtn").addEventListener("click", closeAccountScreen);
-  $("premiumEntryBtn").addEventListener("click", function () { openPremiumScreen(); });
   $("premiumBackBtn").addEventListener("click", closePremiumScreen);
   $("termsLink").addEventListener("click", openTermsScreen);
   $("termsBackBtn").addEventListener("click", closeTermsScreen);
@@ -2763,16 +2463,10 @@
     renderAccountUI();
     toast("已退出登录");
   });
-  $("dlBackupBtn").addEventListener("click", function () {
-    toast("正在打包备份…");
-    uploadsForBackup().then(function (uploadsBackup) {
-      var payload = { version: 6, exportedAt: new Date().toISOString(), debts: debts, docs: docs, uploads: uploadsBackup };
-      var d = new Date(), yymmdd = String(d.getFullYear() % 100).padStart(2, "0") + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
-      var blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
-      saveToDeviceDownloads(blob, "AfterZero备份" + yymmdd + ".json", "application/json");
-    });
-  });
-  $("importFileBtn").addEventListener("click", function () { $("importFileInput").click(); });
+  // dlBackupBtn/importFileBtn(react/src/mine/DataCards.tsx里的"下载备份文件"/"上传备份文件"
+  // 按钮)已经不在vanilla DOM里了，下载逻辑抽成了上面的downloadBackupFile()、通过桥接调用；
+  // "上传备份文件"改成下面这个新函数，间接点击还留在vanilla DOM里的#importFileInput。
+  function triggerImportFilePicker() { $("importFileInput").click(); }
   $("importFileInput").addEventListener("change", function (e) {
     var file = e.target.files[0]; if (!file) return;
     var input = e.target;
@@ -2831,8 +2525,8 @@
     // 保证每次都拿到当前最新的那个引用。
     getPremium: function () { return premium; },
     getAccount: function () { return account; },
-    openDetail: openDetail,
-    openEdit: openEdit,
+    // openDetail/openEdit都已删除——打开详情窗/编辑表单现在都是纯React状态(shared/state.ts的
+    // openDetailSheet/openEditSheet)，不再经过这个桥接对象，见react/src/sheets/。
     payInstallment: payInstallment,
     unsettle: unsettle,
     commitReorder: commitReorder,
@@ -2841,12 +2535,31 @@
     openPremiumScreen: openPremiumScreen,
     openAiScreen: openAiScreen,
     openAccountScreen: openAccountScreen,
+    // detailSheet(react/src/sheets/)新增：#dSettle/#dSimulate这两个按钮以前只在vanilla内部
+    // 调用，现在按钮由React渲染，需要显式桥接。
+    settleFull: settleFull,
+    openSimScreen: openSimScreen,
     getNotify: function () { return notify; },
     openNotifySheet: openNotifySheet,
     exportReportXlsx: exportReportXlsx,
-    exportReportPdf: exportReportPdf
+    exportReportPdf: exportReportPdf,
+    // "我的"tab(react/src/mine/)新增：全部trigger-only，#accountScreen/#premiumScreen/
+    // #backupScreen/#docsScreen这几个subpage、以及备份文件打包/解析/系统文件选择器，
+    // 全部继续100%vanilla，不重新实现。
+    openDocsScreen: openDocsScreen,
+    openBackupScreen: openBackupScreen,
+    downloadBackupFile: downloadBackupFile,
+    triggerImportFilePicker: triggerImportFilePicker,
+    // editSheet(react/src/sheets/EditSheet.tsx)新增：setDebt是保存写入(见上面定义处的注释)，
+    // deleteDebt是原样暴露的既有vanilla函数(自带ask()确认+splice+saveAll+renderAll)，
+    // toast是#flash单例的简单passthrough，confirmAsync是ask()的Promise外壳(批量设置还款日/
+    // 金额要在纯React状态上await结果，见askAsync()定义处的注释)。
+    setDebt: setDebt,
+    deleteDebt: deleteDebt,
+    toast: toast,
+    confirmAsync: askAsync
   };
 
-  renderFiles(); renderDocContent(); renderAll(); loadUploads(); renderAccountUI(); renderPremiumEntryCard();
+  renderFiles(); renderDocContent(); renderAll(); loadUploads(); renderAccountUI();
 })();
 </script>

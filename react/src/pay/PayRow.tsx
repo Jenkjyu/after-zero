@@ -6,10 +6,11 @@ import { useEffect, useRef } from "react";
 import type { Debt } from "../types";
 import type { PayGestureCtx } from "./gestures";
 import { closePaySwipe, onPayPointerDown, onPayTouchStart } from "./gestures";
+import { openDetailSheet } from "../shared/state";
 
 export interface PayRowProps {
   d: Debt;
-  i: number; // debts数组下标——openDetail/payInstallment都按下标寻址
+  i: number; // debts数组下标——openDetailSheet/payInstallment都按下标寻址
   next: Date;
   diff: number;
   ctx: PayGestureCtx;
@@ -39,7 +40,7 @@ export function PayRow({ d, i, next, diff, ctx }: PayRowProps) {
     if (row.__justDragged) { row.__justDragged = false; return; }
     if (row.dataset.open === "1") { closePaySwipe(ctx, row); return; }
     if (ctx.openSwipeRowRef.current && ctx.openSwipeRowRef.current !== row) { closePaySwipe(ctx, ctx.openSwipeRowRef.current); return; }
-    window.__azBridge.openDetail(i);
+    openDetailSheet(i);
   }
 
   function onSwipeBtnClick() {

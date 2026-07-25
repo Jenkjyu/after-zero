@@ -36,17 +36,49 @@
 
 **`summarizeDebts(debts)`是2026-07-24"React 迁移第二步"落地"在还债务"页时新增的第40个函数**：从vanilla`renderSummary()`内联的聚合逻辑（`total`/`monthly`/`paidPrincipal`/`paidInterest`/`active`/`settled`/`pct`）抽出来的纯函数——vanilla那份`renderSummary()`本身已经在这次迁移里整个删除（改由React调用这个函数），抽出来纯粹是为了同一份聚合数学被React组件复用，不是"这次批量整理31个函数"那一轮的产物，详见下面"React 迁移"一节。
 
-## React 迁移：`react/` + "在还债务"页（绞杀者模式第一站）→ "还款日"+"统计"（第三步）
+## React 迁移：`react/` + "在还债务"页（绞杀者模式第一站）→ "还款日"+"统计"（第三步）→ "我的"（第四步，四个tab全部完成）→ `#detailSheet`（第五步，第一个非tab入口）→ `#editSheet`（第六步，全项目最复杂的一块UI）
 
 "六续"定的三步走方向（React迁移+测试优先）第二步：**"在还债务" tab（app最核心、交互最复杂的页面——长按拖拽排序、左滑手势、玻璃卡片）整体由React接管**，走的是绞杀者模式（逐页面替换），这是第一站——之所以先啃最难的页面，是因为它风险和调试成本最高，但也是用户使用最频繁、出问题影响最大的页面，先做完这个，后面的页面都不算难。
 
-**第三步：判断"还款日"（repayment reminders）和"统计"（stats/report）这两个tab都足够简单、且第二步已经把基础设施（桥接契约/构建工具/测试约定）搭好了，合并成一轮一起迁移。** 现在只剩"我的"tab和所有subpage/sheet（详情窗、编辑窗、账户页、通知设置面板等）继续是现有vanilla JS，其余三个tab（在还债务/还款日/统计）全部由React接管，两边共享同一份`localStorage`数据。
+**第三步：判断"还款日"（repayment reminders）和"统计"（stats/report）这两个tab都足够简单、且第二步已经把基础设施（桥接契约/构建工具/测试约定）搭好了，合并成一轮一起迁移。** 当时剩"我的"tab和所有subpage/sheet（详情窗、编辑窗、账户页、通知设置面板等）继续是现有vanilla JS，其余三个tab（在还债务/还款日/统计）全部由React接管，两边共享同一份`localStorage`数据。
+
+**第四步（绞杀者模式最后一站）：把"我的"tab本身也迁移到React，四个tab至此全部由React接管。** "我的"tab跟"统计"一样属于风险最低的一类——纯data→JSX展示，没有手势、没有tab内部状态，唯一的"逻辑"是Premium入口卡的文案/class计算（原样复刻自vanilla已删除的`renderPremiumEntryCard()`）。**这次迁移的边界卡得很清楚：只搬"我的"tab本身这层展示壳，它链接到的subpage（`#accountScreen`/`#premiumScreen`/`#backupScreen`/`#docsScreen`等）一个都没有重新实现**，React新增的4个桥接函数（`openDocsScreen`/`openBackupScreen`/`downloadBackupFile`/`triggerImportFilePicker`）全部是"trigger-only"——点击后调用vanilla函数打开对应subpage/触发对应流程，跟`openDetail`/`openEdit`当年的处理方式完全一致，**"我的"tab现在是最后一处能干净套用这条模式的地方了，往后如果再有subpage/sheet要迁移（比如账户页/订阅页本身），会是完全不同、量级更大的一批工作，不能照搬这次的轻量套路**。
+
+`react/src/mine/`4个文件：`AccountHeader.tsx`（头像+昵称，读`useAccount()`）、`PremiumEntryCard.tsx`（Premium入口卡，读`usePremium()`，文案逻辑原样复刻`renderPremiumEntryCard()`）、`DataCards.tsx`（云备份/档案库/下载备份/上传备份4张纯操作卡，云备份是唯一带`hasPremium()`门禁的）、`App.tsx`（组合以上三个，无`section-label`——原vanilla `#view-data`就没有标题）。
+
+**"下载备份文件"/"上传备份文件"这两个按钮背后的真实逻辑，处理方式分别对应"React 迁移"契约里的两种既有模式**：
+- **"下载备份文件"**：原来是`dlBackupBtn`的inline click handler（`toast+uploadsForBackup().then(...)+saveToDeviceDownloads(...)`），零DOM依赖，直接抽成具名函数`downloadBackupFile()`桥接给React——跟`exportReportXlsx`/`exportReportPdf`当年的处理是同一类。
+- **"上传备份文件"**：这个按钮背后是一个隐藏的`<input type="file" id="importFileInput">`+它的`change`监听器（`FileReader`→`JSON.parse`→`ask()`确认弹窗→覆盖`debts`/`docs`→`saveAll()`/`renderAll()`→`restoreUploads()`），逻辑不是零DOM依赖（依赖`ask()`这个vanilla专属的确认弹窗组件），**这个`<input>`元素和它的`change`监听器完整保留在vanilla**，只是从原来"挂在`#view-data`里面"变成"挂在折叠后的挂载点外面、跟`#uploadInput`同一类'游离在具体卡片外的隐藏文件输入'"。React这边新增的`triggerImportFilePicker()`桥接函数就一行：`$("importFileInput").click()`，只负责间接点开这个还留在vanilla DOM里的input，不碰它背后的任何业务逻辑。
+
+**这次顺带删除了两处vanilla死代码**：`renderPremiumEntryCard()`整个函数（DOM目标`#premiumEntryCard`/`#premiumEntryTitle`/`#premiumEntrySub`全部随HTML折叠消失，逻辑原样搬进了`PremiumEntryCard.tsx`）+ 它的4处调用点（`applyRedeemTier`、`__debugPremium`、备份恢复流程、初始加载）；`renderAccountUI()`只删了`if(account){...}`那个写`#accountAvatarImg`/`#accountNameText`的DOM块，函数本身保留（`#loginGate`的`.authed`/`.open`切换+`az:state-changed`派发这两个职责跟"我的"tab无关，不能连函数一起删）。这4处`renderPremiumEntryCard()`调用点删除后没有功能缺口——它们所在的语句本来就已经各自独立派发`az:state-changed`（或者紧邻的`renderAll()`已经会派发），React的`usePremium()`能自动跟上。
+
+**第五步：`#detailSheet`（债务详情窗）——第一个不属于任何tab、常驻挂载的React入口，也是第一次把sheet的实际内容（不只是容器）搬进React。** 用户明确选择只做`#detailSheet`，`#editSheet`（新增/编辑表单，全项目最复杂的一块UI——公式生成器、批量设置还款日、`oneTimeStash`等状态机分散在DOM里，见"新增/编辑债务表单"一节）留作独立的后续任务，这次完全不碰，`openEdit`继续保持是vanilla函数、被React按索引调用（`#editSheet`本身在下面"第六步"完成迁移，`openEdit`这个桥接函数也随之整个删除）。
+
+**架构上的核心新问题**：`#detailSheet`被"在还债务"（`react-debts-root`）和"还款日"（`react-pay-root`）**两棵独立的React树**通过命令式调用触发打开，不属于任一个tab——不能再用"tab自己的挂载点+自己的React树"这套已经跑通4次的模式。解法是新增第5个Vite入口`react/src/sheets/`，产出`www/js/react-debts/sheets.js`，挂到一个**不放在任何`.view`里、跟四个`react-*-root`平级、全程常驻**的`<div id="react-sheets-root">`（原来`#scrimDetail`+`#detailSheet`所在的那个位置，直接原地替换）。"打开/关闭这个sheet"这件事本身也不再经过`window.__azBridge`——`react/src/shared/state.ts`新增`openDetailSheet(i)`/`closeDetailSheet()`/`useDetailSheetIndex()`，模块级变量+独立的`az:detail-sheet-changed`事件（不复用`az:state-changed`，两者服务的是不同的问题：一个是"哪个sheet开着"，一个是"debts/premium/account数据变了"），`DebtCard.tsx`/`PayRow.tsx`两棵树都直接`import`调用这两个函数，不再桥接给vanilla。`window.__azBridge`里`openDetail`这一项整个删除（vanilla的`openDetail(i)`/`closeDetail()`函数体连同`kv()`辅助函数一起删掉，逻辑原样复刻进`DetailSheet.tsx`），新增`settleFull`/`openSimScreen`两个trigger-only桥接（`#dSettle`"提前结清"、`#dSimulate`"提前还款模拟"这两个按钮以前只在vanilla内部调用，现在按钮由React渲染，需要显式暴露）。
+
+vanilla这边`payInstallment(i)`/`settleFull(i)`都被精简过：原来末尾`if (d.settled) closeDetail(); else if (detailIndex === i) openDetail(i);`（结清就关、没结清就原地刷新）这行整个删除——React的`DetailSheet`组件订阅同一份`debts`，`renderAll()`派发的`az:state-changed`会让它自动重渲染，没结清时天然原地刷新，结清时靠组件自己的一个effect（`if (openIndex !== null && (!debts[openIndex] || debts[openIndex].settled)) closeDetailSheet();`）自动关闭，vanilla不需要再显式回调；`detailIndex`模块变量本身也整个删除（`editIndex`/`docSel`还在同一行，只删这一个）。返回键链最后一项换成反向桥接`window.__azDetailSheetBack`（照抄`DebtList.tsx`注册`__azDebtsBack`的模式），`deleteDebt(i)`里原来防御性调用的`closeDetail()`也顺手删了（这个入口只能从editSheet内部触发，而editSheet只能从detailSheet的"编辑"按钮打开，那一步已经调用过`closeDetailSheet()`，走到删除这一步时detailSheet早就关了）。
+
+**⚠️真机会真实踩到、这次也确实踩到的一个坑：`useDebts()`在`debts`数组被原地mutate（不整体重新赋值）时完全不会触发重渲染，不是"渲染了但显示旧值"，是整个组件根本不重渲染。** `payInstallment`/`settleFull`/`unsettle`改的都是`debts`数组*里的元素*（`r.paid=true`/`d.settled=true`），不是`debts`这个变量本身（只有`commitReorder`/`applyBackupData`/导入JSON三处会整体重新赋值，见下面`getDebts`那条注释）——`renderAll()`确实照常派发了`az:state-changed`，但`useSyncExternalStore`拿到的`getSnapshot()`返回值（`window.__azBridge.getDebts()`）前后是**同一个数组引用**，React按`Object.is`判定"没变"，直接跳过这次重渲染。这次开发`DetailSheet.tsx`时先写了"结清自动关闭"的effect，用Playwright一测发现代码逻辑上完全正确却死活不生效，最后是从`shared/state.ts`层面单独写一个最小复现（一个只用`useDebts()`的`Probe`组件）才定位到问题不在`DetailSheet`，而在这个被4个tab+现在的sheet共同依赖的底层hook——**这个bug理论上从"在还债务"tab迁移那一刻就存在，只是之前的测试都没有精确到"改一个字段后立刻用exact value断言"这个粒度，被"看起来数据早晚会因为别的原因也跟着刷新一次"的巧合掩盖过去了**。
+
+修法：`useDebts()`的`getSnapshot`不再直接返回`window.__azBridge.getDebts()`的原始引用，改成维护一个浅拷贝缓存——`az:state-changed`触发的订阅回调里把缓存标记为"脏"（不管是不是debts真的变了，这个事件本来就是通用的"有什么变了"信号，标脏成本可忽略）；`getSnapshot`发现缓存是脏的**或者**底层引用本身变了（覆盖`commitReorder`那三处整体重新赋值的场景，也顺带覆盖了"测试里换了个全新mock bridge"这种引用变化）就重新`.slice()`一份新数组返回，两者都没发生时返回上一次缓存的同一个引用——跟`useNotify()`那条"按fingerprint比较、别每次都返回新引用"的坑是同一个技术根源（都是"值变了才生成新引用"），但触发条件更简单，不需要像notify那样按内容算fingerprint。**这是这个hook自身的改动，不是detailSheet专属的——`DebtList`/`PayList`/`ReportApp`等所有用`useDebts()`的地方全部受益，以后如果再遇到"数据明明改了、UI却卡在旧画面"这类反馈，先怀疑是不是又在哪加了一处"原地mutate debts、不整体重新赋值"的新代码，而不是重新怀疑`az:state-changed`有没有正确派发。**
+
+**第六步：`#editSheet`（新增/编辑债务表单）——detailSheet那轮明确留到独立后续任务的那块"全项目最复杂的一块UI"，公式生成器+批量设置还款日+`oneTimeStash`状态机全部原样搬进React。** 挂载点复用detailSheet已经建好的`#react-sheets-root`/`sheets`这个Vite entry（`App.tsx`当年的注释就写着"editSheet迁移时会加进来"），不新开第6个entry。开关状态同一个模式：`shared/state.ts`新增`openEditSheet(i)`/`closeEditSheet()`/`useEditSheetIndex()`，独立的`az:edit-sheet-changed`事件，`i=-1`是新增模式（沿用vanilla原来`editIndex=-1`的含义）。`react/src/sheets/`新增4个文件：`EditSheet.tsx`（sheet外壳+顶层字段+`editingPlan`/`oneTimeStash`/`planMode`等核心状态+保存/删除/取消）、`GenPanel.tsx`（公式生成器）、`PlanRows.tsx`（手动逐行编辑）、`BatchBlock.tsx`（批量设置）。
+
+**关键设计决定：批量设置还款日/金额这两处确认弹窗，没有在React里另建一套UI，而是给vanilla共享的`ask()`加了一层Promise外壳复用同一个`#modalScrim`单例。** 这是讨论时用户明确要求的——迁移后触发这两个确认的数据（`editingPlan`）变成纯React状态，vanilla没法再插手改，但这个弹窗以后还要接着优化视觉/交互，做成两份实现（vanilla一份、React一份）以后改一次要同步改两处，用户不想要这个维护负担。技术上：`ask()`/`closeModal()`加了`_onCancel`/`_confirmed`两个新的模块级变量，新增`askAsync(title, body, opts)`返回一个Promise（`opts.month`有值时确认返回选中的月份字符串、取消返回`null`；没有`opts.month`时确认返回`true`、取消返回`false`）——**这层包装完全不影响原有十几个callback风格的调用点**（注销账户确认、销这期、删除债务等）：`_onCancel`只在`askAsync()`内部被设置，老调用点从来不碰这个变量，`closeModal()`里新增的"检查`_onCancel`要不要触发"分支对它们永远是空操作。桥接给React的是`window.__azBridge.confirmAsync(title, body, opts?)`。
+
+**另一处刻意的简化：`#gFirstField`当年的DOM节点搬家技巧（`appendChild`把"首期还款日"这一份DOM物理挪到4个`[data-gg]`区块里当前生效的那个），在React里完全不需要照搬。** 那个技巧存在的唯一原因是vanilla用`display:none/block`互斥切换4个区块、同一个DOM节点没法同时"属于"两个区块；React这边4个分支各自的JSX里放一个绑定同一个`fields.first`状态的受控`<input>`就是完全等价的效果（amort时跟"期数"拼成一行、其它三种单独成一行），不是偷懒抄近路，是这套DOM操作在声明式渲染模型下本来就没有存在的必要。
+
+**踩了两个真实的坑，都已经修复并补了回归测试**：
+1. **批量删除#editSheet相关JS代码那一刀切太宽，误删了`#notifySheet`的`renderNotifyRules`/`openNotifySheet`/`closeNotifySheet`三个函数+5处事件监听器**（这几个函数原来物理上夹在`closeEdit()`和`saveForm()`之间，不属于`#editSheet`、是完全独立的还款提醒通知设置面板，但落在了同一段删除范围里）——表现是页面加载直接`openNotifySheet is not defined`崩溃，`window.__azBridge`都没能正常初始化（`getDebts`/`getAccount`全部读不到）。这是"改一行崩全站"那类错误的另一个变种：不是漏删引用，是**删除范围没有精确核对，靠"看起来是同一个大段落"的直觉批量删除，结果误伤了物理上恰好夹在中间、但逻辑上完全无关的代码**。教训：批量删除一大段vanilla代码前，必须先确认这段代码物理连续区间内，有没有夹带着不相关但逻辑独立的函数——尤其是这种"两个功能的代码在文件里交叉编排"的情况，肉眼过一遍`git diff`的删除内容（不是只看开头结尾对不对）比信任一个行号范围可靠得多。
+2. **⚠️`deleteDebt`触发的自动关闭effect，第一版按下标判断`!debts[editIndex]`，在"删除的不是数组最后一条"时是错的**——`debts.splice(i,1)`会让原来排在后面的debt对象整体往前顺移一位，`debts[editIndex]`这个位置在删除后**依然有值**（只是变成了另一条债务），条件判断成false，sheet不会自动关闭，还会继续显示着已经被删掉的那条债务的过期数据。这个bug是Playwright headless跑完整交互流程时真实复现的（两笔债务、删除排在前面的那笔），不是理论推演。修法：改成`editedDebtRef`（一个存"打开时是哪个debt对象引用"的`useRef`）+ `!debts.includes(editedDebtRef.current)`，按对象引用而不是下标判断"这条debt还在不在"——对splice导致的下标顺移天然免疫，跟这个项目`shared/state.ts`的`keyFor()`（WeakMap给debt生成稳定React key，也是"按引用不按下标"的同一个思路）是同一类解法。`EditSheet.test.tsx`补了一条专门覆盖"删除的不是最后一条"这个场景的回归测试。
+
+**验证**：`EditSheet.test.tsx`(25用例，覆盖开关回填/`oneTimeStash`往返/保存校验每一条/新增与编辑两种保存路径/公式生成器4种计息方式/29-30-31号拒绝/批量设置日期与金额的确认与取消两条路径/删除+两种自动关闭场景/返回键)+`state.test.ts`补充3个用例（`useEditSheetIndex`）；`npx tsc --noEmit`零错误；`npm run test:react`全绿（125个用例）；`npm test`（calc.js套件）不受影响；`npm run build:react`确认`sheets.js`产物正常（从detailSheet单独时的8.74KB涨到35KB左右，符合预期）。Playwright headless跑了一轮完整交互（新增债务、公式生成amort、批量设置还款日弹出月份选择器并正确铺日期、保存、从详情窗点编辑、一次性还清勾选/取消往返、删除确认弹窗+自动关闭、取消按钮、硬件返回键关闭），全部通过，控制台零JS报错，light/dark主题截图确认视觉正常。
 
 ### 目录结构：`react/`（源码）→ `www/js/react-debts/`（构建产物，Vite多入口）
 
-新增顶层目录`react/`（跟`www/`/`android/`/`cloudbase/`/`resources/`平级），是这个项目第一次引入真正的JS构建工具（Vite）。`react/src/debts/`/`react/src/pay/`/`react/src/report/`分别是三个已迁移tab的React源码，`react/src/shared/`是三者共用的状态订阅hook（见下面"vanilla ↔ React 桥接契约"）。`react/vite.config.ts`用Vite的**库模式**（`build.lib`，不是Vite默认的app模式——这次不是造一个独立SPA，是把React组件挂进现有`www/index.html`的某几个节点，库模式产出可以直接`<script type="module">`引入的bundle）。
+新增顶层目录`react/`（跟`www/`/`android/`/`cloudbase/`/`resources/`平级），是这个项目第一次引入真正的JS构建工具（Vite）。`react/src/debts/`/`react/src/pay/`/`react/src/report/`/`react/src/mine/`分别是四个已迁移tab（全部tab）的React源码，`react/src/sheets/`是第五个入口——不属于任何tab、常驻挂载的`#detailSheet`+`#editSheet`（详见上面"第五步"/"第六步"，两者共用同一个Vite entry，不是各自一个）。`react/src/shared/`是这几个入口共用的状态订阅hook（见下面"vanilla ↔ React 桥接契约"）。`react/vite.config.ts`用Vite的**库模式**（`build.lib`，不是Vite默认的app模式——这次不是造一个独立SPA，是把React组件挂进现有`www/index.html`的某几个节点，库模式产出可以直接`<script type="module">`引入的bundle）。
 
-**第三步把`build.lib.entry`从单一路径改成了一个map**（`{debts:"src/debts/main.tsx", pay:"src/pay/main.tsx", report:"src/report/main.tsx"}`，`fileName:(format,name)=>`${name}.js``），一次`vite build`产出`www/js/react-debts/{debts,pay,report}.js`三个文件——**同时必须删掉`rollupOptions.output.inlineDynamicImports:true`这一行**（该选项只支持单入口，多入口配置下Rollup会报错）。删掉之后Rollup对多入口ES输出的默认行为是**自动把三个入口共享的依赖（react/react-dom/`shared/state.ts`）拆成独立的chunk文件**（`state-<hash>.mjs`这种命名），三个入口各自`import`这个共享chunk，不会各打包一份重复的react/react-dom——实测验证过：单入口时`debts.js`是292KB（react/react-dom内联），改多入口后`debts.js`降到33KB+一份~260KB的共享chunk，`pay.js`/`report.js`各自几KB到十几KB，三者总大小基本不变，没有因为拆分而膨胀。**`www/index.html`里debts入口的产物文件名也从`main.js`变成了`debts.js`（因为文件名现在跟入口的key走，不再是硬编码的`"main.js"`）**，对应的`<script type="module">`标签要跟着改，这是这次改配置时容易漏掉、导致404的一个点。
+**第三步把`build.lib.entry`从单一路径改成了一个map**（`{debts:"src/debts/main.tsx", pay:"src/pay/main.tsx", report:"src/report/main.tsx"}`，`fileName:(format,name)=>`${name}.js``），一次`vite build`产出`www/js/react-debts/{debts,pay,report}.js`三个文件——**同时必须删掉`rollupOptions.output.inlineDynamicImports:true`这一行**（该选项只支持单入口，多入口配置下Rollup会报错）。删掉之后Rollup对多入口ES输出的默认行为是**自动把入口共享的依赖（react/react-dom/`shared/state.ts`）拆成独立的chunk文件**（`state-<hash>.mjs`这种命名），各入口各自`import`这个共享chunk，不会各打包一份重复的react/react-dom——实测验证过：单入口时`debts.js`是292KB（react/react-dom内联），改多入口后`debts.js`降到33KB+一份~260KB的共享chunk，其余tab各自几KB到十几KB，总大小基本不变，没有因为拆分而膨胀。**`www/index.html`里debts入口的产物文件名也从`main.js`变成了`debts.js`（因为文件名现在跟入口的key走，不再是硬编码的`"main.js"`）**，对应的`<script type="module">`标签要跟着改，这是这次改配置时容易漏掉、导致404的一个点。**第四步/第五步都只是往这个map里各加一个键**（`mine:"src/mine/main.tsx"`、`sheets:"src/sheets/main.tsx"`），没有其它配置变化——多入口的共享chunk机制、`fileName`按entry key生成文件名，这些第三步就已经搭好，后面几步纯粹是复用。
 
 **`www/js/react-debts/`是构建产物，已加进`.gitignore`（跟`android/app/src/main/assets/public/`同一类"可重新生成的东西不进git"）**，`react/src/**`源码该进git。改了`react/`下的代码后，**必须先`npm run build:react`再`npx cap sync android`**——这是继"改了`www/index.html`要`npx cap sync android`"之后，这个项目第一次出现"先构建、再同步"两步走的场景，别漏了第一步。
 
@@ -60,22 +92,35 @@
 
 现状：vanilla主脚本是一个大IIFE，`debts`/`saveAll`/`renderAll`/`openDetail`/`payInstallment`/`commitReorder`等全部是IIFE内部私有的，不在`window`上（跟已经全局的`calc.js`函数、跟`window.__handleBackButton`这种刻意暴露的例外都不一样）。要让React调用这些，必须显式暴露。
 
-**`window.__azBridge`**（定义在主IIFE末尾，`})();`之前）是唯一的暴露点，只包含已迁移React页面实际需要调用的这几个，第三步新增了`getNotify`/`openNotifySheet`/`exportReportXlsx`/`exportReportPdf`这4个：
+**`window.__azBridge`**（定义在主IIFE末尾，`})();`之前）是唯一的暴露点，只包含已迁移React页面实际需要调用的这几个，第三步新增了`getNotify`/`openNotifySheet`/`exportReportXlsx`/`exportReportPdf`这4个，第四步（"我的"tab）又新增了`openDocsScreen`/`openBackupScreen`/`downloadBackupFile`/`triggerImportFilePicker`这4个，第五步（`#detailSheet`）**删除**了`openDetail`、新增了`settleFull`/`openSimScreen`这2个，第六步（`#editSheet`）**删除**了`openEdit`（打开这两个sheet都不再经过桥接，改成`shared/state.ts`的`openDetailSheet(i)`/`openEditSheet(i)`，见上面"第五步"/"第六步"）、新增了`setDebt`/`deleteDebt`/`toast`/`confirmAsync`这4个：
 ```js
 window.__azBridge = {
   getDebts: function () { return debts; },   // 每次调用现读，见下面"为什么是函数"
   getPremium: function () { return premium; },
   getAccount: function () { return account; },
-  openDetail: openDetail, openEdit: openEdit, payInstallment: payInstallment, unsettle: unsettle,
+  payInstallment: payInstallment, unsettle: unsettle,
   commitReorder: commitReorder, saveAll: saveAll, renderAll: renderAll,
   openPremiumScreen: openPremiumScreen, openAiScreen: openAiScreen, openAccountScreen: openAccountScreen,
+  settleFull: settleFull, openSimScreen: openSimScreen,
   getNotify: function () { return notify; },
   openNotifySheet: openNotifySheet,
   exportReportXlsx: exportReportXlsx,
-  exportReportPdf: exportReportPdf
+  exportReportPdf: exportReportPdf,
+  openDocsScreen: openDocsScreen,
+  openBackupScreen: openBackupScreen,
+  downloadBackupFile: downloadBackupFile,
+  triggerImportFilePicker: triggerImportFilePicker,
+  setDebt: setDebt,
+  deleteDebt: deleteDebt,
+  toast: toast,
+  confirmAsync: askAsync
 };
 ```
-其余（`saveForm`/公式生成器/`ask()`确认弹窗等）继续保持private，后续迁移"我的"tab时才按需加进这个对象。**详情窗`#detailSheet`、新增/编辑表单`#editSheet`、通知设置面板`#notifySheet`这三个sheet完全没有重新实现**——React只是调用`__azBridge.openDetail(i)`/`__azBridge.openEdit(i)`/`__azBridge.openNotifySheet()`，这几个sheet的全部逻辑（含公式生成器、批量设置还款日、通知规则增删等）继续100%由vanilla负责，`#detailSheet`/`#editSheet`同时被"还款日"tab复用，`#notifySheet`只有"还款日"tab的铃铛按钮会打开，工作量本身也大到应该独立成后续阶段（迁移"我的"tab时）再碰。
+`openDocsScreen`/`openBackupScreen`/`downloadBackupFile`/`triggerImportFilePicker`这4个是"我的"tab（`react/src/mine/DataCards.tsx`）专用的trigger-only函数——`openDocsScreen`/`openBackupScreen`是已有vanilla函数，只是原来没暴露；`downloadBackupFile`是把原来`dlBackupBtn`的inline click handler抽成的具名函数；`triggerImportFilePicker`是新写的一行`$("importFileInput").click()`，用来间接点开依然留在vanilla DOM里的`#importFileInput`（这个input和它的`change`监听器完整保留在vanilla，只是从`#view-data`内部搬到了折叠后的挂载点外面）。
+
+`setDebt`/`deleteDebt`/`toast`/`confirmAsync`这4个是`#editSheet`（`react/src/sheets/EditSheet.tsx`等）专用——`setDebt(i, obj)`是`saveForm()`删除后唯一保留的narrow写入函数（`i>=0`覆盖`debts[i]`并合并`old.settled`/`old.settledDate`，`i<0`是push新增，内部调`recompute(obj)`但不调`saveAll`/`renderAll`，React保存时自己依次调这三个桥接函数，跟`commitReorder`那套细粒度调用惯例一致）；`deleteDebt`是原样暴露的既有vanilla函数（自带`ask()`确认+splice+saveAll+renderAll）；`toast`是`#flash`单例的简单passthrough；`confirmAsync`是`ask()`的Promise外壳（详见上面"第六步"）。
+
+其余（`ask()`确认弹窗本身、`renderNotifyRules`等）继续保持private。**详情窗`#detailSheet`和新增/编辑表单`#editSheet`这两个sheet的实际内容都已经搬进React（分别是第五步/第六步）**，`#notifySheet`（通知设置面板）依然100%vanilla，React只调用`__azBridge.openNotifySheet()`打开它——它的逻辑（通知规则增删等）比`#editSheet`简单得多，还没有排上迁移计划，量级也完全不是一个数量级。
 
 **`exportReportXlsx`/`exportReportPdf`两个函数虽然桥接给了React调用，但函数本身继续100%vanilla、原封不动**——它们已经确认是零DOM依赖的纯函数（只读`debts`、拼Excel/PDF的Blob、调用`window.XLSX`/`window.jspdf`/`saveToDeviceDownloads()`），React这边`ExportActions.tsx`只是原样复刻了vanilla原来两个按钮click handler里的`hasPremium(premium)`门禁判断，然后调用桥接函数触发真正的导出，不是把导出逻辑本身搬进React。
 
@@ -147,9 +192,12 @@ React组件挂载在同一份`index.html`文档里（不是iframe/独立页面�
 **已验证（桌面Chromium + Playwright，一次性临时`npm install playwright`验证完就`npm uninstall`了，不是这个项目的常驻依赖）**：
 - 第二步（"在还债务"）：登录门跳过、hero/KPI数字、3档严重度色晕、点卡片开详情、左滑露出+点击"销这期"触发确认弹窗、长按500ms进入抖动编辑模式("保存"按钮出现)、退出编辑模式、排序下拉框切换、"+新增一笔"打开编辑表单、`__debugPremium()`切换AI banner发光态、点头像打开账户页、tab来回切换后债务列表内容不丢。
 - 第三步（"还款日"+"统计"）：还款日hero卡+空状态、按`dueBucket`分组的4档section-label及计数、渲染的卡片数、点铃铛打开`#notifySheet`、**切通知开关后铃铛`.on`状态响应式更新（验证了`saveNotify()`新增的`az:state-changed`派发确实生效）**、筛选按钮切换后列表变化、鼠标模拟左滑露出"标记已还"按钮、点该按钮触发确认弹窗、点卡片（非滑动状态）打开`#detailSheet`；统计tab的KPI/三张图/数据明细表渲染、`hasPremium()`门禁两个方向（未开通跳订阅页/已开通直接触发导出）；跨tab一致性（"在还债务"tab切换后仍正常读同一份`debts`数据）。
+- 第四步（"我的"）：头像/昵称渲染、`__debugPremium()`切换Premium入口卡文案+`.is-member`样式、点头像/Premium入口分别打开`#accountScreen`/`#premiumScreen`、云备份按钮门禁两个方向（未开通跳订阅页/已开通打开`#backupScreen`）、档案库按钮打开`#docsScreen`（无门禁）、"下载备份文件"触发桌面`<a download>`路径实际下载出JSON、"上传备份文件"确认`#importFileInput`搬出`#view-data`后依然能被`triggerImportFilePicker()`间接点开、四个tab来回切换后各自内容不丢。
+- 第五步（`#detailSheet`）：两个tab（"在还债务"/"还款日"）点卡片都能正常打开详情窗，内容跟改之前一致；grip拖拽（下拖关闭、上拖调高、重新打开高度自动重置）；点"销这期"确认后**详情窗原地刷新**显示新进度（不关闭）；一次性债务点"一次性结清"、多期债务点"提前结清"，确认后债务变settled、**详情窗自动关闭**且移入已结清区；点"编辑"详情窗关闭+正确打开`#editSheet`；点"提前还款模拟"详情窗关闭+正确打开`#simScreen`；硬件/手势返回键（详情窗打开时只关详情窗不退出App，关闭后再按才真正退出）；四个tab来回切换互不影响。**这轮还额外挖出并修复了一个前四步遗留的真实bug**：`useDebts()`在`debts`数组被原地mutate时完全不触发重渲染（不是显示旧值，是整个组件都不重渲染），这个bug理论上从第一步就存在，这次靠"结清后详情窗该自动关闭却纹丝不动"这个明显反例才第一次被抓到、修复、补了回归测试（细节见上面"第五步"那段"⚠️真机会真实踩到"的部分）。
+- 第六步（`#editSheet`）：新增债务全流程（填字段、公式生成amort、批量设置还款日弹出月份选择器并正确铺日期、保存）；从详情窗点"编辑"正确打开、detailSheet同步关闭；一次性还清勾选/取消往返数据不丢；点"删除"弹出确认框（复用vanilla`#modalScrim`）、确认后sheet自动关闭且debts数组正确减少；点"取消"关闭；硬件返回键正确关闭。**这轮同样挖出并修复了一个真实bug**：`deleteDebt`触发的自动关闭effect第一版按下标判断，删除的不是数组最后一条时因为`splice`导致下标顺移而误判（细节见上面"第六步"），这次是靠两笔债务、删除排在前面那笔的完整Playwright交互流程真实复现的，不是理论推演，修复后补了专门覆盖这个场景的回归测试。
 - 全程浏览器console **零JS报错**，light/dark两种主题都截图核对过。
 
-**还没验证（老限制，这个项目一贯如此）**：**真机上"还款日"的左滑手势**——桌面Playwright用鼠标模拟的Pointer Events路径验证了"能触发swiping分支、不报错"，但真实手指触摸的手感、多点触控边界情况、安卓WebView的触摸事件时序，历史上这个项目的教训是"必须真机验证"（见"在还债务自定义排序"一节），这次移植代码逻辑上是逐行照抄，但没有免除真机验证这一步。**"统计"tab零手势，不需要真机验证**，桌面Playwright覆盖已经足够（跟第二步Summary/AiBanner这类纯视觉组件判定为无需真机是同一个理由）。下次编译release包装真机时，还款日的滑动手势是重点要过一遍的地方。
+**"统计"和"我的"这两个tab都是零手势的纯data→JSX展示，不需要真机验证，桌面Playwright覆盖已经足够**（跟第二步Summary/AiBanner这类纯视觉组件判定为无需真机是同一个理由）——"我的"tab里"下载/上传备份文件"两个按钮背后的真实原生行为（`SaveFile`插件的"另存为"选择器、真机文件选择器），这次迁移完全没有改动它们的实现，只是把触发入口从vanilla按钮换成React按钮调用同一个函数，不需要为这次迁移重新验证一遍那两个功能本身。`#detailSheet`同理零手势（`initGripDrag`只是4个pointer监听器操作单个DOM节点，不是`gestures.ts`那套长按/滑动状态机），桌面Playwright覆盖已经足够。**"还款日"的左滑手势是目前唯一还留着的真机确认项**——桌面Playwright用鼠标模拟的Pointer Events路径验证了"能触发swiping分支、不报错"，但真实手指触摸的手感、多点触控边界情况、安卓WebView的触摸事件时序，历史上这个项目的教训是"必须真机验证"（见"在还债务自定义排序"一节），这次移植代码逻辑上是逐行照抄，但没有免除真机验证这一步。
 
 ## 原生插件：`SaveFile`
 
