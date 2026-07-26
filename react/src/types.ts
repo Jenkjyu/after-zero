@@ -78,6 +78,21 @@ export interface NotifySettings {
   rules: { offsetDays: 0 | 1 | 2 | 3; time: string }[];
 }
 
+// 档案库(react/src/sheets/DocsScreen.tsx)用——window.__azBridge.getFiles()把vanilla的
+// docs(markdown文档)+uploads(IndexedDB存的图片/PDF/Word等)合并成一份统一的展示数据。
+// id是稳定标识("doc:<key>"或"up:<IndexedDB的id>")，用于删除/下载/分享这几个桥接调用按
+// id反查目标，不需要把原始Blob传过桥接边界。upload为false时是markdown文档，content
+// 是正文(过mdToHtml()渲染)；upload为true时url是objectURL(图片/PDF预览用)。
+export interface FileItem {
+  id: string;
+  upload: boolean;
+  name: string;
+  mime: string;
+  label: string;
+  content?: string;
+  url?: string;
+}
+
 // computeReportData(debts)的返回形状(见 www/js/calc.js)——统计tab的KPI/三张图/数据表
 // 都是这个对象的纯展示，字段名跟calc.js里的保持一致。
 export interface ReportData {
@@ -122,10 +137,9 @@ export interface AzBridge {
   // 只是入口桥接给React的导出按钮调用，premium门禁判断在React这边原样复刻。
   exportReportXlsx(): void;
   exportReportPdf(): void;
-  // "我的"tab新增：这4个全部是trigger-only——#accountScreen/#premiumScreen/#backupScreen/
-  // #docsScreen这几个subpage、以及备份文件的打包/解析/系统文件选择器，全部继续100%vanilla，
-  // React只是调用桥接函数让vanilla去做，不重新实现任何一个。
-  openDocsScreen(): void;
+  // "我的"tab新增：这2个是trigger-only——#backupScreen(第十步才迁移)+备份文件的打包/解析/
+  // 系统文件选择器，继续100%vanilla。openDocsScreen已删除——第九步(docsScreen)迁移React后
+  // 不再经过bridge，改成shared/state.ts的openDocsScreen(纯React状态)。
   openBackupScreen(): void;
   downloadBackupFile(): void;
   triggerImportFilePicker(): void;
@@ -158,6 +172,15 @@ export interface AzBridge {
   addNotifyRule(offsetDays: 0 | 1 | 2 | 3, time: string): void;
   deleteNotifyRule(idx: number): void;
   sendTestNotification(): void;
+  // 第九步(docsScreen)新增：IndexedDB(uploads的blob存储)+docs数组增删+SaveFile/分享原生
+  // 调用全部留vanilla，React只拿到不含原始Blob的展示数据(FileItem)+按id操作的几个函数。
+  // getFiles()每次调用都合成一份新数组(不是同一个底层引用)，配合shared/state.ts的
+  // useFiles()做"事件触发才重新计算"的缓存，避免每次都返回新引用导致无限重渲染。
+  getFiles(): FileItem[];
+  uploadArchiveFile(file: File): Promise<void>;
+  deleteArchiveFile(id: string): Promise<void>;
+  downloadArchiveFile(id: string): Promise<void>;
+  shareArchiveFile(id: string): void;
 }
 
 // 排序方式(含"custom")的类型，跟 www/index.html 原来的 DEBT_SORTS 键名保持一致，

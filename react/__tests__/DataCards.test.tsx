@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { DataCards } from "../src/mine/DataCards";
-import { closePremiumScreen, usePremiumScreenOpen } from "../src/shared/state";
+import { closeDocsScreen, closePremiumScreen, useDocsScreenOpen, usePremiumScreenOpen } from "../src/shared/state";
 import { makeMockBridge } from "./mockBridge";
 import type { Premium } from "../src/types";
 
 afterEach(() => {
-  closePremiumScreen(); // premiumScreenOpen是模块级状态，重置避免测试间互相污染
+  closePremiumScreen(); // premiumScreenOpen/docsScreenOpen是模块级状态，重置避免测试间互相污染
+  closeDocsScreen();
 });
 
 describe("DataCards", () => {
@@ -29,11 +30,12 @@ describe("DataCards", () => {
     expect(hook.result.current).toBe(false);
   });
 
-  it("点档案库调用openDocsScreen，无门禁", () => {
+  it("点档案库调用openDocsScreen(纯React状态)，无门禁", () => {
     window.__azBridge = makeMockBridge();
     render(<DataCards premium={{ premium: null }} />);
+    const hook = renderHook(() => useDocsScreenOpen());
     fireEvent.click(screen.getByText("打开档案库"));
-    expect(window.__azBridge.openDocsScreen).toHaveBeenCalledTimes(1);
+    expect(hook.result.current).toBe(true);
   });
 
   it("点下载备份文件调用downloadBackupFile", () => {

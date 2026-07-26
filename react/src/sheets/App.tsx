@@ -3,6 +3,7 @@
 // TermsScreen(第七步，React迁移收尾)都挂在这一层，不需要为后续每一批新开一个入口。
 import { AccountScreen } from "./AccountScreen";
 import { DetailSheet } from "./DetailSheet";
+import { DocsScreen } from "./DocsScreen";
 import { EditSheet } from "./EditSheet";
 import { NotifySheet } from "./NotifySheet";
 import { PremiumScreen } from "./PremiumScreen";
@@ -19,6 +20,7 @@ export function App() {
       <TermsScreen />
       <SimScreen />
       <NotifySheet />
+      <DocsScreen />
     </>
   );
 }

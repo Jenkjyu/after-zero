@@ -4,7 +4,7 @@
 // 这几个hook本身跟"在还债务"页无关，是所有React tab(在还债务/还款日/统计)共用的通用逻辑，
 // 所以放在shared/而不是某个具体tab的目录下。
 import { useSyncExternalStore } from "react";
-import type { Account, Debt, NotifySettings, Premium } from "../types";
+import type { Account, Debt, FileItem, NotifySettings, Premium } from "../types";
 
 function subscribe(callback: () => void) {
   window.addEventListener("az:state-changed", callback);
@@ -221,6 +221,53 @@ export function closeNotifySheet() {
 }
 export function useNotifySheetOpen(): boolean {
   return useSyncExternalStore(subscribeNotifySheet, () => notifySheetOpen);
+}
+
+// 档案库——第九步(React迁移收尾)新增，布尔开关，跟accountScreen/premiumScreen/termsScreen/
+// notifySheet同一个模式。
+let docsScreenOpen = false;
+function subscribeDocsScreen(callback: () => void) {
+  window.addEventListener("az:docs-screen-changed", callback);
+  return () => window.removeEventListener("az:docs-screen-changed", callback);
+}
+export function openDocsScreen() {
+  docsScreenOpen = true;
+  window.dispatchEvent(new CustomEvent("az:docs-screen-changed"));
+}
+export function closeDocsScreen() {
+  docsScreenOpen = false;
+  window.dispatchEvent(new CustomEvent("az:docs-screen-changed"));
+}
+export function useDocsScreenOpen(): boolean {
+  return useSyncExternalStore(subscribeDocsScreen, () => docsScreenOpen);
+}
+
+// 档案库文件列表——window.__azBridge.getFiles()每次调用都会用.map()合成一份全新数组
+// (不像getDebts()那样有同一个底层引用可比较，结构上更像getNotify())，如果直接把它当
+// getSnapshot返回值会踩跟useNotify()当年同一个坑——useSyncExternalStore在每次渲染/commit
+// 后都会重新调用一次getSnapshot做一致性检查，每次都拿到不同引用会被判定成"还在变"，陷入
+// 无限重渲染循环。用跟useNotify()一样的按值(fingerprint)比较：每次都真的调用bridge拿最新
+// 数据(这几个数组通常很小，重新算一遍成本可忽略)，只有内容真的变了才生成新的缓存数组，
+// 没变就返回上一次缓存的同一个引用。这里特意不采用useDebts()那套"事件触发才标脏"的写法——
+// 那套依赖"能比较底层引用是否变化"这个前提，getFiles()没有这个前提，按内容比较更简单可靠、
+// 也不会有"事件没触发/漏触发时缓存永久陈旧"这个额外的失效模式。
+function subscribeFiles(callback: () => void) {
+  window.addEventListener("az:files-changed", callback);
+  return () => window.removeEventListener("az:files-changed", callback);
+}
+let filesCache: FileItem[] | null = null;
+let filesFingerprint = "";
+function getFilesSnapshot(): FileItem[] {
+  const fresh = window.__azBridge.getFiles();
+  const fp = fresh.map((f) => [f.id, f.label, f.name, f.content, f.url].join(" ")).join("");
+  if (fp !== filesFingerprint || !filesCache) {
+    filesFingerprint = fp;
+    filesCache = fresh;
+  }
+  return filesCache;
+}
+export function useFiles(): FileItem[] {
+  return useSyncExternalStore(subscribeFiles, getFilesSnapshot);
 }
 
 // WeakMap给每个debt对象懒生成一个稳定的React key——commitReorder只是重排同一批对象引用的

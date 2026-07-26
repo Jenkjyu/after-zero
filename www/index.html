@@ -816,23 +816,8 @@
 
 <!-- #simScreen已经整体搬进React(第八步)——见react/src/sheets/SimScreen.tsx。 -->
 
-<div class="subpage" id="docsScreen">
-  <div class="subpage-header">
-    <button type="button" class="subpage-back" id="docsBackBtn" aria-label="返回">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-    </button>
-    <div class="subpage-title">档案库</div>
-    <div class="subpage-header-spacer"></div>
-  </div>
-  <div class="subpage-body">
-    <div class="section-label">文档与文件（图片/PDF等，仅存本设备）</div>
-    <input type="file" id="uploadInput" accept=".jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.bmp,.pdf,.md,.markdown,.doc,.docx,image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none">
-    <button class="add-btn" id="uploadBtn">＋ 上传文件</button>
-    <div id="fileList"></div>
-    <div class="preview-label" id="previewLabel" style="display:none">预览</div>
-    <div id="docContent"></div>
-  </div>
-</div>
+<!-- #docsScreen已经整体搬进React(第九步)——见react/src/sheets/DocsScreen.tsx，
+     含#uploadInput在内的整套上传/预览/下载/删除UI都由React渲染，不再有静态HTML。 -->
 
 <div class="subpage" id="backupScreen">
   <div class="subpage-header">
@@ -1002,10 +987,8 @@
   var SEED = [];
   var DOCS_SEED = [];
 
-  var ICON_IMG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15.5l-5.5-5-9.5 8.5"/></svg>';
-  var ICON_PDF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l5 5v12.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M8.5 14.5h2M12.5 14.5h3M8.5 17.5h7"/></svg>';
-  var ICON_CLIP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 8.5 9.9 16.1a3 3 0 0 1-4.2-4.2l8-8a4.5 4.5 0 1 1 6.4 6.4l-8.2 8.2a1.5 1.5 0 0 1-2.1-2.1L16.3 9.9"/></svg>';
-  var ICON_DOC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l5 5v12.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M8.5 13h7M8.5 16.5h7"/></svg>';
+  // ICON_IMG/ICON_PDF/ICON_CLIP/ICON_DOC已删除——只在renderFiles()里用过，第九步(档案库)
+  // 迁移React后这几个图标原样搬进了react/src/sheets/DocsScreen.tsx里的JSX常量。
 
   var $ = function (id) { return document.getElementById(id); };
   // clone/r2/fmt/money/todayStr/baseName/extOf/pad/parseDate/addMonths/fmtDate/rateClass/today0/
@@ -1075,8 +1058,8 @@
   debts.forEach(normalize);
   // editIndex/editingPlan/oneTimeStash/planMode(手动添加/公式生成二选一)这几个模块变量已经
   // 删除——#editSheet的实际内容整体搬进了React(react/src/sheets/EditSheet.tsx等)，这些状态
-  // 现在是React组件自己的useState，见CLAUDE.md"React 迁移"一节"第六步"。
-  var docSel = -1;
+  // 现在是React组件自己的useState，见CLAUDE.md"React 迁移"一节"第六步"。docSel同理(第九步，
+  // react/src/sheets/DocsScreen.tsx的selectedId)。
 
   // background scroll lock while any sheet/modal is open (counted, since the confirm modal can stack on top of the edit sheet)
   var scrollLockCount = 0;
@@ -1347,15 +1330,9 @@
       toast((err && err.message) || "保存失败");
     });
   }
-  function bindFileDownload(row, getBlob, filename, mime) {
-    row.querySelector(".file-get").addEventListener("click", function (e) {
-      e.stopPropagation();
-      var btn = e.currentTarget;
-      if (btn.disabled) return;
-      btn.disabled = true;
-      saveToDeviceDownloads(getBlob(), filename, mime).then(function () { btn.disabled = false; });
-    });
-  }
+  // bindFileDownload()已删除——原来给renderFiles()每一行按钮绑点击监听器用，第九步(档案库)
+  // 迁移React后，下载按钮的点击直接由React调用downloadArchiveFile(id)触发，不需要这层
+  // DOM绑定辅助函数了。
 
   // 账号登录：微信登录(移动应用OAuth) + 腾讯云开发(CloudBase)自定义登录。
   // 登录现在是全局强制的——account为空时#loginGate会盖住整个App（含tabbar），
@@ -1628,9 +1605,9 @@
   // 全局函数继续被别处使用(AI聊天渲染、备份列表错误提示等)，不受这次删除影响。
   // 两个导出按钮(exportReportXlsx/exportReportPdf，零DOM依赖，见下方定义处)已加进
   // window.__azBridge，premium门禁判断原样复刻进了React的ExportActions.tsx。
-  // 档案库：从"我的"页打开的整页浮层，跟accountScreen/backupScreen同一套subpage模式。
-  function openDocsScreen() { $("docsScreen").classList.add("open"); lockScroll(); }
-  function closeDocsScreen() { if (!$("docsScreen").classList.contains("open")) return; $("docsScreen").classList.remove("open"); unlockScroll(); }
+  // openDocsScreen()/closeDocsScreen()已删除——#docsScreen整体搬进了React(第九步，
+  // react/src/sheets/DocsScreen.tsx)，开关状态是shared/state.ts的openDocsScreen/
+  // closeDocsScreen(纯React状态，不再经过window.__azBridge)。
 
   // escSvg 已搬进 www/js/calc.js。
   // PDF导出用的图表是独立的、颜色写死的浅色版SVG(不是把屏幕上那份主题化的SVG克隆去截图)——
@@ -1955,8 +1932,12 @@
           return upPut({ id: u.id, name: u.name, title: u.name, mime: u.mime, blob: blob, addedAt: todayStr() });
         }).catch(function () {});
       }));
-    }).then(function () { loadUploads(); }).then(function () {
-      renderFiles(); docSel = -1; renderDocContent(); renderAll(); // renderAll()派发的az:state-changed已经够AccountScreen(usePremium)自动跟上，不需要再单独调renderAccountDetail()(已删除)
+    }).then(function () {
+      // loadUploads()内部已经会dispatchFilesChanged()，DocsScreen的useFiles()会重新读取
+      // 最新的docs(上面已整体重新赋值)+uploads；renderAll()派发的az:state-changed已经够
+      // AccountScreen(usePremium)自动跟上，不需要再单独调renderAccountDetail()(已删除)。
+      loadUploads();
+      renderAll();
     });
   }
   function confirmDeleteBackup(id) {
@@ -2029,11 +2010,14 @@
   }
 
   var uploads = [];
+  // 派发档案库数据变化——第九步(档案库迁移React)新增的事件，跟az:state-changed(debts/premium/
+  // account)是同一个模式但服务的是不同数据源，理由跟detailSheetIndex当年拆成独立事件一致。
+  function dispatchFilesChanged() { window.dispatchEvent(new CustomEvent("az:files-changed")); }
   function loadUploads() {
     if (!window.indexedDB) return;
     upGetAll().then(function (items) {
       uploads = items.map(function (it) { return { id: it.id, name: it.name, title: it.title, mime: it.mime, blob: it.blob, objectURL: URL.createObjectURL(it.blob), addedAt: it.addedAt }; });
-      renderFiles();
+      dispatchFilesChanged();
     }).catch(function () { /* IndexedDB unavailable in this browser/context — upload UI still works per-session via in-memory list until reload */ });
   }
   function tryShareFile(it) {
@@ -2045,60 +2029,72 @@
     }
   }
 
-  var FILES = null;
-  function fileItems() {
-    return docs.map(function (d, i) { return { name: baseName(d.file), label: d.title, content: d.content, docIndex: i }; })
-      .concat(uploads.map(function (u) { return { upload: true, id: u.id, name: u.name, mime: u.mime || "", label: u.title || u.name, url: u.objectURL, blob: u.blob }; }));
+  // fileItems()/renderFiles()/renderDocContent()都已删除——第九步(档案库)迁移React后，
+  // 渲染整个交给react/src/sheets/DocsScreen.tsx，这里只留数据+impure操作。
+  //
+  // docs数组元素没有稳定id(纯靠数组下标寻址)，给markdown文档条目生成稳定id用跟
+  // shared/state.ts的keyFor()同一个技巧——WeakMap按对象引用懒生成key，splice/重排不影响
+  // 已生成的key，只有docs被整体替换(备份恢复/导入json)时才会因为引用变了自然生成新key。
+  var docKeyMap = new WeakMap();
+  var docKeyNext = 0;
+  function docKeyFor(d) {
+    var k = docKeyMap.get(d);
+    if (!k) { k = "d" + docKeyNext++; docKeyMap.set(d, k); }
+    return k;
   }
-  function renderFiles() {
-    FILES = fileItems(); var box = $("fileList"); box.innerHTML = "";
-    FILES.forEach(function (it, k) {
-      var row = document.createElement("div"); row.className = "file-row"; row.setAttribute("aria-current", k === docSel ? "true" : "false");
-      var ic = it.upload ? (/^image\//.test(it.mime) ? ICON_IMG : /pdf/.test(it.mime) ? ICON_PDF : ICON_CLIP) : ICON_DOC;
-      var actionBtn = (it.upload || it.content) ? '<button class="file-dl file-get">下载</button><button class="file-dl file-del">删除</button>' : '';
-      row.innerHTML = '<span class="file-ic">' + ic + '</span><span class="file-name"><span class="fl"></span><small></small></span>' + actionBtn;
-      row.querySelector(".fl").textContent = it.label; row.querySelector("small").textContent = it.name;
-      if (it.upload) {
-        bindFileDownload(row, function () { return it.blob; }, it.name, it.mime);
-        row.querySelector(".file-del").addEventListener("click", function (e) {
-          e.stopPropagation();
-          ask("删除文件", "删除「" + it.label + "」？此操作不可撤销。", function () {
-            upDelete(it.id).then(function () {
-              uploads = uploads.filter(function (u) { return u.id !== it.id; });
-              if (docSel === k) { docSel = -1; renderDocContent(); }
-              renderFiles(); toast("已删除");
-            });
-          });
-        });
-      } else if (it.content) {
-        bindFileDownload(row, function () { return new Blob([it.content], { type: "text/markdown;charset=utf-8" }); }, it.name, "text/markdown");
-        row.querySelector(".file-del").addEventListener("click", function (e) {
-          e.stopPropagation();
-          ask("删除文档", "删除「" + it.label + "」？此操作不可撤销。", function () {
-            docs.splice(it.docIndex, 1); saveAll();
-            if (docSel === k) { docSel = -1; renderDocContent(); }
-            renderFiles(); toast("已删除");
-          });
-        });
-      }
-      row.addEventListener("click", function () {
-        if (docSel === k) { docSel = -1; renderFiles(); renderDocContent(); $("previewLabel").style.display = "none"; }
-        else { docSel = k; renderFiles(); renderDocContent(); $("previewLabel").style.display = "block"; $("previewLabel").scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+  // getFiles()把docs(markdown文档)+uploads(IndexedDB存的图片/PDF/Word等)合并成一份统一的
+  // 展示数据给React读——不含原始Blob，只有id(用于删除/下载/分享这几个函数按id反查目标)、
+  // 预览要用的url(图片/PDF的objectURL)/content(markdown正文)。
+  function getFiles() {
+    return docs.map(function (d) { return { id: "doc:" + docKeyFor(d), upload: false, name: baseName(d.file), mime: "", label: d.title, content: d.content }; })
+      .concat(uploads.map(function (u) { return { id: "up:" + u.id, upload: true, name: u.name, mime: u.mime || "", label: u.title || u.name, url: u.objectURL }; }));
+  }
+  function findDocIndexByKey(id) {
+    var m = /^doc:(.+)$/.exec(id);
+    if (!m) return -1;
+    for (var i = 0; i < docs.length; i++) { if ("doc:" + docKeyFor(docs[i]) === id) return i; }
+    return -1;
+  }
+  function uploadArchiveFile(file) {
+    if (UPLOAD_ALLOWED_EXT.indexOf(extOf(file.name)) < 0) { toast("不支持的文件格式，仅支持图片 / PDF / Markdown / Word"); return Promise.resolve(); }
+    if (!window.indexedDB) { toast("此设备浏览器不支持文件存储"); return Promise.resolve(); }
+    var id = "u" + Date.now() + Math.random().toString(36).slice(2, 7);
+    var item = { id: id, name: file.name, title: file.name, mime: file.type, blob: file, addedAt: todayStr() };
+    return upPut(item).then(function () {
+      uploads.push({ id: id, name: file.name, title: file.name, mime: file.type, blob: file, objectURL: URL.createObjectURL(file), addedAt: item.addedAt });
+      toast("已上传 ✓");
+      dispatchFilesChanged();
+    }).catch(function () { toast("保存失败，可能是文件太大或此设备存储空间不足"); });
+  }
+  // 确认弹窗(标题因upload/doc而异)已经挪到React这边用confirmAsync处理，这个函数只做
+  // "确认已经拿到、真的去删"这一步。
+  function deleteArchiveFile(id) {
+    var upIdx = -1;
+    for (var i = 0; i < uploads.length; i++) { if ("up:" + uploads[i].id === id) { upIdx = i; break; } }
+    if (upIdx >= 0) {
+      var upId = uploads[upIdx].id;
+      return upDelete(upId).then(function () {
+        uploads = uploads.filter(function (u) { return u.id !== upId; });
+        dispatchFilesChanged();
       });
-      box.appendChild(row);
-    });
-  }
-  function renderDocContent() {
-    if (docSel < 0) { $("docContent").innerHTML = ""; return; }
-    var it = FILES[docSel];
-    if (it.upload && /^image\//.test(it.mime)) { $("docContent").innerHTML = '<div class="doc-body"><img class="poster" alt="' + it.label + '" src="' + it.url + '"></div><div class="footnote" style="text-align:left;margin-top:8px;padding:0">长按图片可保存到手机相册。</div>'; return; }
-    if (it.upload && /pdf/.test(it.mime)) { $("docContent").innerHTML = '<div class="doc-body"><embed src="' + it.url + '" type="application/pdf" style="width:100%;height:70vh;border:1px solid var(--border);border-radius:10px;background:var(--surface-2)"><div class="footnote" style="text-align:left;margin-top:8px;padding:0">长按预览区可保存到手机 / 通过分享菜单发送；若空白说明此设备浏览器不支持内嵌 PDF 预览。</div></div>'; return; }
-    if (it.upload) {
-      $("docContent").innerHTML = '<div class="doc-body"><div class="footnote" style="text-align:left;padding:0;margin-bottom:10px">此文件类型（' + (it.mime || "未知") + '）不支持内嵌预览。</div><div class="data-actions"><button class="btn primary" id="shareFileBtn">分享 / 保存</button></div></div>';
-      $("shareFileBtn").addEventListener("click", function () { tryShareFile(it); });
-      return;
     }
-    $("docContent").innerHTML = '<div class="doc-body md-body">' + mdToHtml(it.content) + "</div>";
+    var docIdx = findDocIndexByKey(id);
+    if (docIdx >= 0) { docs.splice(docIdx, 1); saveAll(); dispatchFilesChanged(); }
+    return Promise.resolve();
+  }
+  function downloadArchiveFile(id) {
+    var u = uploads.filter(function (x) { return "up:" + x.id === id; })[0];
+    if (u) return saveToDeviceDownloads(u.blob, u.name, u.mime);
+    var docIdx = findDocIndexByKey(id);
+    if (docIdx >= 0) {
+      var d = docs[docIdx];
+      return saveToDeviceDownloads(new Blob([d.content], { type: "text/markdown;charset=utf-8" }), baseName(d.file), "text/markdown");
+    }
+    return Promise.resolve();
+  }
+  function shareArchiveFile(id) {
+    var u = uploads.filter(function (x) { return "up:" + x.id === id; })[0];
+    if (u) tryShareFile(u);
   }
 
   document.querySelectorAll(".tabbar button").forEach(function (b) {
@@ -2135,9 +2131,9 @@
   // (通过window.__azBridge.exportReportXlsx/exportReportPdf调用)，这两个id对应的
   // <button>也已经不在vanilla渲染的DOM里了，这里不再需要重复绑一份监听器。
   // "我的"tab整体React化后(react/src/mine/)，docsEntryBtn/backupEntryBtn同理不再在
-  // vanilla DOM里，门禁+跳转逻辑原样复刻进了DataCards.tsx，通过window.__azBridge.
-  // openDocsScreen/openBackupScreen调用，这里不再需要重复绑监听器。
-  $("docsBackBtn").addEventListener("click", closeDocsScreen);
+  // vanilla DOM里，门禁+跳转逻辑原样复刻进了DataCards.tsx；docsBackBtn/uploadBtn/
+  // uploadInput(#docsScreen)第九步后也整个不在vanilla DOM里了(react/src/sheets/
+  // DocsScreen.tsx自己渲染返回箭头+文件选择器)，这里不再需要重复绑监听器。
   $("backupBackBtn").addEventListener("click", closeBackupScreen);
   $("backupCreateBtn").addEventListener("click", createCloudBackup);
   $("aiBackBtn").addEventListener("click", closeAiScreen);
@@ -2169,10 +2165,11 @@
     if ($("aiHistorySheet").classList.contains("open")) { closeAiHistorySheet(); return true; }
     if ($("aiScreen").classList.contains("open")) { closeAiScreen(); return true; }
     if ($("backupScreen").classList.contains("open")) { closeBackupScreen(); return true; }
-    if ($("docsScreen").classList.contains("open")) { closeDocsScreen(); return true; }
-    // simScreen/notifySheet同理已经是React状态(react/src/sheets/SimScreen.tsx、
-    // NotifySheet.tsx，第八步)，位置沿用原来这两个subpage/sheet在DOM里的顺序。
+    // simScreen/notifySheet/docsScreen同理已经是React状态(react/src/sheets/SimScreen.tsx、
+    // NotifySheet.tsx第八步、DocsScreen.tsx第九步)，位置沿用原来这几个subpage/sheet在DOM里
+    // 的顺序。
     if (window.__azSimScreenBack && window.__azSimScreenBack()) return true;
+    if (window.__azDocsScreenBack && window.__azDocsScreenBack()) return true;
     if (window.__azPremiumScreenBack && window.__azPremiumScreenBack()) return true;
     if (window.__azAccountScreenBack && window.__azAccountScreenBack()) return true;
     if (window.__azNotifySheetBack && window.__azNotifySheetBack()) return true;
@@ -2221,7 +2218,7 @@
         var msg = "用「" + file.name + "」覆盖当前 " + debts.length + " 笔债务" + (Array.isArray(parsed) ? "" : "和档案") + (nuploads ? "、" + nuploads.length + " 个上传文件" : "") + "？";
         ask("导入覆盖", msg, function () {
           debts = nd; docs = ndocs; debts.forEach(normalize); saveAll(); renderAll();
-          var finish = function () { renderFiles(); docSel = -1; renderDocContent(); toast("已导入 " + nd.length + " 笔 ✓"); };
+          var finish = function () { dispatchFilesChanged(); toast("已导入 " + nd.length + " 笔 ✓"); };
           if (nuploads) restoreUploads(nuploads).then(finish).catch(function () { toast("已导入，但上传文件恢复失败"); finish(); });
           else finish();
         });
@@ -2235,19 +2232,9 @@
     reader.onerror = function () { input.value = ""; toast("文件读取失败"); };
     reader.readAsText(file);
   });
-  $("uploadBtn").addEventListener("click", function () { $("uploadInput").click(); });
-  $("uploadInput").addEventListener("change", function (e) {
-    var file = e.target.files[0]; e.target.value = "";
-    if (!file) return;
-    if (UPLOAD_ALLOWED_EXT.indexOf(extOf(file.name)) < 0) { toast("不支持的文件格式，仅支持图片 / PDF / Markdown / Word"); return; }
-    if (!window.indexedDB) { toast("此设备浏览器不支持文件存储"); return; }
-    var id = "u" + Date.now() + Math.random().toString(36).slice(2, 7);
-    var item = { id: id, name: file.name, title: file.name, mime: file.type, blob: file, addedAt: todayStr() };
-    upPut(item).then(function () {
-      uploads.push({ id: id, name: file.name, title: file.name, mime: file.type, blob: file, objectURL: URL.createObjectURL(file), addedAt: item.addedAt });
-      renderFiles(); toast("已上传 ✓");
-    }).catch(function () { toast("保存失败，可能是文件太大或此设备存储空间不足"); });
-  });
+  // uploadBtn/uploadInput的click/change监听器已删除——第九步(档案库)迁移React后，
+  // <input type="file">由DocsScreen.tsx自己渲染+持有ref，onChange直接调用
+  // window.__azBridge.uploadArchiveFile(file)(上面新增的函数，逻辑跟原来这段一致)。
 
   // 通知渠道：安卓8+发通知必须先建channel，插件不会自动建；幂等，每次启动调用无副作用。
   (function () {
@@ -2281,10 +2268,9 @@
     getNotify: function () { return notify; },
     exportReportXlsx: exportReportXlsx,
     exportReportPdf: exportReportPdf,
-    // "我的"tab(react/src/mine/)新增：全部trigger-only，#accountScreen/#premiumScreen/
-    // #backupScreen/#docsScreen这几个subpage、以及备份文件打包/解析/系统文件选择器，
-    // 全部继续100%vanilla，不重新实现。
-    openDocsScreen: openDocsScreen,
+    // "我的"tab(react/src/mine/)新增：#backupScreen(第十步才迁移)+备份文件打包/解析/
+    // 系统文件选择器继续100%vanilla。openDocsScreen已删除——第九步(docsScreen)迁移React后
+    // 不再经过桥接。
     openBackupScreen: openBackupScreen,
     downloadBackupFile: downloadBackupFile,
     triggerImportFilePicker: triggerImportFilePicker,
@@ -2306,9 +2292,16 @@
     setNotifyEnabled: setNotifyEnabled,
     addNotifyRule: addNotifyRule,
     deleteNotifyRule: deleteNotifyRule,
-    sendTestNotification: sendTestNotification
+    sendTestNotification: sendTestNotification,
+    // 第九步(docsScreen)新增：IndexedDB(uploads)+docs数组的增删、原生分享全部留vanilla，
+    // getFiles()合成不含原始Blob的展示数据，其余3个按id反查目标(不需要把Blob传过桥接边界)。
+    getFiles: getFiles,
+    uploadArchiveFile: uploadArchiveFile,
+    deleteArchiveFile: deleteArchiveFile,
+    downloadArchiveFile: downloadArchiveFile,
+    shareArchiveFile: shareArchiveFile
   };
 
-  renderFiles(); renderDocContent(); renderAll(); loadUploads(); renderAccountUI();
+  renderAll(); loadUploads(); renderAccountUI();
 })();
 </script>

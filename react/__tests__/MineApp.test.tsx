@@ -3,12 +3,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { App } from "../src/mine/App";
-import { closeAccountScreen, useAccountScreenOpen } from "../src/shared/state";
+import { closeAccountScreen, closeDocsScreen, useAccountScreenOpen, useDocsScreenOpen } from "../src/shared/state";
 import { makeMockBridge } from "./mockBridge";
 import type { Account } from "../src/types";
 
 afterEach(() => {
-  closeAccountScreen(); // accountScreenOpen是模块级状态，重置避免测试间互相污染
+  closeAccountScreen(); // accountScreenOpen/docsScreenOpen是模块级状态，重置避免测试间互相污染
+  closeDocsScreen();
 });
 
 const account: Account = {
@@ -30,13 +31,14 @@ describe("mine App", () => {
     expect(screen.getByText("上传备份文件")).toBeInTheDocument();
   });
 
-  it("点头像→openAccountScreen(纯React状态)，点档案库→openDocsScreen(仍走桥接)", () => {
+  it("点头像→openAccountScreen，点档案库→openDocsScreen，两个都是纯React状态", () => {
     window.__azBridge = makeMockBridge({ account, premium: { premium: null } });
     render(<App />);
-    const hook = renderHook(() => useAccountScreenOpen());
+    const accountHook = renderHook(() => useAccountScreenOpen());
+    const docsHook = renderHook(() => useDocsScreenOpen());
     fireEvent.click(screen.getByLabelText("账户"));
-    expect(hook.result.current).toBe(true);
+    expect(accountHook.result.current).toBe(true);
     fireEvent.click(screen.getByText("打开档案库"));
-    expect(window.__azBridge.openDocsScreen).toHaveBeenCalledTimes(1);
+    expect(docsHook.result.current).toBe(true);
   });
 });

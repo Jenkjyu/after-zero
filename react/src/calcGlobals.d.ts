@@ -58,6 +58,9 @@ declare global {
     clone<T>(x: T): T;
     addMonths(d: Date, m: number): Date;
     fmtDate(d: Date): string;
+    // docsScreen(react/src/sheets/DocsScreen.tsx)用：markdown文档预览渲染成HTML字符串
+    // (极简手写markdown解析器，见calc.js"纯计算函数"一节)。
+    mdToHtml(src: string): string;
     // 反向桥接：vanilla的__handleBackButton硬件返回键"最上层先关"优先级链第一条检查这个——
     // React挂载"在还债务"页时注册，卸载时删除，见 react/src/debts/DebtList.tsx。
     __azDebtsBack?: () => boolean;
@@ -79,6 +82,8 @@ declare global {
     // notifySheet排在accountScreen之后(沿用原来#notifySheet在DOM里的位置)。
     __azSimScreenBack?: () => boolean;
     __azNotifySheetBack?: () => boolean;
+    // 同上，第九步(docsScreen)新增——见 react/src/sheets/DocsScreen.tsx。
+    __azDocsScreenBack?: () => boolean;
   }
 }
 

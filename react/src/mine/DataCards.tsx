@@ -1,14 +1,14 @@
 // "我的"页4张纯操作卡：云备份/档案库/下载备份/上传备份。云备份是唯一带门禁的
-// （hasPremium(premium)未过先跳订阅页），其余3张都是无条件触发对应的vanilla桥接函数——
-// 这4张卡背后的真实逻辑（云备份的创建/恢复列表、档案库上传预览、备份文件的打包/解析、
-// 系统文件选择器）全部继续100%vanilla，React这里只是入口按钮，跟CLAUDE.md"React 迁移"
-// 一节里"sheet/subpage不重新实现"的原则一致。
+// （hasPremium(premium)未过先跳订阅页）。"打开档案库"第九步(React迁移收尾)后调用
+// shared/state.ts的openDocsScreen(纯React状态，#docsScreen整体已经是React自己的sheet)；
+// 其余3张继续无条件触发vanilla桥接函数——云备份的创建/恢复列表(第十步才迁移)、
+// 备份文件的打包/解析、系统文件选择器这几件事继续100%vanilla。
 //
 // 注意：这个组件不渲染<input type="file">——原来的#importFileInput连同它的change监听器
 // 整个留在vanilla（挪到了折叠后的挂载点外面），"上传备份文件"按钮只是调用桥接函数
 // triggerImportFilePicker()去点击那个还留在vanilla DOM里的隐藏input。
 import type { Premium } from "../types";
-import { openPremiumScreen } from "../shared/state";
+import { openDocsScreen, openPremiumScreen } from "../shared/state";
 
 export interface DataCardsProps {
   premium: Premium;
@@ -23,7 +23,7 @@ export function DataCards({ premium }: DataCardsProps) {
     window.__azBridge.openBackupScreen();
   }
   function onDocs() {
-    window.__azBridge.openDocsScreen();
+    openDocsScreen();
   }
   function onDownload() {
     window.__azBridge.downloadBackupFile();
