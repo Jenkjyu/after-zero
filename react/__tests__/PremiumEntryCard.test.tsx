@@ -1,9 +1,14 @@
 // premiumLabel()是真实calc.js实现(见setup.ts)，未开通返回null、已开通固定返回"Premium 会员"。
-import { describe, expect, it } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { PremiumEntryCard } from "../src/mine/PremiumEntryCard";
+import { closePremiumScreen, usePremiumScreenOpen } from "../src/shared/state";
 import { makeMockBridge } from "./mockBridge";
 import type { Premium } from "../src/types";
+
+afterEach(() => {
+  closePremiumScreen(); // premiumScreenOpen是模块级状态，重置避免测试间互相污染
+});
 
 describe("PremiumEntryCard", () => {
   it("未开通时显示升级文案，无is-member class", () => {
@@ -24,10 +29,11 @@ describe("PremiumEntryCard", () => {
     expect(container.querySelector(".premium-entry-card")).toHaveClass("is-member");
   });
 
-  it("点击总是调用openPremiumScreen，跟是否开通无关", () => {
+  it("点击总是调用openPremiumScreen(纯React状态)，跟是否开通无关", () => {
     window.__azBridge = makeMockBridge();
     render(<PremiumEntryCard premium={{ premium: null }} />);
+    const hook = renderHook(() => usePremiumScreenOpen());
     fireEvent.click(screen.getByText("升级 Premium"));
-    expect(window.__azBridge.openPremiumScreen).toHaveBeenCalledTimes(1);
+    expect(hook.result.current).toBe(true);
   });
 });

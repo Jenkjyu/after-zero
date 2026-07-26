@@ -3,6 +3,7 @@
 // (exportReportXlsx/exportReportPdf零DOM依赖，只读debts造Blob，见CLAUDE.md"统计"一节)，
 // 这里只是通过__azBridge触发。
 import type { Premium } from "../types";
+import { openPremiumScreen } from "../shared/state";
 
 export interface ExportActionsProps {
   premium: Premium;
@@ -10,11 +11,11 @@ export interface ExportActionsProps {
 
 export function ExportActions({ premium }: ExportActionsProps) {
   function onXlsx() {
-    if (!window.hasPremium(premium)) { window.__azBridge.openPremiumScreen(); return; }
+    if (!window.hasPremium(premium)) { openPremiumScreen(); return; }
     window.__azBridge.exportReportXlsx();
   }
   function onPdf() {
-    if (!window.hasPremium(premium)) { window.__azBridge.openPremiumScreen(); return; }
+    if (!window.hasPremium(premium)) { openPremiumScreen(); return; }
     window.__azBridge.exportReportPdf();
   }
   return (

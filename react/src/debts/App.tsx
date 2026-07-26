@@ -5,7 +5,7 @@
 import { Header } from "./Header";
 import { Summary } from "./Summary";
 import { DebtList } from "./DebtList";
-import { useAccount, useDebts, usePremium } from "../shared/state";
+import { openAccountScreen, openPremiumScreen, useAccount, useDebts, usePremium } from "../shared/state";
 
 export function App() {
   const debts = useDebts();
@@ -14,12 +14,12 @@ export function App() {
 
   function onAiBannerClick() {
     if (window.hasPremium(premium)) window.__azBridge.openAiScreen();
-    else window.__azBridge.openPremiumScreen();
+    else openPremiumScreen();
   }
 
   return (
     <>
-      <Header avatarUrl={account ? account.avatarUrl : null} onAvatarClick={() => window.__azBridge.openAccountScreen()} />
+      <Header avatarUrl={account ? account.avatarUrl : null} onAvatarClick={openAccountScreen} />
       <Summary debts={debts} premium={premium} onAiBannerClick={onAiBannerClick} />
       <DebtList debts={debts} />
     </>

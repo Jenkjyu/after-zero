@@ -105,9 +105,11 @@ export interface AzBridge {
   commitReorder(newOrder: Debt[]): void;
   saveAll(): void;
   renderAll(): void;
-  openPremiumScreen(): void;
+  // openAiScreen: aiScreen是第十一步才迁移的，暂时还是trigger-only。openPremiumScreen/
+  // openAccountScreen已删除——第七步(accountScreen/premiumScreen/termsScreen)迁移React后，
+  // 打开这几个screen不再经过bridge，改成shared/state.ts的openAccountScreen/openPremiumScreen/
+  // openTermsScreen(纯React状态，模式同openDetailSheet/openEditSheet)。
   openAiScreen(): void;
-  openAccountScreen(): void;
   // detailSheet新增：#dSettle(提前结清)/#dSimulate(提前还款模拟，跳转#simScreen)以前只在
   // vanilla内部调用，现在detailSheet的按钮由React渲染，需要显式桥接。
   settleFull(i: number): void;
@@ -138,6 +140,15 @@ export interface AzBridge {
   deleteDebt(i: number): void;
   toast(msg: string): void;
   confirmAsync(title: string, body: string, opts?: { month?: string }): Promise<string | boolean | null>;
+  // 第七步(accountScreen/premiumScreen)新增：这三个都是真实的cloud/native调用或者共享状态
+  // 变更，不能重写成纯React——wxLogout()清本地账号态+CloudBase signOut；deleteAccount()调
+  // deleteAccount云函数(不信任客户端参数，身份来自已认证会话)；redeemCode(code)查
+  // REDEEM_CODES表、命中就写premium并返回tier，没命中返回null让React决定toast文案。
+  wxLogout(): void;
+  // 返回是否真的注销成功——vanilla内部会自己toast成功/失败文案(保持跟原doDeleteAccount()
+  // 一致的用户反馈)，React只需要这个布尔值来决定要不要顺带关闭accountScreen。
+  deleteAccount(): Promise<boolean>;
+  redeemCode(code: string): string | null;
 }
 
 // 排序方式(含"custom")的类型，跟 www/index.html 原来的 DEBT_SORTS 键名保持一致，

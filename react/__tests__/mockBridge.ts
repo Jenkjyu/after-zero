@@ -22,9 +22,7 @@ export function makeMockBridge(overrides?: {
     commitReorder: vi.fn(),
     saveAll: vi.fn(),
     renderAll: vi.fn(),
-    openPremiumScreen: vi.fn(),
     openAiScreen: vi.fn(),
-    openAccountScreen: vi.fn(),
     settleFull: vi.fn(),
     openSimScreen: vi.fn(),
     getNotify: vi.fn(() => notify),
@@ -43,6 +41,9 @@ export function makeMockBridge(overrides?: {
     confirmAsync: vi.fn((_title: string, _body: string, opts?: { month?: string }) =>
       Promise.resolve(opts && opts.month !== undefined ? opts.month || "2026-08" : true)
     ),
+    wxLogout: vi.fn(),
+    deleteAccount: vi.fn(() => Promise.resolve(true)),
+    redeemCode: vi.fn(() => null),
   };
 }
 

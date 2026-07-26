@@ -130,6 +130,61 @@ export function useEditSheetIndex(): number | null {
   return useSyncExternalStore(subscribeEditSheet, () => editSheetIndex);
 }
 
+// 账户详情/订阅页/条款页——第七步(React迁移收尾)新增的三个always-mounted subpage，跟
+// detailSheet/editSheet同一个模式(布尔开关而不是下标，因为这三个screen不需要"打开哪一个"
+// 这种参数，全局只有一份)：各自独立的az:x-screen-changed事件("哪个screen开着"跟"debts/
+// premium/account数据变了"是两件事，理由跟detail/editSheet当年一致，不复用az:state-changed)。
+let accountScreenOpen = false;
+function subscribeAccountScreen(callback: () => void) {
+  window.addEventListener("az:account-screen-changed", callback);
+  return () => window.removeEventListener("az:account-screen-changed", callback);
+}
+export function openAccountScreen() {
+  accountScreenOpen = true;
+  window.dispatchEvent(new CustomEvent("az:account-screen-changed"));
+}
+export function closeAccountScreen() {
+  accountScreenOpen = false;
+  window.dispatchEvent(new CustomEvent("az:account-screen-changed"));
+}
+export function useAccountScreenOpen(): boolean {
+  return useSyncExternalStore(subscribeAccountScreen, () => accountScreenOpen);
+}
+
+let premiumScreenOpen = false;
+function subscribePremiumScreen(callback: () => void) {
+  window.addEventListener("az:premium-screen-changed", callback);
+  return () => window.removeEventListener("az:premium-screen-changed", callback);
+}
+export function openPremiumScreen() {
+  premiumScreenOpen = true;
+  window.dispatchEvent(new CustomEvent("az:premium-screen-changed"));
+}
+export function closePremiumScreen() {
+  premiumScreenOpen = false;
+  window.dispatchEvent(new CustomEvent("az:premium-screen-changed"));
+}
+export function usePremiumScreenOpen(): boolean {
+  return useSyncExternalStore(subscribePremiumScreen, () => premiumScreenOpen);
+}
+
+let termsScreenOpen = false;
+function subscribeTermsScreen(callback: () => void) {
+  window.addEventListener("az:terms-screen-changed", callback);
+  return () => window.removeEventListener("az:terms-screen-changed", callback);
+}
+export function openTermsScreen() {
+  termsScreenOpen = true;
+  window.dispatchEvent(new CustomEvent("az:terms-screen-changed"));
+}
+export function closeTermsScreen() {
+  termsScreenOpen = false;
+  window.dispatchEvent(new CustomEvent("az:terms-screen-changed"));
+}
+export function useTermsScreenOpen(): boolean {
+  return useSyncExternalStore(subscribeTermsScreen, () => termsScreenOpen);
+}
+
 // WeakMap给每个debt对象懒生成一个稳定的React key——commitReorder只是重排同一批对象引用的
 // 顺序(不克隆)，只要对象引用不变(拖拽重排属于这种情况)，key就稳定；debts被整体替换成新对象时
 // (备份恢复/导入JSON)，WeakMap查不到旧key，自然生成新key——这正是这种情况下应有的行为，不需要

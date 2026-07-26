@@ -1,15 +1,21 @@
-import { describe, expect, it } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { DataCards } from "../src/mine/DataCards";
+import { closePremiumScreen, usePremiumScreenOpen } from "../src/shared/state";
 import { makeMockBridge } from "./mockBridge";
 import type { Premium } from "../src/types";
 
+afterEach(() => {
+  closePremiumScreen(); // premiumScreenOpen是模块级状态，重置避免测试间互相污染
+});
+
 describe("DataCards", () => {
-  it("未开通premium时点云备份跳订阅页，不打开备份页", () => {
+  it("未开通premium时点云备份跳订阅页(纯React状态)，不打开备份页", () => {
     window.__azBridge = makeMockBridge();
     render(<DataCards premium={{ premium: null }} />);
+    const hook = renderHook(() => usePremiumScreenOpen());
     fireEvent.click(screen.getByText("打开云备份"));
-    expect(window.__azBridge.openPremiumScreen).toHaveBeenCalledTimes(1);
+    expect(hook.result.current).toBe(true);
     expect(window.__azBridge.openBackupScreen).not.toHaveBeenCalled();
   });
 
@@ -17,9 +23,10 @@ describe("DataCards", () => {
     window.__azBridge = makeMockBridge();
     const premium: Premium = { premium: { method: "yearly", at: "2026-01-01" } };
     render(<DataCards premium={premium} />);
+    const hook = renderHook(() => usePremiumScreenOpen());
     fireEvent.click(screen.getByText("打开云备份"));
     expect(window.__azBridge.openBackupScreen).toHaveBeenCalledTimes(1);
-    expect(window.__azBridge.openPremiumScreen).not.toHaveBeenCalled();
+    expect(hook.result.current).toBe(false);
   });
 
   it("点档案库调用openDocsScreen，无门禁", () => {

@@ -8,6 +8,7 @@
 // 整个留在vanilla（挪到了折叠后的挂载点外面），"上传备份文件"按钮只是调用桥接函数
 // triggerImportFilePicker()去点击那个还留在vanilla DOM里的隐藏input。
 import type { Premium } from "../types";
+import { openPremiumScreen } from "../shared/state";
 
 export interface DataCardsProps {
   premium: Premium;
@@ -16,7 +17,7 @@ export interface DataCardsProps {
 export function DataCards({ premium }: DataCardsProps) {
   function onBackup() {
     if (!window.hasPremium(premium)) {
-      window.__azBridge.openPremiumScreen();
+      openPremiumScreen();
       return;
     }
     window.__azBridge.openBackupScreen();

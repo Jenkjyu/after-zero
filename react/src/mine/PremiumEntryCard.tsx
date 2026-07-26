@@ -2,6 +2,7 @@
 // （www/index.html曾经的实现，见CLAUDE.md"React 迁移"一节"我的"tab那部分）。无门禁，
 // 点击直接进#premiumScreen，未开通/已开通都能进（已开通显示的是会员详情）。
 import type { Premium } from "../types";
+import { openPremiumScreen } from "../shared/state";
 
 export interface PremiumEntryCardProps {
   premium: Premium;
@@ -10,13 +11,9 @@ export interface PremiumEntryCardProps {
 export function PremiumEntryCard({ premium }: PremiumEntryCardProps) {
   const label = window.premiumLabel(premium);
 
-  function onClick() {
-    window.__azBridge.openPremiumScreen();
-  }
-
   return (
     <div className={"data-card premium-entry-card" + (label ? " is-member" : "")}>
-      <button type="button" className="premium-entry" onClick={onClick}>
+      <button type="button" className="premium-entry" onClick={openPremiumScreen}>
         <div className="premium-entry-ic" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2l2.9 6.3L21.5 9l-4.8 4.5 1.3 6.7L12 17l-6 3.2 1.3-6.7L2.5 9l6.6-.7L12 2z" />

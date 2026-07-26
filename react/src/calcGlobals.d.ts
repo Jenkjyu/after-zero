@@ -59,6 +59,13 @@ declare global {
     // 同上，editSheet(第六步)新增的一条——见 react/src/sheets/EditSheet.tsx，链里排在
     // notifySheet和detailSheet之间(沿用原来#editSheet在DOM里的位置)。
     __azEditSheetBack?: () => boolean;
+    // 同上，第七步(accountScreen/premiumScreen/termsScreen)新增的三条——各自的React组件
+    // 挂载时注册，卸载时删除，见 react/src/sheets/AccountScreen.tsx、PremiumScreen.tsx、
+    // TermsScreen.tsx。vanilla的__handleBackButton链里按原来DOM顺序排：termsScreen在
+    // aiHistorySheet和aiScreen之后、premiumScreen在accountScreen之前。
+    __azAccountScreenBack?: () => boolean;
+    __azPremiumScreenBack?: () => boolean;
+    __azTermsScreenBack?: () => boolean;
   }
 }
 

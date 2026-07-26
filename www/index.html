@@ -810,93 +810,9 @@
 })();
 </script>
 
-<div class="subpage" id="accountScreen">
-  <div class="subpage-header">
-    <button type="button" class="subpage-back" id="accountBackBtn" aria-label="返回">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-    </button>
-    <div class="subpage-title">账户</div>
-    <div class="subpage-header-spacer"></div>
-  </div>
-  <div class="subpage-body">
-    <div class="data-card">
-      <div class="account-detail-row"><span class="account-detail-label">头像</span><img class="account-avatar" id="acctDetailAvatar" alt=""></div>
-      <div class="account-detail-row"><span class="account-detail-label">昵称</span><span class="account-detail-value" id="acctDetailNickname"></span></div>
-      <div class="account-detail-row"><span class="account-detail-label">会员</span><span class="account-detail-value" id="acctDetailMembership">普通用户</span></div>
-      <div class="account-detail-row"><span class="account-detail-label">微信绑定</span><span class="account-detail-value">已绑定</span></div>
-    </div>
-    <div class="data-actions" style="margin-top:16px"><button class="btn ghost" id="wxLogoutBtn">退出登录</button></div>
-    <div class="data-actions" style="margin-top:10px"><button class="btn danger" id="deleteAccountBtn">注销账户</button></div>
-  </div>
-</div>
-
-<div class="subpage" id="premiumScreen">
-  <div class="subpage-header">
-    <button type="button" class="subpage-back" id="premiumBackBtn" aria-label="返回">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-    </button>
-    <div class="subpage-title">Premium</div>
-    <div class="subpage-header-spacer"></div>
-  </div>
-  <div class="subpage-body">
-
-    <div class="premium-hero">
-      <div class="premium-hero-ic" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3L21.5 9l-4.8 4.5 1.3 6.7L12 17l-6 3.2 1.3-6.7L2.5 9l6.6-.7L12 2z"/></svg>
-      </div>
-      <div class="premium-hero-title">升级你的 After Zero</div>
-      <div class="premium-hero-sub">解锁云备份、报表导出与 AI 债务顾问</div>
-    </div>
-
-    <div class="pf-list">
-      <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.5-8.98A5.5 5.5 0 0 1 17 8.06 4 4 0 0 1 17 18H7z"/></svg></div>
-        <div class="pf-text"><div class="pf-title">云备份</div><div class="pf-desc">手动创建云端备份，每条记录都能单独恢复，换手机也能找回数据</div></div></div>
-      <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .8 1.6v.5h5.4v-.5c0-.6.3-1.2.8-1.6A6 6 0 0 0 12 3z"/></svg></div>
-        <div class="pf-text"><div class="pf-title">AI 债务优化报告</div><div class="pf-desc">雪球法 / 雪崩法分析，告诉你优先还哪笔最省钱</div></div></div>
-      <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v11H8l-4 4z"/></svg></div>
-        <div class="pf-text"><div class="pf-title">AI 智能问答</div><div class="pf-desc">针对你自己的债务数据直接提问，随问随答</div></div></div>
-      <div class="pf-row"><div class="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M11 20V4M18 20v-7"/></svg></div>
-        <div class="pf-text"><div class="pf-title">高级统计报表导出</div><div class="pf-desc">把报表导出成 PDF / Excel，方便存档与分享（图表查看免费）</div></div></div>
-    </div>
-
-    <!-- 价格为占位展示（用户已确认接受占位数字），最终定价与应用内购买商品ID要等上架应用商店时再定 -->
-    <!-- 买断整行高亮 + 月/年两列；三张卡共享一份互斥选中态，选中逻辑见 premiumPlanSel -->
-    <div id="premiumPrice">
-      <div class="price-grid">
-        <button type="button" class="price-card selected" data-plan="onetime">
-          <span class="pc-badge">永久解锁</span>
-          <div class="pc-amt num">¥98</div>
-          <div class="pc-period">一次性付费，永久使用</div>
-        </button>
-      </div>
-      <div class="price-grid two">
-        <button type="button" class="price-card" data-plan="monthly">
-          <div class="pc-amt num">¥5.9</div>
-          <div class="pc-period">/ 月</div>
-          <div class="pc-note">按月订阅，随时可取消</div>
-        </button>
-        <button type="button" class="price-card" data-plan="yearly">
-          <span class="pc-badge">省 29%</span>
-          <div class="pc-amt num">¥50</div>
-          <div class="pc-period">/ 年</div>
-          <div class="pc-note">折合 ¥4.2/月</div>
-        </button>
-      </div>
-    </div>
-
-    <div class="data-actions" style="margin-top:4px">
-      <button type="button" class="btn primary" id="premiumSubscribeBtn">开通 Premium</button>
-    </div>
-    <div class="redeem-row" id="redeemRow">
-      <button type="button" class="redeem-toggle" id="redeemToggleBtn">我有兑换码</button>
-      <div class="redeem-input-wrap" id="redeemInputWrap" style="display:none">
-        <input type="text" id="redeemCodeInput" placeholder="输入兑换码" autocomplete="off">
-        <button type="button" class="btn primary" id="redeemApplyBtn">兑换</button>
-      </div>
-    </div>
-    <div class="footnote" id="premiumTerms">开通即表示你同意我们的<button type="button" class="terms-link" id="termsLink">《购买者服务条款》</button>。永久买断一次付费、长期使用；月付/年付为订阅，除非提前取消否则到期自动续订，费用从你的应用商店账户中扣除，可随时在应用商店的订阅管理中取消。</div>
-  </div>
-</div>
+<!-- #accountScreen/#premiumScreen已经整体搬进React(第七步，React迁移收尾)——见
+     react/src/sheets/AccountScreen.tsx、PremiumScreen.tsx，挂在#react-sheets-root下面。
+     内容原样复刻，没有留任何静态HTML在这里。 -->
 
 <div class="subpage" id="simScreen">
   <div class="subpage-header">
@@ -1020,47 +936,7 @@
   <div id="aiHistoryList"></div>
 </div>
 
-<div class="subpage" id="termsScreen">
-  <div class="subpage-header">
-    <button type="button" class="subpage-back" id="termsBackBtn" aria-label="返回">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-    </button>
-    <div class="subpage-title">购买者服务条款</div>
-    <div class="subpage-header-spacer"></div>
-  </div>
-  <div class="subpage-body terms-body">
-    <p>本条款为《购买者服务条款》初稿，用于说明你在 After Zero 中购买或订阅 Premium 会员服务时双方的权利与义务。在你完成任何付费购买前，请仔细阅读。一旦付费购买或使用会员功能，即视为你已阅读、理解并同意本条款。</p>
-
-    <h3>一、服务提供者与适用范围</h3>
-    <p>本条款适用于 After Zero 应用内提供的一切收费项目，即 Premium 会员（含一次性买断与按周期订阅两种购买方式）。本条款不适用于应用内免费提供的功能。</p>
-
-    <h3>二、会员类型与内容</h3>
-    <p>Premium 会员提供两种购买方式：一次性买断（付费后长期解锁，不涉及到期或续费）与周期性订阅（月付或年付，在订阅有效期内可用）。两种方式解锁的功能完全一致，包括云备份、高级统计报表导出、AI 债务顾问等。具体功能以应用内当时展示的说明为准，我们可能会随版本更新调整功能范围。</p>
-
-    <h3>三、价格与支付</h3>
-    <p>应用内展示的价格当前为占位示意，最终实际价格、货币与计费商品以正式上架应用商店后、你在下单页面看到并确认的金额为准。付款将通过你所使用的应用商店账户完成，具体扣款、发票与账单由相应应用商店提供。</p>
-
-    <h3>四、自动续订与取消</h3>
-    <p>以订阅方式（月付/年付）购买的 Premium，在每个计费周期结束时默认自动续订，费用将从你的应用商店账户扣除。你可以随时在应用商店的订阅管理中关闭自动续订；关闭后当前周期到期前仍可继续使用，到期后不再续费。一次性买断不涉及自动续订。</p>
-
-    <h3>五、退款</h3>
-    <p>退款申请及处理依据你所使用的应用商店的退款政策执行。对于因你个人原因（如误购、不再需要）提出的退款请求，我们将在应用商店政策允许的范围内协助处理，但不保证一定获得退款。</p>
-
-    <h3>六、兑换码</h3>
-    <p>我们可能不定期提供兑换码用于解锁相应会员权益。兑换码不可兑换现金、不可转售，且可能设有使用期限或次数限制。通过非官方渠道获取的兑换码可能无效，由此产生的损失由使用者自行承担。</p>
-
-    <h3>七、服务的变更、中断与终止</h3>
-    <p>我们可能因产品迭代、技术维护或不可抗力等原因，对会员功能进行调整、暂停或终止。若发生对你已购买权益产生重大不利影响的变更，我们将尽合理努力事先告知，并在适用商店政策允许时提供相应补偿方案。</p>
-
-    <h3>八、数据与免责</h3>
-    <p>会员功能（如云备份）会按你的操作处理你的数据。我们会采取合理措施保护数据安全，但在法律允许的最大范围内，不对因网络故障、设备问题、不可抗力或你自身操作导致的数据丢失或损坏承担责任。请你自行做好重要数据的多重备份。</p>
-
-    <h3>九、条款更新</h3>
-    <p>我们可能不时更新本条款。更新后的条款将在应用内公示，你继续使用付费服务即视为接受更新后的条款。</p>
-
-    <p class="terms-note">本文本为初稿，仅用于产品占位与体验展示，不构成最终具有法律约束力的正式条款；正式上架收费前将由我们发布最终版本。如对本条款有任何疑问，可通过应用商店的开发者联系方式与我们联系。</p>
-  </div>
-</div>
+<!-- #termsScreen已经整体搬进React(第七步)——见react/src/sheets/TermsScreen.tsx。 -->
 
 <!-- 债务详情窗(原#scrimDetail+#detailSheet)+编辑表单(原#scrimEdit+#editSheet)都已由React接管
      (react/src/sheets/DetailSheet.tsx、react/src/sheets/EditSheet.tsx)——这是第一个不属于任何
@@ -1228,8 +1104,8 @@
     if (tier === "premium") {
       premium.premium = premium.premium || { method: "redeemed", at: new Date().toISOString() };
     }
-    savePremium(); renderAccountDetail();
-    // AI banner现在归React管(见window.__azBridge.getPremium())，这里改成派发事件通知它重读premium。
+    savePremium();
+    // AccountScreen/PremiumEntryCard/AI banner现在都归React管(见window.__azBridge.getPremium())，这里改成派发事件通知它重读premium。
     window.dispatchEvent(new CustomEvent("az:state-changed"));
   }
   // 开发/测试期间模拟"已订阅"效果用——App还没上应用商店，接不了真实支付，没有别的
@@ -1241,8 +1117,8 @@
   window.__debugPremium = function (state) {
     if (state === "none") { premium = { premium: null }; }
     else if (state === "premium") { premium = { premium: { method: "onetime", at: new Date().toISOString() } }; }
-    savePremium(); renderAccountDetail();
-    // AI banner现在归React管(见window.__azBridge.getPremium())，这里改成派发事件通知它重读premium。
+    savePremium();
+    // AccountScreen/PremiumEntryCard/AI banner现在都归React管(见window.__azBridge.getPremium())，这里改成派发事件通知它重读premium。
     window.dispatchEvent(new CustomEvent("az:state-changed"));
     toast("（调试）订阅状态已设为：" + state);
   };
@@ -1589,13 +1465,37 @@
     window.dispatchEvent(new CustomEvent("az:state-changed"));
   }
 
-  function renderAccountDetail() {
-    $("acctDetailAvatar").src = (account && account.avatarUrl) || "";
-    $("acctDetailNickname").textContent = (account && account.nickname) || "";
-    $("acctDetailMembership").textContent = premiumLabel(premium) || "普通用户";
+  // renderAccountDetail()/openAccountScreen()/closeAccountScreen()已删除——#accountScreen
+  // 整体搬进了React(react/src/sheets/AccountScreen.tsx)，会员/头像/昵称直接读
+  // usePremium()/useAccount()，开关状态是shared/state.ts的openAccountScreen/
+  // closeAccountScreen(纯React状态，不再经过window.__azBridge)。
+  // wxLogoutBtn/deleteAccountBtn两个按钮由React渲染，原来的click handler拆成下面两个
+  // 具名函数桥接给React调用——wxLogout()没有确认弹窗(照抄原handler行为)，deleteAccount()
+  // 去掉了原doDeleteAccount()里"成功后closeAccountScreen()"那行(React关闭)，改成返回
+  // 布尔值让React自己决定要不要关闭。
+  function wxLogout() {
+    account = null;
+    localStorage.removeItem(ACCOUNT_KEY);
+    try { cbAuth().signOut().catch(function () {}); } catch (e) {}
+    renderAccountUI();
+    toast("已退出登录");
   }
-  function openAccountScreen() { renderAccountDetail(); $("accountScreen").classList.add("open"); lockScroll(); }
-  function closeAccountScreen() { if (!$("accountScreen").classList.contains("open")) return; $("accountScreen").classList.remove("open"); unlockScroll(); }
+  function deleteAccount() {
+    toast("正在注销…");
+    return cbApp().callFunction({ name: "deleteAccount" }).then(function (res) {
+      var result = res && res.result;
+      if (!result || !result.ok) throw new Error((result && result.error) || "注销失败");
+      account = null;
+      localStorage.removeItem(ACCOUNT_KEY);
+      try { cbAuth().signOut().catch(function () {}); } catch (e) {}
+      renderAccountUI();
+      toast("已注销账户");
+      return true;
+    }).catch(function (err) {
+      toast("注销失败：" + ((err && err.message) || "网络错误"));
+      return false;
+    });
+  }
 
   // renderAIBanner()已经搬进React(react/src/debts/AiBanner.tsx)，判断逻辑没变
   // (还是调用calc.js的hasPremium(premium))，只是渲染目标从vanilla的#aiBannerBtn
@@ -1604,16 +1504,18 @@
   // premiumLabel(premium))，vanilla这份连同各处调用点一并删除，premium变化时
   // 已有的az:state-changed派发足够让React的usePremium()自动跟上，不需要vanilla
   // 再单独渲染。
-  // 单一 Premium：三张价卡（买断/月/年）共享一份互斥选中态。
-  var premiumPlanSel = "onetime";
-  function openPremiumScreen() {
-    // 兑换码输入框每次进订阅页都收起（默认不展开），避免上次展开后残留成"默认打开"的观感。
-    $("redeemInputWrap").style.display = "none"; $("redeemCodeInput").value = "";
-    $("premiumScreen").classList.add("open"); lockScroll();
+  // premiumPlanSel/openPremiumScreen()/closePremiumScreen()/openTermsScreen()/
+  // closeTermsScreen()已删除——#premiumScreen/#termsScreen整体搬进了React
+  // (react/src/sheets/PremiumScreen.tsx、TermsScreen.tsx)，三张价卡的互斥选中态、
+  // 兑换码输入框的展开/复位现在都是React组件本地状态，开关是shared/state.ts的
+  // openPremiumScreen/closePremiumScreen/openTermsScreen/closeTermsScreen(纯React状态)。
+  // redeemCode(code)是"兑换"按钮唯一还需要vanilla做的事——查REDEEM_CODES表+写premium。
+  function redeemCode(code) {
+    var tier = REDEEM_CODES[code];
+    if (!tier) return null;
+    applyRedeemTier(tier);
+    return tier;
   }
-  function closePremiumScreen() { if (!$("premiumScreen").classList.contains("open")) return; $("premiumScreen").classList.remove("open"); unlockScroll(); }
-  function openTermsScreen() { $("termsScreen").classList.add("open"); lockScroll(); }
-  function closeTermsScreen() { if (!$("termsScreen").classList.contains("open")) return; $("termsScreen").classList.remove("open"); unlockScroll(); }
 
   // ===== AI 债务顾问（Premium）=====
   // 报告=一次性生成、问答=多轮对话，都走 aiAdvisor 云函数（服务端调 CloudBase 大模型）。
@@ -2032,21 +1934,8 @@
     });
   }
 
-  function doDeleteAccount() {
-    toast("正在注销…");
-    cbApp().callFunction({ name: "deleteAccount" }).then(function (res) {
-      var result = res && res.result;
-      if (!result || !result.ok) throw new Error((result && result.error) || "注销失败");
-      account = null;
-      localStorage.removeItem(ACCOUNT_KEY);
-      try { cbAuth().signOut().catch(function () {}); } catch (e) {}
-      closeAccountScreen();
-      renderAccountUI();
-      toast("已注销账户");
-    }).catch(function (err) {
-      toast("注销失败：" + ((err && err.message) || "网络错误"));
-    });
-  }
+  // doDeleteAccount()已删除——被上面新增的deleteAccount()取代(第七步)，逻辑一致，
+  // 只是去掉了"成功后closeAccountScreen()"那行、改成返回布尔值给React自己决定。
 
   // ===== 云备份（Premium）=====
   // 已经从"自动同步、单一文档覆盖"改成"完全手动、每次创建一条独立备份记录"——用户反馈
@@ -2080,7 +1969,11 @@
   }
   function createCloudBackup() {
     if (!account) { toast("请先登录"); return; }
-    if (!hasPremium(premium)) { closeBackupScreen(); openPremiumScreen("premium"); return; }
+    // 原来这里还有一层"万一没premium就跳订阅页"的二次防御检查——由于进入这个函数之前
+    // "我的"页DataCards.tsx已经用hasPremium()gate过一次，且这个app没有订阅到期/降级的
+    // 实际场景，这层检查是多余的；第七步删掉openPremiumScreen()这个vanilla函数后
+    // (premiumScreen已经是React自己的状态，vanilla调不到)，这层检查也没法再照原样写，
+    // 直接去掉(YAGNI，不是遗漏，云备份本身第十步才整体迁移React)。
     var btn = $("backupCreateBtn"); btn.disabled = true;
     toast("正在打包备份…");
     var backupId = "b" + Date.now() + Math.random().toString(36).slice(2, 7);
@@ -2176,7 +2069,7 @@
         }).catch(function () {});
       }));
     }).then(function () { loadUploads(); }).then(function () {
-      renderFiles(); docSel = -1; renderDocContent(); renderAll(); renderAccountDetail();
+      renderFiles(); docSel = -1; renderDocContent(); renderAll(); // renderAll()派发的az:state-changed已经够AccountScreen(usePremium)自动跟上，不需要再单独调renderAccountDetail()(已删除)
     });
   }
   function confirmDeleteBackup(id) {
@@ -2385,14 +2278,18 @@
     // 先关"优先级链，只是判断逻辑物理上不在这个文件里了。详见CLAUDE.md"React 迁移"一节。
     if (window.__azDebtsBack && window.__azDebtsBack()) return true;
     if ($("modalScrim").classList.contains("open")) { closeModal(); return true; }
-    if ($("termsScreen").classList.contains("open")) { closeTermsScreen(); return true; }
+    // termsScreen/premiumScreen/accountScreen同理已经是React状态(react/src/sheets/
+    // TermsScreen.tsx、PremiumScreen.tsx、AccountScreen.tsx，第七步)，vanilla看不到，
+    // 判断逻辑物理上也不在这个文件里了——跟jiggleMode那条(window.__azDebtsBack)是同一个
+    // 模式，位置沿用原来这三个subpage在DOM里的顺序。
+    if (window.__azTermsScreenBack && window.__azTermsScreenBack()) return true;
     if ($("aiHistorySheet").classList.contains("open")) { closeAiHistorySheet(); return true; }
     if ($("aiScreen").classList.contains("open")) { closeAiScreen(); return true; }
     if ($("backupScreen").classList.contains("open")) { closeBackupScreen(); return true; }
     if ($("docsScreen").classList.contains("open")) { closeDocsScreen(); return true; }
     if ($("simScreen").classList.contains("open")) { closeSimScreen(); return true; }
-    if ($("premiumScreen").classList.contains("open")) { closePremiumScreen(); return true; }
-    if ($("accountScreen").classList.contains("open")) { closeAccountScreen(); return true; }
+    if (window.__azPremiumScreenBack && window.__azPremiumScreenBack()) return true;
+    if (window.__azAccountScreenBack && window.__azAccountScreenBack()) return true;
     if ($("notifySheet").classList.contains("open")) { closeNotifySheet(); return true; }
     // editSheet/detailSheet同理已经是React状态(react/src/sheets/EditSheet.tsx、DetailSheet.tsx)，
     // vanilla看不到，判断逻辑物理上也不在这个文件里了——跟jiggleMode那条(window.__azDebtsBack)
@@ -2401,47 +2298,12 @@
     if (window.__azDetailSheetBack && window.__azDetailSheetBack()) return true;
     return false;
   };
-  // #topAvatarBtn(在还债务页头像)的点击由React的Header组件直接处理(调用桥接的
-  // openAccountScreen，见window.__azBridge)；"我的"页自己的accountAvatarBtn/
-  // premiumEntryBtn同理已经是react/src/mine/(AccountHeader.tsx/PremiumEntryCard.tsx)
-  // 的地盘，这几个DOM节点都已经不存在于vanilla里了，这里不再需要重复绑监听器。
-  $("accountBackBtn").addEventListener("click", closeAccountScreen);
-  $("premiumBackBtn").addEventListener("click", closePremiumScreen);
-  $("termsLink").addEventListener("click", openTermsScreen);
-  $("termsBackBtn").addEventListener("click", closeTermsScreen);
-  // 三张价卡（买断/月/年）共享一份互斥选中态
-  document.querySelectorAll("#premiumPrice .price-card").forEach(function (card) {
-    card.addEventListener("click", function () {
-      document.querySelectorAll("#premiumPrice .price-card").forEach(function (c) { c.classList.remove("selected"); });
-      card.classList.add("selected");
-      premiumPlanSel = card.getAttribute("data-plan");
-    });
-  });
-  $("premiumSubscribeBtn").addEventListener("click", function () {
-    // 这次只做UI，不接真实支付——App还没上应用商店。真实支付渠道接入之后，
-    // 这里要换成真正发起购买流程，现在先给一个明确的"暂未开放"反馈。
-    ask("暂未开放真实支付", "After Zero 还未上架应用商店，支付功能尚未接入。上架后即可在此完成开通——敬请期待。", null);
-  });
-  $("redeemToggleBtn").addEventListener("click", function () {
-    var wrap = $("redeemInputWrap");
-    var showing = wrap.style.display !== "none";
-    wrap.style.display = showing ? "none" : "flex";
-    if (!showing) $("redeemCodeInput").focus();
-  });
-  $("redeemApplyBtn").addEventListener("click", function () {
-    var code = ($("redeemCodeInput").value || "").trim();
-    if (!code) { toast("请输入兑换码"); return; }
-    var tier = REDEEM_CODES[code];
-    if (!tier) { toast("兑换码无效"); return; }
-    applyRedeemTier(tier);
-    $("redeemCodeInput").value = ""; $("redeemInputWrap").style.display = "none";
-    toast("兑换成功，已解锁 Premium");
-  });
-  // #aiBannerBtn的点击现在由React的AiBanner组件直接处理(见window.__azBridge.openPremiumScreen/
-  // openAiScreen)，这里不用再挂一份监听器——那个DOM节点已经不存在于vanilla里了。
-  $("deleteAccountBtn").addEventListener("click", function () {
-    ask("注销账户", "注销后账号数据将从服务器永久删除，且需要重新微信登录才能再次使用。此操作不可撤销，确定继续吗？", doDeleteAccount);
-  });
+  // #topAvatarBtn(在还债务页头像)/"我的"页accountAvatarBtn/premiumEntryBtn的点击现在由
+  // React直接调用shared/state.ts的openAccountScreen/openPremiumScreen(第七步)，这几个
+  // DOM节点都已经不存在于vanilla里了，这里不再需要绑监听器；accountBackBtn/premiumBackBtn/
+  // termsLink/termsBackBtn/价卡互斥选中/premiumSubscribeBtn/redeemToggleBtn/redeemApplyBtn/
+  // deleteAccountBtn/wxLogoutBtn同理——#accountScreen/#premiumScreen/#termsScreen整体是
+  // React渲染，这些按钮的onClick直接在JSX里写，不再需要在这里查DOM绑监听器。
   $("wxLoginBtn").addEventListener("click", function () {
     var native = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.WeChatLogin;
     if (!native) { toast("微信登录仅支持安卓App内使用"); return; }
@@ -2454,14 +2316,6 @@
     }).catch(function (err) {
       if (err && err.message) toast(err.message);
     });
-  });
-  $("wxLogoutBtn").addEventListener("click", function () {
-    account = null;
-    localStorage.removeItem(ACCOUNT_KEY);
-    try { cbAuth().signOut().catch(function () {}); } catch (e) {}
-    closeAccountScreen();
-    renderAccountUI();
-    toast("已退出登录");
   });
   // dlBackupBtn/importFileBtn(react/src/mine/DataCards.tsx里的"下载备份文件"/"上传备份文件"
   // 按钮)已经不在vanilla DOM里了，下载逻辑抽成了上面的downloadBackupFile()、通过桥接调用；
@@ -2532,9 +2386,10 @@
     commitReorder: commitReorder,
     saveAll: saveAll,
     renderAll: renderAll,
-    openPremiumScreen: openPremiumScreen,
+    // openPremiumScreen/openAccountScreen已删除——第七步(React迁移收尾)后accountScreen/
+    // premiumScreen/termsScreen都是React自己拥有的sheet(shared/state.ts)，不再经过这个
+    // 桥接对象。openAiScreen暂时保留，aiScreen要等第十一步才迁移。
     openAiScreen: openAiScreen,
-    openAccountScreen: openAccountScreen,
     // detailSheet(react/src/sheets/)新增：#dSettle/#dSimulate这两个按钮以前只在vanilla内部
     // 调用，现在按钮由React渲染，需要显式桥接。
     settleFull: settleFull,
@@ -2557,7 +2412,12 @@
     setDebt: setDebt,
     deleteDebt: deleteDebt,
     toast: toast,
-    confirmAsync: askAsync
+    confirmAsync: askAsync,
+    // 第七步(accountScreen/premiumScreen)新增：这三个是真实的cloud/native调用或者共享
+    // 状态变更，留在vanilla私有作用域里，React只调用不重新实现。
+    wxLogout: wxLogout,
+    deleteAccount: deleteAccount,
+    redeemCode: redeemCode
   };
 
   renderFiles(); renderDocContent(); renderAll(); loadUploads(); renderAccountUI();

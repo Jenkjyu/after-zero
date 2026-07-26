@@ -1,8 +1,13 @@
-import { describe, expect, it } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { AccountHeader } from "../src/mine/AccountHeader";
+import { closeAccountScreen, useAccountScreenOpen } from "../src/shared/state";
 import { makeMockBridge } from "./mockBridge";
 import type { Account } from "../src/types";
+
+afterEach(() => {
+  closeAccountScreen(); // accountScreenOpen是模块级状态，重置避免测试间互相污染
+});
 
 const account: Account = {
   openid: "test-openid",
@@ -26,10 +31,12 @@ describe("AccountHeader", () => {
     expect(screen.getByLabelText("账户").textContent).toBe("");
   });
 
-  it("点头像调用openAccountScreen", () => {
+  it("点头像调用openAccountScreen(纯React状态，不经过__azBridge)", () => {
     window.__azBridge = makeMockBridge();
     render(<AccountHeader account={account} />);
+    const hook = renderHook(() => useAccountScreenOpen());
+    expect(hook.result.current).toBe(false);
     fireEvent.click(screen.getByLabelText("账户"));
-    expect(window.__azBridge.openAccountScreen).toHaveBeenCalledTimes(1);
+    expect(hook.result.current).toBe(true);
   });
 });
