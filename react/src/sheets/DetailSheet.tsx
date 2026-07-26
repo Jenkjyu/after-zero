@@ -8,7 +8,7 @@
 // "销这期"/"提前结清"/"编辑"/"提前还款模拟"这几个真正改数据或跳转到别的vanilla浮层的操作，
 // 依然通过__azBridge调用vanilla函数——vanilla保留的这几个函数完全没有被重新实现。
 import { useEffect, useRef, useState } from "react";
-import { closeDetailSheet, openEditSheet, useDebts, useDetailSheetIndex } from "../shared/state";
+import { closeDetailSheet, openEditSheet, openSimScreen, useDebts, useDetailSheetIndex } from "../shared/state";
 import { makeGripDragState, onGripPointerDown, onGripPointerEnd, onGripPointerMove } from "./gripDrag";
 
 function kv(k: string, v: string) {
@@ -104,7 +104,7 @@ export function DetailSheet() {
   function onSimulate() {
     if (displayIndex === null) return;
     closeDetailSheet();
-    window.__azBridge.openSimScreen(displayIndex);
+    openSimScreen(displayIndex);
   }
   function onSettle() {
     if (displayIndex === null) return;

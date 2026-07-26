@@ -814,29 +814,7 @@
      react/src/sheets/AccountScreen.tsx、PremiumScreen.tsx，挂在#react-sheets-root下面。
      内容原样复刻，没有留任何静态HTML在这里。 -->
 
-<div class="subpage" id="simScreen">
-  <div class="subpage-header">
-    <button type="button" class="subpage-back" id="simBackBtn" aria-label="返回">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-    </button>
-    <div class="subpage-title">提前还款模拟器</div>
-    <div class="subpage-header-spacer"></div>
-  </div>
-  <div class="subpage-body">
-    <div class="data-card">
-      <h3 id="simDebtName"></h3>
-      <p>模拟提前多还一笔钱，看看能省多少利息、提前多久还清（按当前月供、推算年化利率测算，实际以银行/平台真实计算为准）。</p>
-    </div>
-    <div class="premium-tabs" role="tablist" style="margin-bottom:14px">
-      <button type="button" class="premium-tab active" id="simModeOnce" data-mode="once" role="tab" aria-selected="true">单次多还</button>
-      <button type="button" class="premium-tab" id="simModeRecurring" data-mode="recurring" role="tab" aria-selected="false">每期多还</button>
-    </div>
-    <div class="field"><label for="simExtra">多还金额 ¥ <span class="req">*</span></label><input id="simExtra" type="number" step="0.01" min="0" inputmode="decimal"></div>
-    <div class="field"><label for="simAtPeriod">从第几期开始 <span class="req">*</span></label><input id="simAtPeriod" type="number" min="1" inputmode="numeric"></div>
-    <button type="button" class="btn primary" id="simRunBtn" style="width:100%">开始测算</button>
-    <div id="simResult" style="margin-top:18px"></div>
-  </div>
-</div>
+<!-- #simScreen已经整体搬进React(第八步)——见react/src/sheets/SimScreen.tsx。 -->
 
 <div class="subpage" id="docsScreen">
   <div class="subpage-header">
@@ -945,33 +923,7 @@
      详见CLAUDE.md"React 迁移"一节。 -->
 <div id="react-sheets-root"></div>
 
-<div class="scrim" id="scrimNotify"></div>
-<div class="sheet" id="notifySheet" role="dialog" aria-modal="true" aria-labelledby="notifyTitle">
-  <div class="grip"></div>
-  <h2 id="notifyTitle">还款提醒通知</h2>
-  <label class="switch-row">
-    <span>启用通知</span>
-    <span class="switch"><input type="checkbox" id="notifyToggle"><span class="switch-track"></span></span>
-  </label>
-  <button type="button" class="btn ghost" id="notifyTestBtn" style="width:100%">发送测试通知（10秒后）</button>
-  <div class="footnote" style="margin:6px 2px 0; text-align:left">用来验证手机能不能收到，不用等真实还款日；如果测试通知也收不到，大概率是系统电池优化/自启动限制拦了它，去系统设置里把本App加入白名单</div>
-  <div class="section-label" style="margin-top:14px">提醒规则（对所有在还债务统一生效）</div>
-  <div id="notifyRuleList"></div>
-  <div class="section-label" style="margin-top:18px; padding-top:16px; border-top:1px solid var(--border)">添加新提醒</div>
-  <div class="notify-add">
-    <select id="notifyOffset">
-      <option value="0">当天到期</option>
-      <option value="1">提前1天</option>
-      <option value="2">提前2天</option>
-      <option value="3">提前3天</option>
-    </select>
-    <input type="time" id="notifyTime" value="09:00">
-    <button type="button" class="btn ghost" id="notifyAddBtn">添加</button>
-  </div>
-  <div class="sheet-actions" style="margin-top:14px">
-    <button type="button" class="btn primary" id="notifyDoneBtn">完成</button>
-  </div>
-</div>
+<!-- #scrimNotify/#notifySheet已经整体搬进React(第八步)——见react/src/sheets/NotifySheet.tsx。 -->
 
 <div class="modal-scrim" id="modalScrim">
   <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="mTitle">
@@ -1040,10 +992,9 @@
   var AI_CHATLOG_KEY = "after-zero-ai-chatlog-v1";
   var AI_CHATLOG_MAX_CONVOS = 50;
   var AI_CHATLOG_MAX_MSGS = 40;
-  // 提前还款模拟器：只记住上次用的模式+金额，不记是哪笔债务/哪一期——债务没有稳定id
-  // (纯靠数组下标寻址，见"在还债务自定义排序"一节)，记那些容易在债务被删/重排后失效。
-  // 独立于上面几个键。
-  var SIM_KEY = "after-zero-simulate-v1";
+  // 提前还款模拟器(SIM_KEY="after-zero-simulate-v1")第八步(React迁移收尾)后整体移交
+  // react/src/sheets/SimScreen.tsx所有——直接读写这个键，vanilla不再声明/持有这个变量，
+  // 跟debtSort当年"整体移交React"是同一个先例。键名依然不能改(硬性铁律第1条)。
   // 云备份：本地只存"上次备份时间"这一件事用来展示，备份记录本身全部存在云端。
   // 独立于上面几个键。
   var BACKUP_KEY = "after-zero-backup-meta-v1";
@@ -1081,8 +1032,7 @@
   }
   if (premium) delete premium.premiumPlus;
   function savePremium() { try { localStorage.setItem(PREMIUM_KEY, JSON.stringify(premium)); } catch (e) {} }
-  var simPrefs = loadJSON(SIM_KEY, { mode: "once", extra: 0 });
-  function saveSimPrefs() { try { localStorage.setItem(SIM_KEY, JSON.stringify(simPrefs)); } catch (e) {} }
+  // simPrefs/saveSimPrefs()已删除——SIM_KEY整体移交React(见上面注释)。
   // 云备份只需要记住"上次备份是什么时候"这一件事用来展示——备份记录本身全部存在云端，
   // 靠云函数backupList实时查，本地不缓存任何一条备份的内容。
   var lastBackupMeta = loadJSON(BACKUP_KEY, { lastBackupAt: 0 });
@@ -1196,8 +1146,8 @@
   // PAY_REVEAL/paySwipeOpen/closePaySwipe/openPaySwipeTo/paySwipeSettle/initPaySwipe/
   // payFilter/PAY_FILTERS/renderPayFilterBar/renderPay全部删除，逻辑原样搬到
   // react/src/pay/gestures.ts、Hero.tsx、FilterBar.tsx、PayList.tsx、App.tsx。
-  // #notifySheet本身继续100%vanilla(跟#editSheet同一类处理，detailSheet已经迁移React了)，
-  // 只是openNotifySheet/getNotify两个函数新加进了window.__azBridge给React调用。
+  // #notifySheet本身在第八步(React迁移收尾)已经整体搬进React了，见下面"还款提醒通知设置
+  // 面板"附近的注释——这里当年(第三步)只是历史记录，openNotifySheet早已从__azBridge删除。
 
   // "在还债务"/"还款日"/"统计"三个tab都已经整体搬进React，原来这里对各tab渲染函数
   // (renderSummary/renderAIBanner/renderDebts/renderPay/renderReportScreen)的调用
@@ -1312,54 +1262,33 @@
   // 这一个narrow的写入函数(定义在deleteDebt旁边)。见CLAUDE.md"React 迁移"一节"第六步"。
 
   // 还款提醒通知设置面板。规则全局共享(不按债务区分)，跟着每笔债务当下的nextDate
-  // 自动滚动到下一期(syncNotifications里体现)，这里只管开关状态和规则的增删。
-  // offsetLabel 已搬进 www/js/calc.js。#notifySheet本身继续100%vanilla，跟这次
-  // #editSheet的React迁移无关。
-  function renderNotifyRules() {
-    var list = $("notifyRuleList"); list.innerHTML = "";
-    if (!notify.rules.length) { list.innerHTML = '<div class="footnote" style="margin:4px 2px 8px;text-align:left">还没有提醒规则，添加一条吧</div>'; return; }
-    notify.rules.forEach(function (r, idx) {
-      var row = document.createElement("div"); row.className = "notify-rule";
-      row.innerHTML = '<span class="nr-text"></span><button type="button" class="nr-del">删除</button>';
-      row.querySelector(".nr-text").textContent = offsetLabel(r.offsetDays) + " · " + r.time;
-      row.querySelector(".nr-del").addEventListener("click", function () {
-        notify.rules.splice(idx, 1); saveNotify(); renderNotifyRules(); syncNotifications();
-      });
-      list.appendChild(row);
-    });
-  }
-  function openNotifySheet() {
-    $("notifyToggle").checked = notify.enabled;
-    renderNotifyRules();
-    $("scrimNotify").classList.add("open"); $("notifySheet").classList.add("open"); lockScroll();
-  }
-  function closeNotifySheet() {
-    if (!$("notifySheet").classList.contains("open")) return;
-    // 开了通知但一条规则都没加就退出：兜底成"当天到期 09:00"，不能让用户开了开关却什么都收不到。
-    if (notify.enabled && !notify.rules.length) { notify.rules.push({ offsetDays: 0, time: "09:00" }); saveNotify(); }
-    $("scrimNotify").classList.remove("open"); $("notifySheet").classList.remove("open"); unlockScroll();
-    // 铃铛的.on状态现在由React(还款日页Hero.tsx)响应式读取notify.enabled驱动，
-    // 不再需要这里手动调用一个incremental的updateBellUI()——saveNotify()新增的
-    // az:state-changed派发(见上面"硬性铁律"附近)已经能让React那边自动跟上最新状态。
-    syncNotifications();
-  }
-  $("notifyToggle").addEventListener("change", function () {
-    var cb = $("notifyToggle");
+  // 自动滚动到下一期(syncNotifications里体现)。#notifySheet本身整体搬进React了(第八步，
+  // react/src/sheets/NotifySheet.tsx)，renderNotifyRules()/openNotifySheet()/
+  // closeNotifySheet()整个删除(渲染+开关状态改成useNotify()/shared/state.ts)，这里只留
+  // 真正要调用@capacitor/local-notifications原生插件权限API的这4个函数，桥接给React调用。
+  // "开了通知但一条规则都没加就退出兜底成当天到期09:00"那条逻辑挪进了NotifySheet.tsx的
+  // handleClose()里(用notify.enabled/notify.rules判断+调用addNotifyRule)。
+  function setNotifyEnabled(enabled) {
+    if (!enabled) { notify.enabled = false; saveNotify(); return Promise.resolve(false); }
     var LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
-    if (cb.checked) {
-      if (!LN) { cb.checked = false; toast("通知仅支持安卓App内使用"); return; }
-      LN.checkPermissions().then(function (r) {
-        if (r.display === "granted") return r;
-        return LN.requestPermissions();
-      }).then(function (r) {
-        if (r.display !== "granted") { cb.checked = false; toast("未授予通知权限"); return; }
-        notify.enabled = true; saveNotify();
-      }).catch(function () { cb.checked = false; toast("未授予通知权限"); });
-    } else {
-      notify.enabled = false; saveNotify();
-    }
-  });
-  $("notifyTestBtn").addEventListener("click", function () {
+    if (!LN) { toast("通知仅支持安卓App内使用"); return Promise.resolve(false); }
+    return LN.checkPermissions().then(function (r) {
+      if (r.display === "granted") return r;
+      return LN.requestPermissions();
+    }).then(function (r) {
+      if (r.display !== "granted") { toast("未授予通知权限"); return false; }
+      notify.enabled = true; saveNotify();
+      return true;
+    }).catch(function () { toast("未授予通知权限"); return false; });
+  }
+  function addNotifyRule(offsetDays, time) {
+    notify.rules.push({ offsetDays: offsetDays, time: time || "09:00" });
+    saveNotify(); syncNotifications();
+  }
+  function deleteNotifyRule(idx) {
+    notify.rules.splice(idx, 1); saveNotify(); syncNotifications();
+  }
+  function sendTestNotification() {
     var LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
     if (!LN) { toast("通知仅支持安卓App内使用"); return; }
     LN.checkPermissions().then(function (r) {
@@ -1374,14 +1303,7 @@
         schedule: { at: new Date(Date.now() + 10000) }
       }] }).then(function () { toast("已安排，10秒后看通知栏"); });
     }).catch(function (e) { toast("发送失败：" + (e && e.message ? e.message : "未知错误")); });
-  });
-  $("notifyAddBtn").addEventListener("click", function () {
-    var offsetDays = +$("notifyOffset").value, time = $("notifyTime").value || "09:00";
-    notify.rules.push({ offsetDays: offsetDays, time: time });
-    saveNotify(); renderNotifyRules(); syncNotifications();
-  });
-  $("notifyDoneBtn").addEventListener("click", closeNotifySheet);
-  $("scrimNotify").addEventListener("click", closeNotifySheet);
+  }
 
   // closeDetail()/closeEdit()都已删除——这个函数现在直接桥接给React的EditSheet"删除"按钮调用
   // (window.__azBridge.deleteDebt)，确认+删除逻辑保持100%vanilla不变；EditSheet自己有一个
@@ -1695,44 +1617,9 @@
     });
   }
 
-  // ===== 提前还款收益模拟器（Premium）=====
-  var simIndex = -1, simMode = simPrefs.mode === "recurring" ? "recurring" : "once";
-  function setSimMode(mode) {
-    simMode = mode === "recurring" ? "recurring" : "once";
-    $("simModeOnce").classList.toggle("active", simMode === "once");
-    $("simModeOnce").setAttribute("aria-selected", simMode === "once");
-    $("simModeRecurring").classList.toggle("active", simMode === "recurring");
-    $("simModeRecurring").setAttribute("aria-selected", simMode === "recurring");
-  }
-  function openSimScreen(i) {
-    var d = debts[i]; if (!d) return;
-    simIndex = i;
-    $("simDebtName").textContent = d.name;
-    setSimMode(simMode);
-    $("simExtra").value = simPrefs.extra || "";
-    $("simAtPeriod").value = 1;
-    $("simAtPeriod").max = d.terms || 1;
-    $("simResult").innerHTML = "";
-    $("simScreen").classList.add("open"); lockScroll();
-  }
-  function closeSimScreen() { if (!$("simScreen").classList.contains("open")) return; $("simScreen").classList.remove("open"); unlockScroll(); }
-  function runSimulate() {
-    var d = debts[simIndex]; if (!d) return;
-    var extra = +$("simExtra").value || 0;
-    var atPeriod = Math.max(1, Math.min(d.terms || 1, Math.round(+$("simAtPeriod").value) || 1));
-    if (extra <= 0) { toast("请输入大于 0 的多还金额"); return; }
-    simPrefs.mode = simMode; simPrefs.extra = extra; saveSimPrefs();
-    var r = simulatePrepay(d, simMode, atPeriod, extra);
-    if (!r) { toast("月供不足以覆盖利息，无法测算"); return; }
-    var monthsSaved = Math.max(0, r.monthsSaved), interestSaved = Math.max(0, r.interestSaved);
-    $("simResult").innerHTML =
-      '<div class="summary">'
-      + '<div class="kpi half"><div class="v num">' + monthsSaved + ' 个月</div><div class="k">提前还清</div></div>'
-      + '<div class="kpi half"><div class="v num">¥' + fmt(interestSaved) + '</div><div class="k">节省利息</div></div>'
-      + '</div>'
-      + '<div class="footnote" style="text-align:left">按当前月供 ¥' + fmt(d.monthly) + '、推算年化 ' + (d.rate ? Number(d.rate).toFixed(2) : 0) + '% 模拟：原计划约 ' + r.baseMonths + ' 个月还清；'
-      + (simMode === "recurring" ? '从第 ' + atPeriod + ' 期起每期多还' : '第 ' + atPeriod + ' 期多还一次') + ' ¥' + fmt(extra) + ' 后，约 ' + r.newMonths + ' 个月还清。</div>';
-  }
+  // 提前还款收益模拟器（Premium）——simIndex/simMode/setSimMode/openSimScreen/closeSimScreen/
+  // runSimulate全部已删除(第八步)，整体搬进react/src/sheets/SimScreen.tsx，直接调用
+  // window.simulatePrepay(calc.js全局函数)，SIM_KEY也整体移交React(见上面注释)。
 
   // "统计"页(2个KPI+3张图+数据明细表)这次(React迁移第三步)整体搬进React(react/src/report/)，
   // 原来这里的renderBalanceBars/renderTypeStack/renderPayoffLine/renderReportTables/
@@ -2240,14 +2127,10 @@
   // 后续事件的关键一步，跟上面的user-select是两回事，缺一不可。
   document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   // cancelBtn/deleteBtn/debtForm submit/scrimEdit(编辑表单按钮+背景)、dEdit/dSale/dSimulate/
-  // dSettle/dClose/scrimDetail(详情窗按钮+背景)都已经不在vanilla DOM里了(react/src/sheets/
-  // EditSheet.tsx、DetailSheet.tsx整个接管)，这里不再需要重复绑监听器——setDebt/deleteDebt/
-  // settleFull/openSimScreen这几个函数改成通过window.__azBridge桥接给React调用(见下面桥接
-  // 对象定义)，payInstallment本来就已经桥接过。
-  $("simBackBtn").addEventListener("click", closeSimScreen);
-  $("simModeOnce").addEventListener("click", function () { setSimMode("once"); });
-  $("simModeRecurring").addEventListener("click", function () { setSimMode("recurring"); });
-  $("simRunBtn").addEventListener("click", runSimulate);
+  // dSettle/dClose/scrimDetail(详情窗按钮+背景)、simBackBtn/simModeOnce/simModeRecurring/
+  // simRunBtn(#simScreen)都已经不在vanilla DOM里了(react/src/sheets/下对应组件整个接管)，
+  // 这里不再需要重复绑监听器——setDebt/deleteDebt/settleFull这几个函数改成通过
+  // window.__azBridge桥接给React调用(见下面桥接对象定义)，payInstallment本来就已经桥接过。
   // 两个导出按钮的premium门禁+click逻辑已经原样搬进了React的ExportActions.tsx
   // (通过window.__azBridge.exportReportXlsx/exportReportPdf调用)，这两个id对应的
   // <button>也已经不在vanilla渲染的DOM里了，这里不再需要重复绑一份监听器。
@@ -2287,10 +2170,12 @@
     if ($("aiScreen").classList.contains("open")) { closeAiScreen(); return true; }
     if ($("backupScreen").classList.contains("open")) { closeBackupScreen(); return true; }
     if ($("docsScreen").classList.contains("open")) { closeDocsScreen(); return true; }
-    if ($("simScreen").classList.contains("open")) { closeSimScreen(); return true; }
+    // simScreen/notifySheet同理已经是React状态(react/src/sheets/SimScreen.tsx、
+    // NotifySheet.tsx，第八步)，位置沿用原来这两个subpage/sheet在DOM里的顺序。
+    if (window.__azSimScreenBack && window.__azSimScreenBack()) return true;
     if (window.__azPremiumScreenBack && window.__azPremiumScreenBack()) return true;
     if (window.__azAccountScreenBack && window.__azAccountScreenBack()) return true;
-    if ($("notifySheet").classList.contains("open")) { closeNotifySheet(); return true; }
+    if (window.__azNotifySheetBack && window.__azNotifySheetBack()) return true;
     // editSheet/detailSheet同理已经是React状态(react/src/sheets/EditSheet.tsx、DetailSheet.tsx)，
     // vanilla看不到，判断逻辑物理上也不在这个文件里了——跟jiggleMode那条(window.__azDebtsBack)
     // 是同一个模式。editSheet排在detailSheet之前(位置沿用原来#editSheet在DOM里的顺序)。
@@ -2390,12 +2275,10 @@
     // premiumScreen/termsScreen都是React自己拥有的sheet(shared/state.ts)，不再经过这个
     // 桥接对象。openAiScreen暂时保留，aiScreen要等第十一步才迁移。
     openAiScreen: openAiScreen,
-    // detailSheet(react/src/sheets/)新增：#dSettle/#dSimulate这两个按钮以前只在vanilla内部
-    // 调用，现在按钮由React渲染，需要显式桥接。
+    // detailSheet(react/src/sheets/)新增：#dSettle以前只在vanilla内部调用，现在按钮由React
+    // 渲染，需要显式桥接。openSimScreen已删除——第八步(simScreen)迁移React后不再经过桥接。
     settleFull: settleFull,
-    openSimScreen: openSimScreen,
     getNotify: function () { return notify; },
-    openNotifySheet: openNotifySheet,
     exportReportXlsx: exportReportXlsx,
     exportReportPdf: exportReportPdf,
     // "我的"tab(react/src/mine/)新增：全部trigger-only，#accountScreen/#premiumScreen/
@@ -2417,7 +2300,13 @@
     // 状态变更，留在vanilla私有作用域里，React只调用不重新实现。
     wxLogout: wxLogout,
     deleteAccount: deleteAccount,
-    redeemCode: redeemCode
+    redeemCode: redeemCode,
+    // 第八步(notifySheet)新增：这4个都要调用@capacitor/local-notifications原生插件
+    // (权限检查/申请/调度)，留在vanilla私有作用域里，React只调用不重新实现。
+    setNotifyEnabled: setNotifyEnabled,
+    addNotifyRule: addNotifyRule,
+    deleteNotifyRule: deleteNotifyRule,
+    sendTestNotification: sendTestNotification
   };
 
   renderFiles(); renderDocContent(); renderAll(); loadUploads(); renderAccountUI();

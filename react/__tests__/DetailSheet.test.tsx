@@ -4,13 +4,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { DetailSheet } from "../src/sheets/DetailSheet";
-import { closeDetailSheet, closeEditSheet, openDetailSheet, useEditSheetIndex } from "../src/shared/state";
+import { closeDetailSheet, closeEditSheet, closeSimScreen, openDetailSheet, useEditSheetIndex, useSimScreenIndex } from "../src/shared/state";
 import { makeMockBridge, makeDebt } from "./mockBridge";
 import type { Debt } from "../src/types";
 
 afterEach(() => {
   closeDetailSheet(); // detailSheetIndex是模块级状态，重置避免测试间互相污染
   closeEditSheet();
+  closeSimScreen();
 });
 
 describe("DetailSheet", () => {
@@ -71,13 +72,14 @@ describe("DetailSheet", () => {
     expect(window.__azBridge.settleFull).toHaveBeenCalledWith(0);
   });
 
-  it("点提前还款模拟：关闭sheet+调用openSimScreen(i)", () => {
+  it("点提前还款模拟：关闭detailSheet+调用openSimScreen(i)(纯React状态，不经过__azBridge)", () => {
     const debts: Debt[] = [makeDebt()];
     window.__azBridge = makeMockBridge({ debts });
     render(<DetailSheet />);
+    const simHook = renderHook(() => useSimScreenIndex());
     act(() => { openDetailSheet(0); });
     fireEvent.click(screen.getByText("提前还款模拟"));
-    expect(window.__azBridge.openSimScreen).toHaveBeenCalledWith(0);
+    expect(simHook.result.current).toBe(0);
   });
 
   it("点关闭按钮：sheet的open class消失", () => {

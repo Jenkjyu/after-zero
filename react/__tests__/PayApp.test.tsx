@@ -1,10 +1,15 @@
 // 跟其余pay测试(手造PayItem fixture)不同，这里走真实的window.today0()/parseDate/dueBucket
 // 等calc.js全局函数，验证App.tsx的items计算+筛选+分组整条链路真的接得上，不只是各组件
 // 各自正确——跟report的ReportApp.test.tsx是同一个用意。
-import { describe, expect, it } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { App } from "../src/pay/App";
+import { closeNotifySheet, useNotifySheetOpen } from "../src/shared/state";
 import { makeMockBridge, makeDebt } from "./mockBridge";
+
+afterEach(() => {
+  closeNotifySheet(); // notifySheetOpen是模块级状态，重置避免测试间互相污染
+});
 
 function fmtYMD(d: Date): string {
   const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
@@ -53,11 +58,12 @@ describe("pay App", () => {
     expect(list.textContent).not.toContain("本周债务");
   });
 
-  it("点铃铛调用__azBridge.openNotifySheet()", () => {
+  it("点铃铛调用openNotifySheet(纯React状态，不经过__azBridge)", () => {
     window.__azBridge = makeMockBridge({ debts: [] });
     render(<App />);
+    const hook = renderHook(() => useNotifySheetOpen());
     fireEvent.click(screen.getByLabelText("还款提醒通知设置"));
-    expect(window.__azBridge.openNotifySheet).toHaveBeenCalledTimes(1);
+    expect(hook.result.current).toBe(true);
   });
 
   it("没有待还债务时列表区留空、不显示筛选后为空的footnote", () => {

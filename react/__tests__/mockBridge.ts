@@ -24,9 +24,7 @@ export function makeMockBridge(overrides?: {
     renderAll: vi.fn(),
     openAiScreen: vi.fn(),
     settleFull: vi.fn(),
-    openSimScreen: vi.fn(),
     getNotify: vi.fn(() => notify),
-    openNotifySheet: vi.fn(),
     exportReportXlsx: vi.fn(),
     exportReportPdf: vi.fn(),
     openDocsScreen: vi.fn(),
@@ -44,6 +42,10 @@ export function makeMockBridge(overrides?: {
     wxLogout: vi.fn(),
     deleteAccount: vi.fn(() => Promise.resolve(true)),
     redeemCode: vi.fn(() => null),
+    setNotifyEnabled: vi.fn((enabled: boolean) => Promise.resolve(enabled)),
+    addNotifyRule: vi.fn(),
+    deleteNotifyRule: vi.fn(),
+    sendTestNotification: vi.fn(),
   };
 }
 

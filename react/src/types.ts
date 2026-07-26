@@ -110,14 +110,14 @@ export interface AzBridge {
   // 打开这几个screen不再经过bridge，改成shared/state.ts的openAccountScreen/openPremiumScreen/
   // openTermsScreen(纯React状态，模式同openDetailSheet/openEditSheet)。
   openAiScreen(): void;
-  // detailSheet新增：#dSettle(提前结清)/#dSimulate(提前还款模拟，跳转#simScreen)以前只在
-  // vanilla内部调用，现在detailSheet的按钮由React渲染，需要显式桥接。
+  // detailSheet新增：#dSettle(提前结清)以前只在vanilla内部调用，现在detailSheet的按钮由
+  // React渲染，需要显式桥接。openSimScreen已删除——第八步(simScreen)迁移React后，打开
+  // 这个screen不再经过bridge，改成shared/state.ts的openSimScreen(i)(模式同openDetailSheet)。
   settleFull(i: number): void;
-  openSimScreen(i: number): void;
-  // 还款日tab新增：#notifySheet本身继续100%vanilla(跟#editSheet同一类处理，detailSheet
-  // 已经迁移React了)，React只需要读通知设置(铃铛图标的.on状态)+能打开这个sheet。
+  // 还款日tab新增：getNotify()仍然是bridge——notify这份数据的调度(syncNotifications)
+  // 依赖vanilla的debts/renderAll()管线，必须留在vanilla，React只读它。openNotifySheet已
+  // 删除——第八步(notifySheet)迁移React后，打开这个sheet不再经过bridge。
   getNotify(): NotifySettings;
-  openNotifySheet(): void;
   // 统计tab新增：两个导出函数本身零DOM依赖(只读debts造Blob)，继续100%vanilla，
   // 只是入口桥接给React的导出按钮调用，premium门禁判断在React这边原样复刻。
   exportReportXlsx(): void;
@@ -149,6 +149,15 @@ export interface AzBridge {
   // 一致的用户反馈)，React只需要这个布尔值来决定要不要顺带关闭accountScreen。
   deleteAccount(): Promise<boolean>;
   redeemCode(code: string): string | null;
+  // 第八步(notifySheet)新增：这几个都要调用@capacitor/local-notifications原生插件
+  // (权限检查/申请/调度)，不能重写成纯React。setNotifyEnabled返回最终生效的状态(权限被拒时
+  // 会是false，React据此把checkbox退回未勾选)；addNotifyRule/deleteNotifyRule/
+  // sendTestNotification内部都会自己调saveNotify()(已派发az:state-changed，useNotify()
+  // 自动跟上)+syncNotifications()重新排程，不需要React再手动触发。
+  setNotifyEnabled(enabled: boolean): Promise<boolean>;
+  addNotifyRule(offsetDays: 0 | 1 | 2 | 3, time: string): void;
+  deleteNotifyRule(idx: number): void;
+  sendTestNotification(): void;
 }
 
 // 排序方式(含"custom")的类型，跟 www/index.html 原来的 DEBT_SORTS 键名保持一致，

@@ -45,6 +45,14 @@ declare global {
     // 推算下一期默认日期用。
     genPlan(spec: GenSpec): PlanRow[];
     impliedAPR(plan: PlanRow[]): number;
+    // simScreen(react/src/sheets/SimScreen.tsx)用：按标准等额本息模型模拟"多还一笔"的效果，
+    // 月供不足以覆盖利息(无法收敛)时返回null，UI层需要单独toast提示。
+    simulatePrepay(
+      d: Debt,
+      mode: "once" | "recurring",
+      atPeriod: number,
+      extra: number
+    ): { monthsSaved: number; interestSaved: number; newMonths: number; baseMonths: number } | null;
     isBadRepeatDay(day: number): boolean;
     r2(x: number): number;
     clone<T>(x: T): T;
@@ -66,6 +74,11 @@ declare global {
     __azAccountScreenBack?: () => boolean;
     __azPremiumScreenBack?: () => boolean;
     __azTermsScreenBack?: () => boolean;
+    // 同上，第八步(simScreen/notifySheet)新增的两条——见 react/src/sheets/SimScreen.tsx、
+    // NotifySheet.tsx。链里按原来DOM顺序排：simScreen在backupScreen和premiumScreen之间、
+    // notifySheet排在accountScreen之后(沿用原来#notifySheet在DOM里的位置)。
+    __azSimScreenBack?: () => boolean;
+    __azNotifySheetBack?: () => boolean;
   }
 }
 

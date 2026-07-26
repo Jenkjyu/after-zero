@@ -4,7 +4,9 @@
 import { AccountScreen } from "./AccountScreen";
 import { DetailSheet } from "./DetailSheet";
 import { EditSheet } from "./EditSheet";
+import { NotifySheet } from "./NotifySheet";
 import { PremiumScreen } from "./PremiumScreen";
+import { SimScreen } from "./SimScreen";
 import { TermsScreen } from "./TermsScreen";
 
 export function App() {
@@ -15,6 +17,8 @@ export function App() {
       <AccountScreen />
       <PremiumScreen />
       <TermsScreen />
+      <SimScreen />
+      <NotifySheet />
     </>
   );
 }

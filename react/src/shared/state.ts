@@ -185,6 +185,44 @@ export function useTermsScreenOpen(): boolean {
   return useSyncExternalStore(subscribeTermsScreen, () => termsScreenOpen);
 }
 
+// 提前还款模拟器——第八步(React迁移收尾)新增，跟detailSheet/editSheet同一个模式，但需要
+// 债务下标参数(模拟哪笔债务)，所以是useDetailSheetIndex()那种下标风格而不是布尔开关。
+let simScreenIndex: number | null = null;
+function subscribeSimScreen(callback: () => void) {
+  window.addEventListener("az:sim-screen-changed", callback);
+  return () => window.removeEventListener("az:sim-screen-changed", callback);
+}
+export function openSimScreen(i: number) {
+  simScreenIndex = i;
+  window.dispatchEvent(new CustomEvent("az:sim-screen-changed"));
+}
+export function closeSimScreen() {
+  simScreenIndex = null;
+  window.dispatchEvent(new CustomEvent("az:sim-screen-changed"));
+}
+export function useSimScreenIndex(): number | null {
+  return useSyncExternalStore(subscribeSimScreen, () => simScreenIndex);
+}
+
+// 还款提醒通知设置面板——第八步新增，布尔开关，跟accountScreen/premiumScreen/termsScreen
+// 同一个模式(第七步)。
+let notifySheetOpen = false;
+function subscribeNotifySheet(callback: () => void) {
+  window.addEventListener("az:notify-sheet-changed", callback);
+  return () => window.removeEventListener("az:notify-sheet-changed", callback);
+}
+export function openNotifySheet() {
+  notifySheetOpen = true;
+  window.dispatchEvent(new CustomEvent("az:notify-sheet-changed"));
+}
+export function closeNotifySheet() {
+  notifySheetOpen = false;
+  window.dispatchEvent(new CustomEvent("az:notify-sheet-changed"));
+}
+export function useNotifySheetOpen(): boolean {
+  return useSyncExternalStore(subscribeNotifySheet, () => notifySheetOpen);
+}
+
 // WeakMap给每个debt对象懒生成一个稳定的React key——commitReorder只是重排同一批对象引用的
 // 顺序(不克隆)，只要对象引用不变(拖拽重排属于这种情况)，key就稳定；debts被整体替换成新对象时
 // (备份恢复/导入JSON)，WeakMap查不到旧key，自然生成新key——这正是这种情况下应有的行为，不需要

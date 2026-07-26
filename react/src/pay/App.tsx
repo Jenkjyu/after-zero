@@ -1,9 +1,9 @@
 // "还款日"页顶层组件——原样搬vanilla renderPay()的整体编排(items计算/筛选/分组由子组件
-// 分担)，铃铛点开的#notifySheet继续100%vanilla(跟"在还债务"的#detailSheet/#editSheet
-// 同一类处理)，只通过__azBridge.openNotifySheet()桥接调用。
+// 分担)，铃铛点开的#notifySheet第八步(React迁移收尾)后已经是React自己拥有的sheet
+// (shared/state.ts的openNotifySheet)，不再经过__azBridge。
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Debt } from "../types";
-import { useDebts, useNotify } from "../shared/state";
+import { openNotifySheet, useDebts, useNotify } from "../shared/state";
 import type { PayGestureCtx } from "./gestures";
 import { closePaySwipe } from "./gestures";
 import { Hero } from "./Hero";
@@ -64,7 +64,7 @@ export function App() {
 
   return (
     <>
-      <Hero soonest={items[0] ?? null} notifyEnabled={notify.enabled} onBellClick={() => window.__azBridge.openNotifySheet()} />
+      <Hero soonest={items[0] ?? null} notifyEnabled={notify.enabled} onBellClick={openNotifySheet} />
       <div className="pay-stats"><Stats items={items} /></div>
       <div className="pay-filter"><FilterBar value={filter} onChange={setFilter} /></div>
       {/* items.length===0(全部结清/没有待还项)时列表区留空，不显示"该分类下暂无待还款项"
