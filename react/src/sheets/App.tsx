@@ -2,6 +2,7 @@
 // subpage/sheet。DetailSheet(第五步)+EditSheet(第六步)+AccountScreen/PremiumScreen/
 // TermsScreen(第七步，React迁移收尾)都挂在这一层，不需要为后续每一批新开一个入口。
 import { AccountScreen } from "./AccountScreen";
+import { AiScreen } from "./AiScreen";
 import { BackupScreen } from "./BackupScreen";
 import { DetailSheet } from "./DetailSheet";
 import { DocsScreen } from "./DocsScreen";
@@ -23,6 +24,7 @@ export function App() {
       <NotifySheet />
       <DocsScreen />
       <BackupScreen />
+      <AiScreen />
     </>
   );
 }

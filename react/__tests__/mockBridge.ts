@@ -28,7 +28,6 @@ export function makeMockBridge(overrides?: {
     commitReorder: vi.fn(),
     saveAll: vi.fn(),
     renderAll: vi.fn(),
-    openAiScreen: vi.fn(),
     settleFull: vi.fn(),
     getNotify: vi.fn(() => notify),
     exportReportXlsx: vi.fn(),
@@ -60,6 +59,7 @@ export function makeMockBridge(overrides?: {
     restoreBackup: vi.fn(() => Promise.resolve(true)),
     deleteBackup: vi.fn(() => Promise.resolve(true)),
     getBackupMeta: vi.fn(() => ({ lastBackupAt })),
+    callAiAdvisor: vi.fn(() => Promise.resolve("测试回复")),
   };
 }
 

@@ -5,7 +5,7 @@
 //
 // 只声明已迁移的React页面实际会调用的几个，不是calc.js全部39个——够用即可，见CLAUDE.md
 // "React 迁移"一节。
-import type { Debt, DebtSummary, GenSpec, PlanRow, Premium, ReportData, SortKey } from "./types";
+import type { AiConversation, Debt, DebtSummary, GenSpec, PlanRow, Premium, ReportData, SortKey } from "./types";
 
 declare global {
   interface Window {
@@ -61,6 +61,12 @@ declare global {
     // docsScreen(react/src/sheets/DocsScreen.tsx)用：markdown文档预览渲染成HTML字符串
     // (极简手写markdown解析器，见calc.js"纯计算函数"一节)。
     mdToHtml(src: string): string;
+    // aiScreen(react/src/sheets/AiScreen.tsx)用：findAiConv按id查历史对话，找不到返回null；
+    // bumpAiConvTop把命中的记录挪到数组最前面(原地mutate传入的数组，不是纯函数，见calc.js
+    // "纯计算函数"一节)——回复成功后用它把这条对话顶到列表最上面，不需要在React这边重新
+    // 实现同一段逻辑。
+    findAiConv(convos: AiConversation[], id: string): AiConversation | null;
+    bumpAiConvTop(convos: AiConversation[], rec: AiConversation): void;
     // 反向桥接：vanilla的__handleBackButton硬件返回键"最上层先关"优先级链第一条检查这个——
     // React挂载"在还债务"页时注册，卸载时删除，见 react/src/debts/DebtList.tsx。
     __azDebtsBack?: () => boolean;
@@ -87,6 +93,14 @@ declare global {
     // 同上，第十步(backupScreen，React迁移收尾)新增——见 react/src/sheets/BackupScreen.tsx。
     // 链里沿用原来#backupScreen在DOM里的位置：排在aiScreen之后、simScreen之前。
     __azBackupScreenBack?: () => boolean;
+    // 同上，第十一步(aiScreen+aiHistorySheet，React迁移收尾)新增——见
+    // react/src/sheets/AiScreen.tsx。__azAiHistorySheetBack必须排在__azAiScreenBack
+    // 之前判断("最上层先关"：历史对话sheet的z-index=36比aiScreen所在的.subpage(35)更高，
+    // 视觉上盖在aiScreen上层，是这个原则第一次出现在"sheet挂在subpage内部"场景时定下的
+    // 顺序，这次迁移沿用同一个顺序不变)。链里位置沿用原来#aiScreen在DOM里的位置：
+    // 排在backupScreen之前、termsScreen之后。
+    __azAiScreenBack?: () => boolean;
+    __azAiHistorySheetBack?: () => boolean;
   }
 }
 

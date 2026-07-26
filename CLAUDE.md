@@ -36,7 +36,7 @@
 
 **`summarizeDebts(debts)`是2026-07-24"React 迁移第二步"落地"在还债务"页时新增的第40个函数**：从vanilla`renderSummary()`内联的聚合逻辑（`total`/`monthly`/`paidPrincipal`/`paidInterest`/`active`/`settled`/`pct`）抽出来的纯函数——vanilla那份`renderSummary()`本身已经在这次迁移里整个删除（改由React调用这个函数），抽出来纯粹是为了同一份聚合数学被React组件复用，不是"这次批量整理31个函数"那一轮的产物，详见下面"React 迁移"一节。
 
-## React 迁移：`react/` + "在还债务"页（绞杀者模式第一站）→ "还款日"+"统计"（第三步）→ "我的"（第四步，四个tab全部完成）→ `#detailSheet`（第五步，第一个非tab入口）→ `#editSheet`（第六步，全项目最复杂的一块UI）→ 收尾（第七~十一步，剩余全部subpage/sheet）
+## React 迁移：`react/` + "在还债务"页（绞杀者模式第一站）→ "还款日"+"统计"（第三步）→ "我的"（第四步，四个tab全部完成）→ `#detailSheet`（第五步，第一个非tab入口）→ `#editSheet`（第六步，全项目最复杂的一块UI）→ 收尾（第七~十一步，剩余全部subpage/sheet，已全部完成）——vanilla主`<script>`现在只剩数据模型+localStorage/IndexedDB读写+cloud函数/native插件调用这类impure逻辑，不再有任何JSX/DOM渲染代码
 
 "六续"定的三步走方向（React迁移+测试优先）第二步：**"在还债务" tab（app最核心、交互最复杂的页面——长按拖拽排序、左滑手势、玻璃卡片）整体由React接管**，走的是绞杀者模式（逐页面替换），这是第一站——之所以先啃最难的页面，是因为它风险和调试成本最高，但也是用户使用最频繁、出问题影响最大的页面，先做完这个，后面的页面都不算难。
 
@@ -111,6 +111,20 @@ vanilla这边`payInstallment(i)`/`settleFull(i)`都被精简过：原来末尾`i
 
 **真机限制（老规矩，不是新问题）**：真实的创建/列表/恢复/删除往返依赖真实微信登录会话，这个环境测不出——本地Playwright验证时用"伪造`account`跳过登录门"这个老技巧打开`backupScreen`，`listBackups()`确实按预期显示出`获取备份列表失败：Cannot read properties of null (reading 'scope')`这条错误文案，这正是"云备份（Premium）"一节"桌面浏览器测试的边界"里记录的那个已知现象（伪造`account`会让`ensureCbAuthReady()`误判"已登录"从而跳过`signInAnonymously()`兜底，连匿名会话都没有就直接撞上CloudBase SDK的null凭证读`.scope`的bug）——不是这次迁移引入的新bug，UI正确地把它当错误态展示出来而不是崩溃，符合预期。桌面Playwright验证覆盖：打开screen显示正确的"上次备份"文案+列表进入错误态、门禁两个方向（未开通跳订阅页/已开通打开backupScreen）、硬件返回键+点返回箭头都能正确关闭，light/dark主题截图确认，控制台零JS报错。
 
+**第十一步：AI债务顾问（`aiScreen`+`aiHistorySheet`）——收尾里技术上最"干净"的一步，也是最后一步。** 新增`react/src/sheets/AiScreen.tsx`（聊天界面+内嵌的历史对话sheet，两者放在同一个文件里，不是两个独立文件——历史对话sheet只从`AiScreen`自己的header按钮触发，不像其它screen那样"被多棵独立React树共同触发"，不需要在`shared/state.ts`里为它单独开一对`open/close`，`historyOpen`是纯组件本地`useState`，跟`PremiumScreen`兑换码输入框展开/收起是同一类"组件本地UI状态"）。`AI_USAGE_KEY`（每日用量软上限）/`AI_CHATLOG_KEY`（历史对话记录）这两个localStorage键整体移交React所有权（照抄`SIM_KEY`当年"没有别的地方依赖它，整体移交"的先例），vanilla的`aiConvos`/`saveAiConvos`/`aiUsage`/`aiUsageToday`/`aiUsageLeft`/`bumpAiUsage`全部删除，只有`buildAiSummary()`/`callAiAdvisor()`原样保留（因为依赖`ensureCbAuthReady`/`cbApp().callFunction`这套认证会话状态，不可移植）——`callAiAdvisor`是这一步`__azBridge`**唯一**新增的函数，`openAiScreen`则被删除（打开screen不再经过桥接，改成`shared/state.ts`的`openAiScreen()`/`closeAiScreen()`/`useAiScreenOpen()`，跟其它screen同一个布尔开关模式）。`findAiConv`/`bumpAiConvTop`继续是calc.js全局纯函数，React直接`window.findAiConv(...)`/`window.bumpAiConvTop(...)`调用，不复制逻辑到TS这边。
+
+**消息发送/持久化的状态机是vanilla逻辑的逐步骤翻译，不是重新设计**：`composeAndSend(displayQ, isReportMode)`按vanilla`aiComposeAndSend()`原来的顺序——`busy`守卫→用量检查→算出`contextHistory`（发给云函数的上下文，取自"这次提问之前"的已有消息，不含这次提问本身）→乐观追加用户气泡+"思考中"占位气泡→`setConvos`用不可变方式要么更新已有记录（继续追问）要么新增一条（新对话，`unshift`到最前）→调`callAiAdvisor`→成功后`bumpAiUsage()`+替换占位气泡为真实回复+按`AI_CHATLOG_MAX_MSGS`裁剪+用`window.bumpAiConvTop`顶到最前+按`AI_CHATLOG_MAX_CONVOS`裁剪+`saveAiConvos()`持久化→失败则显示错误气泡，**如果这条对话从没成功回复过（`messages.length<=1`）就把这条空壳记录从`convos`里撤销掉**（照抄vanilla"不留僵尸对话"的逻辑，失败分支本来就不调用持久化，这个撤销只影响内存态）。这套翻译用普通的React `useState`不可变更新（`setConvos(prev => ...)`）而不是照抄vanilla那种"直接mutate一个模块级变量+手动触发渲染"的写法——跟`gestures.ts`"手势代码原样照抄不重新设计"的原则不同，这里选择用idiomatic React重写是因为消息状态机不涉及任何真机踩过坑的DOM操作细节，用React自己的机制表达反而更不容易出错，也不违反"忠实复刻行为"这个更高优先级的原则（分支条件、发送顺序、持久化时机全部逐条对照过）。
+
+**魔法棒入场动效**（`castAiWand()`）：`castWand(el)`辅助函数原样照抄vanilla那套"remove class→强制reflow→add class→animationend后移除"技巧，只是用`useRef<SVGGElement>`拿到`<g>`节点而不是`$("aiWelcomeWand")`按id查——**`reflow`那一步在vanilla里用`el.offsetWidth`，React这边改成`el.getBoundingClientRect()`，因为TypeScript的`SVGElement`类型定义里没有`offsetWidth`这个属性**（那是`HTMLElement`专属，浏览器运行时对SVG元素其实也支持，但走类型检查这条路更省事）。触发时机保留vanilla两个入口：screen打开时（`useEffect`依赖`isOpen`）、点"新对话"按钮时，`loadConversation()`（加载历史对话）不触发，因为vanilla的`loadAiConversation()`也没调用`showAiWelcome()`。
+
+**测试环境的两个新坑，都已经修好且以后其它组件也会受益**：
+1. `Element.prototype.scrollIntoView`在jsdom里不存在——`AiScreen.tsx`每次新增消息都会调用它把最新气泡滚进视图（`useEffect`依赖`messages.length`），真实浏览器/WebView都有这个方法，但jsdom没实现，第一次跑测试直接报`el.scrollIntoView is not a function`。修法是在`react/__tests__/setup.ts`里补一个空实现（`if (typeof Element.prototype.scrollIntoView !== "function") Element.prototype.scrollIntoView = () => {}`）——这是全局setup文件的改动，不是`AiScreen.test.tsx`自己糊一个mock，以后别的组件如果也用到`scrollIntoView`不会重复踩这个坑。
+2. **`#aiHistorySheet`的`aria-labelledby="aiHistoryTitle"`让它的可访问名称(accessible name)也是"历史对话"这几个字，跟header上`aria-label="历史对话"`的按钮撞了**——Testing Library的`getByLabelText("历史对话")`会同时命中两者，报"Found multiple elements"。这不是这次迁移引入的新问题（vanilla原来的HTML结构一直是这样），只是第一次有自动化测试去查询这个文本才暴露出来；测试改用`getByRole("button", { name: "历史对话" })`精确限定成"按钮"这个role即可避开，不需要改动组件的DOM结构/aria属性。
+
+**验证**：`AiScreen.test.tsx`(17用例，覆盖欢迎态渲染/3种发送入口/用量上限拦截/发送失败丢弃僵尸对话/连续追问带正确history/成功回复持久化进`AI_CHATLOG_KEY`/历史对话加载与删除两条路径/硬件返回键"先关历史sheet再关aiScreen"的顺序/重新打开重置欢迎态)；`npx tsc --noEmit`零错误；`npm run test:react`208个用例全绿（从191涨到208）；`npm test`（calc.js套件）43个不受影响；`npm run build:react`确认`sheets.js`产物正常增长（93.68KB，从backupScreen那步的79.64KB涨上来，符合预期）。Playwright headless验证：AI banner打开aiScreen、欢迎态3个芯片正确渲染、点常见问题芯片发送后**网络受限环境下`callAiAdvisor`按预期报`Cannot read properties of null (reading 'scope')`**（真机限制，老规矩，见下方）、失败的对话确认没有出现在历史列表里（"还没有历史对话"）、硬件返回键第一次关历史sheet第二次才关aiScreen、重新打开+手输发送一条新消息全流程正常、点返回箭头关闭，全程控制台**零JS报错**，light/dark主题截图确认视觉正常。**真机限制（老规矩）**：真实AI生成/追问依赖真实微信登录会话，这个环境测不出，跟云备份/微信登录当年是同一条限制。
+
+至此**React迁移收尾第七~十一步全部完成**，`www/index.html`主`<script>`里已经不再有任何`.subpage`/`.sheet`的DOM渲染代码——`grep`过一遍确认剩下的全部函数要么是数据模型读写（`debts`/`docs`/`notify`/`premium`/`account`等及其`save*`函数），要么是不可移植的cloud函数调用（`wxLogin`相关、`createBackup`等、`callAiAdvisor`）、native插件调用（`SaveFile`/`WeChatLogin`/`LocalNotifications`）、IndexedDB操作（`upGetAll`等），符合方案里"vanilla只剩impure逻辑"这个最终目标。
+
 ### 目录结构：`react/`（源码）→ `www/js/react-debts/`（构建产物，Vite多入口）
 
 新增顶层目录`react/`（跟`www/`/`android/`/`cloudbase/`/`resources/`平级），是这个项目第一次引入真正的JS构建工具（Vite）。`react/src/debts/`/`react/src/pay/`/`react/src/report/`/`react/src/mine/`分别是四个已迁移tab（全部tab）的React源码，`react/src/sheets/`是第五个入口——不属于任何tab、常驻挂载的`#detailSheet`+`#editSheet`（详见上面"第五步"/"第六步"，两者共用同一个Vite entry，不是各自一个）。`react/src/shared/`是这几个入口共用的状态订阅hook（见下面"vanilla ↔ React 桥接契约"）。`react/vite.config.ts`用Vite的**库模式**（`build.lib`，不是Vite默认的app模式——这次不是造一个独立SPA，是把React组件挂进现有`www/index.html`的某几个节点，库模式产出可以直接`<script type="module">`引入的bundle）。
@@ -129,7 +143,7 @@ vanilla这边`payInstallment(i)`/`settleFull(i)`都被精简过：原来末尾`i
 
 现状：vanilla主脚本是一个大IIFE，`debts`/`saveAll`/`renderAll`/`openDetail`/`payInstallment`/`commitReorder`等全部是IIFE内部私有的，不在`window`上（跟已经全局的`calc.js`函数、跟`window.__handleBackButton`这种刻意暴露的例外都不一样）。要让React调用这些，必须显式暴露。
 
-**`window.__azBridge`**（定义在主IIFE末尾，`})();`之前）是唯一的暴露点，只包含已迁移React页面实际需要调用的这几个，第三步新增了`getNotify`/`openNotifySheet`/`exportReportXlsx`/`exportReportPdf`这4个，第四步（"我的"tab）又新增了`openDocsScreen`/`openBackupScreen`/`downloadBackupFile`/`triggerImportFilePicker`这4个，第五步（`#detailSheet`）**删除**了`openDetail`、新增了`settleFull`/`openSimScreen`这2个，第六步（`#editSheet`）**删除**了`openEdit`（打开这两个sheet都不再经过桥接，改成`shared/state.ts`的`openDetailSheet(i)`/`openEditSheet(i)`，见上面"第五步"/"第六步"）、新增了`setDebt`/`deleteDebt`/`toast`/`confirmAsync`这4个，第七步（accountScreen/premiumScreen/termsScreen）**删除**了`openPremiumScreen`/`openAccountScreen`（同样道理，这三个screen也变成纯React状态）、新增了`wxLogout`/`deleteAccount`/`redeemCode`这3个，第八步（simScreen/notifySheet）**删除**了`openSimScreen`/`openNotifySheet`、新增了`setNotifyEnabled`/`addNotifyRule`/`deleteNotifyRule`/`sendTestNotification`这4个，第九步（docsScreen）**删除**了`openDocsScreen`、新增了`getFiles`/`uploadArchiveFile`/`deleteArchiveFile`/`downloadArchiveFile`/`shareArchiveFile`这5个，**第十步（backupScreen）删除**了`openBackupScreen`、新增了`createBackup`/`listBackups`/`restoreBackup`/`deleteBackup`/`getBackupMeta`这5个：
+**`window.__azBridge`**（定义在主IIFE末尾，`})();`之前）是唯一的暴露点，只包含已迁移React页面实际需要调用的这几个，第三步新增了`getNotify`/`openNotifySheet`/`exportReportXlsx`/`exportReportPdf`这4个，第四步（"我的"tab）又新增了`openDocsScreen`/`openBackupScreen`/`downloadBackupFile`/`triggerImportFilePicker`这4个，第五步（`#detailSheet`）**删除**了`openDetail`、新增了`settleFull`/`openSimScreen`这2个，第六步（`#editSheet`）**删除**了`openEdit`（打开这两个sheet都不再经过桥接，改成`shared/state.ts`的`openDetailSheet(i)`/`openEditSheet(i)`，见上面"第五步"/"第六步"）、新增了`setDebt`/`deleteDebt`/`toast`/`confirmAsync`这4个，第七步（accountScreen/premiumScreen/termsScreen）**删除**了`openPremiumScreen`/`openAccountScreen`（同样道理，这三个screen也变成纯React状态）、新增了`wxLogout`/`deleteAccount`/`redeemCode`这3个，第八步（simScreen/notifySheet）**删除**了`openSimScreen`/`openNotifySheet`、新增了`setNotifyEnabled`/`addNotifyRule`/`deleteNotifyRule`/`sendTestNotification`这4个，第九步（docsScreen）**删除**了`openDocsScreen`、新增了`getFiles`/`uploadArchiveFile`/`deleteArchiveFile`/`downloadArchiveFile`/`shareArchiveFile`这5个，第十步（backupScreen）**删除**了`openBackupScreen`、新增了`createBackup`/`listBackups`/`restoreBackup`/`deleteBackup`/`getBackupMeta`这5个，**第十一步（aiScreen+aiHistorySheet）删除**了`openAiScreen`、新增了这批迁移收尾里唯一的一个新函数`callAiAdvisor`——至此`__azBridge`不再有任何`openXScreen`这类trigger-only函数：
 ```js
 window.__azBridge = {
   getDebts: function () { return debts; },   // 每次调用现读，见下面"为什么是函数"
@@ -137,7 +151,6 @@ window.__azBridge = {
   getAccount: function () { return account; },
   payInstallment: payInstallment, unsettle: unsettle,
   commitReorder: commitReorder, saveAll: saveAll, renderAll: renderAll,
-  openAiScreen: openAiScreen, // aiScreen要等第十一步才迁移，暂时还是trigger-only
   settleFull: settleFull,
   getNotify: function () { return notify; },
   exportReportXlsx: exportReportXlsx,
@@ -156,14 +169,15 @@ window.__azBridge = {
   shareArchiveFile: shareArchiveFile,
   createBackup: createBackup, listBackups: listBackups,
   restoreBackup: restoreBackup, deleteBackup: deleteBackup,
-  getBackupMeta: getBackupMeta
+  getBackupMeta: getBackupMeta,
+  callAiAdvisor: callAiAdvisor
 };
 ```
 `downloadBackupFile`/`triggerImportFilePicker`是"我的"tab（`react/src/mine/DataCards.tsx`）专用的trigger-only函数——`downloadBackupFile`是把原来`dlBackupBtn`的inline click handler抽成的具名函数；`triggerImportFilePicker`是新写的一行`$("importFileInput").click()`，用来间接点开依然留在vanilla DOM里的`#importFileInput`（这个input和它的`change`监听器完整保留在vanilla，只是从`#view-data`内部搬到了折叠后的挂载点外面）。
 
 `setDebt`/`deleteDebt`/`toast`/`confirmAsync`这4个是`#editSheet`（`react/src/sheets/EditSheet.tsx`等）专用——`setDebt(i, obj)`是`saveForm()`删除后唯一保留的narrow写入函数（`i>=0`覆盖`debts[i]`并合并`old.settled`/`old.settledDate`，`i<0`是push新增，内部调`recompute(obj)`但不调`saveAll`/`renderAll`，React保存时自己依次调这三个桥接函数，跟`commitReorder`那套细粒度调用惯例一致）；`deleteDebt`是原样暴露的既有vanilla函数（自带`ask()`确认+splice+saveAll+renderAll）；`toast`是`#flash`单例的简单passthrough；`confirmAsync`是`ask()`的Promise外壳（详见上面"第六步"）。
 
-其余（`ask()`确认弹窗本身等）继续保持private。**详情窗`#detailSheet`、新增/编辑表单`#editSheet`、账户详情`#accountScreen`、订阅页`#premiumScreen`、条款页`#termsScreen`、提前还款模拟器`#simScreen`、通知设置面板`#notifySheet`、档案库`#docsScreen`、云备份`#backupScreen`这九个subpage/sheet的实际内容都已经搬进React（分别是第五~十步）**，`#aiScreen`+`#aiHistorySheet`依然100%vanilla，React只调用`openAiScreen`桥接触发函数打开它——这一个排在第十一步继续做。
+其余（`ask()`确认弹窗本身等）继续保持private。**详情窗`#detailSheet`、新增/编辑表单`#editSheet`、账户详情`#accountScreen`、订阅页`#premiumScreen`、条款页`#termsScreen`、提前还款模拟器`#simScreen`、通知设置面板`#notifySheet`、档案库`#docsScreen`、云备份`#backupScreen`、AI债务顾问`#aiScreen`+`#aiHistorySheet`这十个subpage/sheet的实际内容全部已经搬进React（分别是第五~十一步）**——至此`window.__azBridge`里再也没有任何`openXScreen`这类trigger-only函数，剩下的全部是①真正的debts数据读写、②不可移植的cloud/native/IO调用两类。
 
 **`exportReportXlsx`/`exportReportPdf`两个函数虽然桥接给了React调用，但函数本身继续100%vanilla、原封不动**——它们已经确认是零DOM依赖的纯函数（只读`debts`、拼Excel/PDF的Blob、调用`window.XLSX`/`window.jspdf`/`saveToDeviceDownloads()`），React这边`ExportActions.tsx`只是原样复刻了vanilla原来两个按钮click handler里的`hasPremium(premium)`门禁判断，然后调用桥接函数触发真正的导出，不是把导出逻辑本身搬进React。
 
@@ -242,7 +256,10 @@ React组件挂载在同一份`index.html`文档里（不是iframe/独立页面�
 - 第八步（`simScreen`/`notifySheet`）：从详情窗点"提前还款模拟"正确关闭detailSheet+打开simScreen并显示对应债务名；空金额/月供不足两条toast路径；正常测算显示结果+`SIM_KEY`正确持久化；重新打开时extra按持久化值回填、atPeriod重置为1、结果清空；硬件返回键关闭。从"还款日"tab铃铛打开notifySheet；桌面浏览器无`Capacitor.Plugins.LocalNotifications`时切换开关/发送测试通知都正确toast"仅支持安卓App内使用"、checkbox正确回退未勾选（验证了乐观更新+回退这条路径）；添加/删除提醒规则正确更新列表+`NOTIF_KEY`持久化；点"完成"和硬件返回键都能正确关闭。
 - 第九步（`docsScreen`）：点"打开档案库"打开docsScreen并渲染已有的markdown文档条目；点击文档行触发`mdToHtml`预览渲染出正确的标题标签；上传一张真实图片文件，`uploads`数量正确增加+toast"已上传 ✓"，点该行触发图片预览且`<img>`的`src`是有效的`blob:` objectURL；上传不支持的扩展名（`.exe`）被正确拒绝、toast提示、文件数量不变；点删除文档行弹出标题为"删除文档"的确认框（复用vanilla`#modalScrim`），确认后行数正确减少+toast"已删除"；硬件返回键正确关闭docsScreen。全程浏览器console零JS报错。
 - 第十步（`backupScreen`）：点"打开云备份"打开backupScreen，正确显示"从未备份"+触发`listBackups()`；网络受限环境下`listBackups()`按预期落进错误态（显示"获取备份列表失败：..."，这是"云备份（Premium）"一节记录的已知SDK行为，不是这次迁移的新bug，验证了UI没有因为这个错误而崩溃或卡死）；门禁两个方向（未开通跳订阅页/已开通打开backupScreen）；硬件返回键+点返回箭头都能正确关闭。全程浏览器console零JS报错。**真实的创建/恢复/删除往返依赖真实微信登录会话，这个环境测不出，属于老规矩限制。**
+- 第十一步（`aiScreen`+`aiHistorySheet`）：点AI banner打开aiScreen显示欢迎态+3个快捷芯片；点常见问题芯片/生成分析报告芯片/手输发送三条路径都能正确触发`callAiAdvisor`；网络受限环境下发送按预期落进错误气泡（同样是`Cannot read properties of null (reading 'scope')`这个已知SDK行为，不是新bug）；失败的对话确认不出现在历史列表（"僵尸对话"被正确丢弃）；硬件返回键"先关历史sheet、再关aiScreen"的两段式顺序验证正确；点返回箭头关闭。全程浏览器console零JS报错。**真实AI生成/追问依赖真实微信登录会话，这个环境测不出，属于老规矩限制。**
 - 全程浏览器console **零JS报错**，light/dark两种主题都截图核对过。
+
+**React迁移收尾（第七~十一步）至此全部完成，`www/index.html`主`<script>`不再有任何`.subpage`/`.sheet`的DOM渲染代码。**
 
 **"统计"和"我的"这两个tab都是零手势的纯data→JSX展示，不需要真机验证，桌面Playwright覆盖已经足够**（跟第二步Summary/AiBanner这类纯视觉组件判定为无需真机是同一个理由）——"我的"tab里"下载/上传备份文件"两个按钮背后的真实原生行为（`SaveFile`插件的"另存为"选择器、真机文件选择器），这次迁移完全没有改动它们的实现，只是把触发入口从vanilla按钮换成React按钮调用同一个函数，不需要为这次迁移重新验证一遍那两个功能本身。`#detailSheet`同理零手势（`initGripDrag`只是4个pointer监听器操作单个DOM节点，不是`gestures.ts`那套长按/滑动状态机），桌面Playwright覆盖已经足够。**"还款日"的左滑手势是目前唯一还留着的真机确认项**——桌面Playwright用鼠标模拟的Pointer Events路径验证了"能触发swiping分支、不报错"，但真实手指触摸的手感、多点触控边界情况、安卓WebView的触摸事件时序，历史上这个项目的教训是"必须真机验证"（见"在还债务自定义排序"一节），这次移植代码逻辑上是逐行照抄，但没有免除真机验证这一步。
 
@@ -635,6 +652,8 @@ window.__debugPremium("none")         // 清空，恢复"普通用户"
 **踩过一个坑**：`@capacitor/assets` 默认会给 `mipmap-anydpi-v26/ic_launcher.xml`（自适应图标配置）里的 `<background>` 和 `<foreground>` 都套一层 `16.7%` 的内缩（`<inset>`）。这对本项目不对——`icon-background.png` 设计上就是要通栏铺满到边缘的（黑白对半分），内缩之后四周会露出一圈透明，实机上大概率透出桌面壁纸/系统默认色，很难看。所以 `<background>` 这层的inset已经手动去掉了（保留 `<foreground>` 的inset，因为 `icon-foreground.png` 里的图形本身上下几乎顶到画布边缘，需要靠内缩才不会被圆形/方形等不同launcher遮罩裁掉）——**以后如果重新跑 `@capacitor/assets generate`，它会把 `<background>` 的inset加回去，记得再删一次。**
 
 ## AI 债务顾问（Premium）
+
+> **⚠️ 渲染层已经翻篇：`#aiScreen`+`#aiHistorySheet`（第十一步，React迁移收尾）已经整体由React接管（`react/src/sheets/AiScreen.tsx`）——聊天界面/欢迎态快捷芯片/历史对话sheet全部由React渲染，`AI_USAGE_KEY`/`AI_CHATLOG_KEY`整体移交React所有权直接读写localStorage(不再经过vanilla)。这一节记录的产品设计（聊天式而非报告+问答两段拼接、成本兜底数字、云函数模型选型）依然100%成立，是理解"为什么这么设计"的背景，具体前端实现细节（含`data-q`属性/`#aiChipReport`等DOM id已不存在、`aiComposeAndSend`逻辑已翻译成React的`composeAndSend`）以"React 迁移"一节"第十一步"为准。**
 
 "在还债务"页顶部的 AI banner（`#aiBannerBtn`）现在是这个功能的入口（`hasPremium()` 门禁，未开通跳订阅页）。点开进整页浮层 `#aiScreen`——**这是聊天式界面，不是"大按钮生成报告+底部迷你问答框"那种三段拼接**（那是第一版的做法，已经推翻重做）。**只做了"报告 + 智能问答"两件事，没做 OCR**（当初 Premium+ 列的三条 AI 功能之一，明确推迟）。
 

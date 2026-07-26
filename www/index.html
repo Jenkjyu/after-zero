@@ -822,64 +822,10 @@
 <!-- #backupScreen已经整体搬进React(第十步，React迁移收尾)——见react/src/sheets/BackupScreen.tsx，
      创建/列表/恢复/删除4个cloud函数调用的UI全部由React渲染，内容原样复刻，没有留任何静态HTML在这里。 -->
 
-<div class="subpage" id="aiScreen">
-  <div class="subpage-header">
-    <button type="button" class="subpage-back" id="aiBackBtn" aria-label="返回">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-    </button>
-    <div class="subpage-title">AI 债务顾问</div>
-    <button type="button" class="subpage-back" id="aiHistoryBtn" aria-label="历史对话">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/></svg>
-    </button>
-  </div>
-  <div class="ai-thread">
-    <div class="ai-welcome" id="aiWelcome">
-      <div class="ai-welcome-ic" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none">
-          <path d="M3 8A2.3 2.3 0 0 1 5.3 5.7h7A2.3 2.3 0 0 1 14.6 8v5.5A2.3 2.3 0 0 1 12.3 15.8H8.3l-3.6 2.7a.45.45 0 0 1-.72-.36V15.8A2.3 2.3 0 0 1 1.7 13.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-          <g class="wand" id="aiWelcomeWand" fill="currentColor">
-            <path d="M21 7L10 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M10 -3.15L11.05 -1.05L13.15 0L11.05 1.05L10 3.15L8.95 1.05L6.85 0L8.95 -1.05Z"/>
-            <circle cx="12.6" cy="-2.4" r="0.75"/><circle cx="7.2" cy="1.8" r="0.6"/>
-          </g>
-        </svg>
-      </div>
-      <h2>有什么想聊的？</h2>
-      <p>我能看到你当前的在还债务，可以帮你排优先级、测算利息，或者直接问我一个具体问题。</p>
-      <div class="ai-chips">
-        <button type="button" class="ai-chip primary" id="aiChipReport">
-          <span class="ai-chip-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V10M12 19V5M20 19v-7"/></svg></span>
-          生成分析报告
-        </button>
-        <button type="button" class="ai-chip" data-q="我该先还哪一笔？">
-          <span class="ai-chip-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></span>
-          我该先还哪一笔？
-        </button>
-        <button type="button" class="ai-chip" data-q="怎样最快还清所有债务？">
-          <span class="ai-chip-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg></span>
-          怎样最快还清所有债务？
-        </button>
-      </div>
-    </div>
-    <div id="aiChatLog" class="ai-chat-log"></div>
-  </div>
-  <div class="ai-composer">
-    <textarea id="aiChatInput" rows="1" placeholder="发消息给 AI 债务顾问…"></textarea>
-    <button type="button" class="ai-send-btn" id="aiChatSendBtn" aria-label="发送">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-    </button>
-  </div>
-</div>
-
-<div class="scrim" id="scrimAiHistory"></div>
-<div class="sheet" id="aiHistorySheet" role="dialog" aria-modal="true" aria-labelledby="aiHistoryTitle">
-  <div class="grip"></div>
-  <div class="ai-hist-head">
-    <h2 id="aiHistoryTitle">历史对话</h2>
-    <button type="button" class="ai-hist-new-btn" id="aiNewConvBtn">新对话</button>
-  </div>
-  <div id="aiHistoryList"></div>
-</div>
+<!-- #aiScreen+#aiHistorySheet已经整体搬进React(第十一步，React迁移收尾)——见
+     react/src/sheets/AiScreen.tsx，聊天界面/欢迎态快捷芯片/历史对话列表全部由React渲染，
+     内容原样复刻，没有留任何静态HTML在这里。AI_USAGE_KEY/AI_CHATLOG_KEY整体移交React
+     所有权，vanilla唯一保留的是callAiAdvisor()。 -->
 
 <!-- #termsScreen已经整体搬进React(第七步)——见react/src/sheets/TermsScreen.tsx。 -->
 
@@ -948,17 +894,10 @@
   // Premium。存 { premium: {method:"onetime"|"monthly"|"yearly"|"redeemed", at:ISO} | null }，
   // 只剩单字段；hasPremium(premium) 判 premium.premium 是否为空。独立于上面几个键。
   var PREMIUM_KEY = "after-zero-premium-v1";
-  // AI 债务顾问的每日用量软上限（客户端计数，成本兜底）：存 {date:"YYYY-MM-DD", count}。
-  // 客户端软限可绕过，beta 够用；正式上线要换服务端计数。独立于上面几个键。
-  var AI_USAGE_KEY = "after-zero-ai-usage-v1";
-  var AI_DAILY_LIMIT = 20;
-  // AI 债务顾问的历史对话记录：真实持久化、可翻看（跟下面callAiAdvisor()发给云函数的
-  // "history"上下文数组不是一回事——这里存的是给"历史对话"列表用的完整记录）。存
-  // [{id, title, isReport, updatedAt, messages:[{role,content}]}]，最新的排最前面。
-  // 每条对话的messages、以及对话总数都各自封顶，防止长期使用后无限增长。独立于上面几个键。
-  var AI_CHATLOG_KEY = "after-zero-ai-chatlog-v1";
-  var AI_CHATLOG_MAX_CONVOS = 50;
-  var AI_CHATLOG_MAX_MSGS = 40;
+  // AI_USAGE_KEY(每日用量软上限)/AI_CHATLOG_KEY(历史对话记录)这两个键第十一步(React迁移
+  // 收尾)后整体移交react/src/sheets/AiScreen.tsx所有——跟下面SIM_KEY那条同一个先例，
+  // vanilla不再声明这两个常量/持有对应数据，只有callAiAdvisor()还留在vanilla(依赖认证会话
+  // 状态，不可移植)。键名依然不能改(硬性铁律第1条)。
   // 提前还款模拟器(SIM_KEY="after-zero-simulate-v1")第八步(React迁移收尾)后整体移交
   // react/src/sheets/SimScreen.tsx所有——直接读写这个键，vanilla不再声明/持有这个变量，
   // 跟debtSort当年"整体移交React"是同一个先例。键名依然不能改(硬性铁律第1条)。
@@ -1002,15 +941,11 @@
   // 靠云函数backupList实时查，本地不缓存任何一条备份的内容。
   var lastBackupMeta = loadJSON(BACKUP_KEY, { lastBackupAt: 0 });
   function saveLastBackupMeta() { try { localStorage.setItem(BACKUP_KEY, JSON.stringify(lastBackupMeta)); } catch (e) {} }
-  var aiConvos = loadJSON(AI_CHATLOG_KEY, []);
-  function saveAiConvos() { try { localStorage.setItem(AI_CHATLOG_KEY, JSON.stringify(aiConvos)); } catch (e) {} }
+  // aiConvos/saveAiConvos/aiUsage/aiUsageToday/aiUsageLeft/bumpAiUsage已删除——AI_USAGE_KEY/
+  // AI_CHATLOG_KEY这两个键第十一步(React迁移收尾)整体移交react/src/sheets/AiScreen.tsx所有权
+  // (跟SIM_KEY当年"没有别的地方依赖它，整体移交"是同一个先例)，vanilla不再声明/持有这两份数据。
   // hasPremium/premiumLabel 已搬进 www/js/calc.js（改成显式传参 hasPremium(premium)/
   // premiumLabel(premium)，原来直接读闭包变量 premium，下面调用处都已经加了这个参数）。
-  // AI 每日用量：读/加/判上限。date 用本地日期字符串，跨天自动清零。
-  var aiUsage = loadJSON(AI_USAGE_KEY, { date: "", count: 0 });
-  function aiUsageToday() { var t = fmtDate(today0()); if (aiUsage.date !== t) { aiUsage = { date: t, count: 0 }; } return aiUsage; }
-  function aiUsageLeft() { return Math.max(0, AI_DAILY_LIMIT - aiUsageToday().count); }
-  function bumpAiUsage() { var u = aiUsageToday(); u.count++; try { localStorage.setItem(AI_USAGE_KEY, JSON.stringify(u)); } catch (e) {} }
   // 兑换码：这一批只做最小可用——硬编码一个调试码方便自己在没有真实支付渠道时验证
   // Premium效果，不是真实的兑换码发放/核销系统。App正式上线、接入真实支付后，
   // 这条硬编码要删掉，换成真正的后端兑换码校验（一次性使用、绑定具体商品等）。
@@ -1402,19 +1337,16 @@
   // 报告=一次性生成、问答=多轮对话，都走 aiAdvisor 云函数（服务端调 CloudBase 大模型）。
   // 结构化数据在客户端算好再上传（条目少、token 便宜），云函数不碰债务原始数组。
   //
-  // 聊天式模型：任何时候只有一个"当前会话"，不区分"只读历史"和"进行中"——点历史列表
-  // 某一条 = 把它整个加载回当前会话（消息+上下文都恢复），可以直接继续追问，新问答会
-  // 追加进这条记录并把它顶到列表最上面；"新对话"按钮才会真正清空、开始一条全新记录。
-  // currentAiConvId=null 表示还没产生过消息的全新会话，第一次成功回复时才会落盘成一条记录。
-  var currentAiConvId = null;
-  var aiBusy = false;
-  function aiConvId() { return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-  // findAiConv/bumpAiConvTop 已搬进 www/js/calc.js（改成显式传参，原来直接读/改闭包变量
-  // aiConvos，下面调用处都已经加了这个参数）。
-  // 极轻量渲染：转义 + 保留换行 + **加粗**（不引 markdown 库）
-  function aiRender(text) {
-    return esc(text || "").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-  }
+  // #aiScreen+#aiHistorySheet已经整体搬进React(第十一步，React迁移收尾)——见
+  // react/src/sheets/AiScreen.tsx。currentAiConvId/aiBusy/aiConvId/aiRender/castAiWand/
+  // showAiWelcome/hideAiWelcome/appendAiMsg/startNewAiConversation/loadAiConversation/
+  // openAiScreen/closeAiScreen/aiComposeAndSend/aiSendFromInput/openAiHistorySheet/
+  // closeAiHistorySheet/renderAiHistoryList全部整个删除，逻辑原样复刻进了AiScreen.tsx
+  // (魔法棒入场动效用useEffect+ref+CSS class重现同一套技巧)。findAiConv/bumpAiConvTop
+  // 继续是calc.js全局纯函数，React直接window.findAiConv(...)/window.bumpAiConvTop(...)
+  // 调用，不复制逻辑。
+  // buildAiSummary()/callAiAdvisor()原样保留——它们依赖ensureCbAuthReady/
+  // cbApp().callFunction这套认证会话状态，不可移植，是这一步__azBridge唯一新增的桥接函数。
   function buildAiSummary() {
     var data = computeReportData(debts);
     var list = debts.filter(function (d) { return (+d.balance || 0) > 0.005; }).map(function (d) {
@@ -1424,57 +1356,6 @@
     });
     return { 在还总负债: data.totalBalance, 加权平均年化利率百分比: r2(data.avgRate),
       预计全部还清日期: data.payoffDate || "未知", 债务清单: list };
-  }
-  // 空状态入场：魔法棒摇两下再定住，转成常驻呼吸光晕（.wand基础规则本来就一直在播wandGlow，
-  // 这里只是临时加cast类覆盖它，播完移除即可自动接续，见上面.wand.cast的CSS注释）。
-  // reduced-motion时animation:none会让animationend永远不触发，cast类会卡住不移除，
-  // 所以直接跳过整个流程，不加cast类。
-  function castAiWand() {
-    var el = $("aiWelcomeWand");
-    if (!el || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
-    el.classList.remove("cast");
-    void el.offsetWidth; // 强制reflow，这样连续两次进入空状态也能重新播放
-    el.classList.add("cast");
-    el.addEventListener("animationend", function handler() {
-      el.removeEventListener("animationend", handler);
-      el.classList.remove("cast");
-    });
-  }
-  function showAiWelcome() {
-    $("aiWelcome").style.display = "flex";
-    $("aiChatLog").innerHTML = "";
-    castAiWand();
-  }
-  function hideAiWelcome() { $("aiWelcome").style.display = "none"; }
-  function appendAiMsg(role, html, pending) {
-    var div = document.createElement("div");
-    div.className = "ai-msg " + role + (pending ? " pending" : "");
-    div.innerHTML = pending ? '思考中<span class="ai-typing-dots"><span></span><span></span><span></span></span>' : html;
-    $("aiChatLog").appendChild(div);
-    div.scrollIntoView({ block: "end" });
-    return div;
-  }
-  function startNewAiConversation() {
-    currentAiConvId = null;
-    showAiWelcome();
-  }
-  // 把一条历史记录整个加载回当前会话——之后可以直接继续追问，不是只读打开。
-  function loadAiConversation(rec) {
-    currentAiConvId = rec.id;
-    hideAiWelcome();
-    $("aiChatLog").innerHTML = "";
-    rec.messages.forEach(function (m) { appendAiMsg(m.role === "user" ? "user" : "bot", aiRender(m.content)); });
-  }
-  function openAiScreen() {
-    currentAiConvId = null;
-    $("aiChatInput").value = "";
-    showAiWelcome();
-    $("aiScreen").classList.add("open"); lockScroll();
-  }
-  function closeAiScreen() {
-    if (!$("aiScreen").classList.contains("open")) return;
-    closeAiHistorySheet();
-    $("aiScreen").classList.remove("open"); unlockScroll();
   }
   // 调云函数：mode=report 无 question、不需要 history；mode=chat 带 question + history
   // （history 是这次提问之前的上下文，不含这次提问本身，服务端会把 question 接在最后）。
@@ -1487,92 +1368,6 @@
       var r = res && res.result;
       if (!r || !r.ok) throw new Error((r && r.error) || "AI 分析失败，请稍后再试");
       return r.text || "";
-    });
-  }
-  // 统一入口：快捷芯片（生成报告/两个常见问题）和手输都走这里，displayQ是气泡里显示的文字，
-  // isReportMode决定调云函数时用mode=report还是mode=chat（report模式question不生效，
-  // 但气泡里仍然显示"生成分析报告"这句话，跟用户真的问了这句话视觉上一致）。
-  function aiComposeAndSend(displayQ, isReportMode) {
-    if (aiBusy) return;
-    if (aiUsageLeft() <= 0) { toast("今日 AI 分析次数已用完，明天再来"); return; }
-    hideAiWelcome();
-    aiBusy = true; $("aiChatSendBtn").disabled = true;
-    appendAiMsg("user", aiRender(displayQ));
-    var pending = appendAiMsg("bot", "", true);
-
-    var rec = currentAiConvId ? findAiConv(aiConvos, currentAiConvId) : null;
-    var contextHistory = rec ? rec.messages.slice(-12).map(function (m) { return { role: m.role, content: m.content }; }) : [];
-    if (!rec) {
-      rec = { id: aiConvId(), title: displayQ, isReport: isReportMode, updatedAt: Date.now(), messages: [] };
-      aiConvos.unshift(rec);
-      currentAiConvId = rec.id;
-    }
-    rec.messages.push({ role: "user", content: displayQ });
-
-    callAiAdvisor(isReportMode ? "report" : "chat", isReportMode ? "" : displayQ, contextHistory).then(function (text) {
-      bumpAiUsage();
-      pending.classList.remove("pending");
-      pending.innerHTML = aiRender(text);
-      rec.messages.push({ role: "assistant", content: text });
-      if (rec.messages.length > AI_CHATLOG_MAX_MSGS) rec.messages = rec.messages.slice(-AI_CHATLOG_MAX_MSGS);
-      rec.updatedAt = Date.now();
-      bumpAiConvTop(aiConvos, rec);
-      if (aiConvos.length > AI_CHATLOG_MAX_CONVOS) aiConvos = aiConvos.slice(0, AI_CHATLOG_MAX_CONVOS);
-      saveAiConvos();
-    }).catch(function (err) {
-      pending.classList.remove("pending");
-      pending.innerHTML = '<span style="color:var(--critical)">' + esc(err && err.message ? err.message : "AI 分析失败") + '</span>';
-      // 这轮失败了：如果是刚创建的新对话、从没成功回复过，就把这条空壳记录撤销掉，
-      // 不然历史列表里会出现一条只有用户提问、AI 从没真正回过的"僵尸对话"。
-      if (rec.messages.length <= 1) {
-        var idx = aiConvos.indexOf(rec);
-        if (idx >= 0) aiConvos.splice(idx, 1);
-        currentAiConvId = null;
-      }
-    }).then(function () {
-      aiBusy = false; $("aiChatSendBtn").disabled = false;
-    });
-  }
-  function aiSendFromInput() {
-    var v = ($("aiChatInput").value || "").trim();
-    if (!v) { toast("请输入你想问的问题"); return; }
-    $("aiChatInput").value = ""; $("aiChatInput").style.height = "";
-    aiComposeAndSend(v, false);
-  }
-  // ---- 历史对话 sheet：从 #aiScreen 内部打开，列表复用 .backup-row 那套已有的行样式 ----
-  function openAiHistorySheet() {
-    renderAiHistoryList();
-    $("scrimAiHistory").classList.add("open");
-    $("aiHistorySheet").classList.add("open");
-    lockScroll();
-  }
-  function closeAiHistorySheet() {
-    if (!$("aiHistorySheet").classList.contains("open")) return;
-    $("aiHistorySheet").classList.remove("open");
-    $("scrimAiHistory").classList.remove("open");
-    unlockScroll();
-  }
-  function renderAiHistoryList() {
-    var box = $("aiHistoryList");
-    box.innerHTML = "";
-    if (!aiConvos.length) { box.innerHTML = '<div class="footnote" style="text-align:left">还没有历史对话——问过一次之后会出现在这里</div>'; return; }
-    aiConvos.forEach(function (rec) {
-      var row = document.createElement("div"); row.className = "backup-row"; row.style.cursor = "pointer";
-      row.innerHTML = '<div class="backup-row-main"><div class="backup-row-time"></div><div class="backup-row-sub"></div></div>'
-        + '<div class="backup-row-actions"><button type="button" class="btn danger">删除</button></div>';
-      row.querySelector(".backup-row-time").textContent = rec.title;
-      row.querySelector(".backup-row-sub").textContent = new Date(rec.updatedAt).toLocaleString() + " · " + rec.messages.length + " 条消息";
-      row.querySelector(".backup-row-main").addEventListener("click", function () { loadAiConversation(rec); closeAiHistorySheet(); });
-      row.querySelector(".backup-row-actions button").addEventListener("click", function (e) {
-        e.stopPropagation();
-        ask("删除这条对话", "删除后无法恢复，确定继续吗？", function () {
-          var idx = aiConvos.indexOf(rec); if (idx >= 0) aiConvos.splice(idx, 1);
-          saveAiConvos();
-          if (rec.id === currentAiConvId) startNewAiConversation();
-          renderAiHistoryList();
-        });
-      });
-      box.appendChild(row);
     });
   }
 
@@ -2100,22 +1895,10 @@
   // uploadInput(#docsScreen)第九步后也整个不在vanilla DOM里了(react/src/sheets/
   // DocsScreen.tsx自己渲染返回箭头+文件选择器)；backupBackBtn/backupCreateBtn/
   // backupList(#backupScreen)第十步后同理，react/src/sheets/BackupScreen.tsx自己渲染
-  // 返回箭头+创建按钮+列表，这里不再需要重复绑监听器。
-  $("aiBackBtn").addEventListener("click", closeAiScreen);
-  $("aiHistoryBtn").addEventListener("click", openAiHistorySheet);
-  $("scrimAiHistory").addEventListener("click", closeAiHistorySheet);
-  $("aiNewConvBtn").addEventListener("click", function () { closeAiHistorySheet(); startNewAiConversation(); });
-  $("aiChipReport").addEventListener("click", function () { aiComposeAndSend("生成分析报告", true); });
-  document.querySelectorAll(".ai-chip[data-q]").forEach(function (btn) {
-    btn.addEventListener("click", function () { aiComposeAndSend(btn.getAttribute("data-q"), false); });
-  });
-  $("aiChatSendBtn").addEventListener("click", aiSendFromInput);
-  $("aiChatInput").addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); aiSendFromInput(); } });
-  // 输入框随内容自动长高（最多90px，跟CSS max-height一致），rows=1的textarea不会自动长高
-  $("aiChatInput").addEventListener("input", function () {
-    this.style.height = "auto";
-    this.style.height = Math.min(this.scrollHeight, 90) + "px";
-  });
+  // 返回箭头+创建按钮+列表；aiBackBtn/aiHistoryBtn/scrimAiHistory/aiNewConvBtn/
+  // aiChipReport/ai-chip[data-q]/aiChatSendBtn/aiChatInput(#aiScreen+#aiHistorySheet)
+  // 第十一步后同理，react/src/sheets/AiScreen.tsx自己渲染整套聊天界面+历史对话sheet，
+  // 这里不再需要重复绑监听器。
   window.__handleBackButton = function () {
     // 抖动编辑模式(jiggleMode)现在是React状态(react/src/debts/DebtList.tsx)，vanilla这边
     // 看不到——React挂载时会把这个判断以window.__azDebtsBack的形式注册回来，同一个"最上层
@@ -2127,11 +1910,13 @@
     // 判断逻辑物理上也不在这个文件里了——跟jiggleMode那条(window.__azDebtsBack)是同一个
     // 模式，位置沿用原来这三个subpage在DOM里的顺序。
     if (window.__azTermsScreenBack && window.__azTermsScreenBack()) return true;
-    if ($("aiHistorySheet").classList.contains("open")) { closeAiHistorySheet(); return true; }
-    if ($("aiScreen").classList.contains("open")) { closeAiScreen(); return true; }
-    // backupScreen/simScreen/notifySheet/docsScreen同理已经是React状态(react/src/sheets/
-    // BackupScreen.tsx第十步、SimScreen.tsx、NotifySheet.tsx第八步、DocsScreen.tsx第九步)，
-    // 位置沿用原来这几个subpage/sheet在DOM里的顺序。
+    // aiHistorySheet/aiScreen/backupScreen/simScreen/notifySheet/docsScreen同理已经是
+    // React状态(react/src/sheets/AiScreen.tsx第十一步、BackupScreen.tsx第十步、
+    // SimScreen.tsx、NotifySheet.tsx第八步、DocsScreen.tsx第九步)，位置沿用原来这几个
+    // subpage/sheet在DOM里的顺序——aiHistorySheet必须排在aiScreen之前("最上层先关"：
+    // 历史对话sheet的z-index比aiScreen所在的.subpage更高，视觉上盖在aiScreen上层)。
+    if (window.__azAiHistorySheetBack && window.__azAiHistorySheetBack()) return true;
+    if (window.__azAiScreenBack && window.__azAiScreenBack()) return true;
     if (window.__azBackupScreenBack && window.__azBackupScreenBack()) return true;
     if (window.__azSimScreenBack && window.__azSimScreenBack()) return true;
     if (window.__azDocsScreenBack && window.__azDocsScreenBack()) return true;
@@ -2223,10 +2008,9 @@
     commitReorder: commitReorder,
     saveAll: saveAll,
     renderAll: renderAll,
-    // openPremiumScreen/openAccountScreen已删除——第七步(React迁移收尾)后accountScreen/
-    // premiumScreen/termsScreen都是React自己拥有的sheet(shared/state.ts)，不再经过这个
-    // 桥接对象。openAiScreen暂时保留，aiScreen要等第十一步才迁移。
-    openAiScreen: openAiScreen,
+    // openPremiumScreen/openAccountScreen/openAiScreen已删除——第七步(accountScreen/
+    // premiumScreen/termsScreen)/第十一步(aiScreen)迁移React后，这几个screen都是React
+    // 自己拥有的sheet(shared/state.ts)，不再经过这个桥接对象。
     // detailSheet(react/src/sheets/)新增：#dSettle以前只在vanilla内部调用，现在按钮由React
     // 渲染，需要显式桥接。openSimScreen已删除——第八步(simScreen)迁移React后不再经过桥接。
     settleFull: settleFull,
@@ -2271,7 +2055,10 @@
     listBackups: listBackups,
     restoreBackup: restoreBackup,
     deleteBackup: deleteBackup,
-    getBackupMeta: getBackupMeta
+    getBackupMeta: getBackupMeta,
+    // 第十一步(aiScreen)新增，且是这一步唯一的新增：callAiAdvisor原样保留(依赖
+    // ensureCbAuthReady/cbApp().callFunction这套认证会话状态，不可移植)。
+    callAiAdvisor: callAiAdvisor
   };
 
   renderAll(); loadUploads(); renderAccountUI();

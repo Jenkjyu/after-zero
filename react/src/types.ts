@@ -105,6 +105,23 @@ export interface ReportData {
   timeline: { date: string; balance: number }[];
 }
 
+// AI 债务顾问历史对话记录（react/src/sheets/AiScreen.tsx用）——第十一步(React迁移收尾)后
+// AI_CHATLOG_KEY整体移交React所有权，直接读写localStorage(不经过bridge，跟SIM_KEY当年
+// 的先例一致)。messages里的role只有"user"/"assistant"两种(跟发给aiAdvisor云函数的history
+// 参数、以及calc.js的findAiConv/bumpAiConvTop操作的形状完全一致)，UI渲染时按
+// role==="user"?"user":"bot"映射成CSS class。
+export interface AiChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+export interface AiConversation {
+  id: string;
+  title: string;
+  isReport: boolean;
+  updatedAt: number;
+  messages: AiChatMessage[];
+}
+
 // 云备份记录（react/src/sheets/BackupScreen.tsx用）——window.__azBridge.listBackups()的
 // 单条元素形状，跟backupList云函数`.field({...})`投影出来的轻量字段一致（不含完整debts/docs，
 // 那些要等真正"恢复"时才通过restoreBackup(id)取回）。
@@ -131,11 +148,10 @@ export interface AzBridge {
   commitReorder(newOrder: Debt[]): void;
   saveAll(): void;
   renderAll(): void;
-  // openAiScreen: aiScreen是第十一步才迁移的，暂时还是trigger-only。openPremiumScreen/
-  // openAccountScreen已删除——第七步(accountScreen/premiumScreen/termsScreen)迁移React后，
-  // 打开这几个screen不再经过bridge，改成shared/state.ts的openAccountScreen/openPremiumScreen/
-  // openTermsScreen(纯React状态，模式同openDetailSheet/openEditSheet)。
-  openAiScreen(): void;
+  // openPremiumScreen/openAccountScreen/openAiScreen已删除——第七步(accountScreen/
+  // premiumScreen/termsScreen)/第十一步(aiScreen)迁移React后，打开这几个screen不再经过
+  // bridge，改成shared/state.ts的openAccountScreen/openPremiumScreen/openTermsScreen/
+  // openAiScreen(纯React状态，模式同openDetailSheet/openEditSheet)。
   // detailSheet新增：#dSettle(提前结清)以前只在vanilla内部调用，现在detailSheet的按钮由
   // React渲染，需要显式桥接。openSimScreen已删除——第八步(simScreen)迁移React后，打开
   // 这个screen不再经过bridge，改成shared/state.ts的openSimScreen(i)(模式同openDetailSheet)。
@@ -202,6 +218,12 @@ export interface AzBridge {
   restoreBackup(id: string): Promise<boolean>;
   deleteBackup(id: string): Promise<boolean>;
   getBackupMeta(): { lastBackupAt: number };
+  // 第十一步(aiScreen)新增，且是这一步唯一的新增：callAiAdvisor原样保留现有vanilla函数
+  // (内部继续用vanilla自己的debts调buildAiSummary())，因为它依赖ensureCbAuthReady/
+  // cbApp().callFunction这套认证会话状态，不可移植。AI_USAGE_KEY/AI_CHATLOG_KEY整体移交
+  // React所有权(跟SIM_KEY当年同一个先例)，不经过bridge。history是"这次提问之前的上下文"，
+  // 不含这次提问本身(服务端会把question接在最后)；report模式不需要history，传空数组。
+  callAiAdvisor(mode: "report" | "chat", question: string, history: AiChatMessage[]): Promise<string>;
 }
 
 // 排序方式(含"custom")的类型，跟 www/index.html 原来的 DEBT_SORTS 键名保持一致，

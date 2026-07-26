@@ -5,7 +5,7 @@
 import { Header } from "./Header";
 import { Summary } from "./Summary";
 import { DebtList } from "./DebtList";
-import { openAccountScreen, openPremiumScreen, useAccount, useDebts, usePremium } from "../shared/state";
+import { openAccountScreen, openAiScreen, openPremiumScreen, useAccount, useDebts, usePremium } from "../shared/state";
 
 export function App() {
   const debts = useDebts();
@@ -13,7 +13,7 @@ export function App() {
   const account = useAccount();
 
   function onAiBannerClick() {
-    if (window.hasPremium(premium)) window.__azBridge.openAiScreen();
+    if (window.hasPremium(premium)) openAiScreen();
     else openPremiumScreen();
   }
 

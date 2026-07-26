@@ -244,6 +244,28 @@ export function useBackupScreenOpen(): boolean {
   return useSyncExternalStore(subscribeBackupScreen, () => backupScreenOpen);
 }
 
+// AI 债务顾问——第十一步(React迁移收尾)新增，布尔开关，跟accountScreen/premiumScreen/
+// termsScreen/notifySheet/docsScreen/backupScreen同一个模式。"哪个历史对话开着"这份状态
+// (原来的aiHistorySheet)完全是AiScreen自己的组件内部状态，不需要在这里再加一对
+// open/close——跟其它几个screen不同的是，历史对话sheet只会从AiScreen自己的header按钮
+// 触发，不存在"被多棵独立React树共同触发"这个需要提到共享层的理由。
+let aiScreenOpen = false;
+function subscribeAiScreen(callback: () => void) {
+  window.addEventListener("az:ai-screen-changed", callback);
+  return () => window.removeEventListener("az:ai-screen-changed", callback);
+}
+export function openAiScreen() {
+  aiScreenOpen = true;
+  window.dispatchEvent(new CustomEvent("az:ai-screen-changed"));
+}
+export function closeAiScreen() {
+  aiScreenOpen = false;
+  window.dispatchEvent(new CustomEvent("az:ai-screen-changed"));
+}
+export function useAiScreenOpen(): boolean {
+  return useSyncExternalStore(subscribeAiScreen, () => aiScreenOpen);
+}
+
 // 档案库——第九步(React迁移收尾)新增，布尔开关，跟accountScreen/premiumScreen/termsScreen/
 // notifySheet同一个模式。
 let docsScreenOpen = false;

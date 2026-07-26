@@ -14,6 +14,14 @@ import * as calc from "../../www/js/calc.js";
 // <script src="js/calc.js">的效果等价。
 Object.assign(window, calc);
 
+// jsdom不实现Element.scrollIntoView(真实浏览器/WebView都有)——AiScreen.tsx新消息追加后
+// 会调用它把最新气泡滚进视图，测试环境下这个方法压根不存在，直接报
+// "el.scrollIntoView is not a function"。补一个空实现，跟真实滚动行为无关，只是让代码
+// 能跑，不需要断言滚动位置。
+if (typeof Element.prototype.scrollIntoView !== "function") {
+  Element.prototype.scrollIntoView = () => {};
+}
+
 afterEach(() => {
   cleanup();
 });
