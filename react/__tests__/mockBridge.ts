@@ -1,7 +1,7 @@
 // 测试用的window.__azBridge假实现——用vitest的vi.fn()包一层，方便断言"React调用了正确的
 // vanilla桥接函数"，不需要真的挂载一整个vanilla index.html环境。
 import { vi } from "vitest";
-import type { Account, AzBridge, Debt, FileItem, NotifySettings, Premium } from "../src/types";
+import type { Account, AzBridge, BackupRecord, Debt, FileItem, NotifySettings, Premium } from "../src/types";
 
 export function makeMockBridge(overrides?: {
   debts?: Debt[];
@@ -9,12 +9,16 @@ export function makeMockBridge(overrides?: {
   account?: Account | null;
   notify?: NotifySettings;
   files?: FileItem[];
+  backups?: BackupRecord[];
+  lastBackupAt?: number;
 }): AzBridge {
   const debts = overrides?.debts ?? [];
   const premium = overrides?.premium ?? { premium: null };
   const account = overrides?.account ?? null;
   const notify = overrides?.notify ?? { enabled: false, rules: [] };
   const files = overrides?.files ?? [];
+  const backups = overrides?.backups ?? [];
+  const lastBackupAt = overrides?.lastBackupAt ?? 0;
   return {
     getDebts: vi.fn(() => debts),
     getPremium: vi.fn(() => premium),
@@ -29,7 +33,6 @@ export function makeMockBridge(overrides?: {
     getNotify: vi.fn(() => notify),
     exportReportXlsx: vi.fn(),
     exportReportPdf: vi.fn(),
-    openBackupScreen: vi.fn(),
     downloadBackupFile: vi.fn(),
     triggerImportFilePicker: vi.fn(),
     setDebt: vi.fn(),
@@ -52,6 +55,11 @@ export function makeMockBridge(overrides?: {
     deleteArchiveFile: vi.fn(() => Promise.resolve()),
     downloadArchiveFile: vi.fn(() => Promise.resolve()),
     shareArchiveFile: vi.fn(),
+    createBackup: vi.fn(() => Promise.resolve(true)),
+    listBackups: vi.fn(() => Promise.resolve(backups)),
+    restoreBackup: vi.fn(() => Promise.resolve(true)),
+    deleteBackup: vi.fn(() => Promise.resolve(true)),
+    getBackupMeta: vi.fn(() => ({ lastBackupAt })),
   };
 }
 

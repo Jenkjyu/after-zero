@@ -103,6 +103,14 @@ vanilla这边`payInstallment(i)`/`settleFull(i)`都被精简过：原来末尾`i
 
 删除：`fileItems`/`renderFiles`/`renderDocContent`/`bindFileDownload`/`docSel`/`FILES`/`ICON_IMG`/`ICON_PDF`/`ICON_CLIP`/`ICON_DOC`全部删除（图标SVG原样复刻进`DocsScreen.tsx`的JSX常量），`#uploadInput`不再是vanilla DOM里游离的隐藏input——第九步之后它是`DocsScreen.tsx`自己渲染+持有ref的普通React元素（不需要再像`#importFileInput`那样留一个手动触发的桥接函数，因为上传的业务逻辑本身已经整体搬进React，不需要vanilla继续插手）。
 
+**第十步：云备份（`backupScreen`）——跟"我的"tab当年的云备份入口不同，这次是里面的实际内容（创建/列表/恢复/删除4个cloud函数调用）搬进React，不再只是trigger-only。** 新增`react/src/sheets/BackupScreen.tsx`，`useState`管理"加载中/列表/错误"三态（原来`renderBackupList()`直接改DOM，这次改成组件内`useEffect`在`isOpen`变`true`时触发`listBackups()`重新拉取——不是常驻订阅，备份记录列表不是"数据变了自动跟上"这种共享状态，是这个screen自己私有的、每次打开都值得重新问一遍服务端的东西）。`openBackupScreen()`/`closeBackupScreen()`挪进`shared/state.ts`（布尔开关，跟`accountScreen`/`docsScreen`同一个模式，`DataCards.tsx`"打开云备份"门禁通过后的调用点改成直接`import`）。
+
+全部cloud函数调用逻辑（`ensureCbAuthReady`/`cbApp().callFunction`这套认证会话状态）继续保留vanilla——跟`aiAdvisor`/`wxLogin`同一个"认证会话状态是vanilla独占的、不可移植"的原因。`__azBridge`新增5个函数：`createBackup(): Promise<boolean>`、`restoreBackup(id): Promise<boolean>`、`deleteBackup(id): Promise<boolean>`这3个**沿用`deleteAccount()`那个先例**——内部照旧`toast`成功/失败文案（跟原来`createCloudBackup`/`doRestoreBackup`/`confirmDeleteBackup`的文案逐字一致），返回布尔值让React决定要不要刷新列表；`listBackups(): Promise<BackupRecord[]>`是纯读取，没有布尔判断需要做，失败直接`throw`，React用`try/catch`显示错误文案（效果跟原来`renderBackupList()`的`catch`分支一致）；`getBackupMeta(): {lastBackupAt}`是同步读取（`lastBackupMeta`本来就是常驻内存的模块变量，不需要额外的loading态）。恢复/删除的二次确认弹窗（原来`ask()`包着的"此操作不可撤销，确定继续吗"）挪到了React用`confirmAsync`处理，成功后再调`restoreBackup`/`deleteBackup`——这几个vanilla函数因此**不含确认逻辑**，只做"真的去调用"这一步，跟第九步`deleteArchiveFile`同一个处理方式。
+
+删除：`createCloudBackup`/`renderBackupList`/`confirmRestoreBackup`/`doRestoreBackup`/`confirmDeleteBackup`/`renderBackupMeta`/`openBackupScreen`/`closeBackupScreen`全部删除（`applyBackupData`保留，`restoreBackup`内部继续调用它），HTML里`#backupScreen`整块。`createCloudBackup()`内部原来那行"万一没premium就跳订阅页"的二次防御检查在第七步（删除`openPremiumScreen()`时）就已经因为YAGNI被提前删掉，这一步不需要再处理这层。
+
+**真机限制（老规矩，不是新问题）**：真实的创建/列表/恢复/删除往返依赖真实微信登录会话，这个环境测不出——本地Playwright验证时用"伪造`account`跳过登录门"这个老技巧打开`backupScreen`，`listBackups()`确实按预期显示出`获取备份列表失败：Cannot read properties of null (reading 'scope')`这条错误文案，这正是"云备份（Premium）"一节"桌面浏览器测试的边界"里记录的那个已知现象（伪造`account`会让`ensureCbAuthReady()`误判"已登录"从而跳过`signInAnonymously()`兜底，连匿名会话都没有就直接撞上CloudBase SDK的null凭证读`.scope`的bug）——不是这次迁移引入的新bug，UI正确地把它当错误态展示出来而不是崩溃，符合预期。桌面Playwright验证覆盖：打开screen显示正确的"上次备份"文案+列表进入错误态、门禁两个方向（未开通跳订阅页/已开通打开backupScreen）、硬件返回键+点返回箭头都能正确关闭，light/dark主题截图确认，控制台零JS报错。
+
 ### 目录结构：`react/`（源码）→ `www/js/react-debts/`（构建产物，Vite多入口）
 
 新增顶层目录`react/`（跟`www/`/`android/`/`cloudbase/`/`resources/`平级），是这个项目第一次引入真正的JS构建工具（Vite）。`react/src/debts/`/`react/src/pay/`/`react/src/report/`/`react/src/mine/`分别是四个已迁移tab（全部tab）的React源码，`react/src/sheets/`是第五个入口——不属于任何tab、常驻挂载的`#detailSheet`+`#editSheet`（详见上面"第五步"/"第六步"，两者共用同一个Vite entry，不是各自一个）。`react/src/shared/`是这几个入口共用的状态订阅hook（见下面"vanilla ↔ React 桥接契约"）。`react/vite.config.ts`用Vite的**库模式**（`build.lib`，不是Vite默认的app模式——这次不是造一个独立SPA，是把React组件挂进现有`www/index.html`的某几个节点，库模式产出可以直接`<script type="module">`引入的bundle）。
@@ -121,7 +129,7 @@ vanilla这边`payInstallment(i)`/`settleFull(i)`都被精简过：原来末尾`i
 
 现状：vanilla主脚本是一个大IIFE，`debts`/`saveAll`/`renderAll`/`openDetail`/`payInstallment`/`commitReorder`等全部是IIFE内部私有的，不在`window`上（跟已经全局的`calc.js`函数、跟`window.__handleBackButton`这种刻意暴露的例外都不一样）。要让React调用这些，必须显式暴露。
 
-**`window.__azBridge`**（定义在主IIFE末尾，`})();`之前）是唯一的暴露点，只包含已迁移React页面实际需要调用的这几个，第三步新增了`getNotify`/`openNotifySheet`/`exportReportXlsx`/`exportReportPdf`这4个，第四步（"我的"tab）又新增了`openDocsScreen`/`openBackupScreen`/`downloadBackupFile`/`triggerImportFilePicker`这4个，第五步（`#detailSheet`）**删除**了`openDetail`、新增了`settleFull`/`openSimScreen`这2个，第六步（`#editSheet`）**删除**了`openEdit`（打开这两个sheet都不再经过桥接，改成`shared/state.ts`的`openDetailSheet(i)`/`openEditSheet(i)`，见上面"第五步"/"第六步"）、新增了`setDebt`/`deleteDebt`/`toast`/`confirmAsync`这4个，第七步（accountScreen/premiumScreen/termsScreen）**删除**了`openPremiumScreen`/`openAccountScreen`（同样道理，这三个screen也变成纯React状态）、新增了`wxLogout`/`deleteAccount`/`redeemCode`这3个，第八步（simScreen/notifySheet）**删除**了`openSimScreen`/`openNotifySheet`、新增了`setNotifyEnabled`/`addNotifyRule`/`deleteNotifyRule`/`sendTestNotification`这4个，**第九步（docsScreen）删除**了`openDocsScreen`、新增了`getFiles`/`uploadArchiveFile`/`deleteArchiveFile`/`downloadArchiveFile`/`shareArchiveFile`这5个：
+**`window.__azBridge`**（定义在主IIFE末尾，`})();`之前）是唯一的暴露点，只包含已迁移React页面实际需要调用的这几个，第三步新增了`getNotify`/`openNotifySheet`/`exportReportXlsx`/`exportReportPdf`这4个，第四步（"我的"tab）又新增了`openDocsScreen`/`openBackupScreen`/`downloadBackupFile`/`triggerImportFilePicker`这4个，第五步（`#detailSheet`）**删除**了`openDetail`、新增了`settleFull`/`openSimScreen`这2个，第六步（`#editSheet`）**删除**了`openEdit`（打开这两个sheet都不再经过桥接，改成`shared/state.ts`的`openDetailSheet(i)`/`openEditSheet(i)`，见上面"第五步"/"第六步"）、新增了`setDebt`/`deleteDebt`/`toast`/`confirmAsync`这4个，第七步（accountScreen/premiumScreen/termsScreen）**删除**了`openPremiumScreen`/`openAccountScreen`（同样道理，这三个screen也变成纯React状态）、新增了`wxLogout`/`deleteAccount`/`redeemCode`这3个，第八步（simScreen/notifySheet）**删除**了`openSimScreen`/`openNotifySheet`、新增了`setNotifyEnabled`/`addNotifyRule`/`deleteNotifyRule`/`sendTestNotification`这4个，第九步（docsScreen）**删除**了`openDocsScreen`、新增了`getFiles`/`uploadArchiveFile`/`deleteArchiveFile`/`downloadArchiveFile`/`shareArchiveFile`这5个，**第十步（backupScreen）删除**了`openBackupScreen`、新增了`createBackup`/`listBackups`/`restoreBackup`/`deleteBackup`/`getBackupMeta`这5个：
 ```js
 window.__azBridge = {
   getDebts: function () { return debts; },   // 每次调用现读，见下面"为什么是函数"
@@ -134,7 +142,6 @@ window.__azBridge = {
   getNotify: function () { return notify; },
   exportReportXlsx: exportReportXlsx,
   exportReportPdf: exportReportPdf,
-  openBackupScreen: openBackupScreen, // #backupScreen要等第十步才迁移
   downloadBackupFile: downloadBackupFile,
   triggerImportFilePicker: triggerImportFilePicker,
   setDebt: setDebt,
@@ -146,14 +153,17 @@ window.__azBridge = {
   deleteNotifyRule: deleteNotifyRule, sendTestNotification: sendTestNotification,
   getFiles: getFiles, uploadArchiveFile: uploadArchiveFile,
   deleteArchiveFile: deleteArchiveFile, downloadArchiveFile: downloadArchiveFile,
-  shareArchiveFile: shareArchiveFile
+  shareArchiveFile: shareArchiveFile,
+  createBackup: createBackup, listBackups: listBackups,
+  restoreBackup: restoreBackup, deleteBackup: deleteBackup,
+  getBackupMeta: getBackupMeta
 };
 ```
-`openDocsScreen`/`openBackupScreen`/`downloadBackupFile`/`triggerImportFilePicker`这4个是"我的"tab（`react/src/mine/DataCards.tsx`）专用的trigger-only函数——`openDocsScreen`/`openBackupScreen`是已有vanilla函数，只是原来没暴露；`downloadBackupFile`是把原来`dlBackupBtn`的inline click handler抽成的具名函数；`triggerImportFilePicker`是新写的一行`$("importFileInput").click()`，用来间接点开依然留在vanilla DOM里的`#importFileInput`（这个input和它的`change`监听器完整保留在vanilla，只是从`#view-data`内部搬到了折叠后的挂载点外面）。
+`downloadBackupFile`/`triggerImportFilePicker`是"我的"tab（`react/src/mine/DataCards.tsx`）专用的trigger-only函数——`downloadBackupFile`是把原来`dlBackupBtn`的inline click handler抽成的具名函数；`triggerImportFilePicker`是新写的一行`$("importFileInput").click()`，用来间接点开依然留在vanilla DOM里的`#importFileInput`（这个input和它的`change`监听器完整保留在vanilla，只是从`#view-data`内部搬到了折叠后的挂载点外面）。
 
 `setDebt`/`deleteDebt`/`toast`/`confirmAsync`这4个是`#editSheet`（`react/src/sheets/EditSheet.tsx`等）专用——`setDebt(i, obj)`是`saveForm()`删除后唯一保留的narrow写入函数（`i>=0`覆盖`debts[i]`并合并`old.settled`/`old.settledDate`，`i<0`是push新增，内部调`recompute(obj)`但不调`saveAll`/`renderAll`，React保存时自己依次调这三个桥接函数，跟`commitReorder`那套细粒度调用惯例一致）；`deleteDebt`是原样暴露的既有vanilla函数（自带`ask()`确认+splice+saveAll+renderAll）；`toast`是`#flash`单例的简单passthrough；`confirmAsync`是`ask()`的Promise外壳（详见上面"第六步"）。
 
-其余（`ask()`确认弹窗本身等）继续保持private。**详情窗`#detailSheet`、新增/编辑表单`#editSheet`、账户详情`#accountScreen`、订阅页`#premiumScreen`、条款页`#termsScreen`、提前还款模拟器`#simScreen`、通知设置面板`#notifySheet`、档案库`#docsScreen`这八个subpage/sheet的实际内容都已经搬进React（分别是第五~九步）**，`#backupScreen`/`#aiScreen`依然100%vanilla，React只调用各自的桥接触发函数打开它们——这两个排在第十~十一步继续做。
+其余（`ask()`确认弹窗本身等）继续保持private。**详情窗`#detailSheet`、新增/编辑表单`#editSheet`、账户详情`#accountScreen`、订阅页`#premiumScreen`、条款页`#termsScreen`、提前还款模拟器`#simScreen`、通知设置面板`#notifySheet`、档案库`#docsScreen`、云备份`#backupScreen`这九个subpage/sheet的实际内容都已经搬进React（分别是第五~十步）**，`#aiScreen`+`#aiHistorySheet`依然100%vanilla，React只调用`openAiScreen`桥接触发函数打开它——这一个排在第十一步继续做。
 
 **`exportReportXlsx`/`exportReportPdf`两个函数虽然桥接给了React调用，但函数本身继续100%vanilla、原封不动**——它们已经确认是零DOM依赖的纯函数（只读`debts`、拼Excel/PDF的Blob、调用`window.XLSX`/`window.jspdf`/`saveToDeviceDownloads()`），React这边`ExportActions.tsx`只是原样复刻了vanilla原来两个按钮click handler里的`hasPremium(premium)`门禁判断，然后调用桥接函数触发真正的导出，不是把导出逻辑本身搬进React。
 
@@ -231,6 +241,7 @@ React组件挂载在同一份`index.html`文档里（不是iframe/独立页面�
 - 第七步（`accountScreen`/`premiumScreen`/`termsScreen`）：点头像打开accountScreen并显示正确的头像/昵称/会员/微信绑定文案；退出登录（无确认弹窗）清空account并重新弹出登录门；三张价卡互斥选中态切换；空/无效/有效兑换码三条路径的toast文案+有效兑换码后输入框收起+Premium入口卡更新成"Premium 会员"+`.is-member`；点《购买者服务条款》打开termsScreen并显示条款正文；硬件返回键按"先关termsScreen再关premiumScreen"的顺序逐层退；点"开通Premium"弹出"暂未开放真实支付"提示。全程零JS报错。
 - 第八步（`simScreen`/`notifySheet`）：从详情窗点"提前还款模拟"正确关闭detailSheet+打开simScreen并显示对应债务名；空金额/月供不足两条toast路径；正常测算显示结果+`SIM_KEY`正确持久化；重新打开时extra按持久化值回填、atPeriod重置为1、结果清空；硬件返回键关闭。从"还款日"tab铃铛打开notifySheet；桌面浏览器无`Capacitor.Plugins.LocalNotifications`时切换开关/发送测试通知都正确toast"仅支持安卓App内使用"、checkbox正确回退未勾选（验证了乐观更新+回退这条路径）；添加/删除提醒规则正确更新列表+`NOTIF_KEY`持久化；点"完成"和硬件返回键都能正确关闭。
 - 第九步（`docsScreen`）：点"打开档案库"打开docsScreen并渲染已有的markdown文档条目；点击文档行触发`mdToHtml`预览渲染出正确的标题标签；上传一张真实图片文件，`uploads`数量正确增加+toast"已上传 ✓"，点该行触发图片预览且`<img>`的`src`是有效的`blob:` objectURL；上传不支持的扩展名（`.exe`）被正确拒绝、toast提示、文件数量不变；点删除文档行弹出标题为"删除文档"的确认框（复用vanilla`#modalScrim`），确认后行数正确减少+toast"已删除"；硬件返回键正确关闭docsScreen。全程浏览器console零JS报错。
+- 第十步（`backupScreen`）：点"打开云备份"打开backupScreen，正确显示"从未备份"+触发`listBackups()`；网络受限环境下`listBackups()`按预期落进错误态（显示"获取备份列表失败：..."，这是"云备份（Premium）"一节记录的已知SDK行为，不是这次迁移的新bug，验证了UI没有因为这个错误而崩溃或卡死）；门禁两个方向（未开通跳订阅页/已开通打开backupScreen）；硬件返回键+点返回箭头都能正确关闭。全程浏览器console零JS报错。**真实的创建/恢复/删除往返依赖真实微信登录会话，这个环境测不出，属于老规矩限制。**
 - 全程浏览器console **零JS报错**，light/dark两种主题都截图核对过。
 
 **"统计"和"我的"这两个tab都是零手势的纯data→JSX展示，不需要真机验证，桌面Playwright覆盖已经足够**（跟第二步Summary/AiBanner这类纯视觉组件判定为无需真机是同一个理由）——"我的"tab里"下载/上传备份文件"两个按钮背后的真实原生行为（`SaveFile`插件的"另存为"选择器、真机文件选择器），这次迁移完全没有改动它们的实现，只是把触发入口从vanilla按钮换成React按钮调用同一个函数，不需要为这次迁移重新验证一遍那两个功能本身。`#detailSheet`同理零手势（`initGripDrag`只是4个pointer监听器操作单个DOM节点，不是`gestures.ts`那套长按/滑动状态机），桌面Playwright覆盖已经足够。**"还款日"的左滑手势是目前唯一还留着的真机确认项**——桌面Playwright用鼠标模拟的Pointer Events路径验证了"能触发swiping分支、不报错"，但真实手指触摸的手感、多点触控边界情况、安卓WebView的触摸事件时序，历史上这个项目的教训是"必须真机验证"（见"在还债务自定义排序"一节），这次移植代码逻辑上是逐行照抄，但没有免除真机验证这一步。
@@ -566,9 +577,11 @@ window.__debugPremium("none")         // 清空，恢复"普通用户"
 
 ## 云备份（Premium）
 
+> **⚠️ 渲染层已经翻篇：`#backupScreen`（第十步，React迁移收尾）已经整体由React接管（`react/src/sheets/BackupScreen.tsx`）——创建/列表/恢复/删除4个cloud函数调用的UI全部由React渲染，二次确认弹窗改用`confirmAsync`。这一节记录的产品决策（手动/独立记录而非自动同步、配额/单文件上限数字、身份来自服务端会话不信任客户端参数）依然100%成立，是理解"为什么这么设计"的背景，具体前端实现细节以"React 迁移"一节"第十步"为准。**
+
 **⚠️ 这个功能第一版做的是"自动同步、单一文档覆盖"，已经推翻重做成"完全手动、每次创建一条独立备份记录"——用户自己用下来发现自动同步让人担心手滑/多设备冲突把数据搞乱，宁可自己点一下、每条备份都能单独恢复更放心。**"云同步"这个说法也一并废弃，整个App只保留"云备份"这一种说法，别再在新代码/文案里用"同步"字眼描述这个功能。
 
-"我的"页"云备份"入口卡片（`#backupEntryBtn`，`hasPremium()`门禁）打开整页浮层`#backupScreen`：一个"上次备份"时间展示 + "创建备份"按钮（`#backupCreateBtn`，点击会打包当前的债务/文档/设置/档案库文件，作为**新的一条**记录写入云端，不覆盖已有记录）+ 备份记录列表（`#backupList`，每条显示创建时间、笔数/文件数/大小，各自带"恢复"和"删除"按钮）。点"恢复"会先弹`ask()`二次确认（"此操作不可撤销，确定继续吗"），确认后才会用那条记录的内容整体覆盖本机当前数据。**没有任何自动触发的推送/拉取**——数据变动不会自动上云，登录/冷启动也不会自动去云端拉数据，一切都要用户自己点"创建备份"/"恢复"。
+"我的"页"云备份"入口卡片（`#backupEntryBtn`，`hasPremium()`门禁）打开整页浮层`#backupScreen`：一个"上次备份"时间展示 + "创建备份"按钮（点击会打包当前的债务/文档/设置/档案库文件，作为**新的一条**记录写入云端，不覆盖已有记录）+ 备份记录列表（每条显示创建时间、笔数/文件数/大小，各自带"恢复"和"删除"按钮）。点"恢复"会先弹二次确认（"此操作不可撤销，确定继续吗"），确认后才会用那条记录的内容整体覆盖本机当前数据。**没有任何自动触发的推送/拉取**——数据变动不会自动上云，登录/冷启动也不会自动去云端拉数据，一切都要用户自己点"创建备份"/"恢复"。
 
 **架构：依然是全部走云函数代理，不做客户端直传云存储**——复用`deleteAccount`已经建立的"身份完全来自服务端已认证会话（`auth.getUserInfo().customUserId`），绝不信任客户端参数"这条安全原则，不用去研究一套这个项目从没碰过的CloudBase Storage安全规则语法（那是一个完全独立于云函数"权限控制"的配置面板）。代价：文件走base64通过函数体积会膨胀~33%、受函数超时/请求体限制——**单文件上限`BACKUP_MAX_FILE_BYTES`（8MB）**，超过的文件在打包这条备份时会被跳过（`console.error`记一条日志），不参与这次备份，仍然可以走手动的本地JSON导出导入兜底。
 

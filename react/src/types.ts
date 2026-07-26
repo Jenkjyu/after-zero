@@ -105,6 +105,17 @@ export interface ReportData {
   timeline: { date: string; balance: number }[];
 }
 
+// 云备份记录（react/src/sheets/BackupScreen.tsx用）——window.__azBridge.listBackups()的
+// 单条元素形状，跟backupList云函数`.field({...})`投影出来的轻量字段一致（不含完整debts/docs，
+// 那些要等真正"恢复"时才通过restoreBackup(id)取回）。
+export interface BackupRecord {
+  id: string;
+  createdAt: number;
+  debtsCount: number;
+  filesCount: number;
+  totalSizeBytes: number;
+}
+
 // vanilla主IIFE暴露出来的桥接对象——见 www/index.html 里 window.__azBridge 的定义和CLAUDE.md
 // "React 迁移"一节。只包含已迁移的React页面实际需要调用的这几个，其余(saveForm/公式生成器
 // 等)继续留在vanilla私有作用域里，后续阶段迁移到别的页面时才按需加进来。
@@ -137,10 +148,9 @@ export interface AzBridge {
   // 只是入口桥接给React的导出按钮调用，premium门禁判断在React这边原样复刻。
   exportReportXlsx(): void;
   exportReportPdf(): void;
-  // "我的"tab新增：这2个是trigger-only——#backupScreen(第十步才迁移)+备份文件的打包/解析/
-  // 系统文件选择器，继续100%vanilla。openDocsScreen已删除——第九步(docsScreen)迁移React后
-  // 不再经过bridge，改成shared/state.ts的openDocsScreen(纯React状态)。
-  openBackupScreen(): void;
+  // "我的"tab新增：备份文件的打包/解析、系统文件选择器，继续100%vanilla。openDocsScreen/
+  // openBackupScreen已删除——docsScreen(第九步)/backupScreen(第十步)迁移React后不再经过
+  // bridge，改成shared/state.ts的openDocsScreen/openBackupScreen(纯React状态)。
   downloadBackupFile(): void;
   triggerImportFilePicker(): void;
   // editSheet(react/src/sheets/EditSheet.tsx)新增：setDebt是保存写入(i>=0覆盖debts[i]并保留
@@ -181,6 +191,17 @@ export interface AzBridge {
   deleteArchiveFile(id: string): Promise<void>;
   downloadArchiveFile(id: string): Promise<void>;
   shareArchiveFile(id: string): void;
+  // 第十步(backupScreen)新增：全部cloud函数调用(ensureCbAuthReady/cbApp().callFunction这套
+  // 认证会话状态)继续100%vanilla，React只拿到调用结果。createBackup/restoreBackup/
+  // deleteBackup内部照旧toast成功/失败文案(跟deleteAccount()同一个先例)，返回布尔值让React
+  // 决定要不要刷新列表；listBackups()没有布尔判断需要做，失败直接throw，React用try/catch
+  // 显示错误文案(跟原来renderBackupList()的catch分支效果一致)。getBackupMeta()是同步读取
+  // (lastBackupMeta本来就是常驻内存的模块变量，不需要额外的loading态)。
+  createBackup(): Promise<boolean>;
+  listBackups(): Promise<BackupRecord[]>;
+  restoreBackup(id: string): Promise<boolean>;
+  deleteBackup(id: string): Promise<boolean>;
+  getBackupMeta(): { lastBackupAt: number };
 }
 
 // 排序方式(含"custom")的类型，跟 www/index.html 原来的 DEBT_SORTS 键名保持一致，

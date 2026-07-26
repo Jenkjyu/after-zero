@@ -819,26 +819,8 @@
 <!-- #docsScreen已经整体搬进React(第九步)——见react/src/sheets/DocsScreen.tsx，
      含#uploadInput在内的整套上传/预览/下载/删除UI都由React渲染，不再有静态HTML。 -->
 
-<div class="subpage" id="backupScreen">
-  <div class="subpage-header">
-    <button type="button" class="subpage-back" id="backupBackBtn" aria-label="返回">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-    </button>
-    <div class="subpage-title">云备份</div>
-    <div class="subpage-header-spacer"></div>
-  </div>
-  <div class="subpage-body">
-    <div class="data-card">
-      <p style="margin-bottom:0">手动创建云端备份，每一条都是独立记录，可以随时选一条恢复到本机。恢复会覆盖本机当前的全部数据，请谨慎操作。</p>
-    </div>
-    <div class="data-card">
-      <div class="sync-status-row"><span class="sync-status-label">上次备份</span><span class="sync-status-value" id="backupLastText">从未备份</span></div>
-      <div class="data-actions" style="margin-top:8px"><button type="button" class="btn primary" id="backupCreateBtn">创建备份</button></div>
-    </div>
-    <div class="section-label" style="margin-top:6px">备份记录</div>
-    <div id="backupList"></div>
-  </div>
-</div>
+<!-- #backupScreen已经整体搬进React(第十步，React迁移收尾)——见react/src/sheets/BackupScreen.tsx，
+     创建/列表/恢复/删除4个cloud函数调用的UI全部由React渲染，内容原样复刻，没有留任何静态HTML在这里。 -->
 
 <div class="subpage" id="aiScreen">
   <div class="subpage-header">
@@ -1831,17 +1813,24 @@
     }
     return _cbAnonReady;
   }
-  function createCloudBackup() {
-    if (!account) { toast("请先登录"); return; }
+  // #backupScreen已经整体搬进React(第十步，React迁移收尾)——见react/src/sheets/BackupScreen.tsx。
+  // 这几个函数是新的桥接接口，替代原来直接改DOM的createCloudBackup/renderBackupList/
+  // confirmRestoreBackup/doRestoreBackup/confirmDeleteBackup/renderBackupMeta：全部cloud
+  // 函数调用(ensureCbAuthReady/cbApp().callFunction这套认证会话状态)继续100%vanilla，
+  // React只拿到调用结果。二次确认弹窗(原来的ask())挪到了React用confirmAsync处理，这几个
+  // 函数只做"真的去调用"这一步。createBackup/restoreBackup/deleteBackup沿用deleteAccount()
+  // 那个先例——内部照旧toast成功/失败文案，返回布尔值让React决定要不要刷新列表；
+  // listBackups()是纯读取，没有布尔判断需要做，失败直接throw，React用try/catch显示错误。
+  function createBackup() {
+    if (!account) { toast("请先登录"); return Promise.resolve(false); }
     // 原来这里还有一层"万一没premium就跳订阅页"的二次防御检查——由于进入这个函数之前
     // "我的"页DataCards.tsx已经用hasPremium()gate过一次，且这个app没有订阅到期/降级的
     // 实际场景，这层检查是多余的；第七步删掉openPremiumScreen()这个vanilla函数后
     // (premiumScreen已经是React自己的状态，vanilla调不到)，这层检查也没法再照原样写，
-    // 直接去掉(YAGNI，不是遗漏，云备份本身第十步才整体迁移React)。
-    var btn = $("backupCreateBtn"); btn.disabled = true;
+    // 直接去掉(YAGNI，不是遗漏)。
     toast("正在打包备份…");
     var backupId = "b" + Date.now() + Math.random().toString(36).slice(2, 7);
-    ensureCbAuthReady().then(function () { return upGetAll(); }).then(function (items) {
+    return ensureCbAuthReady().then(function () { return upGetAll(); }).then(function (items) {
       var eligible = items.filter(function (it) {
         if (it.blob.size > BACKUP_MAX_FILE_BYTES) { console.error("文件超过云备份单文件上限，跳过：", it.name); return false; }
         return true;
@@ -1862,48 +1851,25 @@
       var result = res && res.result;
       if (!result || !result.ok) throw new Error((result && result.error) || "备份失败");
       lastBackupMeta.lastBackupAt = Date.now(); saveLastBackupMeta();
-      renderBackupMeta();
       toast("备份已创建 ✓");
-      return renderBackupList();
+      return true;
     }).catch(function (err) {
       toast("备份失败：" + ((err && err.message) || "网络错误"));
-    }).then(function () { btn.disabled = false; });
+      return false;
+    });
   }
-  function renderBackupList() {
-    var box = $("backupList");
-    box.innerHTML = '<div class="footnote" style="text-align:left">加载中…</div>';
+  function listBackups() {
     return ensureCbAuthReady().then(function () {
       return cbApp().callFunction({ name: "backupList" });
     }).then(function (res) {
       var result = res && res.result;
       if (!result || !result.ok) throw new Error((result && result.error) || "获取备份列表失败");
-      var list = result.list || [];
-      if (!list.length) { box.innerHTML = '<div class="footnote" style="text-align:left">还没有备份记录，点上面的按钮创建第一条</div>'; return; }
-      box.innerHTML = "";
-      list.forEach(function (rec) {
-        var row = document.createElement("div"); row.className = "backup-row";
-        var sizeKB = Math.round((rec.totalSizeBytes || 0) / 1024);
-        var sizeText = sizeKB > 1024 ? (sizeKB / 1024).toFixed(1) + " MB" : sizeKB + " KB";
-        row.innerHTML = '<div class="backup-row-main"><div class="backup-row-time"></div><div class="backup-row-sub"></div></div>'
-          + '<div class="backup-row-actions"><button type="button" class="btn ghost backup-restore">恢复</button><button type="button" class="btn danger backup-del">删除</button></div>';
-        row.querySelector(".backup-row-time").textContent = new Date(rec.createdAt).toLocaleString();
-        row.querySelector(".backup-row-sub").textContent = rec.debtsCount + " 笔债务 · " + rec.filesCount + " 个文件 · " + sizeText;
-        row.querySelector(".backup-restore").addEventListener("click", function () { confirmRestoreBackup(rec.id, rec.createdAt); });
-        row.querySelector(".backup-del").addEventListener("click", function () { confirmDeleteBackup(rec.id); });
-        box.appendChild(row);
-      });
-    }).catch(function (err) {
-      box.innerHTML = '<div class="footnote" style="text-align:left">获取备份列表失败：' + esc((err && err.message) || "网络错误") + '</div>';
+      return result.list || [];
     });
   }
-  function confirmRestoreBackup(id, createdAt) {
-    ask("恢复这条备份？",
-      "创建于 " + new Date(createdAt).toLocaleString() + " 的这条备份记录，将覆盖本机当前的全部债务/档案/设置数据。此操作不可撤销，确定继续吗？",
-      function () { doRestoreBackup(id); });
-  }
-  function doRestoreBackup(id) {
+  function restoreBackup(id) {
     toast("正在恢复…");
-    ensureCbAuthReady().then(function () {
+    return ensureCbAuthReady().then(function () {
       return cbApp().callFunction({ name: "backupRestore", data: { backupId: id } });
     }).then(function (res) {
       var result = res && res.result;
@@ -1911,10 +1877,26 @@
       return applyBackupData(result.data);
     }).then(function () {
       toast("已恢复 ✓");
+      return true;
     }).catch(function (err) {
       toast("恢复失败：" + ((err && err.message) || "网络错误"));
+      return false;
     });
   }
+  function deleteBackup(id) {
+    return ensureCbAuthReady().then(function () {
+      return cbApp().callFunction({ name: "backupDelete", data: { backupId: id } });
+    }).then(function (res) {
+      var result = res && res.result;
+      if (!result || !result.ok) throw new Error((result && result.error) || "删除失败");
+      toast("已删除");
+      return true;
+    }).catch(function (err) {
+      toast("删除失败：" + ((err && err.message) || "网络错误"));
+      return false;
+    });
+  }
+  function getBackupMeta() { return lastBackupMeta; }
   function applyBackupData(data) {
     debts = data.debts || []; docs = data.docs || [];
     notify = data.notify || { enabled: false, rules: [] };
@@ -1940,23 +1922,6 @@
       renderAll();
     });
   }
-  function confirmDeleteBackup(id) {
-    ask("删除这条备份记录？", "删除后无法恢复这条备份，确定继续吗？", function () {
-      ensureCbAuthReady().then(function () {
-        return cbApp().callFunction({ name: "backupDelete", data: { backupId: id } });
-      }).then(function (res) {
-        var result = res && res.result;
-        if (!result || !result.ok) throw new Error((result && result.error) || "删除失败");
-        toast("已删除");
-        return renderBackupList();
-      }).catch(function (err) { toast("删除失败：" + ((err && err.message) || "网络错误")); });
-    });
-  }
-  function renderBackupMeta() {
-    $("backupLastText").textContent = lastBackupMeta.lastBackupAt ? new Date(lastBackupMeta.lastBackupAt).toLocaleString() : "从未备份";
-  }
-  function openBackupScreen() { renderBackupMeta(); $("backupScreen").classList.add("open"); lockScroll(); renderBackupList(); }
-  function closeBackupScreen() { if (!$("backupScreen").classList.contains("open")) return; $("backupScreen").classList.remove("open"); unlockScroll(); }
   // uploaded PDF storage (IndexedDB — localStorage's 5MB quota is shared with debt data, PDFs need real headroom)
   var UP_DB = "debtManagerFiles", UP_STORE = "uploads";
   function openUploadDB() {
@@ -2133,9 +2098,9 @@
   // "我的"tab整体React化后(react/src/mine/)，docsEntryBtn/backupEntryBtn同理不再在
   // vanilla DOM里，门禁+跳转逻辑原样复刻进了DataCards.tsx；docsBackBtn/uploadBtn/
   // uploadInput(#docsScreen)第九步后也整个不在vanilla DOM里了(react/src/sheets/
-  // DocsScreen.tsx自己渲染返回箭头+文件选择器)，这里不再需要重复绑监听器。
-  $("backupBackBtn").addEventListener("click", closeBackupScreen);
-  $("backupCreateBtn").addEventListener("click", createCloudBackup);
+  // DocsScreen.tsx自己渲染返回箭头+文件选择器)；backupBackBtn/backupCreateBtn/
+  // backupList(#backupScreen)第十步后同理，react/src/sheets/BackupScreen.tsx自己渲染
+  // 返回箭头+创建按钮+列表，这里不再需要重复绑监听器。
   $("aiBackBtn").addEventListener("click", closeAiScreen);
   $("aiHistoryBtn").addEventListener("click", openAiHistorySheet);
   $("scrimAiHistory").addEventListener("click", closeAiHistorySheet);
@@ -2164,10 +2129,10 @@
     if (window.__azTermsScreenBack && window.__azTermsScreenBack()) return true;
     if ($("aiHistorySheet").classList.contains("open")) { closeAiHistorySheet(); return true; }
     if ($("aiScreen").classList.contains("open")) { closeAiScreen(); return true; }
-    if ($("backupScreen").classList.contains("open")) { closeBackupScreen(); return true; }
-    // simScreen/notifySheet/docsScreen同理已经是React状态(react/src/sheets/SimScreen.tsx、
-    // NotifySheet.tsx第八步、DocsScreen.tsx第九步)，位置沿用原来这几个subpage/sheet在DOM里
-    // 的顺序。
+    // backupScreen/simScreen/notifySheet/docsScreen同理已经是React状态(react/src/sheets/
+    // BackupScreen.tsx第十步、SimScreen.tsx、NotifySheet.tsx第八步、DocsScreen.tsx第九步)，
+    // 位置沿用原来这几个subpage/sheet在DOM里的顺序。
+    if (window.__azBackupScreenBack && window.__azBackupScreenBack()) return true;
     if (window.__azSimScreenBack && window.__azSimScreenBack()) return true;
     if (window.__azDocsScreenBack && window.__azDocsScreenBack()) return true;
     if (window.__azPremiumScreenBack && window.__azPremiumScreenBack()) return true;
@@ -2268,10 +2233,9 @@
     getNotify: function () { return notify; },
     exportReportXlsx: exportReportXlsx,
     exportReportPdf: exportReportPdf,
-    // "我的"tab(react/src/mine/)新增：#backupScreen(第十步才迁移)+备份文件打包/解析/
-    // 系统文件选择器继续100%vanilla。openDocsScreen已删除——第九步(docsScreen)迁移React后
-    // 不再经过桥接。
-    openBackupScreen: openBackupScreen,
+    // "我的"tab(react/src/mine/)新增：备份文件打包/解析、系统文件选择器继续100%vanilla。
+    // openDocsScreen/openBackupScreen已删除——第九步(docsScreen)/第十步(backupScreen)迁移
+    // React后不再经过桥接。
     downloadBackupFile: downloadBackupFile,
     triggerImportFilePicker: triggerImportFilePicker,
     // editSheet(react/src/sheets/EditSheet.tsx)新增：setDebt是保存写入(见上面定义处的注释)，
@@ -2299,7 +2263,15 @@
     uploadArchiveFile: uploadArchiveFile,
     deleteArchiveFile: deleteArchiveFile,
     downloadArchiveFile: downloadArchiveFile,
-    shareArchiveFile: shareArchiveFile
+    shareArchiveFile: shareArchiveFile,
+    // 第十步(backupScreen)新增：全部cloud函数调用(ensureCbAuthReady/cbApp().callFunction
+    // 这套认证会话状态)继续100%vanilla，二次确认弹窗挪到了React用confirmAsync处理，这几个
+    // 函数只做"真的去调用"这一步(见上面定义处的注释)。
+    createBackup: createBackup,
+    listBackups: listBackups,
+    restoreBackup: restoreBackup,
+    deleteBackup: deleteBackup,
+    getBackupMeta: getBackupMeta
   };
 
   renderAll(); loadUploads(); renderAccountUI();

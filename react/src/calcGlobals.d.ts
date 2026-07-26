@@ -84,6 +84,9 @@ declare global {
     __azNotifySheetBack?: () => boolean;
     // 同上，第九步(docsScreen)新增——见 react/src/sheets/DocsScreen.tsx。
     __azDocsScreenBack?: () => boolean;
+    // 同上，第十步(backupScreen，React迁移收尾)新增——见 react/src/sheets/BackupScreen.tsx。
+    // 链里沿用原来#backupScreen在DOM里的位置：排在aiScreen之后、simScreen之前。
+    __azBackupScreenBack?: () => boolean;
   }
 }
 

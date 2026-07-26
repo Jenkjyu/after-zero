@@ -223,6 +223,27 @@ export function useNotifySheetOpen(): boolean {
   return useSyncExternalStore(subscribeNotifySheet, () => notifySheetOpen);
 }
 
+// 云备份——第十步(React迁移收尾)新增，布尔开关，跟accountScreen/premiumScreen/termsScreen/
+// notifySheet/docsScreen同一个模式。这次不只是trigger-only(容器本身也搬进React)，但"哪个
+// screen开着"这份状态归属跟其它screen完全一样，不需要跟docsScreen的useFiles()一样额外做
+// 数据缓存——列表数据(BackupRecord[])是每次进screen时组件内部异步拉取的，不经过这里。
+let backupScreenOpen = false;
+function subscribeBackupScreen(callback: () => void) {
+  window.addEventListener("az:backup-screen-changed", callback);
+  return () => window.removeEventListener("az:backup-screen-changed", callback);
+}
+export function openBackupScreen() {
+  backupScreenOpen = true;
+  window.dispatchEvent(new CustomEvent("az:backup-screen-changed"));
+}
+export function closeBackupScreen() {
+  backupScreenOpen = false;
+  window.dispatchEvent(new CustomEvent("az:backup-screen-changed"));
+}
+export function useBackupScreenOpen(): boolean {
+  return useSyncExternalStore(subscribeBackupScreen, () => backupScreenOpen);
+}
+
 // 档案库——第九步(React迁移收尾)新增，布尔开关，跟accountScreen/premiumScreen/termsScreen/
 // notifySheet同一个模式。
 let docsScreenOpen = false;
