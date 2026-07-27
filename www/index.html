@@ -679,7 +679,10 @@
   .viz-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text); }
   .viz-legend-swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
   .viz-line-svg { width: 100%; height: auto; display: block; }
-  .viz-line-label { font-size: 10px; fill: var(--text-muted); font-family: var(--font-ui); }
+  /* MonthlyChart.tsx/PayoffLine.tsx共用的"精确值展示行"——chartScrub.ts拖动/点击查看曲线
+     任意一点时更新的文字条，取代了原来画在SVG里的静态<text>标签。 */
+  .viz-scrub-readout { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;
+    font-family: var(--font-num); }
   .viz-table-toggle { font-size: 12px; color: var(--accent); font-weight: 600; margin: 8px 0 0; }
   .viz-table-toggle table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
   .viz-table-toggle th, .viz-table-toggle td { padding: 6px 7px; text-align: right; border-bottom: 1px solid var(--border); }

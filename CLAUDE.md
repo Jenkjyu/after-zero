@@ -279,6 +279,8 @@ React组件挂载在同一份`index.html`文档里（不是iframe/独立页面�
 
 **"统计"和"我的"这两个tab都是零手势的纯data→JSX展示，不需要真机验证，桌面Playwright覆盖已经足够**（跟第二步Summary/AiBanner这类纯视觉组件判定为无需真机是同一个理由）——"我的"tab里"下载/上传备份文件"两个按钮背后的真实原生行为（`SaveFile`插件的"另存为"选择器、真机文件选择器），这次迁移完全没有改动它们的实现，只是把触发入口从vanilla按钮换成React按钮调用同一个函数，不需要为这次迁移重新验证一遍那两个功能本身。`#detailSheet`同理零手势（`initGripDrag`只是4个pointer监听器操作单个DOM节点，不是`gestures.ts`那套长按/滑动状态机），桌面Playwright覆盖已经足够。**"还款日"的左滑手势是目前唯一还留着的真机确认项**——桌面Playwright用鼠标模拟的Pointer Events路径验证了"能触发swiping分支、不报错"，但真实手指触摸的手感、多点触控边界情况、安卓WebView的触摸事件时序，历史上这个项目的教训是"必须真机验证"（见"在还债务自定义排序"一节），这次移植代码逻辑上是逐行照抄，但没有免除真机验证这一步。
 
+> **⚠️ "'统计'tab零手势"这句话从"统计tab视觉+交互升级"这轮（`react/src/report/chartScrub.ts`落地）开始已经不成立**——`PayoffLine.tsx`接入了真正的Touch Events拖动/点击scrub手势（后续`MonthlyChart.tsx`也会共用同一套），"统计"tab从此变成这个项目里第二个有真实触摸手势代码、需要真机验证的tab（"还款日"左滑是第一个）。这轮完成后（含真机验证）要把这段话连同"这两个tab都是零手势"的表述一起改写，见下面"统计（原'高级统计报表'...）"一节末尾会补的验证记录。
+
 ## 原生插件：`SaveFile`
 
 档案库的"下载"按钮存文件到用户自己选的位置，用的是这个自定义原生插件（`android/app/src/main/java/io/github/jenkjyu/afterzero/SaveFilePlugin.java`），不是网页标准的`<a download>`。
