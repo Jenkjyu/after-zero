@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - run: npm install
+
+      - name: calc.js unit tests (node:test)
+        run: npm test
+
+      - name: React component tests (Vitest)
+        run: npm run test:react
+
+      - name: TypeScript type check (react/)
+        run: npx tsc --noEmit --project react/tsconfig.json
+
+      - name: React build (Vite multi-entry)
+        run: npm run build:react
