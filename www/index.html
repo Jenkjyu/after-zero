@@ -685,6 +685,27 @@
   .viz-table-toggle th, .viz-table-toggle td { padding: 6px 7px; text-align: right; border-bottom: 1px solid var(--border); }
   .viz-table-toggle th:first-child, .viz-table-toggle td:first-child { text-align: left; }
   .report-actions { display: flex; gap: 8px; margin: 4px 0 20px; }
+
+  /* 共享锚定浮层(react/src/shared/Popover.tsx)——"?"说明弹窗(InfoTip)和"⋮"导出菜单
+     (report/ExportMenu.tsx)共用。popover-root给触发器元素做定位锚点，popover-panel贴着
+     它绝对定位展开，align-start/align-end决定面板从锚点左边还是右边对齐展开。 */
+  .popover-root { position: relative; display: inline-flex; }
+  .popover-panel { position: absolute; z-index: 5; top: calc(100% + 6px); background: var(--card-grad);
+    border: 1px solid var(--hair); border-radius: 14px; box-shadow: var(--e2); min-width: 160px; }
+  .popover-panel.align-end { right: 0; }
+  .popover-panel.align-start { left: 0; }
+  .info-tip-btn { width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--hair);
+    background: var(--surface-2); color: var(--text-muted); font-size: 11px; font-weight: 700;
+    line-height: 1; display: inline-flex; align-items: center; justify-content: center;
+    padding: 0; font-family: inherit; flex: none; -webkit-tap-highlight-color: transparent; }
+  .popover-tip { padding: 10px 12px; font-size: 12.5px; line-height: 1.55; color: var(--text-muted);
+    width: 220px; max-width: 60vw; }
+  .popover-menu-list { display: flex; flex-direction: column; padding: 6px; min-width: 140px; }
+  .popover-menu-item { display: block; width: 100%; text-align: left; background: none; border: none;
+    padding: 9px 10px; font-size: 13px; font-weight: 600; color: var(--text); border-radius: 9px;
+    font-family: inherit; -webkit-tap-highlight-color: transparent; }
+  .popover-menu-item:active { background: var(--surface-2); }
+
   .sync-status-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; }
   .sync-status-label { font-size: 13px; color: var(--text-muted); }
   .sync-status-value { font-size: 13.5px; font-weight: 600; }
