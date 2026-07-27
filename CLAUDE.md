@@ -388,25 +388,38 @@ npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
 
 **已实测确认一个真实坑：华为/荣耀（EMUI/HarmonyOS）把"从最近任务卡片划掉App"当成对这个App的软性强制停止处理**，会连带撤销它的后台唤醒权限，导致App在前台时测试通知能收到、划掉最近任务后同一条测试通知就再也收不到——这不是`syncNotifications()`调度逻辑的bug（AlarmManager本身是系统级的，不依赖App进程存活），是系统限制。**排查"通知到点收不到"类反馈，先问两件事：手机品牌/系统是什么、用户是怎么"关闭"App的（划掉最近任务 vs 单纯回到桌面 vs 系统设置里手动强制停止）**——这两个变量决定了是要去"应用启动管理"里放行，还是真的要去查调度代码。华为/荣耀这台上的解法：**手机管家→应用启动管理**，找到这个App把"自动管理"关掉，手动打开"自启动/关联启动/后台活动"三个开关；小米/OPPO/vivo等其他国产系统大概率有同类限制，只是入口页面名字不同，遇到报告先按这个思路查对应设置页，不要先怀疑代码。
 
-## Edge-to-edge（状态栏/导航栏透明，内容延伸到全屏）——⚠️第一版没做对，真机效果不对，还在修
+## Edge-to-edge（状态栏/导航栏透明，内容延伸到全屏）
 
-**真机反馈"App不是全屏的，顶部明显有一截不属于App"，第一版理解成"顶部有个空隙没铺满"去修的，修完真机效果依然不对**——用户原话反馈更精确的诉求是"状态栏那一整条也应该显示App的背景，而不是现在这样直接加了一个不知道啥玩意在上面"：意思是修完之后状态栏那块区域出现了一个**具体的、看得出来的异物**（不是单纯的空白/间隙），跟App当前实际背景对不上，用户也说不清那是什么。**这一条到目前为止还没有定位到真正原因，下面记的是已经排除的猜测和还没验证的疑点，不是确认过的结论，下一轮从这里接着查。**
+**根因已找到并修复：不是CSS/safe-area的问题，是一条常驻的原生ActionBar。** 早期怀疑过`android:background`指向的启动图drawable透出来（见下面"排查过、已经证伪的猜测"），但用户提供的真机截图给出了更直接的证据——状态栏正下方多出来的那"一层"是**朴素无衬线粗体的"After Zero"文字**，跟App自己CSS画的手写体wordmark logo（在再往下的hero卡片上方）字体完全不同，一眼能看出是两个不同来源，不是"CSS背景没铺到位"这种视觉缝隙问题。
 
-### 已经做的改动（原理上是对的，但显然没有解决真机症状，别急着推翻重来，先定位到底哪一步没生效）
+**根因**：`AndroidManifest.xml`里`<activity>`标签的`android:theme="@style/AppTheme.NoActionBarLaunch"`，这个主题名字虽然带"Launch"，但**实际上是`MainActivity`整个生命周期一直生效的运行时主题**，不是只在启动闪屏那一下用——这个项目里从来没有代码把主题从"启动态"切换成"运行态"（没调用`SplashScreen.installSplashScreen()`，也没有`postSplashScreenTheme`声明）。而`AppTheme.NoActionBarLaunch`（`android/app/src/main/res/values/styles.xml`）继承自`Theme.SplashScreen`，**没有像它的兄弟主题`AppTheme.NoActionBar`那样显式设置`windowActionBar=false`/`windowNoTitle=true`**——于是系统全程显示一条原生ActionBar，标题读的是`strings.xml`里`title_activity_main`这个字符串资源，值恰好就是字面量"After Zero"。这条ActionBar是传统View、不理解edge-to-edge的system bar insets，顶在状态栏正下方把WebView内容往下挤，这就是真机上看到"两层After Zero叠在一起、状态栏下面多出一截"的完整成因。
+
+**修法**：给`AppTheme.NoActionBarLaunch`补上跟兄弟主题一样的`windowActionBar=false`/`windowNoTitle=true`（AppCompat和platform两种属性名都加了，因为这个主题的parent链不是AppCompat系，只用AppCompat自定义属性名不一定生效）：
+```xml
+<style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+    <item name="android:background">@drawable/splash</item>
+    <item name="windowActionBar">false</item>
+    <item name="windowNoTitle">true</item>
+    <item name="android:windowActionBar">false</item>
+    <item name="android:windowNoTitle">true</item>
+</style>
+```
+ActionBar消失后，WebView内容直接从状态栏正后方开始铺，配合下面"已经做的改动"里`WindowCompat.setDecorFitsSystemWindows(false)`+透明状态栏/导航栏+CSS `env(safe-area-inset-top)`这套本来就正确的edge-to-edge基础设施，效果才能真正生效——**这几行原来就没写错，只是一直被这条常驻ActionBar从中间打断，视觉上看起来像是"CSS没生效"，实际上CSS这层从来没出过问题。**
+
+**教训**：`android:theme`挂在`<activity>`标签上、且名字里带"Launch"/"Splash"这类字眼的主题，不能想当然认为它只在启动那一刻起作用——除非代码里真的调用了`installSplashScreen()`并配了`postSplashScreenTheme`做主题切换，否则这个主题就是这个Activity**唯一、永久**的主题，它遗漏的任何"运行态该有的设置"（这次是关ActionBar）都会在整个App生命周期里持续生效，不会在闪屏结束后自动消失。以后新增/修改这类"名字暗示是临时态"的主题配置，先确认代码里是否真的做了主题切换，没有的话就要按"这是唯一主题"的标准去核对它的完整性。
+
+### 已经做的改动（这些原理上一直是对的，这次确认没有问题，别怀疑到这一层）
 1. `www/index.html`头部加了`<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">`（原来完全没有viewport标签，`env(safe-area-inset-*)`一直解析成0）。
 2. `MainActivity.java`的`onCreate()`里调用`WindowCompat.setDecorFitsSystemWindows(getWindow(), false)` + `getWindow().setStatusBarColor(Color.TRANSPARENT)` + `setNavigationBarColor(Color.TRANSPARENT)` + 状态栏图标深浅跟系统日夜间模式走。
 3. CSS给`.app`/`.login-gate`/`.subpage-header`三处共享容器的padding-top换成了`max(原值, env(safe-area-inset-top))`。
 
-### 排查过、大概率不是根因的猜测
+### 排查过、已经证伪的猜测
 - **`capacitor_bridge_layout_main.xml`（Capacitor官方WebView容器布局，`node_modules/@capacitor/android/capacitor/src/main/res/layout/`）没有设置`fitsSystemWindows`**，`CoordinatorLayout`和`CapacitorWebView`都是`match_parent`——排除了"Capacitor自己的布局在悄悄吃掉状态栏空间"这个猜测。
-- `body { margin:0; background: var(--bg); }`已经是既有代码（这轮没动），理论上body的背景应该天然铺到视口最顶端，不需要额外处理——如果真机上状态栏那块区域显示的不是`var(--bg)`而是别的东西，说明问题出在**WebView这块Surface本身有没有真的画到状态栏后面**，而不是CSS背景色选错。
+- **`android:background`指向的启动图drawable透出来**这条曾经是怀疑度最高的猜测，实际证伪——真机截图显示的是ActionBar标题文字，不是图标/图片，两者视觉上完全不同，这条猜测方向就没对。
 
-### 还没验证、下一轮应该先查的疑点（怀疑度从高到低）
-- **`AppTheme.NoActionBarLaunch`（`android/app/src/main/res/values/styles.xml`）目前直接当成`MainActivity`的运行时主题在用**（`AndroidManifest.xml`里`android:theme="@style/AppTheme.NoActionBarLaunch"`），而这个主题继承自`Theme.SplashScreen`、`android:background`指向`@drawable/splash`（启动图，内容是App图标，不是App实际的渐变背景）。**这个项目里没有任何代码把主题从"启动态"切换成"运行态"**（没有调用`SplashScreen.installSplashScreen()`，也没有`postSplashScreenTheme`声明）。在旧的非edge-to-edge世界这不是问题——WebView铺满整个非系统栏区域，主题背景图只在WebView画出第一帧之前的一瞬间可能露一下，之后彻底看不见。**但开了edge-to-edge之后，如果WebView这块Surface因为某种原因没有严丝合缝地铺到状态栏正后方那几个像素（哪怕只是极小的合成/时序缝隙），透出来的就是这张启动图/`windowBackground`，而不是App的CSS背景**——用户反馈的"不知道啥玩意"跟"一小条不相关的启动图/图标"这个描述能对上。**这是目前怀疑度最高、但还没验证的一条**，下一轮直接查：把`android:background`换成纯色（比如跟`--bg`色值一致的一个新drawable/color），或者干脆研究一下要不要用`androidx.core:core-splashscreen`这个库（`variables.gradle`里`coreSplashScreenVersion='1.2.0'`已经是依赖但目前压根没被调用）规范地做一次真正的启动屏转场，而不是像现在这样直接把启动主题常驻当运行时主题用。
-- 需要用`chrome://inspect`/`edge://inspect`（真机release包+无线adb，参考"环境要求"里已经记过的调试方式）配合真机截图，肉眼确认状态栏那块区域的**颜色/内容到底是什么**——目前只有用户一句话描述，没有截图/录屏，排查效率有限，下一轮第一件事应该是先拿到一张真机截图。
-- 也要确认这不是某个具体手机品牌的ROM定制行为（参考本项目已经踩过的华为/荣耀通知权限那类"先怀疑系统限制、再查代码"的教训）——但目前信息不够排除代码本身的问题，不能跳过上面两条直接归咎于ROM。
+**这类改动没法在桌面浏览器验证**——状态栏、显示安全区这些概念桌面浏览器压根不存在，`env(safe-area-inset-*)`桌面上恒等于0，跟真机行为不是一回事，必须编译release包装真机看。**这次的教训依然成立**：光凭代码审查+编译通过不足以确认"做对了"，第一版就是编译成功、逻辑看起来没错，但真机效果依然不对；这次能定位到真正根因，靠的是用户提供了真机截图——之前只有一句话描述"不知道啥玩意"，排查效率很有限，拿到截图后一眼就能分辨出"两种字体的After Zero叠在一起"这个具体细节，才带出了"这是原生ActionBar不是CSS问题"这个关键转向。**遇到"看起来对不上但说不清哪里不对"的真机UI反馈，第一反应应该是先要一张真机截图，而不是继续在代码层面猜。**
 
-**这类改动没法在桌面浏览器验证**——状态栏、显示安全区这些概念桌面浏览器压根不存在，`env(safe-area-inset-*)`桌面上恒等于0，跟真机行为不是一回事，必须编译release包装真机看，而且这次的教训是：光凭代码审查+编译通过不足以确认"做对了"，这轮就是编译成功、逻辑看起来没错，但真机效果依然不对，必须要有真机截图/录屏才能真正验证。
+**已真机验证通过**：装了`assembleRelease`产出的包，原生ActionBar确实消失了，App背景直接延伸到状态栏，效果符合预期。
 
 ## 返回键处理（安卓硬件/手势返回）
 
