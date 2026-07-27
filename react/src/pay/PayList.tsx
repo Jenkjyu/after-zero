@@ -1,10 +1,9 @@
 // 按dueBucket(diff)分组的列表——直译自vanilla renderPay()末尾那段分组+插section-label逻辑
 // （www/index.html）。DUE_BUCKET_LABEL常量搬到这里(单一消费者，不进types.ts)。
-// PayRow用keyFor(o.d)（而不是o.i）当React key——debts数组下标会因为"在还债务"页的拖拽重排
-// 变化，用WeakMap稳定key避免重排时把某一行的滑动状态错误地"传"给另一笔债务，
-// 跟"在还债务"页DebtCard列表同一个理由（见CLAUDE.md"在还债务"React迁移一节）。
+// PayRow用o.d.id当React key——这是债务真正、永久的身份(见CLAUDE.md"债务对象加了真正的
+// id字段"一节)，不会因为"在还债务"页的拖拽重排而变化，避免重排时把某一行的滑动状态
+// 错误地"传"给另一笔债务，跟"在还债务"页DebtCard列表同一个理由。
 import type { ReactNode } from "react";
-import { keyFor } from "../shared/state";
 import type { PayGestureCtx } from "./gestures";
 import { PayRow } from "./PayRow";
 import type { PayItem } from "./App";
@@ -37,7 +36,7 @@ export function PayList({ visible, ctx }: PayListProps) {
       );
       lastBucket = bucket;
     }
-    nodes.push(<PayRow key={keyFor(o.d)} d={o.d} i={o.i} next={o.next} diff={o.diff} ctx={ctx} />);
+    nodes.push(<PayRow key={o.d.id} d={o.d} next={o.next} diff={o.diff} ctx={ctx} />);
   });
   return <>{nodes}</>;
 }

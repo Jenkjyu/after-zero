@@ -70,7 +70,7 @@ vanilla这边`payInstallment(i)`/`settleFull(i)`都被精简过：原来末尾`i
 
 **踩了两个真实的坑，都已经修复并补了回归测试**：
 1. **批量删除#editSheet相关JS代码那一刀切太宽，误删了`#notifySheet`的`renderNotifyRules`/`openNotifySheet`/`closeNotifySheet`三个函数+5处事件监听器**（这几个函数原来物理上夹在`closeEdit()`和`saveForm()`之间，不属于`#editSheet`、是完全独立的还款提醒通知设置面板，但落在了同一段删除范围里）——表现是页面加载直接`openNotifySheet is not defined`崩溃，`window.__azBridge`都没能正常初始化（`getDebts`/`getAccount`全部读不到）。这是"改一行崩全站"那类错误的另一个变种：不是漏删引用，是**删除范围没有精确核对，靠"看起来是同一个大段落"的直觉批量删除，结果误伤了物理上恰好夹在中间、但逻辑上完全无关的代码**。教训：批量删除一大段vanilla代码前，必须先确认这段代码物理连续区间内，有没有夹带着不相关但逻辑独立的函数——尤其是这种"两个功能的代码在文件里交叉编排"的情况，肉眼过一遍`git diff`的删除内容（不是只看开头结尾对不对）比信任一个行号范围可靠得多。
-2. **⚠️`deleteDebt`触发的自动关闭effect，第一版按下标判断`!debts[editIndex]`，在"删除的不是数组最后一条"时是错的**——`debts.splice(i,1)`会让原来排在后面的debt对象整体往前顺移一位，`debts[editIndex]`这个位置在删除后**依然有值**（只是变成了另一条债务），条件判断成false，sheet不会自动关闭，还会继续显示着已经被删掉的那条债务的过期数据。这个bug是Playwright headless跑完整交互流程时真实复现的（两笔债务、删除排在前面的那笔），不是理论推演。修法：改成`editedDebtRef`（一个存"打开时是哪个debt对象引用"的`useRef`）+ `!debts.includes(editedDebtRef.current)`，按对象引用而不是下标判断"这条debt还在不在"——对splice导致的下标顺移天然免疫，跟这个项目`shared/state.ts`的`keyFor()`（WeakMap给debt生成稳定React key，也是"按引用不按下标"的同一个思路）是同一类解法。`EditSheet.test.tsx`补了一条专门覆盖"删除的不是最后一条"这个场景的回归测试。
+2. **⚠️`deleteDebt`触发的自动关闭effect，第一版按下标判断`!debts[editIndex]`，在"删除的不是数组最后一条"时是错的**——`debts.splice(i,1)`会让原来排在后面的debt对象整体往前顺移一位，`debts[editIndex]`这个位置在删除后**依然有值**（只是变成了另一条债务），条件判断成false，sheet不会自动关闭，还会继续显示着已经被删掉的那条债务的过期数据。这个bug是Playwright headless跑完整交互流程时真实复现的（两笔债务、删除排在前面的那笔），不是理论推演。**当时的修法**：改成`editedDebtRef`（一个存"打开时是哪个debt对象引用"的`useRef`）+ `!debts.includes(editedDebtRef.current)`，按对象引用而不是下标判断"这条debt还在不在"——对splice导致的下标顺移天然免疫，跟这个项目`shared/state.ts`的`keyFor()`（WeakMap给debt生成稳定React key，也是"按引用不按下标"的同一个思路）是同一类解法。`EditSheet.test.tsx`补了一条专门覆盖"删除的不是最后一条"这个场景的回归测试。**这个workaround后来被彻底替换掉了**：债务加了真正的`id`字段之后，`editedDebtRef`整个删除，判断改成`!debts.some(x => x.id === editId)`——不再是"绕开下标不安全"的补丁，是结构上正确的写法。`DetailSheet.tsx`当时就已经有一模一样形状的潜在bug（只是还没触发过），也在同一轮里用同样的模式修好了。详见"债务对象加了真正的id字段"一节。
 
 **验证**：`EditSheet.test.tsx`(25用例，覆盖开关回填/`oneTimeStash`往返/保存校验每一条/新增与编辑两种保存路径/公式生成器4种计息方式/29-30-31号拒绝/批量设置日期与金额的确认与取消两条路径/删除+两种自动关闭场景/返回键)+`state.test.ts`补充3个用例（`useEditSheetIndex`）；`npx tsc --noEmit`零错误；`npm run test:react`全绿（125个用例）；`npm test`（calc.js套件）不受影响；`npm run build:react`确认`sheets.js`产物正常（从detailSheet单独时的8.74KB涨到35KB左右，符合预期）。Playwright headless跑了一轮完整交互（新增债务、公式生成amort、批量设置还款日弹出月份选择器并正确铺日期、保存、从详情窗点编辑、一次性还清勾选/取消往返、删除确认弹窗+自动关闭、取消按钮、硬件返回键关闭），全部通过，控制台零JS报错，light/dark主题截图确认视觉正常。
 
@@ -143,7 +143,7 @@ vanilla这边`payInstallment(i)`/`settleFull(i)`都被精简过：原来末尾`i
 
 现状：vanilla主脚本是一个大IIFE，`debts`/`saveAll`/`renderAll`/`openDetail`/`payInstallment`/`commitReorder`等全部是IIFE内部私有的，不在`window`上（跟已经全局的`calc.js`函数、跟`window.__handleBackButton`这种刻意暴露的例外都不一样）。要让React调用这些，必须显式暴露。
 
-**`window.__azBridge`**（定义在主IIFE末尾，`})();`之前）是唯一的暴露点，只包含已迁移React页面实际需要调用的这几个，第三步新增了`getNotify`/`openNotifySheet`/`exportReportXlsx`/`exportReportPdf`这4个，第四步（"我的"tab）又新增了`openDocsScreen`/`openBackupScreen`/`downloadBackupFile`/`triggerImportFilePicker`这4个，第五步（`#detailSheet`）**删除**了`openDetail`、新增了`settleFull`/`openSimScreen`这2个，第六步（`#editSheet`）**删除**了`openEdit`（打开这两个sheet都不再经过桥接，改成`shared/state.ts`的`openDetailSheet(i)`/`openEditSheet(i)`，见上面"第五步"/"第六步"）、新增了`setDebt`/`deleteDebt`/`toast`/`confirmAsync`这4个，第七步（accountScreen/premiumScreen/termsScreen）**删除**了`openPremiumScreen`/`openAccountScreen`（同样道理，这三个screen也变成纯React状态）、新增了`wxLogout`/`deleteAccount`/`redeemCode`这3个，第八步（simScreen/notifySheet）**删除**了`openSimScreen`/`openNotifySheet`、新增了`setNotifyEnabled`/`addNotifyRule`/`deleteNotifyRule`/`sendTestNotification`这4个，第九步（docsScreen）**删除**了`openDocsScreen`、新增了`getFiles`/`uploadArchiveFile`/`deleteArchiveFile`/`downloadArchiveFile`/`shareArchiveFile`这5个，第十步（backupScreen）**删除**了`openBackupScreen`、新增了`createBackup`/`listBackups`/`restoreBackup`/`deleteBackup`/`getBackupMeta`这5个，**第十一步（aiScreen+aiHistorySheet）删除**了`openAiScreen`、新增了这批迁移收尾里唯一的一个新函数`callAiAdvisor`——至此`__azBridge`不再有任何`openXScreen`这类trigger-only函数：
+**`window.__azBridge`**（定义在主IIFE末尾，`})();`之前）是唯一的暴露点，只包含已迁移React页面实际需要调用的这几个，第三步新增了`getNotify`/`openNotifySheet`/`exportReportXlsx`/`exportReportPdf`这4个，第四步（"我的"tab）又新增了`openDocsScreen`/`openBackupScreen`/`downloadBackupFile`/`triggerImportFilePicker`这4个，第五步（`#detailSheet`）**删除**了`openDetail`、新增了`settleFull`/`openSimScreen`这2个，第六步（`#editSheet`）**删除**了`openEdit`（打开这两个sheet都不再经过桥接，改成`shared/state.ts`的`openDetailSheet(id)`/`openEditSheet(id)`——这两个当年是按下标`i`存的，后来引入债务`id`字段之后改成按id存，见"债务对象加了真正的id字段"一节，见上面"第五步"/"第六步"）、新增了`setDebt`/`deleteDebt`/`toast`/`confirmAsync`这4个，第七步（accountScreen/premiumScreen/termsScreen）**删除**了`openPremiumScreen`/`openAccountScreen`（同样道理，这三个screen也变成纯React状态）、新增了`wxLogout`/`deleteAccount`/`redeemCode`这3个，第八步（simScreen/notifySheet）**删除**了`openSimScreen`/`openNotifySheet`、新增了`setNotifyEnabled`/`addNotifyRule`/`deleteNotifyRule`/`sendTestNotification`这4个，第九步（docsScreen）**删除**了`openDocsScreen`、新增了`getFiles`/`uploadArchiveFile`/`deleteArchiveFile`/`downloadArchiveFile`/`shareArchiveFile`这5个，第十步（backupScreen）**删除**了`openBackupScreen`、新增了`createBackup`/`listBackups`/`restoreBackup`/`deleteBackup`/`getBackupMeta`这5个，**第十一步（aiScreen+aiHistorySheet）删除**了`openAiScreen`、新增了这批迁移收尾里唯一的一个新函数`callAiAdvisor`——至此`__azBridge`不再有任何`openXScreen`这类trigger-only函数：
 ```js
 window.__azBridge = {
   getDebts: function () { return debts; },   // 每次调用现读，见下面"为什么是函数"
@@ -175,7 +175,9 @@ window.__azBridge = {
 ```
 `downloadBackupFile`/`triggerImportFilePicker`是"我的"tab（`react/src/mine/DataCards.tsx`）专用的trigger-only函数——`downloadBackupFile`是把原来`dlBackupBtn`的inline click handler抽成的具名函数；`triggerImportFilePicker`是新写的一行`$("importFileInput").click()`，用来间接点开依然留在vanilla DOM里的`#importFileInput`（这个input和它的`change`监听器完整保留在vanilla，只是从`#view-data`内部搬到了折叠后的挂载点外面）。
 
-`setDebt`/`deleteDebt`/`toast`/`confirmAsync`这4个是`#editSheet`（`react/src/sheets/EditSheet.tsx`等）专用——`setDebt(i, obj)`是`saveForm()`删除后唯一保留的narrow写入函数（`i>=0`覆盖`debts[i]`并合并`old.settled`/`old.settledDate`，`i<0`是push新增，内部调`recompute(obj)`但不调`saveAll`/`renderAll`，React保存时自己依次调这三个桥接函数，跟`commitReorder`那套细粒度调用惯例一致）；`deleteDebt`是原样暴露的既有vanilla函数（自带`ask()`确认+splice+saveAll+renderAll）；`toast`是`#flash`单例的简单passthrough；`confirmAsync`是`ask()`的Promise外壳（详见上面"第六步"）。
+**⚠️`payInstallment`/`unsettle`/`settleFull`/`deleteDebt`/`setDebt`这几个单笔债务寻址的函数，参数后来从下标`i: number`换成了id`string`**（见"债务对象加了真正的id字段"一节）——上面代码块里的写法（`payInstallment: payInstallment`这种直接引用）没有变化，变的是这些函数自身的参数类型和内部实现（改成`debts.find(x => x.id === id)`现查，不再是`debts[i]`）。
+
+`setDebt`/`deleteDebt`/`toast`/`confirmAsync`这4个是`#editSheet`（`react/src/sheets/EditSheet.tsx`等）专用——`setDebt(id, obj)`是`saveForm()`删除后唯一保留的narrow写入函数（`id`非空时按id查到对应下标覆盖并合并`old.id`/`old.settled`/`old.settledDate`，`id`为`null`是push新增并生成新id，内部调`recompute(obj)`但不调`saveAll`/`renderAll`，React保存时自己依次调这三个桥接函数，跟`commitReorder`那套细粒度调用惯例一致）；`deleteDebt`是原样暴露的既有vanilla函数（自带`ask()`确认+按id查下标+splice+saveAll+renderAll）；`toast`是`#flash`单例的简单passthrough；`confirmAsync`是`ask()`的Promise外壳（详见上面"第六步"）。
 
 其余（`ask()`确认弹窗本身等）继续保持private。**详情窗`#detailSheet`、新增/编辑表单`#editSheet`、账户详情`#accountScreen`、订阅页`#premiumScreen`、条款页`#termsScreen`、提前还款模拟器`#simScreen`、通知设置面板`#notifySheet`、档案库`#docsScreen`、云备份`#backupScreen`、AI债务顾问`#aiScreen`+`#aiHistorySheet`这十个subpage/sheet的实际内容全部已经搬进React（分别是第五~十一步）**——至此`window.__azBridge`里再也没有任何`openXScreen`这类trigger-only函数，剩下的全部是①真正的debts数据读写、②不可移植的cloud/native/IO调用两类。
 
@@ -208,9 +210,19 @@ export function useDebts() { return useSyncExternalStore(subscribe, () => window
 
 排序方式（含"自定义"）这次**整体归`react/src/debts/useDebtSort.ts`所有**，直接读写`localStorage["debt-manager-sort-v1"]`（`SORT_KEY`这个键名依然不能改，硬性铁律第1条），不经过桥接。这样做是因为现有代码里没有其它tab读`debtSort`（还款日用`dueBucket`分组，统计不依赖它）——vanilla原来的`DEBT_SORTS`/`debtSort`/`setDebtSort`/`SORT_KEY`变量已随这次迁移整体删除，不留一份不再被使用的死代码。`DEBT_SORTS`（10个预设排序的取值函数映射）在React这边（`useDebtSort.ts`）原样重新声明了一份，跟vanilla原来那份逐字对照过。
 
-### 债务对象没有id——React列表key靠`WeakMap`懒生成
+### 债务对象加了真正的`id`字段——`keyFor()`的`WeakMap`+`editedDebtRef`两处workaround都已删除
 
-这个项目的债务对象一直没有稳定id字段（纯靠数组下标寻址，见"在还债务自定义排序"一节），这对React的`key` prop是个问题——如果用数组下标当key，`commitReorder`重排后同一个下标可能对应"不同"的债务，容易导致状态/DOM节点复用错乱。`react/src/debts/useDebts.ts`的`keyFor(d)`用一个模块级`WeakMap<Debt, string>`给每个债务对象懒生成一个稳定key：**只要对象引用不变（`commitReorder`只是重排同一批对象的顺序，不克隆），key就稳定跨越拖拽重排**；`debts`被整体替换成新对象时（备份恢复、导入JSON），`WeakMap`查不到旧key会自然生成新key——这正是这种情况下应有的行为（恢复备份后本来就没有"这还是同一笔债务"的意义）。这个方案完全没有碰数据模型本身，不是给债务加了个真正的id字段（那是一个更大的架构决定，不在这次范围内）。
+**这一节的历史已经翻篇。** 早期这个项目的债务对象没有稳定id字段（纯靠数组下标寻址），`react/src/debts/useDebts.ts`（后来搬到`shared/state.ts`）的`keyFor(d)`曾经用一个模块级`WeakMap<Debt, string>`给每个债务对象懒生成一个稳定的React key：只要对象引用不变（`commitReorder`只是重排同一批对象的顺序，不克隆），key就稳定跨越拖拽重排；`debts`被整体替换成新对象时（备份恢复、导入JSON），`WeakMap`查不到旧key会自然生成新key。当时这段注释还写着"这是一个更大的架构决定，不在这次范围内"。
+
+**促成这次真正加id字段的直接原因，是`EditSheet.tsx`"第六步"那次真实踩过的bug**（详见下面"第六步"小节）：`deleteDebt`触发的自动关闭effect第一版按下标`!debts[editIndex]`判断，删除的不是数组最后一条时会误判——`splice`导致后面的debt顺移进被删的下标，`debts[editIndex]`读到的是"存在、但是另一条债务"。当时用`editedDebtRef`（一个存对象引用的`useRef`）+`debts.includes(ref)`打了个补丁，绕开了这个具体症状，但没有解决"债务没有身份"这个根本问题——`DetailSheet.tsx`里当时就已经有一模一样形状的按下标判断陈旧性逻辑，同样暴露在这个坑里，只是还没被触发过。
+
+**后续直接从根上解决了这个问题**：`www/js/calc.js`新增`genDebtId()`（`"d"+Date.now()+Math.random().toString(36).slice(2,7)`，沿用备份`"b..."`/上传`"u..."`/AI对话`"c..."`同一个id生成惯例），`normalize(d)`给缺id的老数据惰性补发（`if (!d.id) d.id = genDebtId();`——现有3处`debts.forEach(normalize)`调用点自动完成迁移，不需要专门的一次性脚本）；`setDebt(id, obj)`新增债务时赋新id、编辑时保留旧id。`react/src/types.ts`的`Debt`接口加了`id: string`字段。
+
+**结果**：`keyFor()`和它的`WeakMap`已经整个删除，所有React列表（`DebtList.tsx`/`SettledList.tsx`/`PayList.tsx`）直接用`d.id`当key；`EditSheet.tsx`的`editedDebtRef`也整个删除，自动关闭effect改成`!debts.some(x => x.id === editId)`（`DetailSheet.tsx`原本潜藏的同类bug，这次也顺手用同一个模式修好了：`!debts.some(x => x.id === openId)`，`SimScreen.tsx`原来完全没有这层保护，这次也补上了）。**真正的id还带来一个当年WeakMap方案做不到的好处**：因为`applyBackupData`/JSON导入都会走`debts.forEach(normalize)`，只要备份/导入的数据本身已经带着id（这次改动之后新产生的备份都会带），id能在备份恢复、导入导出这几个环节里原样存活——不再像WeakMap那样"备份恢复后是全新的key"。
+
+**`window.__azBridge`里所有单笔债务寻址的函数，参数从下标`i: number`换成了id`string`**：`payInstallment(id)`/`unsettle(id)`/`settleFull(id)`/`deleteDebt(id)`/`setDebt(id, obj)`（`id`为`null`表示新增，取代原来`i<0`的写法；`obj`参数类型是`Omit<Debt,"id">`，id永远由vanilla赋值/保留，React这边保存时不该也不需要造一个id出来）。`shared/state.ts`里`openDetailSheet`/`openEditSheet`/`openSimScreen`这几个React自己拥有的sheet开关状态，同样从存下标改成存id，`openEditSheet`原来`-1`代表"新增"的约定换成了字符串哨兵值`NEW_DEBT_ID = "new"`（真实id都以`"d"`开头，不会跟这个哨兵值撞车）。`commitReorder`本身**不变**——它一直是按对象引用重排，不是按下标，这次加id字段不影响它的实现，也不需要它去用id做什么。
+
+**没有变的地方**：`commitReorder`的"稳定分区"重排算法本身（见下面"在还债务自定义排序"一节）——id解决的是"怎么单独寻址一笔债务"，不是"怎么记录债务之间的相对顺序"，这两件事是独立的，`debts`数组里的物理顺序依然是唯一的排序依据，没有另外引入一个顺序字段。`SIM_KEY`的持久化形状也没变（依然只存`{mode, extra}`，不存"哪笔债务"）——这是product层面刻意维持的决定，不是因为技术上做不到了，详见"提前还款收益模拟器"一节。
 
 ### 手势代码：原样移植，不重新设计
 
@@ -412,7 +424,7 @@ npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
 
 "在还债务"列表除了10种预设排序（利率/借款金额/剩余待还/月供/剩余期数），还有第11种"自定义"——长按任意债务卡片进入iOS桌面图标式的抖动编辑模式（`jiggleMode`），此时卡片可以按住拖动重新排序，松手后如果新顺序恰好跟某个预设排序完全一致会自动切回那个预设名，否则自动切到"自定义"。退出编辑模式靠排序框左边的"保存"按钮（`#jiggleDoneBtn`，只在编辑模式显示）。相关状态/函数集中在`renderDebts()`后面那一整块（`jiggleMode`/`dragCtx`/`onCardTouchStart`/`onCardPointerDown`/`beginDrag`/`applyDragFrame`/`autoScrollTick`/`finishDrag`/`commitReorder`/`detectMatchingSort`）。
 
-**没有id字段，靠"稳定分区"重排`debts`数组本身**：这个项目里债务对象一直是用数组下标寻址（`openDetail(i)`等），没有单独的id或顺序字段。拖拽提交时`commitReorder()`按原数组顺序走一遍，凡是"在还"的槽位依次填入新顺序，凡是"已结清"的槽位原样不动——已结清债务在数组里的相对位置完全不受这次拖拽影响，也不需要给`debts`加任何新字段。
+**靠"稳定分区"重排`debts`数组本身**：早期这个项目的债务对象是纯用数组下标寻址的（`openDetail(i)`等），没有单独的id或顺序字段；后来加了真正的`id`字段（见"债务对象加了真正的id字段"一节），但那解决的是"怎么单独寻址一笔债务"，不是"怎么记录债务之间的相对顺序"——`debts`数组里的物理位置依然是唯一的排序依据，没有另外引入一个顺序字段，下面这套重排算法完全没有变。拖拽提交时`commitReorder()`按原数组顺序走一遍，凡是"在还"的槽位依次填入新顺序，凡是"已结清"的槽位原样不动——已结清债务在数组里的相对位置完全不受这次拖拽影响。
 
 **拖拽全程用文档坐标（`clientY + window.scrollY`），不是纯视口坐标**——这是为了让"拖到屏幕边缘自动滚动页面"不需要额外的重新测量：`beginDrag()`一次性测好每张卡片在文档坐标下的自然位置（`naturalTop[]`），之后无论页面怎么滚动，两张卡片位置的差值都不变，`applyDragFrame()`每次都是从`naturalTop[]`重新算全部卡片该挪多少像素，不是在上一帧基础上累加——这样来回快速拖拽也不会产生漂移误差，卡片回到原位时自动得到位移为0。
 
@@ -555,7 +567,7 @@ window.__debugPremium("none")         // 清空，恢复"普通用户"
 
 `M <= interest`（月供还不够付利息，本金永远还不完）时`amortForward`返回`null`，UI层toast"月供不足以覆盖利息，无法测算"——这不该在正常数据下触发，但custom计划允许全0金额，属于防御性兜底。
 
-**只持久化`{mode, extra}`（上次用的模式+金额），不记是哪笔债务/哪一期**：新增localStorage键`after-zero-simulate-v1`（`SIM_KEY`）。这个项目的债务没有稳定id（纯靠数组下标寻址，见"在还债务自定义排序"一节），记"哪笔债务"这类信息在债务被删除/拖拽重排后就会失效或指错对象，只记用户的数值习惯（模式+金额）更稳妥。
+**只持久化`{mode, extra}`（上次用的模式+金额），不记是哪笔债务/哪一期**：新增localStorage键`after-zero-simulate-v1`（`SIM_KEY`）。**这条决定当初的理由是"债务没有稳定id，记'哪笔债务'在删除/拖拽重排后会失效或指错对象"——这条理由现在已经是历史了**（债务后来加了真正的id字段，见"债务对象加了真正的id字段"一节，技术上完全可以记）。`SIM_KEY`的形状**刻意维持不变**：只记用户的数值习惯（模式+金额）而不记"上次模拟的是哪笔债务"，是产品层面的选择——这个模拟器本来就是"临时算一下、看个大概"的工具，没有"记住上次在哪笔债务上算过"的实际需求。`SimScreen.tsx`倒是借这次机会顺手补了一个之前没有的auto-close effect（这笔债务在模拟器开着的时候被删除/消失会自动关闭），这是识别度更高的正确性修复，跟`SIM_KEY`存不存debt id是两件事。
 
 ## 导航重排：tabbar从"债务/还款日/档案库/我的"改成"债务/还款日/统计/我的"
 

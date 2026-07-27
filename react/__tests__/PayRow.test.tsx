@@ -17,23 +17,23 @@ function makeCtx(): PayGestureCtx {
 }
 
 describe("PayRow", () => {
-  it("点击卡面(非滑动展开状态)调用openDetailSheet(i)", () => {
+  it("点击卡面(非滑动展开状态)调用openDetailSheet(d.id)", () => {
     window.__azBridge = makeMockBridge();
     openDetailSheet.mockClear();
     const d = makeDebt({ name: "信用卡分期", monthly: 800 });
-    const { container } = render(<PayRow d={d} i={4} next={new Date(2026, 6, 30)} diff={5} ctx={makeCtx()} />);
+    const { container } = render(<PayRow d={d} next={new Date(2026, 6, 30)} diff={5} ctx={makeCtx()} />);
     fireEvent.click(container.querySelector<HTMLElement>(".pay")!);
-    expect(openDetailSheet).toHaveBeenCalledWith(4);
+    expect(openDetailSheet).toHaveBeenCalledWith(d.id);
   });
 
-  it("点击'标记已还'按钮调用__azBridge.payInstallment(i)，并收起滑出状态", () => {
+  it("点击'标记已还'按钮调用__azBridge.payInstallment(d.id)，并收起滑出状态", () => {
     window.__azBridge = makeMockBridge();
     const d = makeDebt();
-    const { container } = render(<PayRow d={d} i={7} next={new Date(2026, 6, 30)} diff={5} ctx={makeCtx()} />);
+    const { container } = render(<PayRow d={d} next={new Date(2026, 6, 30)} diff={5} ctx={makeCtx()} />);
     const row = container.querySelector<HTMLElement>(".pay-swipe-row")!;
     row.dataset.open = "1"; // 模拟已经左滑露出状态
     fireEvent.click(container.querySelector<HTMLElement>(".pay-swipe-btn")!);
-    expect(window.__azBridge.payInstallment).toHaveBeenCalledWith(7);
+    expect(window.__azBridge.payInstallment).toHaveBeenCalledWith(d.id);
     expect(row.style.transform).toBe("translateX(0)");
     expect(row.dataset.open).toBe("0");
   });
@@ -42,7 +42,7 @@ describe("PayRow", () => {
     window.__azBridge = makeMockBridge();
     openDetailSheet.mockClear();
     const d = makeDebt();
-    const { container } = render(<PayRow d={d} i={0} next={new Date(2026, 6, 30)} diff={5} ctx={makeCtx()} />);
+    const { container } = render(<PayRow d={d} next={new Date(2026, 6, 30)} diff={5} ctx={makeCtx()} />);
     const row = container.querySelector<HTMLElement>(".pay-swipe-row")!;
     row.dataset.open = "1";
     fireEvent.click(container.querySelector<HTMLElement>(".pay")!);
@@ -53,14 +53,14 @@ describe("PayRow", () => {
   it("urgencyTier(diff)决定.pay-row的严重度class", () => {
     window.__azBridge = makeMockBridge();
     // diff=-1 -> overdue
-    const { container } = render(<PayRow d={makeDebt()} i={0} next={new Date()} diff={-1} ctx={makeCtx()} />);
+    const { container } = render(<PayRow d={makeDebt()} next={new Date()} diff={-1} ctx={makeCtx()} />);
     expect(container.querySelector(".pay-row")!.className).toContain("overdue");
   });
 
   it("渲染日期(M/D)、剩余天数文案、金额", () => {
     window.__azBridge = makeMockBridge();
     const d = makeDebt({ name: "网贷A", monthly: 1234 });
-    const { container } = render(<PayRow d={d} i={0} next={new Date(2026, 6, 30)} diff={5} ctx={makeCtx()} />);
+    const { container } = render(<PayRow d={d} next={new Date(2026, 6, 30)} diff={5} ctx={makeCtx()} />);
     expect(container.textContent).toContain("7/30");
     expect(container.textContent).toContain("网贷A");
     expect(container.textContent).toContain("¥1,234");

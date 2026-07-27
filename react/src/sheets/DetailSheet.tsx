@@ -3,12 +3,12 @@
 // (不只是容器)搬进React，也是第一个不属于任何tab、常驻挂载的React入口——见CLAUDE.md
 // "React 迁移"一节detailSheet那部分的完整背景。
 //
-// 打开/关闭这个sheet不再经过window.__azBridge——openDetailSheet(i)/closeDetailSheet()是纯
+// 打开/关闭这个sheet不再经过window.__azBridge——openDetailSheet(id)/closeDetailSheet()是纯
 // React侧状态(shared/state.ts)，"在还债务"/"还款日"两棵独立的React树都直接调用它们。
 // "销这期"/"提前结清"/"编辑"/"提前还款模拟"这几个真正改数据或跳转到别的vanilla浮层的操作，
 // 依然通过__azBridge调用vanilla函数——vanilla保留的这几个函数完全没有被重新实现。
 import { useEffect, useRef, useState } from "react";
-import { closeDetailSheet, openEditSheet, openSimScreen, useDebts, useDetailSheetIndex } from "../shared/state";
+import { closeDetailSheet, openEditSheet, openSimScreen, useDebts, useDetailSheetId } from "../shared/state";
 import { makeGripDragState, onGripPointerDown, onGripPointerEnd, onGripPointerMove } from "./gripDrag";
 
 function kv(k: string, v: string) {
@@ -21,7 +21,7 @@ function kv(k: string, v: string) {
 }
 
 export function DetailSheet() {
-  const openIndex = useDetailSheetIndex();
+  const openId = useDetailSheetId();
   const debts = useDebts();
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const gripRef = useRef<HTMLDivElement | null>(null);
@@ -29,27 +29,29 @@ export function DetailSheet() {
 
   // 关闭动画(translateY滑出屏幕)播放期间内容不能瞬间清空——冻结在最后一次打开时的债务上，
   // 跟vanilla"关闭时不清#dInfo，只是CSS把sheet挪出屏幕"效果一致。
-  const [displayIndex, setDisplayIndex] = useState<number | null>(null);
+  const [displayId, setDisplayId] = useState<string | null>(null);
   useEffect(() => {
-    if (openIndex !== null) setDisplayIndex(openIndex);
-  }, [openIndex]);
+    if (openId !== null) setDisplayId(openId);
+  }, [openId]);
 
   // 打开时重置上次拖拽调整过的高度——对应vanilla openDetail()开头的
   // $("detailSheet").style.height = ""。
   useEffect(() => {
-    if (openIndex !== null && sheetRef.current) sheetRef.current.style.height = "";
-  }, [openIndex]);
+    if (openId !== null && sheetRef.current) sheetRef.current.style.height = "";
+  }, [openId]);
 
-  // 结清(或这笔债务因为备份恢复/导入等原因从debts数组消失)时自动关闭——这是vanilla
+  // 结清(或这笔债务因为被删除/备份恢复/导入等原因从debts数组消失)时自动关闭——这是vanilla
   // payInstallment()里"if (d.settled) closeDetail()"那行逻辑的等效替代，靠React对debts
   // 变化的自动重渲染实现，不需要vanilla显式回调关闭。这个前提依赖shared/state.ts的
   // useDebts()在payInstallment/settleFull这类"原地mutate debts元素、不整体重新赋值"的
   // 操作后依然能正确触发重渲染——这是真实踩过的坑，修法和踩坑细节见useDebts()自己的注释。
-  // 故意不写[debts, openIndex]依赖数组、改成每次渲染后都跑：这个判断很便宜，没有明显开销，
-  // 不依赖"debts引用一定会变"这个前提也能正确工作，属于双重保险。
+  // 按id(不是下标)查找这笔债务是否还在——对splice导致的下标顺移天然免疫，见CLAUDE.md
+  // "债务对象加了真正的id字段"一节。故意不写[debts, openId]依赖数组、改成每次渲染后都跑：
+  // 这个判断很便宜，没有明显开销，不依赖"debts引用一定会变"这个前提也能正确工作，属于双重保险。
   useEffect(() => {
-    if (openIndex !== null && (!debts[openIndex] || debts[openIndex].settled)) {
-      closeDetailSheet();
+    if (openId !== null) {
+      const d = debts.find((x) => x.id === openId);
+      if (!d || d.settled) closeDetailSheet();
     }
   });
 
@@ -58,7 +60,7 @@ export function DetailSheet() {
   // window.__azDebtsBack是同一个模式。
   useEffect(() => {
     window.__azDetailSheetBack = () => {
-      if (openIndex !== null) {
+      if (openId !== null) {
         closeDetailSheet();
         return true;
       }
@@ -67,7 +69,7 @@ export function DetailSheet() {
     return () => {
       delete window.__azDetailSheetBack;
     };
-  }, [openIndex]);
+  }, [openId]);
 
   useEffect(() => {
     const grip = gripRef.current;
@@ -89,26 +91,26 @@ export function DetailSheet() {
     };
   }, []);
 
-  const isOpen = openIndex !== null;
-  const d = displayIndex !== null ? debts[displayIndex] : undefined;
+  const isOpen = openId !== null;
+  const d = displayId !== null ? debts.find((x) => x.id === displayId) : undefined;
 
   function onEdit() {
-    if (displayIndex === null) return;
+    if (displayId === null) return;
     closeDetailSheet();
-    openEditSheet(displayIndex);
+    openEditSheet(displayId);
   }
   function onSale() {
-    if (displayIndex === null) return;
-    window.__azBridge.payInstallment(displayIndex);
+    if (displayId === null) return;
+    window.__azBridge.payInstallment(displayId);
   }
   function onSimulate() {
-    if (displayIndex === null) return;
+    if (displayId === null) return;
     closeDetailSheet();
-    openSimScreen(displayIndex);
+    openSimScreen(displayId);
   }
   function onSettle() {
-    if (displayIndex === null) return;
-    window.__azBridge.settleFull(displayIndex);
+    if (displayId === null) return;
+    window.__azBridge.settleFull(displayId);
   }
 
   let nextNo = -1;

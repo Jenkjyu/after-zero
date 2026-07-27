@@ -73,9 +73,9 @@ describe("finishDrag", () => {
 
   it("commit=true时按order把DOM节点上挂的__o.d取出来、按新顺序调用onCommitReorder", () => {
     const d0 = makeDebt({ name: "A" }), d1 = makeDebt({ name: "B" }), d2 = makeDebt({ name: "C" });
-    const el0 = document.createElement("div") as CardEl; el0.__o = { d: d0, i: 0 };
-    const el1 = document.createElement("div") as CardEl; el1.__o = { d: d1, i: 1 };
-    const el2 = document.createElement("div") as CardEl; el2.__o = { d: d2, i: 2 };
+    const el0 = document.createElement("div") as CardEl; el0.__o = { d: d0 };
+    const el1 = document.createElement("div") as CardEl; el1.__o = { d: d1 };
+    const el2 = document.createElement("div") as CardEl; el2.__o = { d: d2 };
     const onCommitReorder = vi.fn();
     // order=[1,2,0] 模拟"B被拖到最前，然后C，最后A"这个新顺序
     const ctx = makeCtx({

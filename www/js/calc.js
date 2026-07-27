@@ -77,7 +77,15 @@ function recompute(d) {
   d.rate = impliedAPR(plan);
 }
 function markPaidThrough(plan, n) { for (var k = 0; k < plan.length; k++) plan[k].paid = k < n; }
-function normalize(d) { if (!d.plan) { d.plan = genPlan(d.gen); markPaidThrough(d.plan, (d.gen && d.gen.paid) || 0); } recompute(d); }
+// 债务对象的稳定id——创建时生成一次，往后不变。前缀"d"专属债务(备份用"b"/上传用"u"/AI对话
+// 用"c"，同一个约定的延伸)。normalize()给老数据(没有id字段的旧localStorage/旧备份/旧导入
+// json)惰性补发，见下面。
+function genDebtId() { return "d" + Date.now() + Math.random().toString(36).slice(2, 7); }
+function normalize(d) {
+  if (!d.id) d.id = genDebtId();
+  if (!d.plan) { d.plan = genPlan(d.gen); markPaidThrough(d.plan, (d.gen && d.gen.paid) || 0); }
+  recompute(d);
+}
 
 // 提前还款模拟器：4种计划生成器(等额本息/信用卡等本等费/先息后本/自定义)各自的逐行
 // 数学不统一(equalfee/custom没有良定义的"月利率"概念)，没法统一处理"注入一笔额外还款"。
@@ -236,7 +244,7 @@ if (typeof module !== "undefined" && module.exports) {
     clone: clone, r2: r2, fmt: fmt, money: money, todayStr: todayStr, baseName: baseName, extOf: extOf,
     pad: pad, parseDate: parseDate, addMonths: addMonths, fmtDate: fmtDate, today0: today0,
     rateClass: rateClass, isActive: isActive, genPlan: genPlan, npv: npv, impliedAPR: impliedAPR,
-    recompute: recompute, markPaidThrough: markPaidThrough, normalize: normalize,
+    recompute: recompute, markPaidThrough: markPaidThrough, normalize: normalize, genDebtId: genDebtId,
     amortForward: amortForward, simulatePrepay: simulatePrepay, detectMatchingSort: detectMatchingSort,
     urgencyTier: urgencyTier, relLabel: relLabel, dueBucket: dueBucket,
     isBadRepeatDay: isBadRepeatDay, offsetLabel: offsetLabel, computeReportData: computeReportData, summarizeDebts: summarizeDebts,

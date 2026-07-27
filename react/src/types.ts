@@ -25,6 +25,10 @@ export interface GenSpec {
 }
 
 export interface Debt {
+  // 稳定id——calc.js的genDebtId()创建时生成一次，往后不变(normalize()给老数据惰性补发)。
+  // 拖拽重排/编辑/备份恢复/JSON导入导出全程保持不变，是这个项目里唯一可靠的"这是同一笔
+  // 债务"判断依据，不要再用数组下标或对象引用寻址单笔债务。
+  id: string;
   name: string;
   funder?: string;
   type?: string;
@@ -143,8 +147,9 @@ export interface AzBridge {
   // openDetail/openEdit都已删除——detailSheet/editSheet迁移React后，"打开详情窗/编辑表单"
   // 变成纯React侧状态(shared/state.ts的openDetailSheet/closeDetailSheet/openEditSheet/
   // closeEditSheet)，不再经过这个桥接对象，见 react/src/sheets/ 和 CLAUDE.md"React 迁移"一节。
-  payInstallment(i: number): void;
-  unsettle(i: number): void;
+  // 这几个都按id(不是下标)寻址——见CLAUDE.md"债务对象加了真正的id字段"一节。
+  payInstallment(id: string): void;
+  unsettle(id: string): void;
   commitReorder(newOrder: Debt[]): void;
   saveAll(): void;
   renderAll(): void;
@@ -155,7 +160,7 @@ export interface AzBridge {
   // detailSheet新增：#dSettle(提前结清)以前只在vanilla内部调用，现在detailSheet的按钮由
   // React渲染，需要显式桥接。openSimScreen已删除——第八步(simScreen)迁移React后，打开
   // 这个screen不再经过bridge，改成shared/state.ts的openSimScreen(i)(模式同openDetailSheet)。
-  settleFull(i: number): void;
+  settleFull(id: string): void;
   // 还款日tab新增：getNotify()仍然是bridge——notify这份数据的调度(syncNotifications)
   // 依赖vanilla的debts/renderAll()管线，必须留在vanilla，React只读它。openNotifySheet已
   // 删除——第八步(notifySheet)迁移React后，打开这个sheet不再经过bridge。
@@ -169,15 +174,17 @@ export interface AzBridge {
   // bridge，改成shared/state.ts的openDocsScreen/openBackupScreen(纯React状态)。
   downloadBackupFile(): void;
   triggerImportFilePicker(): void;
-  // editSheet(react/src/sheets/EditSheet.tsx)新增：setDebt是保存写入(i>=0覆盖debts[i]并保留
-  // settled/settledDate，i<0是push新增)，故意不在内部调saveAll/renderAll——React保存时自己
-  // 依次调setDebt→saveAll→renderAll，跟commitReorder那套细粒度调用惯例一致。deleteDebt是原样
-  // 暴露的既有vanilla函数(自带ask()确认+splice+saveAll+renderAll)。toast是#flash单例的简单
-  // passthrough。confirmAsync是vanilla共享确认弹窗ask()的Promise外壳——opts.month有值时
-  // 确认返回选中的月份字符串、取消返回null；没有opts.month时确认返回true、取消返回false。
-  // 特意复用这一份弹窗UI而不是在React里另建一套，见CLAUDE.md"React 迁移"一节"第六步"。
-  setDebt(i: number, obj: Debt): void;
-  deleteDebt(i: number): void;
+  // editSheet(react/src/sheets/EditSheet.tsx)新增：setDebt是保存写入(id非空覆盖对应debt并
+  // 保留settled/settledDate，id为null是新增)，故意不在内部调saveAll/renderAll——React保存时
+  // 自己依次调setDebt→saveAll→renderAll，跟commitReorder那套细粒度调用惯例一致。obj参数用
+  // Omit<Debt,"id">——id永远由vanilla赋值/保留，React这边保存时不该也不需要造一个id出来。
+  // deleteDebt是原样暴露的既有vanilla函数(自带ask()确认+splice+saveAll+renderAll)。toast是
+  // #flash单例的简单passthrough。confirmAsync是vanilla共享确认弹窗ask()的Promise外壳——
+  // opts.month有值时确认返回选中的月份字符串、取消返回null；没有opts.month时确认返回true、
+  // 取消返回false。特意复用这一份弹窗UI而不是在React里另建一套，见CLAUDE.md"React 迁移"
+  // 一节"第六步"。
+  setDebt(id: string | null, obj: Omit<Debt, "id">): void;
+  deleteDebt(id: string): void;
   toast(msg: string): void;
   confirmAsync(title: string, body: string, opts?: { month?: string }): Promise<string | boolean | null>;
   // 第七步(accountScreen/premiumScreen)新增：这三个都是真实的cloud/native调用或者共享状态

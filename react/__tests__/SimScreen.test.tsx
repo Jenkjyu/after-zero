@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { SimScreen } from "../src/sheets/SimScreen";
-import { closeSimScreen, openSimScreen, useSimScreenIndex } from "../src/shared/state";
+import { closeSimScreen, openSimScreen, useSimScreenId } from "../src/shared/state";
 import { makeMockBridge, makeDebt } from "./mockBridge";
 import type { Debt } from "../src/types";
 
@@ -11,7 +11,7 @@ beforeEach(() => {
   localStorage.removeItem(SIM_KEY);
 });
 afterEach(() => {
-  closeSimScreen(); // simScreenIndex是模块级状态，重置避免测试间互相污染
+  closeSimScreen(); // simScreenId是模块级状态，重置避免测试间互相污染
 });
 
 describe("SimScreen", () => {
@@ -25,7 +25,7 @@ describe("SimScreen", () => {
     const debts: Debt[] = [makeDebt({ name: "测试债务", terms: 6 })];
     window.__azBridge = makeMockBridge({ debts });
     render(<SimScreen />);
-    act(() => { openSimScreen(0); });
+    act(() => { openSimScreen(debts[0].id); });
     expect(screen.getByText("测试债务")).toBeInTheDocument();
     expect(screen.getByText("单次多还")).toHaveClass("active");
     expect(screen.getByText("每期多还")).not.toHaveClass("active");
@@ -35,7 +35,7 @@ describe("SimScreen", () => {
     const debts: Debt[] = [makeDebt()];
     window.__azBridge = makeMockBridge({ debts });
     render(<SimScreen />);
-    act(() => { openSimScreen(0); });
+    act(() => { openSimScreen(debts[0].id); });
     fireEvent.click(screen.getByText("每期多还"));
     expect(screen.getByText("每期多还")).toHaveClass("active");
     expect(screen.getByText("单次多还")).not.toHaveClass("active");
@@ -45,7 +45,7 @@ describe("SimScreen", () => {
     const debts: Debt[] = [makeDebt()];
     window.__azBridge = makeMockBridge({ debts });
     render(<SimScreen />);
-    act(() => { openSimScreen(0); });
+    act(() => { openSimScreen(debts[0].id); });
     fireEvent.click(screen.getByText("开始测算"));
     expect(window.__azBridge.toast).toHaveBeenCalledWith("请输入大于 0 的多还金额");
     expect(screen.queryByText("提前还清")).not.toBeInTheDocument();
@@ -56,7 +56,7 @@ describe("SimScreen", () => {
     const debts: Debt[] = [makeDebt({ balance: 100000, monthly: 10, rate: 1200 })];
     window.__azBridge = makeMockBridge({ debts });
     render(<SimScreen />);
-    act(() => { openSimScreen(0); });
+    act(() => { openSimScreen(debts[0].id); });
     fireEvent.change(screen.getByLabelText(/多还金额/), { target: { value: "100" } });
     fireEvent.click(screen.getByText("开始测算"));
     expect(window.__azBridge.toast).toHaveBeenCalledWith("月供不足以覆盖利息，无法测算");
@@ -66,7 +66,7 @@ describe("SimScreen", () => {
     const debts: Debt[] = [makeDebt({ balance: 12000, monthly: 1100, rate: 12, terms: 12 })];
     window.__azBridge = makeMockBridge({ debts });
     render(<SimScreen />);
-    act(() => { openSimScreen(0); });
+    act(() => { openSimScreen(debts[0].id); });
     fireEvent.change(screen.getByLabelText(/多还金额/), { target: { value: "2000" } });
     fireEvent.change(screen.getByLabelText(/从第几期开始/), { target: { value: "2" } });
     fireEvent.click(screen.getByText("开始测算"));
@@ -80,12 +80,12 @@ describe("SimScreen", () => {
     const debts: Debt[] = [makeDebt({ balance: 12000, monthly: 1100, rate: 12, terms: 12 })];
     window.__azBridge = makeMockBridge({ debts });
     render(<SimScreen />);
-    act(() => { openSimScreen(0); });
+    act(() => { openSimScreen(debts[0].id); });
     fireEvent.change(screen.getByLabelText(/多还金额/), { target: { value: "3000" } });
     fireEvent.click(screen.getByText("开始测算"));
     expect(screen.getByText("提前还清")).toBeInTheDocument();
     act(() => { closeSimScreen(); });
-    act(() => { openSimScreen(0); });
+    act(() => { openSimScreen(debts[0].id); });
     expect((screen.getByLabelText(/多还金额/) as HTMLInputElement).value).toBe("3000");
     expect((screen.getByLabelText(/从第几期开始/) as HTMLInputElement).value).toBe("1");
     expect(screen.queryByText("提前还清")).not.toBeInTheDocument();
@@ -96,17 +96,31 @@ describe("SimScreen", () => {
     window.__azBridge = makeMockBridge({ debts });
     render(<SimScreen />);
     expect(window.__azSimScreenBack!()).toBe(false);
-    act(() => { openSimScreen(0); });
+    act(() => { openSimScreen(debts[0].id); });
     expect(window.__azSimScreenBack!()).toBe(true);
   });
 
   it("点返回箭头关闭", () => {
     const debts: Debt[] = [makeDebt()];
     window.__azBridge = makeMockBridge({ debts });
-    const hook = renderHook(() => useSimScreenIndex());
+    const hook = renderHook(() => useSimScreenId());
     render(<SimScreen />);
-    act(() => { openSimScreen(0); });
+    act(() => { openSimScreen(debts[0].id); });
     fireEvent.click(screen.getByLabelText("返回"));
     expect(hook.result.current).toBeNull();
+  });
+
+  it("这笔债务从debts数组消失(删除/被恢复流程覆盖等)后自动关闭——这个screen以前没有这层保护，是引入债务id字段后顺手补上的", () => {
+    const debts: Debt[] = [makeDebt({ name: "会消失的债务" })];
+    window.__azBridge = makeMockBridge({ debts });
+    const { container } = render(<SimScreen />);
+    act(() => { openSimScreen(debts[0].id); });
+    expect(container.querySelector("#simScreen")).toHaveClass("open");
+
+    const emptyDebts: Debt[] = [];
+    window.__azBridge.getDebts = () => emptyDebts;
+    act(() => { window.dispatchEvent(new CustomEvent("az:state-changed")); });
+
+    expect(container.querySelector("#simScreen")).not.toHaveClass("open");
   });
 });

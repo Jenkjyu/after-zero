@@ -32,7 +32,7 @@ interface DragCtx {
 // vanilla用el.__o把{d,i}直接挂在DOM节点上，finishDrag靠这个反查提交顺序——
 // 这里原样复刻同一个技巧(不是引入什么新模式)，card组件在自己的effect里设置这个属性。
 export interface CardEl extends HTMLDivElement {
-  __o?: { d: Debt; i: number };
+  __o?: { d: Debt };
 }
 
 export interface GestureCtx {

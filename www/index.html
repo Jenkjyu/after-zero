@@ -1124,8 +1124,10 @@
     grip.addEventListener("pointercancel", endDrag);
   }
 
-  function payInstallment(i) {
-    var d = debts[i], plan = d.plan || [], idx = -1;
+  function payInstallment(id) {
+    var d = debts.find(function (x) { return x.id === id; });
+    if (!d) return;
+    var plan = d.plan || [], idx = -1;
     for (var k = 0; k < plan.length; k++) { if (!plan[k].paid) { idx = k; break; } }
     if (idx < 0) { toast("已全部还清"); return; }
     var r = plan[idx], isLast = true;
@@ -1143,15 +1145,20 @@
       toast(d.settled ? d.name + " 已还清 🎉" : "已销第 " + (idx + 1) + " 期 · 本金 -¥" + fmt(r.principal));
     });
   }
-  function settleFull(i) {
-    var d = debts[i];
+  function settleFull(id) {
+    var d = debts.find(function (x) { return x.id === id; });
+    if (!d) return;
     ask("提前结清", "把「" + d.name + "」标记为已结清？\n不再计入在还总债（可在列表底部恢复）。", function () {
       // closeDetail()/closeEdit()都已删除——detailSheet/editSheet现在都是React拥有的sheet，
       // 各自靠自己的effect监听debts变化自动关闭(结清/被删除)，vanilla不需要再显式回调。
       d.settled = true; d.settledDate = todayStr(); saveAll(); renderAll(); toast(d.name + " 已结清 🎉");
     });
   }
-  function unsettle(i) { debts[i].settled = false; recompute(debts[i]); saveAll(); renderAll(); toast("已恢复到在还"); }
+  function unsettle(id) {
+    var d = debts.find(function (x) { return x.id === id; });
+    if (!d) return;
+    d.settled = false; recompute(d); saveAll(); renderAll(); toast("已恢复到在还");
+  }
 
   // ===== edit + plan editor =====
   // setGenUI/setPlanMode/syncOneTimeUI/doGen点击handler/addRow点击handler/refreshPlanSum/
@@ -1208,20 +1215,29 @@
   // closeDetail()/closeEdit()都已删除——这个函数现在直接桥接给React的EditSheet"删除"按钮调用
   // (window.__azBridge.deleteDebt)，确认+删除逻辑保持100%vanilla不变；EditSheet自己有一个
   // effect监听debts变化，发现正在编辑的这条已经不在数组里了就自动关闭，不需要这里显式回调。
-  function deleteDebt(i) { ask("删除债务", "彻底删除「" + debts[i].name + "」？\n这不是结清，是从记录里移除。", function () { debts.splice(i, 1); saveAll(); renderAll(); toast("已删除"); }); }
+  function deleteDebt(id) {
+    var idx = debts.findIndex(function (x) { return x.id === id; });
+    if (idx < 0) return;
+    ask("删除债务", "彻底删除「" + debts[idx].name + "」？\n这不是结清，是从记录里移除。", function () { debts.splice(idx, 1); saveAll(); renderAll(); toast("已删除"); });
+  }
 
   // #editSheet的实际内容(表单/公式生成器/批量设置/oneTimeStash状态机)已经整体搬进React
   // (react/src/sheets/EditSheet.tsx等，见CLAUDE.md"React 迁移"一节)，vanilla这边只保留
-  // setDebt(i,obj)这一个narrow的写入函数——i>=0覆盖debts[i](沿用原saveForm()的做法，
-  // 合并old.settled/old.settledDate，不让"编辑一条已结清的债务"意外把它变回在还状态)，
-  // i<0是新增(push)。故意不在这里顺带调用saveAll()/renderAll()——保持跟commitReorder一样的
-  // 细粒度调用惯例，React保存时自己依次调setDebt→saveAll→renderAll三个桥接函数。
-  function setDebt(i, obj) {
-    if (i >= 0) {
-      var old = debts[i];
-      obj.settled = old.settled; obj.settledDate = old.settledDate;
-      debts[i] = obj;
+  // setDebt(id,obj)这一个narrow的写入函数——id非空时按id查到原来的下标覆盖(沿用原
+  // saveForm()的做法，合并old.id/old.settled/old.settledDate，不让"编辑一条已结清的债务"
+  // 意外把它变回在还状态)，id为null是新增(push，赋一个新生成的id)。故意不在这里顺带调用
+  // saveAll()/renderAll()——保持跟commitReorder一样的细粒度调用惯例，React保存时自己依次调
+  // setDebt→saveAll→renderAll三个桥接函数。
+  function setDebt(id, obj) {
+    if (id != null) {
+      var idx = debts.findIndex(function (x) { return x.id === id; });
+      if (idx >= 0) {
+        var old = debts[idx];
+        obj.id = old.id; obj.settled = old.settled; obj.settledDate = old.settledDate;
+        debts[idx] = obj;
+      }
     } else {
+      obj.id = genDebtId();
       debts.push(obj);
     }
     recompute(obj);
@@ -1792,8 +1808,9 @@
   // fileItems()/renderFiles()/renderDocContent()都已删除——第九步(档案库)迁移React后，
   // 渲染整个交给react/src/sheets/DocsScreen.tsx，这里只留数据+impure操作。
   //
-  // docs数组元素没有稳定id(纯靠数组下标寻址)，给markdown文档条目生成稳定id用跟
-  // shared/state.ts的keyFor()同一个技巧——WeakMap按对象引用懒生成key，splice/重排不影响
+  // docs数组元素没有稳定id(纯靠数组下标寻址)，给markdown文档条目生成稳定id用的是
+  // shared/state.ts的keyFor()当年那个技巧(debts后来加了真正的id字段、keyFor()已删除，
+  // 但docs这边还没做同样的改造)——WeakMap按对象引用懒生成key，splice/重排不影响
   // 已生成的key，只有docs被整体替换(备份恢复/导入json)时才会因为引用变了自然生成新key。
   var docKeyMap = new WeakMap();
   var docKeyNext = 0;

@@ -11,23 +11,19 @@ import { openDetailSheet } from "../shared/state";
 
 export interface DebtCardProps {
   d: Debt;
-  i: number; // 在debts数组里的下标——openDetailSheet/payInstallment都是按下标寻址(见CLAUDE.md
-  // "在还债务自定义排序"一节"没有id字段"这条已知架构缺口)
   jiggleMode: boolean;
   ctx: GestureCtx;
 }
 
-export function DebtCard({ d, i, jiggleMode, ctx }: DebtCardProps) {
+export function DebtCard({ d, jiggleMode, ctx }: DebtCardProps) {
   const cardRef = useRef<CardEl | null>(null);
   const rowRef = useRef<HTMLDivElement | null>(null);
 
-  // __o跟vanilla的el.__o是同一个技巧：把{d,i}直接挂在DOM节点上，finishDrag提交重排时
-  // 从DOM子节点顺序反查每张卡片对应哪个debt对象——这个下标i会因为其它卡片的重排/增删
-  // 而变化，所以要单独用一个轻量effect在i变化时保持同步，不跟"绑长按/滑动监听器"那个
-  // effect混在一起(监听器只需要绑一次，不依赖i)。
+  // __o跟vanilla的el.__o是同一个技巧：把{d}直接挂在DOM节点上，finishDrag提交重排时
+  // 从DOM子节点顺序反查每张卡片对应哪个debt对象。
   useEffect(() => {
-    if (cardRef.current) cardRef.current.__o = { d, i };
-  }, [d, i]);
+    if (cardRef.current) cardRef.current.__o = { d };
+  }, [d]);
 
   useEffect(() => {
     const el = cardRef.current, row = rowRef.current;
@@ -49,13 +45,13 @@ export function DebtCard({ d, i, jiggleMode, ctx }: DebtCardProps) {
     if (row.__justDragged) { row.__justDragged = false; return; }
     if (row.dataset.open === "1") { closeDebtSwipe(ctx, row); return; }
     if (jiggleMode) return;
-    openDetailSheet(i);
+    openDetailSheet(d.id);
   }
 
   function onSwipeBtnClick() {
     const row = rowRef.current;
     if (row) closeDebtSwipe(ctx, row);
-    window.__azBridge.payInstallment(i);
+    window.__azBridge.payInstallment(d.id);
   }
 
   const rate = d.rate || 0;

@@ -122,6 +122,24 @@ test("normalize: 从spec生成plan、按gen.paid标记已还期数、recompute�
   assert.equal(d.rate, 6);
 });
 
+test("genDebtId: 返回以d开头的字符串，两次调用不同", () => {
+  const a = calc.genDebtId(), b = calc.genDebtId();
+  assert.equal(typeof a, "string");
+  assert.ok(a.startsWith("d"));
+  assert.notEqual(a, b);
+});
+
+test("normalize: 给缺id的老数据补发id，已有id的不会被覆盖", () => {
+  const legacy = { gen: { kind: "custom", n: 1, first: "2026-01-01" } };
+  calc.normalize(legacy);
+  assert.equal(typeof legacy.id, "string");
+  assert.ok(legacy.id.startsWith("d"));
+
+  const withId = { id: "d-existing", gen: { kind: "custom", n: 1, first: "2026-01-01" } };
+  calc.normalize(withId);
+  assert.equal(withId.id, "d-existing");
+});
+
 test("amortForward: 标准摊销直到还清，返回月数+总利息", () => {
   const r = calc.amortForward(1000, 0.01, 90, null);
   assert.equal(r.months, 12);

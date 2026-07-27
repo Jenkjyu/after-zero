@@ -10,13 +10,12 @@ import { openDetailSheet } from "../shared/state";
 
 export interface PayRowProps {
   d: Debt;
-  i: number; // debts数组下标——openDetailSheet/payInstallment都按下标寻址
   next: Date;
   diff: number;
   ctx: PayGestureCtx;
 }
 
-export function PayRow({ d, i, next, diff, ctx }: PayRowProps) {
+export function PayRow({ d, next, diff, ctx }: PayRowProps) {
   const outerRef = useRef<HTMLDivElement | null>(null);
   const swipeRowRef = useRef<HTMLDivElement | null>(null);
 
@@ -40,12 +39,12 @@ export function PayRow({ d, i, next, diff, ctx }: PayRowProps) {
     if (row.__justDragged) { row.__justDragged = false; return; }
     if (row.dataset.open === "1") { closePaySwipe(ctx, row); return; }
     if (ctx.openSwipeRowRef.current && ctx.openSwipeRowRef.current !== row) { closePaySwipe(ctx, ctx.openSwipeRowRef.current); return; }
-    openDetailSheet(i);
+    openDetailSheet(d.id);
   }
 
   function onSwipeBtnClick() {
     if (swipeRowRef.current) closePaySwipe(ctx, swipeRowRef.current);
-    window.__azBridge.payInstallment(i);
+    window.__azBridge.payInstallment(d.id);
   }
 
   return (

@@ -14,7 +14,6 @@ import { PayList } from "./PayList";
 
 export interface PayItem {
   d: Debt;
-  i: number;
   next: Date;
   diff: number;
 }
@@ -43,12 +42,11 @@ export function App() {
   const items = useMemo<PayItem[]>(() => {
     const t0 = window.today0();
     return debts
-      .map((d, i) => ({ d, i }))
-      .filter((o) => window.isActive(o.d) && o.d.nextDate)
-      .map((o) => {
-        const next = window.parseDate(o.d.nextDate as string) as Date;
+      .filter((d) => window.isActive(d) && d.nextDate)
+      .map((d) => {
+        const next = window.parseDate(d.nextDate as string) as Date;
         const diff = Math.round((next.getTime() - t0.getTime()) / 86400000);
-        return { d: o.d, i: o.i, next, diff };
+        return { d, next, diff };
       })
       .sort((a, b) => a.diff - b.diff);
   }, [debts]);

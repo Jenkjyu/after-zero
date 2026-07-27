@@ -3,26 +3,26 @@
 // (第六步)做。挂载点跟detailSheet共用同一个常驻React入口(#react-sheets-root，见App.tsx)，
 // 不新开Vite entry。
 //
-// 打开/关闭这个sheet不再经过window.__azBridge——openEditSheet(i)/closeEditSheet()是纯React
+// 打开/关闭这个sheet不再经过window.__azBridge——openEditSheet(id)/closeEditSheet()是纯React
 // 侧状态(shared/state.ts)，"+新增一笔"(DebtList.tsx)和detailSheet的"编辑"按钮都直接调用它们。
 // 保存/删除这两个真正改debts数组的操作，依然通过__azBridge调用vanilla函数(setDebt/deleteDebt)。
 //
-// ⚠️跟DetailSheet.tsx不同，这里不需要"displayIndex冻结"那套技巧：DetailSheet的内容是每次渲染
-// 直接从debts[openIndex]读出来的，openIndex变成null后就会读到undefined，所以需要冻结最后一次
-// 打开时的index才能让关闭动画期间内容不瞬间清空。EditSheet的表单字段(name/editingPlan/gen等)
-// 是本组件自己的useState，只在"下一次打开"(editIndex变化)时才会被effect重新赋值，关闭动画
-// 期间(editIndex变成null但组件还在播放CSS滑出动画)这些state天然保持着关闭前最后的内容，
+// ⚠️跟DetailSheet.tsx不同，这里不需要"displayId冻结"那套技巧：DetailSheet的内容是每次渲染
+// 直接从debts里按id查出来读的，openId变成null后就查不到了，所以需要冻结最后一次打开时的id
+// 才能让关闭动画期间内容不瞬间清空。EditSheet的表单字段(name/editingPlan/gen等)
+// 是本组件自己的useState，只在"下一次打开"(editId变化)时才会被effect重新赋值，关闭动画
+// 期间(editId变成null但组件还在播放CSS滑出动画)这些state天然保持着关闭前最后的内容，
 // 不需要额外的冻结逻辑。
 import { useEffect, useRef, useState } from "react";
 import type { Debt, GenSpec, PlanRow } from "../types";
-import { closeEditSheet, useDebts, useEditSheetIndex } from "../shared/state";
+import { closeEditSheet, NEW_DEBT_ID, useDebts, useEditSheetId } from "../shared/state";
 import { makeGripDragState, onGripPointerDown, onGripPointerEnd, onGripPointerMove } from "./gripDrag";
 import { DEFAULT_GEN_FIELDS, GenPanel, type GenFields } from "./GenPanel";
 import { PlanRows } from "./PlanRows";
 import { BatchBlock } from "./BatchBlock";
 
 export function EditSheet() {
-  const editIndex = useEditSheetIndex();
+  const editId = useEditSheetId();
   const debts = useDebts();
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const gripRef = useRef<HTMLDivElement | null>(null);
@@ -38,24 +38,20 @@ export function EditSheet() {
   const [oneTimeStash, setOneTimeStash] = useState<PlanRow[]>([]);
   const [planMode, setPlanMode] = useState<"manual" | "gen">("manual");
   const [gen, setGen] = useState<GenFields>(DEFAULT_GEN_FIELDS);
-  // 标题("编辑债务"/"新增债务")和"删除"按钮的显隐都要在i>=0/i<0之间做区分，但只在*打开那一刻*
-  // 判断一次并冻结——跟上面说的"表单字段不需要冻结"是同一个道理的例外：这两处直接依赖
-  // editIndex>=0这个布尔判断本身，而editIndex关闭时会变成null，用它现算会在关闭动画期间
+  // 标题("编辑债务"/"新增债务")和"删除"按钮的显隐都要在editId===NEW_DEBT_ID这个判断上做
+  // 区分，但只在*打开那一刻*判断一次并冻结——跟上面说的"表单字段不需要冻结"是同一个道理的
+  // 例外：这两处直接依赖这个布尔判断本身，而editId关闭时会变成null，用它现算会在关闭动画期间
   // 变成false(显示"删除"按钮消失/标题变"新增债务")产生视觉跳变，所以单独用一个"打开时冻结"
   // 的state存起来，只在openEdit效果里更新。
   const [isNew, setIsNew] = useState(false);
-  // 正在编辑的这个debt对象引用——只在打开(populate effect)时赋值，用来判断"这条debt是不是
-  // 已经被删掉了"。⚠️不能用editIndex这个下标去比对(见下面自动关闭effect的注释)。
-  const editedDebtRef = useRef<Debt | undefined>(undefined);
 
-  // 对应vanilla openEdit(i)——每次editIndex变化(打开新增/打开编辑/切换到另一条)时，把表单
-  // 全部字段从debts[i]或空白重新灌一遍。也复刻了openEdit()末尾syncOneTimeUI()在"这条债务
+  // 对应vanilla openEdit(i)——每次editId变化(打开新增/打开编辑/切换到另一条)时，把表单
+  // 全部字段从对应的debt或空白重新灌一遍。也复刻了openEdit()末尾syncOneTimeUI()在"这条债务
   // 本来就标了oneTime且plan有多期"这种边缘情况下的行为(第2期起挪进oneTimeStash)。
   useEffect(() => {
-    if (editIndex === null) return;
-    const d: Debt | undefined = editIndex >= 0 ? debts[editIndex] : undefined;
-    editedDebtRef.current = d;
-    setIsNew(editIndex < 0);
+    if (editId === null) return;
+    const d: Debt | undefined = editId !== NEW_DEBT_ID ? debts.find((x) => x.id === editId) : undefined;
+    setIsNew(editId === NEW_DEBT_ID);
     setName(d?.name || "");
     setFunder(d?.funder || "");
     setType(d?.type || "银行贷");
@@ -87,31 +83,31 @@ export function EditSheet() {
     setPlanMode("manual");
     if (sheetRef.current) sheetRef.current.scrollTop = 0;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editIndex]);
+  }, [editId]);
 
   // 删除债务后(debts.splice原地mutate，靠useDebts()的脏标记修复触发重渲染，见shared/state.ts
   // useDebts()自己的注释)，正在编辑的这条从数组里消失了——自动关闭，跟DetailSheet.tsx
   // "结清自动关闭"的effect同一个模式。deleteDebt()走的是vanilla ask()异步确认，React没法
   // 在点击那一刻就同步知道用户是否真的确认了，只能被动感知"这条debt不在了"。
-  // ⚠️真机(其实是Playwright headless)踩过的坑：一开始判断条件写的是`!debts[editIndex]`
-  // (按下标判断)，在"被删的不是数组最后一条"这种情况下是错的——splice(i,1)会让原来排在
-  // 后面的debt对象顺移到i这个下标，debts[editIndex]会读到一个"存在、但是别的债务"的对象，
-  // 条件判断成false，sheet不会关闭，还会继续显示已经被删掉的那条债务的过期数据。改成用
-  // editedDebtRef(populate effect里存的对象引用)去比对"这个对象还在不在数组里"，不依赖下标，
-  // 对splice导致的下标顺移天然免疫——跟这个项目WeakMap给debt生成稳定key(shared/state.ts的
-  // keyFor)是同一个"按引用而不是按下标识别一条debt"的思路。
+  // ⚠️这里曾经是一个真实踩过的坑：第一版判断条件写的是`!debts[editIndex]`(按下标判断)，
+  // 在"被删的不是数组最后一条"这种情况下是错的——splice(i,1)会让原来排在后面的debt对象
+  // 顺移到i这个下标，debts[editIndex]会读到一个"存在、但是别的债务"的对象，条件判断成
+  // false，sheet不会关闭，还会继续显示已经被删掉的那条债务的过期数据。当时用了
+  // editedDebtRef(一个存对象引用的useRef)+debts.includes(ref)去打补丁；现在债务有了真正的
+  // id字段(见CLAUDE.md"债务对象加了真正的id字段"一节)，直接按id查找是否还在数组里就是
+  // 结构上正确、不需要额外workaround的写法，editedDebtRef已删除。
   useEffect(() => {
-    if (editIndex !== null && editIndex >= 0 && editedDebtRef.current && !debts.includes(editedDebtRef.current)) {
+    if (editId !== null && editId !== NEW_DEBT_ID && !debts.some((x) => x.id === editId)) {
       closeEditSheet();
     }
-  }, [debts, editIndex]);
+  }, [debts, editId]);
 
   // 硬件/手势返回键"最上层先关"优先级链——跟react/src/sheets/DetailSheet.tsx注册
   // window.__azDetailSheetBack是同一个模式，链上排在notifySheet和detailSheet之间
   // (沿用原来#editSheet在DOM里的位置)。
   useEffect(() => {
     window.__azEditSheetBack = () => {
-      if (editIndex !== null) {
+      if (editId !== null) {
         closeEditSheet();
         return true;
       }
@@ -120,7 +116,7 @@ export function EditSheet() {
     return () => {
       delete window.__azEditSheetBack;
     };
-  }, [editIndex]);
+  }, [editId]);
 
   useEffect(() => {
     const grip = gripRef.current;
@@ -166,8 +162,8 @@ export function EditSheet() {
   }
 
   function handleDelete() {
-    if (editIndex === null || editIndex < 0) return;
-    window.__azBridge.deleteDebt(editIndex);
+    if (editId === null || editId === NEW_DEBT_ID) return;
+    window.__azBridge.deleteDebt(editId);
   }
 
   // 原样照抄vanilla saveForm()的全部校验逻辑+obj构建。
@@ -193,21 +189,22 @@ export function EditSheet() {
     else if (gen.kind === "interestfirst") { g.P = +gen.P3; g.rate = +gen.rate3; g.ni = +gen.ni; g.np = +gen.np; }
     else { g.n = +gen.nc; }
     // original/balance等派生字段先给占位值——setDebt()内部会调recompute(obj)重新算，
-    // 跟vanilla saveForm()构建的obj一样，这几个字段本来就不该由这里算。
-    const obj: Debt = {
+    // 跟vanilla saveForm()构建的obj一样，这几个字段本来就不该由这里算。obj不带id——id永远
+    // 由vanilla的setDebt()赋值/保留(见types.ts的Omit<Debt,"id">)。
+    const obj: Omit<Debt, "id"> = {
       name: trimmedName, funder: funder.trim(), type, opened, day: fday, notes: notes.trim(),
       oneTime: oneTime || editingPlan.length === 1, plan: window.clone(editingPlan), gen: g,
       original: null, balance: 0, paidPrincipal: 0, paidInterest: 0,
       totalTerms: 0, paidTerms: 0, terms: 0, monthly: 0, nextDate: null, rate: 0,
     };
-    window.__azBridge.setDebt(editIndex ?? -1, obj);
+    window.__azBridge.setDebt(editId === NEW_DEBT_ID ? null : editId, obj);
     window.__azBridge.saveAll();
     window.__azBridge.renderAll();
     closeEditSheet();
     window.__azBridge.toast("已保存 ✓");
   }
 
-  const isOpen = editIndex !== null;
+  const isOpen = editId !== null;
   const firstDate = editingPlan[0] && editingPlan[0].date ? window.parseDate(editingPlan[0].date) : null;
   const fDay = firstDate ? firstDate.getDate() : "";
   const borrow = editingPlan.reduce((s, r) => s + (+r.principal || 0), 0);

@@ -87,47 +87,50 @@ export function useNotify(): NotifySettings {
 }
 
 // "哪个detail sheet开着"——这份状态从DetailSheet迁移开始不再由vanilla拥有，纯粹是React
-// 自己的UI状态(见CLAUDE.md"React 迁移"一节里detailSheet那部分)：openDetailSheet(i)/
+// 自己的UI状态(见CLAUDE.md"React 迁移"一节里detailSheet那部分)：openDetailSheet(id)/
 // closeDetailSheet()不经过window.__azBridge，是"在还债务"/"还款日"两棵独立React树(各自的
 // DebtCard.tsx/PayRow.tsx)跟常驻挂载的第5棵树(react/src/sheets/)之间共享的状态，用独立的
 // az:detail-sheet-changed事件通知——故意不复用az:state-changed，因为"哪个sheet开着"和
 // "debts/premium/account数据变了"是两件不同的事，混在一起会让不相关的订阅者收到无意义的通知。
-let detailSheetIndex: number | null = null;
+// 存的是debt.id(不是下标)——见CLAUDE.md"债务对象加了真正的id字段"一节。
+let detailSheetId: string | null = null;
 function subscribeDetailSheet(callback: () => void) {
   window.addEventListener("az:detail-sheet-changed", callback);
   return () => window.removeEventListener("az:detail-sheet-changed", callback);
 }
-export function openDetailSheet(i: number) {
-  detailSheetIndex = i;
+export function openDetailSheet(id: string) {
+  detailSheetId = id;
   window.dispatchEvent(new CustomEvent("az:detail-sheet-changed"));
 }
 export function closeDetailSheet() {
-  detailSheetIndex = null;
+  detailSheetId = null;
   window.dispatchEvent(new CustomEvent("az:detail-sheet-changed"));
 }
-export function useDetailSheetIndex(): number | null {
-  return useSyncExternalStore(subscribeDetailSheet, () => detailSheetIndex);
+export function useDetailSheetId(): string | null {
+  return useSyncExternalStore(subscribeDetailSheet, () => detailSheetId);
 }
 
-// "哪个edit sheet开着"——跟上面detailSheetIndex完全同一个模式(React自己拥有的UI状态，不经过
+// "哪个edit sheet开着"——跟上面detailSheetId完全同一个模式(React自己拥有的UI状态，不经过
 // window.__azBridge)，独立的az:edit-sheet-changed事件(不复用az:detail-sheet-changed，理由
 // 同上："哪个sheet开着"这类状态各自独立成事件，别人不关心的sheet开关不该收到无意义的通知)。
-// null=关闭，-1=新增债务模式(对应vanilla原来editIndex=-1的含义)，>=0=编辑debts[i]。
-let editSheetIndex: number | null = null;
+// null=关闭，NEW_DEBT_ID=新增债务模式(对应vanilla原来editIndex=-1的含义，改用字符串哨兵值
+// 是因为真实id都是字符串，"-1"这种数字约定没法直接沿用)，其它字符串=编辑对应id的debt。
+export const NEW_DEBT_ID = "new";
+let editSheetId: string | null = null;
 function subscribeEditSheet(callback: () => void) {
   window.addEventListener("az:edit-sheet-changed", callback);
   return () => window.removeEventListener("az:edit-sheet-changed", callback);
 }
-export function openEditSheet(i: number) {
-  editSheetIndex = i;
+export function openEditSheet(id: string) {
+  editSheetId = id;
   window.dispatchEvent(new CustomEvent("az:edit-sheet-changed"));
 }
 export function closeEditSheet() {
-  editSheetIndex = null;
+  editSheetId = null;
   window.dispatchEvent(new CustomEvent("az:edit-sheet-changed"));
 }
-export function useEditSheetIndex(): number | null {
-  return useSyncExternalStore(subscribeEditSheet, () => editSheetIndex);
+export function useEditSheetId(): string | null {
+  return useSyncExternalStore(subscribeEditSheet, () => editSheetId);
 }
 
 // 账户详情/订阅页/条款页——第七步(React迁移收尾)新增的三个always-mounted subpage，跟
@@ -186,22 +189,22 @@ export function useTermsScreenOpen(): boolean {
 }
 
 // 提前还款模拟器——第八步(React迁移收尾)新增，跟detailSheet/editSheet同一个模式，但需要
-// 债务下标参数(模拟哪笔债务)，所以是useDetailSheetIndex()那种下标风格而不是布尔开关。
-let simScreenIndex: number | null = null;
+// 债务id参数(模拟哪笔债务)，所以是useDetailSheetId()那种风格而不是布尔开关。
+let simScreenId: string | null = null;
 function subscribeSimScreen(callback: () => void) {
   window.addEventListener("az:sim-screen-changed", callback);
   return () => window.removeEventListener("az:sim-screen-changed", callback);
 }
-export function openSimScreen(i: number) {
-  simScreenIndex = i;
+export function openSimScreen(id: string) {
+  simScreenId = id;
   window.dispatchEvent(new CustomEvent("az:sim-screen-changed"));
 }
 export function closeSimScreen() {
-  simScreenIndex = null;
+  simScreenId = null;
   window.dispatchEvent(new CustomEvent("az:sim-screen-changed"));
 }
-export function useSimScreenIndex(): number | null {
-  return useSyncExternalStore(subscribeSimScreen, () => simScreenIndex);
+export function useSimScreenId(): string | null {
+  return useSyncExternalStore(subscribeSimScreen, () => simScreenId);
 }
 
 // 还款提醒通知设置面板——第八步新增，布尔开关，跟accountScreen/premiumScreen/termsScreen
@@ -313,14 +316,3 @@ export function useFiles(): FileItem[] {
   return useSyncExternalStore(subscribeFiles, getFilesSnapshot);
 }
 
-// WeakMap给每个debt对象懒生成一个稳定的React key——commitReorder只是重排同一批对象引用的
-// 顺序(不克隆)，只要对象引用不变(拖拽重排属于这种情况)，key就稳定；debts被整体替换成新对象时
-// (备份恢复/导入JSON)，WeakMap查不到旧key，自然生成新key——这正是这种情况下应有的行为，不需要
-// 给debt数据模型加真正的id字段(那是一个更大的架构决定，不在这次范围内)。
-const keyMap = new WeakMap<Debt, string>();
-let nextKeyId = 0;
-export function keyFor(d: Debt): string {
-  let k = keyMap.get(d);
-  if (!k) { k = "d" + nextKeyId++; keyMap.set(d, k); }
-  return k;
-}

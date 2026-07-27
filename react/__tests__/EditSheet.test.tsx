@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { EditSheet } from "../src/sheets/EditSheet";
-import { closeEditSheet, openEditSheet, useEditSheetIndex } from "../src/shared/state";
+import { closeEditSheet, NEW_DEBT_ID, openEditSheet, useEditSheetId } from "../src/shared/state";
 import { makeMockBridge, makeDebt } from "./mockBridge";
 import type { Debt } from "../src/types";
 
@@ -14,24 +14,24 @@ function getForm(container: HTMLElement) {
 }
 
 afterEach(() => {
-  closeEditSheet(); // editSheetIndex是模块级状态，重置避免测试间互相污染
+  closeEditSheet(); // editSheetId是模块级状态，重置避免测试间互相污染
 });
 
 describe("EditSheet 开关 + 回填", () => {
-  it("openEditSheet(-1)新增模式：标题新增债务，字段全空，没有删除按钮", () => {
+  it("openEditSheet(NEW_DEBT_ID)新增模式：标题新增债务，字段全空，没有删除按钮", () => {
     window.__azBridge = makeMockBridge();
     render(<EditSheet />);
-    act(() => { openEditSheet(-1); });
+    act(() => { openEditSheet(NEW_DEBT_ID); });
     expect(screen.getByText("新增债务")).toBeInTheDocument();
     expect(screen.getByLabelText(/贷款产品/)).toHaveValue("");
     expect(screen.queryByText("删除")).not.toBeInTheDocument();
   });
 
-  it("openEditSheet(i)编辑模式：标题编辑债务，字段回填debts[i]，有删除按钮", () => {
+  it("openEditSheet(id)编辑模式：标题编辑债务，字段回填对应debt，有删除按钮", () => {
     const debts: Debt[] = [makeDebt({ name: "银行贷", funder: "某银行", opened: "2026-01-01", notes: "备注文字" })];
     window.__azBridge = makeMockBridge({ debts });
     render(<EditSheet />);
-    act(() => { openEditSheet(0); });
+    act(() => { openEditSheet(debts[0].id); });
     expect(screen.getByText("编辑债务")).toBeInTheDocument();
     expect(screen.getByLabelText(/贷款产品/)).toHaveValue("银行贷");
     expect(screen.getByLabelText(/出资方/)).toHaveValue("某银行");
@@ -46,7 +46,7 @@ describe("EditSheet 开关 + 回填", () => {
     })];
     window.__azBridge = makeMockBridge({ debts });
     render(<EditSheet />);
-    act(() => { openEditSheet(0); });
+    act(() => { openEditSheet(debts[0].id); });
     fireEvent.click(screen.getByText("公式生成"));
     expect(screen.getByLabelText(/借款金额/)).toHaveValue(12000);
     expect(screen.getByLabelText(/年化/)).toHaveValue(6);
@@ -65,7 +65,7 @@ describe("一次性还清(oneTimeStash)", () => {
     })];
     window.__azBridge = makeMockBridge({ debts });
     render(<EditSheet />);
-    act(() => { openEditSheet(0); });
+    act(() => { openEditSheet(debts[0].id); });
     expect(screen.getAllByText(/第\d期/)).toHaveLength(2);
     fireEvent.click(screen.getByLabelText(/一次性还清/));
     expect(screen.getAllByText(/第\d期/)).toHaveLength(1); // 第2期被挪进oneTimeStash，界面上只剩1期
@@ -78,7 +78,7 @@ describe("保存校验", () => {
   it("名称为空：不调用setDebt", () => {
     window.__azBridge = makeMockBridge();
     const { container } = render(<EditSheet />);
-    act(() => { openEditSheet(-1); });
+    act(() => { openEditSheet(NEW_DEBT_ID); });
     fireEvent.submit(getForm(container));
     expect(window.__azBridge.setDebt).not.toHaveBeenCalled();
   });
@@ -86,7 +86,7 @@ describe("保存校验", () => {
   it("借款日为空：toast提示且不调用setDebt", () => {
     window.__azBridge = makeMockBridge();
     const { container } = render(<EditSheet />);
-    act(() => { openEditSheet(-1); });
+    act(() => { openEditSheet(NEW_DEBT_ID); });
     fireEvent.change(screen.getByLabelText(/贷款产品/), { target: { value: "测试贷" } });
     fireEvent.submit(getForm(container));
     expect(window.__azBridge.toast).toHaveBeenCalledWith("借款日必填");
@@ -96,7 +96,7 @@ describe("保存校验", () => {
   it("一期还款计划都没有：toast提示且不调用setDebt", () => {
     window.__azBridge = makeMockBridge();
     const { container } = render(<EditSheet />);
-    act(() => { openEditSheet(-1); });
+    act(() => { openEditSheet(NEW_DEBT_ID); });
     fireEvent.change(screen.getByLabelText(/贷款产品/), { target: { value: "测试贷" } });
     fireEvent.change(screen.getByLabelText(/借款日/), { target: { value: "2026-01-01" } });
     fireEvent.submit(getForm(container));
@@ -107,7 +107,7 @@ describe("保存校验", () => {
   it("第1期日期没填：toast提示且不调用setDebt", () => {
     window.__azBridge = makeMockBridge();
     const { container } = render(<EditSheet />);
-    act(() => { openEditSheet(-1); });
+    act(() => { openEditSheet(NEW_DEBT_ID); });
     fireEvent.change(screen.getByLabelText(/贷款产品/), { target: { value: "测试贷" } });
     fireEvent.change(screen.getByLabelText(/借款日/), { target: { value: "2026-01-01" } });
     fireEvent.click(screen.getByText("＋ 加一期"));
@@ -120,7 +120,7 @@ describe("保存校验", () => {
     const debts: Debt[] = [makeDebt({ opened: "2026-01-01" })];
     window.__azBridge = makeMockBridge({ debts });
     const { container } = render(<EditSheet />);
-    act(() => { openEditSheet(0); });
+    act(() => { openEditSheet(debts[0].id); });
     // .prow .r2 input顺序固定是[金额,本金,利息/费]——不用getAllByRole("spinbutton")按全局下标找，
     // 因为#f-day(只读)和批量设置的数值框也是<input type="number">，全局下标很容易数错。
     const r2Inputs = container.querySelectorAll(".prow .r2 input");
@@ -137,7 +137,7 @@ describe("保存校验", () => {
     })];
     window.__azBridge = makeMockBridge({ debts });
     const { container } = render(<EditSheet />);
-    act(() => { openEditSheet(0); });
+    act(() => { openEditSheet(debts[0].id); });
     fireEvent.submit(getForm(container));
     expect(window.__azBridge.toast).toHaveBeenCalledWith(expect.stringContaining("不能同时为0"));
     expect(window.__azBridge.setDebt).not.toHaveBeenCalled();
@@ -145,10 +145,10 @@ describe("保存校验", () => {
 });
 
 describe("保存成功", () => {
-  it("新增债务：setDebt(-1, obj) → saveAll → renderAll → 关闭 → toast", () => {
+  it("新增债务：setDebt(null, obj) → saveAll → renderAll → 关闭 → toast", () => {
     window.__azBridge = makeMockBridge();
     const { container } = render(<EditSheet />);
-    act(() => { openEditSheet(-1); });
+    act(() => { openEditSheet(NEW_DEBT_ID); });
     fireEvent.change(screen.getByLabelText(/贷款产品/), { target: { value: "测试贷" } });
     fireEvent.change(screen.getByLabelText(/借款日/), { target: { value: "2026-01-01" } });
     fireEvent.click(screen.getByText("＋ 加一期"));
@@ -159,24 +159,24 @@ describe("保存成功", () => {
     fireEvent.submit(getForm(container));
 
     expect(window.__azBridge.setDebt).toHaveBeenCalledTimes(1);
-    const [i, obj] = (window.__azBridge.setDebt as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(i).toBe(-1);
+    const [id, obj] = (window.__azBridge.setDebt as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(id).toBe(null);
     expect(obj.name).toBe("测试贷");
     expect(obj.plan[0].principal).toBe(480);
     expect(window.__azBridge.saveAll).toHaveBeenCalled();
     expect(window.__azBridge.renderAll).toHaveBeenCalled();
     expect(window.__azBridge.toast).toHaveBeenCalledWith("已保存 ✓");
-    const { result } = renderHook(() => useEditSheetIndex());
+    const { result } = renderHook(() => useEditSheetId());
     expect(result.current).toBe(null);
   });
 
-  it("编辑已有债务：setDebt(i, obj)里i是正确的下标", () => {
+  it("编辑已有债务：setDebt(id, obj)里id是正确的债务id", () => {
     const debts: Debt[] = [makeDebt({ opened: "2026-01-01" })];
     window.__azBridge = makeMockBridge({ debts });
     const { container } = render(<EditSheet />);
-    act(() => { openEditSheet(0); });
+    act(() => { openEditSheet(debts[0].id); });
     fireEvent.submit(getForm(container));
-    expect(window.__azBridge.setDebt).toHaveBeenCalledWith(0, expect.objectContaining({ name: "测试债务" }));
+    expect(window.__azBridge.setDebt).toHaveBeenCalledWith(debts[0].id, expect.objectContaining({ name: "测试债务" }));
   });
 });
 
@@ -184,7 +184,7 @@ describe("公式生成器(GenPanel)", () => {
   it("amort：生成计划写入还款计划表格，切回手动添加tab", () => {
     window.__azBridge = makeMockBridge();
     render(<EditSheet />);
-    act(() => { openEditSheet(-1); });
+    act(() => { openEditSheet(NEW_DEBT_ID); });
     fireEvent.click(screen.getByText("公式生成"));
     fireEvent.change(screen.getByLabelText(/借款金额/), { target: { value: "12000" } });
     fireEvent.change(screen.getByLabelText(/年化/), { target: { value: "6" } });
@@ -200,7 +200,7 @@ describe("公式生成器(GenPanel)", () => {
   it("首期还款日选29号：被拒绝清空+toast，不影响其它字段", () => {
     window.__azBridge = makeMockBridge();
     render(<EditSheet />);
-    act(() => { openEditSheet(-1); });
+    act(() => { openEditSheet(NEW_DEBT_ID); });
     fireEvent.click(screen.getByText("公式生成"));
     fireEvent.change(screen.getByLabelText(/首期还款日/), { target: { value: "2026-01-29" } });
     expect(window.__azBridge.toast).toHaveBeenCalledWith(expect.stringContaining("不支持29/30/31号"));
@@ -210,7 +210,7 @@ describe("公式生成器(GenPanel)", () => {
   it("amort：借款金额/年化/期数缺一个就toast提示必填，不生成", () => {
     window.__azBridge = makeMockBridge();
     render(<EditSheet />);
-    act(() => { openEditSheet(-1); });
+    act(() => { openEditSheet(NEW_DEBT_ID); });
     fireEvent.click(screen.getByText("公式生成"));
     fireEvent.change(screen.getByLabelText(/首期还款日/), { target: { value: "2026-02-01" } });
     fireEvent.click(screen.getByText("生成计划"));
@@ -221,7 +221,7 @@ describe("公式生成器(GenPanel)", () => {
   it("custom：按填的期数生成对应数量的空白行", () => {
     window.__azBridge = makeMockBridge();
     render(<EditSheet />);
-    act(() => { openEditSheet(-1); });
+    act(() => { openEditSheet(NEW_DEBT_ID); });
     fireEvent.click(screen.getByText("公式生成"));
     fireEvent.change(screen.getByLabelText(/计息方式/), { target: { value: "custom" } });
     fireEvent.change(screen.getByLabelText(/生成几期空白行/), { target: { value: "3" } });
@@ -243,7 +243,7 @@ describe("批量设置(BatchBlock)", () => {
     window.__azBridge = makeMockBridge({ debts });
     (window.__azBridge.confirmAsync as ReturnType<typeof vi.fn>).mockResolvedValueOnce("2026-03");
     render(<EditSheet />);
-    act(() => { openEditSheet(0); });
+    act(() => { openEditSheet(debts[0].id); });
     fireEvent.change(screen.getAllByRole("combobox").find((el) => el.querySelector('option[value="date"]'))!, { target: { value: "date" } });
     fireEvent.change(screen.getByPlaceholderText("几号（1-28）"), { target: { value: "15" } });
     fireEvent.click(screen.getByText("应用到全部"));
@@ -259,7 +259,7 @@ describe("批量设置(BatchBlock)", () => {
     window.__azBridge = makeMockBridge({ debts });
     (window.__azBridge.confirmAsync as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
     render(<EditSheet />);
-    act(() => { openEditSheet(0); });
+    act(() => { openEditSheet(debts[0].id); });
     fireEvent.change(screen.getAllByRole("combobox").find((el) => el.querySelector('option[value="date"]'))!, { target: { value: "date" } });
     fireEvent.change(screen.getByPlaceholderText("几号（1-28）"), { target: { value: "15" } });
     const before = (document.querySelector('.plan-rows input[type="date"]') as HTMLInputElement).value;
@@ -275,7 +275,7 @@ describe("批量设置(BatchBlock)", () => {
     window.__azBridge = makeMockBridge({ debts });
     (window.__azBridge.confirmAsync as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
     const { container } = render(<EditSheet />);
-    act(() => { openEditSheet(0); });
+    act(() => { openEditSheet(debts[0].id); });
     fireEvent.change(screen.getAllByRole("combobox").find((el) => el.querySelector('option[value="amount"]'))!, { target: { value: "amount" } });
     fireEvent.change(screen.getByPlaceholderText("数值"), { target: { value: "600" } });
     fireEvent.click(screen.getByText("应用到全部"));
@@ -291,7 +291,7 @@ describe("批量设置(BatchBlock)", () => {
     const debts: Debt[] = [makeDebt({ opened: "2026-01-01" })];
     window.__azBridge = makeMockBridge({ debts });
     render(<EditSheet />);
-    act(() => { openEditSheet(0); });
+    act(() => { openEditSheet(debts[0].id); });
     fireEvent.change(screen.getAllByRole("combobox").find((el) => el.querySelector('option[value="date"]'))!, { target: { value: "date" } });
     fireEvent.change(screen.getByPlaceholderText("几号（1-28）"), { target: { value: "29" } });
     fireEvent.click(screen.getByText("应用到全部"));
@@ -301,22 +301,22 @@ describe("批量设置(BatchBlock)", () => {
 });
 
 describe("删除", () => {
-  it("点删除：调用deleteDebt(i)", () => {
+  it("点删除：调用deleteDebt(id)", () => {
     const debts: Debt[] = [makeDebt()];
     window.__azBridge = makeMockBridge({ debts });
     render(<EditSheet />);
-    act(() => { openEditSheet(0); });
+    act(() => { openEditSheet(debts[0].id); });
     fireEvent.click(screen.getByText("删除"));
-    expect(window.__azBridge.deleteDebt).toHaveBeenCalledWith(0);
+    expect(window.__azBridge.deleteDebt).toHaveBeenCalledWith(debts[0].id);
   });
 
   it("debts数组因删除收缩(该条不存在了)：sheet自动关闭", () => {
     const debts: Debt[] = [makeDebt()];
     window.__azBridge = makeMockBridge({ debts });
     const { rerender } = render(<EditSheet />);
-    act(() => { openEditSheet(0); });
-    const { result } = renderHook(() => useEditSheetIndex());
-    expect(result.current).toBe(0);
+    act(() => { openEditSheet(debts[0].id); });
+    const { result } = renderHook(() => useEditSheetId());
+    expect(result.current).toBe(debts[0].id);
 
     // 模拟vanilla deleteDebt()确认后splice+派发az:state-changed
     debts.splice(0, 1);
@@ -328,15 +328,16 @@ describe("删除", () => {
   it("⚠️回归：删除的不是数组最后一条时，splice导致下标顺移，也要正确自动关闭(不能只按下标判断)", () => {
     // 这是真实踩过的坑：第一版用`!debts[editIndex]`判断，splice(0,1)后原来排第2的debt会顺移
     // 到下标0，`debts[0]`变成"存在，但是另一条债务"，条件误判成false，sheet不关闭、还显示着
-    // 已经被删掉的那条债务的过期数据。正确做法是按对象引用(editedDebtRef)判断，不依赖下标。
+    // 已经被删掉的那条债务的过期数据。当时用对象引用(editedDebtRef)打了补丁；现在债务有了
+    // 真正的id字段，直接按id查找是否还在数组里是结构上正确的写法，不再需要那个workaround。
     const target = makeDebt({ name: "被删的这条" });
     const other = makeDebt({ name: "另一条" });
     const debts: Debt[] = [target, other];
     window.__azBridge = makeMockBridge({ debts });
     const { rerender } = render(<EditSheet />);
-    act(() => { openEditSheet(0); }); // 编辑target(下标0)
-    const { result } = renderHook(() => useEditSheetIndex());
-    expect(result.current).toBe(0);
+    act(() => { openEditSheet(target.id); }); // 编辑target
+    const { result } = renderHook(() => useEditSheetId());
+    expect(result.current).toBe(target.id);
 
     debts.splice(0, 1); // target被删，other顺移到下标0
     act(() => { window.dispatchEvent(new CustomEvent("az:state-changed")); });
@@ -347,11 +348,12 @@ describe("删除", () => {
 
 describe("返回键 window.__azEditSheetBack", () => {
   it("打开时返回true并关闭，关闭时返回false", () => {
-    window.__azBridge = makeMockBridge({ debts: [makeDebt()] });
+    const debts: Debt[] = [makeDebt()];
+    window.__azBridge = makeMockBridge({ debts });
     render(<EditSheet />);
-    act(() => { openEditSheet(0); });
+    act(() => { openEditSheet(debts[0].id); });
     expect(window.__azEditSheetBack!()).toBe(true);
-    const { result } = renderHook(() => useEditSheetIndex());
+    const { result } = renderHook(() => useEditSheetId());
     expect(result.current).toBe(null);
     expect(window.__azEditSheetBack!()).toBe(false);
   });

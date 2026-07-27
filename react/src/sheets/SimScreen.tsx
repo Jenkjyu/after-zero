@@ -3,7 +3,7 @@
 // debtSort当年"没有别的地方依赖它，整体移交"是同一个先例——这里不经过__azBridge。
 // simulatePrepay()仍然是calc.js全局纯函数，直接window.simulatePrepay(...)调用。
 import { useEffect, useState } from "react";
-import { closeSimScreen, useDebts, useSimScreenIndex } from "../shared/state";
+import { closeSimScreen, useDebts, useSimScreenId } from "../shared/state";
 
 const SIM_KEY = "after-zero-simulate-v1";
 
@@ -39,9 +39,9 @@ interface SimResultView {
 }
 
 export function SimScreen() {
-  const openIndex = useSimScreenIndex();
+  const openId = useSimScreenId();
   const debts = useDebts();
-  const [displayIndex, setDisplayIndex] = useState<number | null>(null);
+  const [displayId, setDisplayId] = useState<string | null>(null);
   const [mode, setMode] = useState<"once" | "recurring">("once");
   const [extra, setExtra] = useState("");
   const [atPeriod, setAtPeriod] = useState("1");
@@ -51,26 +51,35 @@ export function SimScreen() {
   const [result, setResult] = useState<SimResultView | null>(null);
 
   useEffect(() => {
-    if (openIndex !== null) {
-      setDisplayIndex(openIndex);
+    if (openId !== null) {
+      setDisplayId(openId);
       const prefs = loadSimPrefs();
       setMode(prefs.mode);
       setExtra(prefs.extra ? String(prefs.extra) : "");
       setAtPeriod("1");
       setResult(null);
     }
-  }, [openIndex]);
+  }, [openId]);
+
+  // 债务在模拟器开着的时候消失(删除/结清后被恢复流程覆盖等)——自动关闭，跟DetailSheet.tsx/
+  // EditSheet.tsx同一个模式，按id(不是下标)判断是否还在。这个screen以前没有这层保护，是这次
+  // 引入债务id字段后顺手补上的一个小修复，见CLAUDE.md"债务对象加了真正的id字段"一节。
+  useEffect(() => {
+    if (openId !== null && !debts.some((x) => x.id === openId)) {
+      closeSimScreen();
+    }
+  });
 
   useEffect(() => {
     window.__azSimScreenBack = () => {
-      if (openIndex !== null) { closeSimScreen(); return true; }
+      if (openId !== null) { closeSimScreen(); return true; }
       return false;
     };
     return () => { delete window.__azSimScreenBack; };
-  }, [openIndex]);
+  }, [openId]);
 
-  const isOpen = openIndex !== null;
-  const d = displayIndex !== null ? debts[displayIndex] : undefined;
+  const isOpen = openId !== null;
+  const d = displayId !== null ? debts.find((x) => x.id === displayId) : undefined;
   const maxPeriod = d ? (d.terms || 1) : 1;
 
   function onRun() {

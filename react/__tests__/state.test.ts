@@ -8,7 +8,7 @@
 // 返回的原始数组，但内容应该始终一致。
 import { describe, expect, it } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { closeDetailSheet, closeEditSheet, keyFor, openDetailSheet, openEditSheet, useAccount, useDebts, useDetailSheetIndex, useEditSheetIndex, usePremium } from "../src/shared/state";
+import { closeDetailSheet, closeEditSheet, NEW_DEBT_ID, openDetailSheet, openEditSheet, useAccount, useDebts, useDetailSheetId, useEditSheetId, usePremium } from "../src/shared/state";
 import { makeMockBridge, makeDebt } from "./mockBridge";
 
 describe("useDebts / usePremium / useAccount", () => {
@@ -68,19 +68,19 @@ describe("useDebts / usePremium / useAccount", () => {
   });
 });
 
-describe("useDetailSheetIndex / openDetailSheet / closeDetailSheet", () => {
+describe("useDetailSheetId / openDetailSheet / closeDetailSheet", () => {
   it("初始值为null(没有sheet开着)", () => {
-    closeDetailSheet(); // 重置——detailSheetIndex是模块级状态，不同it()之间会残留上一次的值
-    const { result } = renderHook(() => useDetailSheetIndex());
+    closeDetailSheet(); // 重置——detailSheetId是模块级状态，不同it()之间会残留上一次的值
+    const { result } = renderHook(() => useDetailSheetId());
     expect(result.current).toBe(null);
   });
 
-  it("openDetailSheet(i)后重新渲染读到i，closeDetailSheet()后读到null——都不依赖az:state-changed事件", () => {
+  it("openDetailSheet(id)后重新渲染读到id，closeDetailSheet()后读到null——都不依赖az:state-changed事件", () => {
     closeDetailSheet();
-    const { result } = renderHook(() => useDetailSheetIndex());
+    const { result } = renderHook(() => useDetailSheetId());
     expect(result.current).toBe(null);
-    act(() => { openDetailSheet(3); });
-    expect(result.current).toBe(3);
+    act(() => { openDetailSheet("d3"); });
+    expect(result.current).toBe("d3");
     act(() => { closeDetailSheet(); });
     expect(result.current).toBe(null);
   });
@@ -89,52 +89,39 @@ describe("useDetailSheetIndex / openDetailSheet / closeDetailSheet", () => {
     window.__azBridge = makeMockBridge({ debts: [makeDebt()] });
     closeDetailSheet();
     const debtsHook = renderHook(() => useDebts());
-    const sheetHook = renderHook(() => useDetailSheetIndex());
+    const sheetHook = renderHook(() => useDetailSheetId());
     const before = debtsHook.result.current;
-    act(() => { openDetailSheet(1); });
-    expect(sheetHook.result.current).toBe(1);
+    act(() => { openDetailSheet("d1"); });
+    expect(sheetHook.result.current).toBe("d1");
     expect(debtsHook.result.current).toBe(before); // 没有派发az:state-changed，debts快照不变
   });
 });
 
-describe("useEditSheetIndex / openEditSheet / closeEditSheet", () => {
+describe("useEditSheetId / openEditSheet / closeEditSheet", () => {
   it("初始值为null(没有sheet开着)", () => {
     closeEditSheet();
-    const { result } = renderHook(() => useEditSheetIndex());
+    const { result } = renderHook(() => useEditSheetId());
     expect(result.current).toBe(null);
   });
 
-  it("openEditSheet(-1)是新增模式，openEditSheet(i)是编辑模式，closeEditSheet()回到null", () => {
+  it("openEditSheet(NEW_DEBT_ID)是新增模式，openEditSheet(id)是编辑模式，closeEditSheet()回到null", () => {
     closeEditSheet();
-    const { result } = renderHook(() => useEditSheetIndex());
-    act(() => { openEditSheet(-1); });
-    expect(result.current).toBe(-1);
-    act(() => { openEditSheet(2); });
-    expect(result.current).toBe(2);
+    const { result } = renderHook(() => useEditSheetId());
+    act(() => { openEditSheet(NEW_DEBT_ID); });
+    expect(result.current).toBe(NEW_DEBT_ID);
+    act(() => { openEditSheet("d2"); });
+    expect(result.current).toBe("d2");
     act(() => { closeEditSheet(); });
     expect(result.current).toBe(null);
   });
 
-  it("跟useDetailSheetIndex是各自独立的事件，互相不触发对方重渲染", () => {
+  it("跟useDetailSheetId是各自独立的事件，互相不触发对方重渲染", () => {
     closeDetailSheet();
     closeEditSheet();
-    const detailHook = renderHook(() => useDetailSheetIndex());
-    const editHook = renderHook(() => useEditSheetIndex());
-    act(() => { openEditSheet(0); });
-    expect(editHook.result.current).toBe(0);
+    const detailHook = renderHook(() => useDetailSheetId());
+    const editHook = renderHook(() => useEditSheetId());
+    act(() => { openEditSheet("d0"); });
+    expect(editHook.result.current).toBe("d0");
     expect(detailHook.result.current).toBe(null);
-  });
-});
-
-describe("keyFor", () => {
-  it("同一个债务对象引用多次调用返回同一个key(支撑拖拽重排后React key保持稳定)", () => {
-    const d = makeDebt();
-    expect(keyFor(d)).toBe(keyFor(d));
-  });
-
-  it("不同债务对象返回不同key", () => {
-    const a = makeDebt({ name: "a" });
-    const b = makeDebt({ name: "b" });
-    expect(keyFor(a)).not.toBe(keyFor(b));
   });
 });

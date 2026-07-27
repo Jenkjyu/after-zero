@@ -63,9 +63,13 @@ export function makeMockBridge(overrides?: {
   };
 }
 
-// 造一笔测试用债务对象——只填字段够用，跟真实recompute()产出的形状一致。
+// 造一笔测试用债务对象——只填字段够用，跟真实recompute()产出的形状一致。默认id前缀"test-d"
+// 刻意跟真实genDebtId()的"d..."区分开，万一某个bug意外命中"按真实id查找"这条路径会直接
+// 失败，而不是巧合般地通过。
+let nextTestDebtId = 0;
 export function makeDebt(overrides?: Partial<Debt>): Debt {
   return {
+    id: overrides?.id ?? "test-d" + nextTestDebtId++,
     name: "测试债务",
     plan: [{ date: "2026-08-01", amount: 500, principal: 480, interest: 20, paid: false }],
     settled: false,

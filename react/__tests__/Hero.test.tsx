@@ -12,7 +12,7 @@ describe("Hero", () => {
 
   it("有soonest时显示日期/金额/名称", () => {
     const d = makeDebt({ name: "银行贷", monthly: 2000 });
-    render(<Hero soonest={{ d, i: 0, next: new Date(2026, 6, 30), diff: 5 }} notifyEnabled={false} onBellClick={() => {}} />);
+    render(<Hero soonest={{ d, next: new Date(2026, 6, 30), diff: 5 }} notifyEnabled={false} onBellClick={() => {}} />);
     expect(screen.getByText("7月30日")).toBeInTheDocument();
     expect(screen.getByText("¥2,000")).toBeInTheDocument();
     expect(screen.getByText("银行贷")).toBeInTheDocument();

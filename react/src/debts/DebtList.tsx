@@ -12,7 +12,7 @@ import type { GestureCtx } from "./gestures";
 import { closeDebtSwipe, finishDrag } from "./gestures";
 import { DebtCard } from "./DebtCard";
 import { SettledList } from "./SettledList";
-import { keyFor, openEditSheet } from "../shared/state";
+import { NEW_DEBT_ID, openEditSheet } from "../shared/state";
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "rate-desc", label: "利率 高→低" },
@@ -109,13 +109,12 @@ export function DebtList({ debts }: DebtListProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const indexed = debts.map((d, i) => ({ d, i }));
-  const active = indexed.filter((o) => window.isActive(o.d));
-  const settled = indexed.filter((o) => !!o.d.settled);
+  const active = debts.filter((d) => window.isActive(d));
+  const settled = debts.filter((d) => !!d.settled);
   let sorted = active;
   if (sort !== "custom") {
     const keyFn = DEBT_SORTS[sort] ?? DEBT_SORTS["rate-desc"];
-    sorted = active.slice().sort((a, b) => keyFn(a.d) - keyFn(b.d));
+    sorted = active.slice().sort((a, b) => keyFn(a) - keyFn(b));
   }
 
   return (
@@ -137,11 +136,11 @@ export function DebtList({ debts }: DebtListProps) {
       </div>
       <div className="debt-hint">长按卡片可拖动排序</div>
       <div id="debtList" ref={containerRef}>
-        {sorted.map(({ d, i }) => (
-          <DebtCard key={keyFor(d)} d={d} i={i} jiggleMode={jiggleMode} ctx={ctx} />
+        {sorted.map((d) => (
+          <DebtCard key={d.id} d={d} jiggleMode={jiggleMode} ctx={ctx} />
         ))}
       </div>
-      <button type="button" className="add-btn" id="addBtn" onClick={() => openEditSheet(-1)}>＋ 新增一笔</button>
+      <button type="button" className="add-btn" id="addBtn" onClick={() => openEditSheet(NEW_DEBT_ID)}>＋ 新增一笔</button>
       <SettledList items={settled} />
     </>
   );
