@@ -32,6 +32,8 @@
 
 **Node测试环境靠文件末尾的`module.exports`兼容，浏览器里这段代码不会执行**：`calc.js`末尾有一段`if (typeof module !== "undefined" && module.exports) { module.exports = {...} }`——`test/calc.test.js`用`node:test`（Node自带，不用额外装包，`package.json`的`"type":"commonjs"`决定了这里用`require`不是`import`）直接`require("../www/js/calc.js")`跑单元测试；浏览器加载这个文件时是普通`<script src>`，`typeof module`是`"undefined"`，这段代码整个跳过，不会往全局塞一个多余的`module`变量。**以后这批纯函数还要再增补的话**，加到`calc.js`时记得同步把新函数名加进这段`module.exports`，忘记加的话`require`拿到的对象里会缺这个函数，`test/calc.test.js`里`calc.xxx is not a function`会立刻暴露出来，不难查。
 
+**CI（`.github/workflows/ci.yml`）会在每次push/PR时自动跑`npm test`/`npm run test:react`/`npx tsc --noEmit`（`react/`目录）/`npm run build:react`这4条命令**——都是纯命令行、不依赖Android SDK/真机的部分，天生适合搬进CI。安卓Gradle编译和Playwright真机手势验证这两块因为需要Android SDK或真实设备，继续保持手动做，没有搬进CI。
+
 跑测试：`npm test`（`package.json`的`"test"`脚本是`node --test 'test/*.test.js'`，**注意这个glob是显式写死的，不是裸的`node --test`**——见下面"React 迁移"一节的坑：`react/__tests__/`目录下也有`*.test.ts`文件是给Vitest用的，Node自带的`node:test`默认会递归扫描整个项目找测试文件，连`react/__tests__/`里那些`.ts`/`.tsx`都会被当成自己的测试用例尝试去跑（失败），显式限定glob只看根目录`test/`下的`.js`文件，两套测试工具（`node --test`测`calc.js`，`vitest`测React组件）才能互不干扰）。**这批测试完全不需要真机/浏览器**——不像这个项目里大多数"必须真机验证"的功能（原生插件、云函数、WebView专属行为），纯计算函数是这个项目里少数能在CI/命令行里可靠验证、桌面和真机行为保证一致的部分，以后改这些函数、或者再往`calc.js`里加新函数，先把对应的`node:test`补上再改代码，比每次都指望真机走一遍划算得多。
 
 **`summarizeDebts(debts)`是2026-07-24"React 迁移第二步"落地"在还债务"页时新增的第40个函数**：从vanilla`renderSummary()`内联的聚合逻辑（`total`/`monthly`/`paidPrincipal`/`paidInterest`/`active`/`settled`/`pct`）抽出来的纯函数——vanilla那份`renderSummary()`本身已经在这次迁移里整个删除（改由React调用这个函数），抽出来纯粹是为了同一份聚合数学被React组件复用，不是"这次批量整理31个函数"那一轮的产物，详见下面"React 迁移"一节。

@@ -54,6 +54,7 @@ cd android
 - `cloudbase/` —— 腾讯云开发（CloudBase）云函数的服务端代码，配合微信登录（`wxLogin`换取登录票据、`deleteAccount`处理注销账户）、Premium会员的云备份功能（`backupCreate`/`backupList`/`backupRestore`/`backupDelete`/`backupUploadFile`）、以及AI债务顾问（`aiAdvisor`，调用CloudBase内置大模型）使用，不属于Capacitor/Android那套构建流程，需要单独部署，细节见 `CLAUDE.md`
 - `resources/` —— App图标的设计源文件，改图标时改这里，然后跑 `npx @capacitor/assets generate --android` 重新生成 `android/app/src/main/res/mipmap-*/` 下的实际图标文件（细节和一个工具默认值的坑见 `CLAUDE.md`）
 - `capacitor.config.json` —— 包名、显示名、web目录配置
+- `.github/workflows/ci.yml` —— GitHub Actions，每次push/PR自动跑`npm test`/`npm run test:react`/`tsc --noEmit`/`npm run build:react`这几条纯命令行的检查（Android编译和真机验证不在CI里，仍需手动做）
 
 ## 备注
 
