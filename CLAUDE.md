@@ -38,6 +38,8 @@
 
 **`summarizeDebts(debts)`是2026-07-24"React 迁移第二步"落地"在还债务"页时新增的第40个函数**：从vanilla`renderSummary()`内联的聚合逻辑（`total`/`monthly`/`paidPrincipal`/`paidInterest`/`active`/`settled`/`pct`）抽出来的纯函数——vanilla那份`renderSummary()`本身已经在这次迁移里整个删除（改由React调用这个函数），抽出来纯粹是为了同一份聚合数学被React组件复用，不是"这次批量整理31个函数"那一轮的产物，详见下面"React 迁移"一节。
 
+**`computeMonthlyRepayment(debts)`是"统计tab视觉+交互升级"这轮（"月还款统计"图，详见下面"React 迁移"一节）新增的第41个函数**：按`plan`里每一期的`date`所在月份分组，拆已还(`actual`)/待还(`scheduled`)两条金额序列，月份在数据范围内按月连续补0（不留稀疏空洞）。**故意不塞进`computeReportData()`的返回对象**——那个对象被`exportReportXlsx`/`exportReportPdf`（100% vanilla）按字段名精确解构，改形状会同时打断两个导出功能，任何要给统计tab加的新数据维度都应该照这个先例独立成新函数，不要往被解构的对象里加字段。**不按`active`过滤**——已结清债务的历史已还记录仍要计入对应月份，否则一笔债务结清的瞬间会让过去月份的柱子突然变矮，是会让用户困惑的倒退。用`amount`（本金+利息合计）不是`principal`，这张图回答"当月要还多少钱"而不是负债本金变化。
+
 ## React 迁移：`react/` + "在还债务"页（绞杀者模式第一站）→ "还款日"+"统计"（第三步）→ "我的"（第四步，四个tab全部完成）→ `#detailSheet`（第五步，第一个非tab入口）→ `#editSheet`（第六步，全项目最复杂的一块UI）→ 收尾（第七~十一步，剩余全部subpage/sheet，已全部完成）——vanilla主`<script>`现在只剩数据模型+localStorage/IndexedDB读写+cloud函数/native插件调用这类impure逻辑，不再有任何JSX/DOM渲染代码
 
 "六续"定的三步走方向（React迁移+测试优先）第二步：**"在还债务" tab（app最核心、交互最复杂的页面——长按拖拽排序、左滑手势、玻璃卡片）整体由React接管**，走的是绞杀者模式（逐页面替换），这是第一站——之所以先啃最难的页面，是因为它风险和调试成本最高，但也是用户使用最频繁、出问题影响最大的页面，先做完这个，后面的页面都不算难。

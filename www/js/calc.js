@@ -220,6 +220,36 @@ function summarizeDebts(debts) {
   return { total: r2(total), monthly: r2(monthly), active: active, settled: settled, paidPrincipal: r2(paidPrincipal), paidInterest: r2(paidInterest), pct: pct };
 }
 
+// 统计tab"月还款统计"图用的月度聚合：按 plan 里每一期的 date 所在月份分组，拆已还(actual)/
+// 待还(scheduled)。故意不塞进 computeReportData() 的返回对象——那个对象被 exportReportXlsx/
+// exportReportPdf（100% vanilla）按字段名精确解构，改形状会同时打断两个导出功能，新维度必须
+// 独立成新函数。不按 active 过滤，已结清债务的历史已还记录仍要计入对应月份，否则一笔债务结清
+// 的瞬间会让过去月份的柱子突然变矮。用 amount（本金+利息合计）不是 principal——这张图回答
+// "当月要还多少钱"，不是负债本金变化。月份序列在 min~max 之间按月连续补齐，没数据的月份补0，
+// 避免看起来像数据缺失。
+function computeMonthlyRepayment(debts) {
+  var byMonth = {};
+  debts.forEach(function (d) {
+    (d.plan || []).forEach(function (r) {
+      var m = (r.date || "").slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(m)) return;
+      if (!byMonth[m]) byMonth[m] = { actual: 0, scheduled: 0 };
+      if (r.paid) byMonth[m].actual += (+r.amount || 0);
+      else byMonth[m].scheduled += (+r.amount || 0);
+    });
+  });
+  var keys = Object.keys(byMonth).sort();
+  if (!keys.length) return [];
+  var out = [], y = +keys[0].slice(0, 4), mo = +keys[0].slice(5, 7), endKey = keys[keys.length - 1], cur = keys[0];
+  while (cur <= endKey) {
+    var b = byMonth[cur] || { actual: 0, scheduled: 0 };
+    out.push({ month: cur, actual: r2(b.actual), scheduled: r2(b.scheduled) });
+    mo++; if (mo > 12) { mo = 1; y++; }
+    cur = y + "-" + pad(mo);
+  }
+  return out;
+}
+
 // 会员判断：原来直接读闭包变量 premium，改成显式传参（跟 detectMatchingSort/computeReportData
 // 参数化的道理一样）。premium 的形状是 {premium: {method, at} | null}，见 index.html 里 PREMIUM_KEY
 // 的注释——这里不重新解释那份数据模型，只是把判断逻辑本身搬出来。
@@ -248,6 +278,7 @@ if (typeof module !== "undefined" && module.exports) {
     amortForward: amortForward, simulatePrepay: simulatePrepay, detectMatchingSort: detectMatchingSort,
     urgencyTier: urgencyTier, relLabel: relLabel, dueBucket: dueBucket,
     isBadRepeatDay: isBadRepeatDay, offsetLabel: offsetLabel, computeReportData: computeReportData, summarizeDebts: summarizeDebts,
+    computeMonthlyRepayment: computeMonthlyRepayment,
     esc: esc, inline: inline, isHr: isHr, mdToHtml: mdToHtml, escSvg: escSvg, truncateLabel: truncateLabel,
     hasPremium: hasPremium, premiumLabel: premiumLabel, findAiConv: findAiConv, bumpAiConvTop: bumpAiConvTop
   };

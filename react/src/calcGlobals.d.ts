@@ -5,7 +5,7 @@
 //
 // 只声明已迁移的React页面实际会调用的几个，不是calc.js全部39个——够用即可，见CLAUDE.md
 // "React 迁移"一节。
-import type { AiConversation, Debt, DebtSummary, GenSpec, PlanRow, Premium, ReportData, SortKey } from "./types";
+import type { AiConversation, Debt, DebtSummary, GenSpec, MonthlyRepayment, PlanRow, Premium, ReportData, SortKey } from "./types";
 
 declare global {
   interface Window {
@@ -37,6 +37,9 @@ declare global {
     // 余额对比条形图的债务名做截断。
     computeReportData(debts: Debt[]): ReportData;
     truncateLabel(s: string, n: number): string;
+    // 统计tab"月还款统计"图(MonthlyChart.tsx)+第4张明细表(ReportTables.tsx)用：按月聚合
+    // 已还(actual)/待还(scheduled)金额，不按active过滤、月份连续补0，见calc.js注释。
+    computeMonthlyRepayment(debts: Debt[]): MonthlyRepayment[];
     // editSheet(react/src/sheets/EditSheet.tsx等)用：genPlan是公式生成器4种计息方式共用的
     // 生成函数，impliedAPR从还款计划反推年化利率(#planSum摘要用)，isBadRepeatDay拒绝
     // 29/30/31号(批量设置还款日/公式生成器首期还款日都要拒)，r2是两位小数四舍五入

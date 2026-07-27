@@ -282,6 +282,77 @@ test("summarizeDebts: 完成度百分比 = 已还本金/(已还本金+在还总�
   assert.equal(s2.settled, 0);
 });
 
+test("computeMonthlyRepayment: 空输入返回空数组", () => {
+  assert.deepEqual(calc.computeMonthlyRepayment([]), []);
+});
+
+test("computeMonthlyRepayment: 单笔债务已还/待还正确拆分", () => {
+  const d = {
+    plan: [
+      { date: "2026-01-15", amount: 1000, paid: true },
+      { date: "2026-02-15", amount: 1000, paid: false }
+    ]
+  };
+  const out = calc.computeMonthlyRepayment([d]);
+  assert.deepEqual(out, [
+    { month: "2026-01", actual: 1000, scheduled: 0 },
+    { month: "2026-02", actual: 0, scheduled: 1000 }
+  ]);
+});
+
+test("computeMonthlyRepayment: 两笔债务同月金额相加", () => {
+  const d1 = { plan: [{ date: "2026-03-05", amount: 500, paid: true }] };
+  const d2 = { plan: [{ date: "2026-03-20", amount: 300, paid: true }] };
+  const out = calc.computeMonthlyRepayment([d1, d2]);
+  assert.deepEqual(out, [{ month: "2026-03", actual: 800, scheduled: 0 }]);
+});
+
+test("computeMonthlyRepayment: settled=true 债务的已还记录仍被计入（不按active过滤）", () => {
+  const d = { settled: true, plan: [{ date: "2026-04-10", amount: 200, paid: true }] };
+  const out = calc.computeMonthlyRepayment([d]);
+  assert.deepEqual(out, [{ month: "2026-04", actual: 200, scheduled: 0 }]);
+});
+
+test("computeMonthlyRepayment: 月份缺口正确补0（1月和4月有数据，输出4条，2/3月为0）", () => {
+  const d = {
+    plan: [
+      { date: "2026-01-10", amount: 100, paid: true },
+      { date: "2026-04-10", amount: 200, paid: false }
+    ]
+  };
+  const out = calc.computeMonthlyRepayment([d]);
+  assert.deepEqual(out, [
+    { month: "2026-01", actual: 100, scheduled: 0 },
+    { month: "2026-02", actual: 0, scheduled: 0 },
+    { month: "2026-03", actual: 0, scheduled: 0 },
+    { month: "2026-04", actual: 0, scheduled: 200 }
+  ]);
+});
+
+test("computeMonthlyRepayment: 跨年补月（11月到次年2月）", () => {
+  const d = {
+    plan: [
+      { date: "2026-11-10", amount: 100, paid: true },
+      { date: "2027-02-10", amount: 150, paid: false }
+    ]
+  };
+  const out = calc.computeMonthlyRepayment([d]);
+  assert.deepEqual(out.map(x => x.month), ["2026-11", "2026-12", "2027-01", "2027-02"]);
+});
+
+test("computeMonthlyRepayment: date缺失/格式不对的行被防御性忽略", () => {
+  const d = {
+    plan: [
+      { date: "2026-05-01", amount: 100, paid: true },
+      { date: "", amount: 999, paid: true },
+      { amount: 999, paid: true },
+      { date: "not-a-date", amount: 999, paid: true }
+    ]
+  };
+  const out = calc.computeMonthlyRepayment([d]);
+  assert.deepEqual(out, [{ month: "2026-05", actual: 100, scheduled: 0 }]);
+});
+
 test("isActive / rateClass: 简单谓词", () => {
   assert.equal(calc.isActive({ settled: false }), true);
   assert.equal(calc.isActive({ settled: true }), false);

@@ -109,6 +109,15 @@ export interface ReportData {
   timeline: { date: string; balance: number }[];
 }
 
+// computeMonthlyRepayment(debts)的返回形状(见 www/js/calc.js)——"月还款统计"图(MonthlyChart.tsx)+
+// ReportTables第4张表用。故意不并入 ReportData，因为 ReportData 被 exportReportXlsx/exportReportPdf
+// 按字段名精确解构，新维度必须独立成型。
+export interface MonthlyRepayment {
+  month: string;
+  actual: number;
+  scheduled: number;
+}
+
 // AI 债务顾问历史对话记录（react/src/sheets/AiScreen.tsx用）——第十一步(React迁移收尾)后
 // AI_CHATLOG_KEY整体移交React所有权，直接读写localStorage(不经过bridge，跟SIM_KEY当年
 // 的先例一致)。messages里的role只有"user"/"assistant"两种(跟发给aiAdvisor云函数的history
