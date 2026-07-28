@@ -679,6 +679,14 @@ React迁移第三步时"统计"tab是最后一批机械翻译的组件（零手�
 - **删掉底部明细表的前提是"没有任何数值只能靠手势才读得到"**（dataviz的硬性anti-pattern：tooltip不能是读到值的唯一途径）。所以同一轮**给`TypeStack`的图例补上了金额**——那张表原本是唯一能看到各类型"具体多少钱"的地方。现在每个数值都有非手势的读法：`BalanceBars`每行自带金额、`TypeStack`图例带金额、`PressureChart`有Y轴刻度＋摘要行＋点击展开的当月债务组成、以及导出Excel/PDF这条完整表格路径。**⚠️`exportReportXlsx`/`exportReportPdf`是100%vanilla的独立实现，删`ReportTables.tsx`不影响它们**（这一点专门核实过）。
 - **模块顺序改成"先回答哪个问题"**：未来压力 → 是否在下降（负债预测走势）→ 结构分析（余额对比/类型占比）。
 
+**P2：走势图改真实时间轴、`BalanceBars`加排序切换、新增底部总结卡。**
+- **`PayoffLine`的X轴从"按数组下标等距"改成"按真实时间比例"**（`x = (date - t0)/(tEnd - t0) * W`）。原来的画法让折线斜率完全没有意义——同样陡的一段可能是一个月也可能是两年；密集期（多笔债务同期还款、时间线上点多）横向被拉宽，长尾期被压窄。**用户反馈过的"突然下降后长期水平"就是这么来的**：短期债务集中还完那段点很密、占了很宽的画布，剩一笔长债之后每月一个点且本金小，看起来就是一条长长的缓坡。时间比例之后斜率才真正代表"还债速度"。同时加了Y轴3档刻度、X轴3个时间刻度（今天/时间中点/还清月），标题改成"负债余额走势"+一个"预测"角标+一条footnote明说**这个App不保存历史余额、这条线不是实际走过的轨迹**（做不到"原计划vs实际"对比就诚实说明，不把预测包装成历史）。
+- **⚠️两张图共用的坐标轴外壳类名统一成`.chart-plot`/`.chart-gridline`/`.chart-xaxis`/`.chart-xtick`**（PressureChart专属的部件继续用`.pchart-`前缀），`niceCeil`也挪进了`calc.js`给两张图共用。
+- **⚠️踩了一个坐标系错配的坑，两张图都中招**：`.chart-plot`有`padding-left:34px`的刻度槽，而**绝对定位子元素的百分比是相对"含padding的整宽"算的**，不是相对内容区。所以直接把圆点挂在`.chart-plot`下面写`left:X%`，左端会偏34px、右端才恰好对上（这个"右端对得上"特别有迷惑性，容易以为没问题）。修法是加一层`.chart-area`（`position:absolute; left:34px; right:0`）当作真正的绘图区，SVG和圆点都挂在它里面。**同一个错配也让scrub手势的命中位置整体偏移**——`attachChartScrub`用`el.getBoundingClientRect()`映射手指落点到索引，绑在含刻度槽的`.chart-plot`上会让最左边那个点几乎点不到；现在PayoffLine绑`.chart-area`、PressureChart绑`.pchart-bars`，都是精确的绘图区。**以后再写"SVG图表 + 覆盖在上面的HTML标记"，先确认两者的定位参照是同一个盒子。**
+- **`BalanceBars`加了余额/利率/剩余利息三个排序维度，`.viz-bar-fill`的长度跟着当前维度换**，不是只换顺序——"标题说按利率排序、横条还是按余额画"会让读者以为最长的那条利率最高，是会直接误导人的。测试里专门构造了"余额最大的那笔利率最低"的fixture来锁这一点。数据源从`data.byName`换成`data.active`（利率在`d.rate`、剩余利息用新增的`remainingInterest(d)`现算），**故意不动`computeReportData`的返回形状**（`byName`被`exportReportPdf`按字段名解构）。
+- **新增`calc.js`的`remainingInterest(d)`（未还期次的interest之和）和`niceCeil(v)`**。⚠️`remainingInterest`对amort/equalfee/interestfirst都可靠，但"自定义"计划如果用户只填了金额、没拆本金/利息，会低估成0——UI两处（BalanceBars的"剩余利息"模式、总结卡）都带了这条口径提示，不能当精确值展示。
+- **新增`SummaryCard.tsx`**（底部统计总结），原则是**只放这一页别处看不到的结论**、不复述上面的数字：利率最高的是哪一笔、高息(≥18%，沿用`rateClass()`的既有分档)笔数与合计、剩余待付利息合计、距离还清还有几个月。**刻意不做"查看全部债务>"跳转按钮**——tabbar就在屏幕底部一步可达，为它新增一个跨React树切tab的桥接不划算（切tab目前是vanilla tabbar的职责）。
+
 - 口径说明的内容必须覆盖6条：在还总负债只算本金、累计已还本金含已结清、经常性月供不含一次性还清、归零进度只按本金算、预计还清日期是预测不是承诺、**以及"提前结清"的剩余本金既不计入总负债也不计入累计已还**（实际付了多少钱App并不知道，必须诚实说明，不能假装它被还了）。
 
 ## 云备份（Premium）

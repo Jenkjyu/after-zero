@@ -6,7 +6,7 @@
 // ReportTables（底部4张平铺明细表）整个删除——它跟债务页重复、把timeline几十行原样铺出来
 // 让页面很长、视觉上是裸<table>跟卡片体系不一致，而"看完整明细"这个需求由导出Excel/PDF
 // 承担（那两个函数是100%vanilla的独立实现，删这里不影响它们）。
-// 模块顺序按"先回答哪个问题"排：未来压力 → 是否在下降 → 结构分析。
+// 模块顺序按"先回答哪个问题"排：未来压力 → 是否在下降 → 结构分析 → 总结收尾。
 import { useMemo } from "react";
 import { useDebts, usePremium } from "../shared/state";
 import { Hero } from "./Hero";
@@ -14,6 +14,7 @@ import { BalanceBars } from "./BalanceBars";
 import { TypeStack } from "./TypeStack";
 import { PayoffLine } from "./PayoffLine";
 import { PressureChart } from "./PressureChart";
+import { SummaryCard } from "./SummaryCard";
 
 export function App() {
   const debts = useDebts();
@@ -29,6 +30,7 @@ export function App() {
         <PayoffLine data={data} />
         <BalanceBars data={data} />
         <TypeStack data={data} />
+        <SummaryCard data={data} totalAhead={pressure.totalAhead} />
       </div>
     </>
   );

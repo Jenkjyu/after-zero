@@ -43,6 +43,12 @@ declare global {
     // 统计tab"未来N个月还款压力"柱状图(PressureChart.tsx)用——按active过滤、逾期单独成桶、
     // 窗口从当前月起固定N个月、拆本金/利息两段，见calc.js注释。today参数只为可测，正常不传。
     computeUpcomingPressure(debts: Debt[], monthsAhead?: number, today?: Date): UpcomingPressure;
+    // 一笔债务按现有计划还到底还要再付多少利息/手续费(未还期次的interest之和)——BalanceBars的
+    // "按剩余利息排序"和总结卡的合计用。自定义计划没拆本息时会低估成0，见calc.js注释。
+    remainingInterest(d: Debt): number;
+    // 图表Y轴刻度取整到"好看数字"(档位表 1/1.5/2/2.5/3/4/5/6/8/10 ×10^n)——PressureChart和
+    // PayoffLine共用，见calc.js注释里"为什么档位不能只有1/2/2.5/5/10"。
+    niceCeil(v: number): number;
     // editSheet(react/src/sheets/EditSheet.tsx等)用：genPlan是公式生成器4种计息方式共用的
     // 生成函数，impliedAPR从还款计划反推年化利率(#planSum摘要用)，isBadRepeatDay拒绝
     // 29/30/31号(批量设置还款日/公式生成器首期还款日都要拒)，r2是两位小数四舍五入

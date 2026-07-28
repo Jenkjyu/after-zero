@@ -136,13 +136,15 @@ export function PressureChart({ data }: PressureChartProps) {
       </div>
 
       <div className="pchart">
-        <div className="pchart-plot" ref={plotRef}>
+        <div className="chart-plot">
           {[0, 0.5, 1].map((f) => (
-            <div key={f} className="pchart-gridline" style={{ bottom: f * 100 + "%" }}>
+            <div key={f} className="chart-gridline" style={{ bottom: f * 100 + "%" }}>
               <span className="num">{f === 0 ? "0" : window.fmt(top * f)}</span>
             </div>
           ))}
-          <div className="pchart-bars">
+          {/* ⚠️scrub绑在.pchart-bars不是.chart-plot——后者含34px的刻度槽(padding-left)，
+              手指落点映射到的索引会整体偏移，最左边那根柱子几乎点不到 */}
+          <div className="pchart-bars" ref={plotRef}>
             {months.map((m, i) => {
               const { pH, iH } = segHeights(m);
               return (
@@ -166,9 +168,9 @@ export function PressureChart({ data }: PressureChartProps) {
         </div>
         {/* x轴标签band在容器内部，不靠固定高度挤掉它(anti-pattern)。每个月都标(只写数字，
             约24px的柱距放得下)，跨年靠柱子上那条竖分隔线区分，见monthTick()的注释。 */}
-        <div className="pchart-xaxis">
+        <div className="chart-xaxis">
           {months.map((m, i) => (
-            <div key={m.month} className={"pchart-xtick" + (i === idx ? " active" : "")}>
+            <div key={m.month} className={"chart-xtick" + (i === idx ? " active" : "")}>
               {monthTick(m.month)}
             </div>
           ))}

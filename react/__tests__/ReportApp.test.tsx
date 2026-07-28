@@ -17,8 +17,10 @@ describe("report App", () => {
     // hero-label从"统计"改成了"在还总负债"——原来大金额上方没有任何口径标签(见Hero.tsx)
     expect(screen.getByText("在还总负债")).toBeInTheDocument();
     expect(screen.getByText("只算本金")).toBeInTheDocument();
-    // 已结清的网贷A不计入统计(computeReportData按!d.settled过滤)
-    expect(screen.getByText("6.00%")).toBeInTheDocument();
+    // 已结清的网贷A不计入统计(computeReportData按!d.settled过滤)——限定在Hero的KPI网格里，
+    // 底部总结卡的"利率最高"也会显示同一个6.00%
+    const kpiRates = [...document.querySelectorAll(".summary .kpi .v")].map((el) => el.textContent);
+    expect(kpiRates).toContain("6.00%");
     // 导出按钮收进了右上角"⋮"菜单，默认关闭，点触发器才显示
     expect(screen.queryByText("导出 Excel")).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("导出报表"));
@@ -33,9 +35,10 @@ describe("report App", () => {
     const blocks = [...document.querySelectorAll(".viz-block .viz-title")].map((el) => el.textContent);
     expect(blocks).toEqual([
       "未来12个月还款压力",
-      "负债预测走势（按现有还款计划推算）",
-      "各债务余额对比",
+      "负债余额走势",
+      "各债务剩余待还",
       "债务类型占比",
+      "统计总结",
     ]);
   });
 });

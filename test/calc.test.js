@@ -629,3 +629,31 @@ test("computeUpcomingPressure: 已还期次和一次性还清债务的处理", (
   assert.equal(aug.total, 8000, "已还期次不计入；一次性还清是真实的当月支出，必须计入");
   assert.equal(aug.items.length, 1);
 });
+
+test("remainingInterest: 只累加未还期次的利息/手续费", () => {
+  const d = { plan: [
+    { interest: 100, paid: true }, { interest: 90, paid: true },
+    { interest: 80, paid: false }, { interest: 70, paid: false },
+  ] };
+  assert.equal(calc.remainingInterest(d), 150); // 只算未还的 80+70
+  assert.equal(calc.remainingInterest({ plan: [] }), 0);
+  assert.equal(calc.remainingInterest({}), 0); // 没有plan字段也不抛异常
+  // 自定义计划没拆本息时会低估成0——这是数据缺口不是算错，UI措辞要留余地
+  assert.equal(calc.remainingInterest({ plan: [{ amount: 5000, principal: 0, interest: 0, paid: false }] }), 0);
+});
+
+test("niceCeil: 取整到好看的刻度数字，档位够细不会把柱子压成半格高", () => {
+  assert.equal(calc.niceCeil(2760), 3000); // 关键用例：粗档位下会被抬到5000
+  assert.equal(calc.niceCeil(2194), 2500);
+  assert.equal(calc.niceCeil(1733), 2000);
+  assert.equal(calc.niceCeil(1000), 1000); // 正好落在档位上不再往上跳
+  assert.equal(calc.niceCeil(1001), 1500);
+  assert.equal(calc.niceCeil(85), 100);
+  assert.equal(calc.niceCeil(0), 0);
+  assert.equal(calc.niceCeil(-5), 0);
+  // 每个档位的一半都还是整数（中间那条刻度线不会出现1,250这种零头）
+  [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].forEach((s) => {
+    if (s === 2.5) return; // 2500的一半是1250，是这批档位里唯一的例外，保留它是因为2000~2500之间需要一档
+    assert.equal((s * 1000) / 2 % 1, 0, `档位${s}k的一半不是整数`);
+  });
+});

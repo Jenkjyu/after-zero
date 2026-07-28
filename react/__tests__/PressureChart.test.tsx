@@ -86,8 +86,8 @@ describe("report/PressureChart", () => {
     expect(screen.getByText(/7月待还 ¥500/)).toBeInTheDocument();
     expect(screen.getByText("7月要还的债务")).toBeInTheDocument();
 
-    // 点9月那根柱子(index 2)——chartScrub挂在.pchart-plot上，用pointer事件模拟
-    const plot = document.querySelector(".pchart-plot") as HTMLElement;
+    // 点9月那根柱子(index 2)——chartScrub挂在.chart-plot上，用pointer事件模拟
+    const plot = document.querySelector(".pchart-bars") as HTMLElement;
     plot.getBoundingClientRect = () => ({ left: 0, width: 120, top: 0, height: 100, right: 120, bottom: 100, x: 0, y: 0, toJSON: () => ({}) });
     // 12个点均分120px：index 2 落在 2/11*120 ≈ 21.8
     fireEvent.pointerDown(plot, { pointerType: "mouse", pointerId: 1, clientX: 22 });
@@ -133,7 +133,7 @@ describe("report/PressureChart", () => {
   it("x轴每个月都标数字，跨年靠1月柱子的分隔线而不是加长标签", () => {
     const debts = [makeDebt({ id: "d1", plan: [row("2026-09-10", 100, 0)] })];
     render(<PressureChart data={pressureOf(debts)} />);
-    const ticks = [...document.querySelectorAll(".pchart-xtick")].map((t) => t.textContent);
+    const ticks = [...document.querySelectorAll(".chart-xtick")].map((t) => t.textContent);
     expect(ticks).toEqual(["7", "8", "9", "10", "11", "12", "1", "2", "3", "4", "5", "6"]);
     // 2027-01 那根(index 6)带跨年分隔线
     const cols = document.querySelectorAll(".pchart-col");
@@ -145,7 +145,7 @@ describe("report/PressureChart", () => {
     // 最大月1,733 → 刻度顶应该是2,000而不是1,733
     const debts = [makeDebt({ id: "d1", plan: [row("2026-09-10", 1733, 0)] })];
     render(<PressureChart data={pressureOf(debts)} />);
-    const ticks = [...document.querySelectorAll(".pchart-gridline span")].map((s) => s.textContent);
+    const ticks = [...document.querySelectorAll(".chart-gridline span")].map((s) => s.textContent);
     expect(ticks).toEqual(["0", "1,000", "2,000"]);
   });
 });

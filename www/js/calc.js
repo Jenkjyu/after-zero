@@ -334,6 +334,17 @@ function computeUpcomingPressure(debts, monthsAhead, today) {
   };
 }
 
+// 一笔债务按现有还款计划"还到底还要再付多少利息/手续费"——未还期次的 interest 之和。
+// 统计tab用在两个地方：BalanceBars 的"按剩余利息排序"、以及底部总结卡的"剩余待付利息"合计。
+// ⚠️这个数字对 amort/equalfee/interestfirst 三种生成方式都可靠(它们都会逐期写 interest)，
+// 但"自定义"计划如果用户只填了金额、没拆本金/利息，interest 会是0 → 这笔债务的剩余利息被
+// 低估成0。这是数据本身的缺口不是算错，UI上要按"可能偏低"来措辞，不能当成精确值展示。
+function remainingInterest(d) {
+  var s = 0;
+  (d.plan || []).forEach(function (r) { if (!r.paid) s += +r.interest || 0; });
+  return r2(s);
+}
+
 // 会员判断：原来直接读闭包变量 premium，改成显式传参（跟 detectMatchingSort/computeReportData
 // 参数化的道理一样）。premium 的形状是 {premium: {method, at} | null}，见 index.html 里 PREMIUM_KEY
 // 的注释——这里不重新解释那份数据模型，只是把判断逻辑本身搬出来。
@@ -350,6 +361,18 @@ function bumpAiConvTop(aiConvos, rec) { var idx = aiConvos.indexOf(rec); if (idx
 // escSvg跟esc实现内容目前相同，但是两个独立的调用点（esc给markdown渲染用，escSvg给
 // PDF导出的SVG图表文字用）——保留成两个名字，不合并，避免这次搬运顺带改变调用方式。
 function escSvg(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+// 图表Y轴刻度取整到"好看数字"——否则刻度会是 ¥1,733 这种没法快速心算的值。档位表要够细：
+// 只有 1/2/2.5/5/10 的话，最大值2,760会被抬到5,000，最高的柱子只有半格高，白白浪费一半画布；
+// 加上1.5/3/4/6/8之后落到3,000，且这些档位的一半(1.5k/2k/3k/4k)都还是整数，中间那条刻度线
+// 不会出现1,250这种零头。PressureChart(柱状)和PayoffLine(折线)共用这一份。
+var NICE_STEPS = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+function niceCeil(v) {
+  if (!(v > 0)) return 0;
+  var mag = Math.pow(10, Math.floor(Math.log10(v))), n = v / mag;
+  for (var i = 0; i < NICE_STEPS.length; i++) if (n <= NICE_STEPS[i]) return NICE_STEPS[i] * mag;
+  return 10 * mag;
+}
+
 // 报表图表/PDF导出用来截断过长的债务名/标签，后面补"…"。
 function truncateLabel(s, n) { s = String(s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 
@@ -363,6 +386,7 @@ if (typeof module !== "undefined" && module.exports) {
     urgencyTier: urgencyTier, relLabel: relLabel, dueBucket: dueBucket,
     isBadRepeatDay: isBadRepeatDay, offsetLabel: offsetLabel, computeReportData: computeReportData, summarizeDebts: summarizeDebts,
     computeMonthlyRepayment: computeMonthlyRepayment, computeUpcomingPressure: computeUpcomingPressure,
+    remainingInterest: remainingInterest, niceCeil: niceCeil,
     esc: esc, inline: inline, isHr: isHr, mdToHtml: mdToHtml, escSvg: escSvg, truncateLabel: truncateLabel,
     hasPremium: hasPremium, premiumLabel: premiumLabel, findAiConv: findAiConv, bumpAiConvTop: bumpAiConvTop
   };
