@@ -259,17 +259,17 @@ test("computeReportData: 没有在还债务时返回空结构而不是抛异常"
   assert.equal(data.timeline.length, 1); // 只有"今天"这一个起点
 });
 
-test("summarizeDebts: 已结清债务只计入settled计数，不计入本金/月供聚合", () => {
+test("summarizeDebts: 已结清债务不计入在还总负债/月供，但它已还的本金/利息计入累计", () => {
   const d1 = { settled: false, oneTime: false, balance: 1000, monthly: 200, paidPrincipal: 500, paidInterest: 50 };
   const d2 = { settled: false, oneTime: true, balance: 2000, monthly: 2000, paidPrincipal: 0, paidInterest: 0 }; // 一次性还清不计入monthly
-  const d3 = { settled: true, oneTime: false, balance: 0, monthly: 0, paidPrincipal: 3000, paidInterest: 300 }; // 已结清，被排除在外
+  const d3 = { settled: true, oneTime: false, balance: 0, monthly: 0, paidPrincipal: 3000, paidInterest: 300 };
   const s = calc.summarizeDebts([d1, d2, d3]);
   assert.equal(s.active, 2);
   assert.equal(s.settled, 1);
   assert.equal(s.total, 3000); // 只算未结清的balance: 1000+2000
   assert.equal(s.monthly, 200); // d2是oneTime不计入
-  assert.equal(s.paidPrincipal, 500); // 只算未结清的，d3的3000被排除
-  assert.equal(s.paidInterest, 50);
+  assert.equal(s.paidPrincipal, 3500); // 500 + 已结清d3的3000 ← 累计口径
+  assert.equal(s.paidInterest, 350); // 50 + 300
 });
 
 test("summarizeDebts: 完成度百分比 = 已还本金/(已还本金+在还总负债)，零本零负债兜底0%", () => {
@@ -463,35 +463,31 @@ function r2sum(rows) {
 // 这三条是2026-07-29"统计tab优化"调查阶段用真实数据跑出来的、确认存在的口径问题，
 // 每一条都先于实现写好并确认过是红的，不是事后补的描述性测试。
 
-test("summarizeAllTime: 已结清债务的已还本金/利息计入累计，结清瞬间数字不倒退（BUG-2 回归）", () => {
-  // 场景：一笔债务销掉最后一期→payInstallment把settled置为true。用户视角是"我刚还完一笔"，
-  // 统计页的"累计已还本金"绝不该因此变小。summarizeDebts()故意排除已结清债务（债务tab的
-  // 局部口径，有footnote说明，不动它），统计tab需要的是真正的累计口径。
+test("summarizeDebts: 债务结清瞬间已还金额/归零进度不倒退（BUG-2 回归）", () => {
+  // 真实场景：销掉最后一期→payInstallment把settled置为true。用户视角是"我刚还完一笔"，
+  // 已还金额和归零进度绝不该因此变小。这里曾经排除已结清债务，导致数字当场往回跳
+  // （用户真实报过：销掉后数字不动，过一会儿点"恢复"它自己又涨回来了）。
   const beforeSettle = { settled: false, oneTime: false, balance: 0, monthly: 0, paidPrincipal: 3000, paidInterest: 300 };
   const afterSettle = { settled: true, oneTime: false, balance: 0, monthly: 0, paidPrincipal: 3000, paidInterest: 300 };
-  const before = calc.summarizeAllTime([beforeSettle]);
-  const after = calc.summarizeAllTime([afterSettle]);
+  const before = calc.summarizeDebts([beforeSettle]);
+  const after = calc.summarizeDebts([afterSettle]);
   assert.equal(before.paidPrincipal, 3000);
   assert.equal(after.paidPrincipal, 3000); // 关键：结清前后完全一致，不掉回0
   assert.equal(after.paidInterest, 300);
-  assert.equal(after.pct, 100); // 全部还完=100%，不是summarizeDebts算出来的0%
+  assert.equal(after.pct, 100); // 全部还完=100%，不是旧口径算出来的0%
   assert.ok(after.pct >= before.pct, "归零进度不能因为一笔债务结清而倒退");
-  // 同时确认对照组：summarizeDebts 仍然是旧口径（这个函数本轮明确不改）
-  assert.equal(calc.summarizeDebts([afterSettle]).paidPrincipal, 0);
 });
 
-test("summarizeAllTime: 在还总负债/月供/笔数仍只算在还债务，只有累计已还是全量口径", () => {
-  const d1 = { settled: false, oneTime: false, balance: 1000, monthly: 200, paidPrincipal: 500, paidInterest: 50 };
-  const d2 = { settled: false, oneTime: true, balance: 2000, monthly: 2000, paidPrincipal: 0, paidInterest: 0 };
-  const d3 = { settled: true, oneTime: false, balance: 0, monthly: 0, paidPrincipal: 3000, paidInterest: 300 };
-  const s = calc.summarizeAllTime([d1, d2, d3]);
-  assert.equal(s.total, 3000); // 只算在还的balance，跟summarizeDebts一致
-  assert.equal(s.monthly, 200); // oneTime不计入，跟summarizeDebts一致
-  assert.equal(s.active, 2);
-  assert.equal(s.settled, 1);
-  assert.equal(s.paidPrincipal, 3500); // 500 + 已结清的3000 ← 唯一的差异点
-  assert.equal(s.paidInterest, 350); // 50 + 已结清的300
-  assert.equal(s.pct, 54); // 3500/(3500+3000)=53.8%→54
+test("summarizeDebts: 结清/恢复来回切换，已还金额保持不变（用户报的\"点恢复数字自己涨了\"）", () => {
+  // 一笔100元本金的一次性还清债务，销掉→settled=true，再点"恢复"→settled=false。
+  // 旧口径下这个来回会让已还金额 6144→6144→6244（结清期间那100被踢出去了）。
+  const base = { settled: false, oneTime: false, balance: 3000, monthly: 500, paidPrincipal: 6144, paidInterest: 120 };
+  const oneTime = { oneTime: true, balance: 0, monthly: 0, paidPrincipal: 100, paidInterest: 0 };
+  const settled = calc.summarizeDebts([base, { ...oneTime, settled: true }]);
+  const restored = calc.summarizeDebts([base, { ...oneTime, settled: false }]);
+  assert.equal(settled.paidPrincipal, 6244);
+  assert.equal(restored.paidPrincipal, 6244); // 两个状态必须一模一样
+  assert.equal(settled.pct, restored.pct);
 });
 
 test("computeUpcomingPressure: 提前结清的债务，未来未还期次不再计入待还（BUG-1 回归）", () => {

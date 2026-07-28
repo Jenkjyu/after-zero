@@ -5,10 +5,9 @@
 // hero-prog)——那张hero已经在展示完全相同的一份数据，"统计"tab的hero改用"总额+口径+还清时间"
 // 这个组合，跟"债务"tab的hero(总额+进度条)形成差异化定位。
 //
-// ⚠️这里读的是 summarizeAllTime() 不是 summarizeDebts()——后者排除已结清债务的已还本金/利息，
-// 会导致"销掉最后一期→债务结清→累计已还金额和归零进度当场倒退"。两个函数返回形状完全相同，
-// 是drop-in替换；为什么不直接改summarizeDebts见 www/js/calc.js 里的注释("债务"tab共用它，
-// 且那张卡片的footnote明写着自己的局部口径)。
+// summarizeDebts()的已还本金/利息是**累计口径(含已结清债务)**——这曾经是个真实bug(排除已结清
+// 会导致"销掉最后一期→债务结清→已还金额当场倒退")，2026-07-29修正时两个tab统一成了累计口径，
+// 详见 www/js/calc.js 里那个函数上面的注释。
 import { useState } from "react";
 import type { Debt, Premium, ReportData } from "../types";
 import { InfoTip } from "../shared/InfoTip";
@@ -21,7 +20,7 @@ export interface HeroProps {
 }
 
 export function Hero({ data, debts, premium }: HeroProps) {
-  const s = window.summarizeAllTime(debts);
+  const s = window.summarizeDebts(debts);
   const [noteOpen, setNoteOpen] = useState(false);
 
   return (

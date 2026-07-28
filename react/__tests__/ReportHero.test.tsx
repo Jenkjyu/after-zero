@@ -2,7 +2,7 @@
 // __tests__/Hero.test.tsx这个名字，两者在__tests__/是同一层目录，源码各自在pay/report子
 // 目录下不冲突，测试文件按tab名前缀消歧，照抄PayApp.test.tsx/ReportApp.test.tsx的既有惯例）。
 //
-// 走真实computeReportData+summarizeAllTime（calc.js通过setup.ts挂到window上，见CLAUDE.md
+// 走真实computeReportData+summarizeDebts（calc.js通过setup.ts挂到window上，见CLAUDE.md
 // "React 迁移"一节"为什么显式window.xxx调用"），不是另外手写一份mock聚合逻辑，避免跟真实
 // 实现悄悄分叉——跟report/App.tsx里useMemo(() => window.computeReportData(debts), [debts])
 // 这条真实数据链路保持一致。

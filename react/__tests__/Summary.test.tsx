@@ -12,8 +12,8 @@ describe("Summary", () => {
     render(<Summary debts={debts} premium={{ premium: null }} onAiBannerClick={() => {}} />);
     // hero: 只算未结清的1000
     expect(screen.getByText("1,000")).toBeInTheDocument();
-    // 已还金额KPI: 只算未结清的500(已结清的300被排除)
-    expect(screen.getByText("¥500")).toBeInTheDocument();
+    // 已还金额KPI: 累计口径=500+已结清的300=800（曾经排除已结清，是真实bug，见calc.js注释）
+    expect(screen.getByText("¥800")).toBeInTheDocument();
     // 在还笔数=1，已结清=1
     const kpis = document.querySelectorAll(".kpi .v");
     const values = Array.from(kpis).map((el) => el.textContent);

@@ -221,35 +221,24 @@ function mdToHtml(src) {
 // 在还债务主页hero/KPI的聚合数字：从 renderSummary() 内联的聚合逻辑抽出来的纯函数——
 // vanilla侧renderSummary()本身已经在React迁移里被删除，抽出来纯粹是为了给React组件复用，
 // 避免同一份"total/monthly/paidPrincipal/paidInterest累加"逻辑在两处各写一份、以后改一处忘了改另一处。
+//
+// ⚠️口径：**已还本金/已还利息算全量（含已结清债务），其余字段只算在还债务**。这两个口径混在
+// 同一个函数里看着别扭，但它们回答的是两个不同的问题：`total`/`monthly`/`active`是"我现在还欠
+// 多少、每月要还多少"（只跟在还债务有关），`paidPrincipal`/`paidInterest`/`pct`是"我一共已经
+// 还掉了多少"（是累计成就，已结清的债务恰恰是其中最大的一块）。
+//
+// 这里曾经是"已还本金也只算在还债务"，是一个真实的、用户报过的bug：一笔债务销掉最后一期→
+// 自动变成已结清→它已还的那部分本金被整个踢出统计，表现为"刚还完一笔钱，已还金额纹丝不动，
+// 过一会儿点了'恢复'它自己又涨回来了"；更糟的是`pct`（归零进度条）用同一份数字，意味着
+// **每还清一笔债务，进度条会往回缩**。当时"债务"tab的口径说明footnote里写着"两者都不含已结清
+// 的债务"试图解释这个行为，但真实用户不会读footnote，只会看到数字往回跳——文档解释不了的
+// 反直觉行为就是bug，不是特性。
+// 2026-07-29修正时曾短暂存在过一个只给"统计"tab用的`summarizeAllTime()`，后来确认两个tab都
+// 该用累计口径，就合并回这一个函数了，不留两份只差一点的实现。
 function summarizeDebts(debts) {
   var total = 0, monthly = 0, active = 0, settled = 0, paidPrincipal = 0, paidInterest = 0;
   debts.forEach(function (d) {
-    if (d.settled) { settled++; return; }
-    active++; total += +d.balance || 0; if (!d.oneTime) monthly += +d.monthly || 0;
     paidPrincipal += +d.paidPrincipal || 0; paidInterest += +d.paidInterest || 0;
-  });
-  var zeroBase = paidPrincipal + total, pct = zeroBase > 0 ? Math.round(paidPrincipal / zeroBase * 100) : 0;
-  return { total: r2(total), monthly: r2(monthly), active: active, settled: settled, paidPrincipal: r2(paidPrincipal), paidInterest: r2(paidInterest), pct: pct };
-}
-
-// 统计tab专用的"累计"口径聚合——跟上面的 summarizeDebts 只差一点：已还本金/已还利息算全量
-// (含已结清债务)，其余字段(在还总负债/经常性月供/笔数)口径完全一致。
-//
-// 为什么要单独一个函数而不是改 summarizeDebts：后者被"债务"tab的hero(debts/Summary.tsx)共用，
-// 那张卡片的口径说明footnote明写着"两者都不含已结清的债务"，是它自洽的局部口径。但"统计"tab
-// 语义上要的是真正的累计——用 summarizeDebts 会导致"销掉最后一期→债务结清→已还金额和归零进度
-// 当场倒退"(真实bug，见test/calc.test.js BUG-2回归用例)，用户刚还完一笔钱却看到统计数字变小。
-// 独立成新函数、不动被别处共用的既有函数，跟 computeMonthlyRepayment 当初不并入 computeReportData
-// 是同一个先例。
-//
-// ⚠️口径细节：提前结清(settleFull)只写 settled=true、不标记plan为已还，所以那笔债务的剩余本金
-// 既不在 total(它不再是active)也不在 paidPrincipal(那些行的paid仍是false)——它是"用一笔金额未知的
-// 钱结掉了"，两边都不计是诚实的处理，UI的口径说明里要讲清楚这一点，不能假装它被还了。
-function summarizeAllTime(debts) {
-  var total = 0, monthly = 0, active = 0, settled = 0, paidPrincipal = 0, paidInterest = 0;
-  debts.forEach(function (d) {
-    paidPrincipal += +d.paidPrincipal || 0;
-    paidInterest += +d.paidInterest || 0;
     if (d.settled) { settled++; return; }
     active++; total += +d.balance || 0; if (!d.oneTime) monthly += +d.monthly || 0;
   });
@@ -373,7 +362,6 @@ if (typeof module !== "undefined" && module.exports) {
     amortForward: amortForward, simulatePrepay: simulatePrepay, detectMatchingSort: detectMatchingSort,
     urgencyTier: urgencyTier, relLabel: relLabel, dueBucket: dueBucket,
     isBadRepeatDay: isBadRepeatDay, offsetLabel: offsetLabel, computeReportData: computeReportData, summarizeDebts: summarizeDebts,
-    summarizeAllTime: summarizeAllTime,
     computeMonthlyRepayment: computeMonthlyRepayment, computeUpcomingPressure: computeUpcomingPressure,
     esc: esc, inline: inline, isHr: isHr, mdToHtml: mdToHtml, escSvg: escSvg, truncateLabel: truncateLabel,
     hasPremium: hasPremium, premiumLabel: premiumLabel, findAiConv: findAiConv, bumpAiConvTop: bumpAiConvTop
