@@ -106,6 +106,41 @@ describe("report/PressureChart", () => {
     expect(screen.getByText("利息")).toBeInTheDocument();
   });
 
+  it("金额与本金+利息对不上时柱子仍落在Y轴之内（不会冲出画布）", () => {
+    // PlanRows.tsx的"金额"输入框可以单独改、不联动本金/利息，两者对不上是真实可能出现的
+    // 数据。柱高必须由total(=Y轴口径)决定、本金/利息只按比例切分它——否则两段各自按
+    // principal/top、interest/top独立算，这里会得出 2194% 的高度整根冲出画布。
+    const debts = [
+      makeDebt({
+        id: "d1",
+        plan: [{ date: "2026-09-10", principal: 1676, interest: 518, amount: 100, paid: false }],
+      }),
+    ];
+    render(<PressureChart data={pressureOf(debts)} />);
+    const segs = [...document.querySelectorAll(".pchart-col .seg")] as HTMLElement[];
+    const pcts = segs.map((el) => parseFloat(el.style.height) || 0);
+    expect(Math.max(...pcts)).toBeLessThanOrEqual(100);
+    // 同一根柱子两段之和 = total/top，不超过100%
+    const sep = [...document.querySelectorAll(".pchart-col")][2];
+    const sum = [...sep.querySelectorAll(".seg")].reduce(
+      (a, el) => a + (parseFloat((el as HTMLElement).style.height) || 0), 0);
+    expect(sum).toBeCloseTo(100, 1); // 这是唯一有金额的月份，所以它就是轴顶
+    // 比例仍然反映本金/利息的真实构成
+    const [pr, it] = [...sep.querySelectorAll(".seg")].map((el) => parseFloat((el as HTMLElement).style.height));
+    expect(pr / (pr + it)).toBeCloseTo(1676 / 2194, 2);
+  });
+
+  it("x轴每个月都标数字，跨年靠1月柱子的分隔线而不是加长标签", () => {
+    const debts = [makeDebt({ id: "d1", plan: [row("2026-09-10", 100, 0)] })];
+    render(<PressureChart data={pressureOf(debts)} />);
+    const ticks = [...document.querySelectorAll(".pchart-xtick")].map((t) => t.textContent);
+    expect(ticks).toEqual(["7", "8", "9", "10", "11", "12", "1", "2", "3", "4", "5", "6"]);
+    // 2027-01 那根(index 6)带跨年分隔线
+    const cols = document.querySelectorAll(".pchart-col");
+    expect(cols[6].className).toContain("year-break");
+    expect(cols[5].className).not.toContain("year-break");
+  });
+
   it("Y轴3档刻度取整到好看的数字，不是原始最大值", () => {
     // 最大月1,733 → 刻度顶应该是2,000而不是1,733
     const debts = [makeDebt({ id: "d1", plan: [row("2026-09-10", 1733, 0)] })];

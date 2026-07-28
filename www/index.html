@@ -752,6 +752,9 @@
   .pchart-stack .seg.interest.zero ~ .seg.principal { border-radius: 4px 4px 0 0; }
   .pchart-col.active .seg { filter: brightness(1.12); }
   .pchart-col.is-current .pchart-stack { box-shadow: 0 2px 0 0 var(--accent); }
+  /* 跨年分隔：1月那根柱子左侧一条竖线（x轴标签只写月份数字，年份靠这条线区分） */
+  .pchart-col.year-break::before { content: ""; position: absolute; left: -2px; top: 0; bottom: -4px;
+    width: 1px; background: var(--hair); }
   .pchart-peak { position: absolute; left: 50%; top: -1px; transform: translateX(-50%);
     width: 0; height: 0; border-left: 3.5px solid transparent; border-right: 3.5px solid transparent;
     border-top: 4px solid var(--text-faint); }

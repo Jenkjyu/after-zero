@@ -42,11 +42,17 @@ function niceCeil(v: number): number {
   return (NICE_STEPS.find((s) => n <= s) || 10) * mag;
 }
 
-// "2026-08" → "8月"。1月带上年份("27年1月")——12个月的窗口必然跨年，光写"1月"夹在
-// "10月"和"4月"中间看不出是哪一年；只在1月这一处标年，不是每个标签都带，避免轴变吵。
+// "2026-08" → "8月"。1月带上年份("27年1月")——12个月的窗口必然跨年，光写"1月"看不出是哪年。
+// 这个用在readout和摘要行里(有足够宽度)；x轴上用下面的monthTick()，只写数字。
 function monthLabel(m: string): string {
   const mo = +m.slice(5, 7);
   return mo === 1 ? m.slice(2, 4) + "年1月" : mo + "月";
+}
+// x轴刻度只写月份数字。12根柱子的间距约24px，"9"/"12"这种1~2字符稳稳放得下，所以**每个月都标**——
+// 原来只标i%3===0那4个，"哪根柱子是9月"得靠自己数，是真实的可用性问题。跨年靠1月柱子左边
+// 那条竖分隔线表达，不靠把某个标签写成"27年1月"(那个标签宽度是别人的2.5倍，必然撞上邻居)。
+function monthTick(m: string): string {
+  return String(+m.slice(5, 7));
 }
 
 export function PressureChart({ data }: PressureChartProps) {
@@ -75,6 +81,21 @@ export function PressureChart({ data }: PressureChartProps) {
   const active = months[idx];
   const top = niceCeil(Math.max(...months.map((m) => m.total))) || 1;
   const peakIdx = data.peak ? months.findIndex((m) => m.month === data.peak!.month) : -1;
+  const activeSplit = active.principal + active.interest;
+
+  // ⚠️柱子的总高度必须由 total(=这个月实际要还的钱，也就是Y轴的口径)决定，本金/利息只负责
+  // **按比例切分**这根柱子——不能让两段各自按 principal/top、interest/top 独立算高度。
+  // 原因：PlanRow 的 amount 和 principal+interest 在正常生成的计划里相等，但手动逐行编辑时
+  // PlanRows.tsx 的"金额"输入框是可以单独改的(不联动本金/利息)，两者一旦对不上，独立算高度
+  // 会让柱子画到 total/top 之外——实测过一个极端例子：amount=100 而 principal+interest=2194，
+  // 柱子高度算出来是 2194%，整根冲出画布(.pchart-stack 没有 overflow:hidden，也不该有——
+  // 裁掉只是把错误藏起来)。按比例切分则永远落在 total 之内，且正常数据下结果完全一致。
+  function segHeights(m: (typeof months)[number]) {
+    const barPct = (m.total / top) * 100;
+    const split = m.principal + m.interest;
+    if (split <= 0) return { pH: barPct, iH: 0 }; // 只填了金额没拆本息：整根按本金色画
+    return { pH: barPct * (m.principal / split), iH: barPct * (m.interest / split) };
+  }
 
   return (
     <div className="viz-block">
@@ -109,7 +130,9 @@ export function PressureChart({ data }: PressureChartProps) {
 
       <div className="viz-scrub-readout">
         {monthLabel(active.month)}待还 ¥{window.fmt(active.total)}
-        <span className="dim">（本金 ¥{window.fmt(active.principal)} · 利息 ¥{window.fmt(active.interest)}）</span>
+        {activeSplit > 0 && (
+          <span className="dim">（本金 ¥{window.fmt(active.principal)} · 利息 ¥{window.fmt(active.interest)}）</span>
+        )}
       </div>
 
       <div className="pchart">
@@ -121,13 +144,14 @@ export function PressureChart({ data }: PressureChartProps) {
           ))}
           <div className="pchart-bars">
             {months.map((m, i) => {
-              const pH = (m.principal / top) * 100;
-              const iH = (m.interest / top) * 100;
+              const { pH, iH } = segHeights(m);
               return (
                 <div
                   key={m.month}
                   className={
-                    "pchart-col" + (i === idx ? " active" : "") + (i === 0 ? " is-current" : "")
+                    "pchart-col" + (i === idx ? " active" : "") + (i === 0 ? " is-current" : "") +
+                    // 1月柱子左边一条竖分隔线表示跨年（x轴标签只写月份数字，年份靠这条线区分）
+                    (m.month.slice(5, 7) === "01" && i > 0 ? " year-break" : "")
                   }
                 >
                   {i === peakIdx && <span className="pchart-peak" aria-hidden="true" />}
@@ -140,12 +164,12 @@ export function PressureChart({ data }: PressureChartProps) {
             })}
           </div>
         </div>
-        {/* x轴标签band在容器内部，不靠固定高度挤掉它(anti-pattern)。12根柱子只标4个，
-            选择性标注，避免相邻标签撞在一起。当前月和被选中的那一根总是标出来。 */}
+        {/* x轴标签band在容器内部，不靠固定高度挤掉它(anti-pattern)。每个月都标(只写数字，
+            约24px的柱距放得下)，跨年靠柱子上那条竖分隔线区分，见monthTick()的注释。 */}
         <div className="pchart-xaxis">
           {months.map((m, i) => (
             <div key={m.month} className={"pchart-xtick" + (i === idx ? " active" : "")}>
-              {i % 3 === 0 || i === idx ? monthLabel(m.month) : ""}
+              {monthTick(m.month)}
             </div>
           ))}
         </div>
