@@ -24,8 +24,18 @@ describe("report App", () => {
     fireEvent.click(screen.getByLabelText("导出报表"));
     expect(screen.getByText("导出 Excel")).toBeInTheDocument();
     expect(screen.getByText("导出 PDF")).toBeInTheDocument();
-    // MonthlyChart(第4张图)已经接入viz-root
-    expect(screen.getByText("月还款统计")).toBeInTheDocument();
-    expect(screen.getByText("月还款明细")).toBeInTheDocument();
+    // PressureChart取代了MonthlyChart，且排在viz-root第一位（"未来压力"是这一页最该先看到的）
+    expect(screen.getByText("未来12个月还款压力")).toBeInTheDocument();
+    expect(screen.queryByText("月还款统计")).not.toBeInTheDocument();
+    // ReportTables(底部4张平铺明细表)整个删除——完整明细由导出Excel/PDF承担
+    expect(screen.queryByText("数据明细表")).not.toBeInTheDocument();
+    expect(screen.queryByText("月还款明细")).not.toBeInTheDocument();
+    const blocks = [...document.querySelectorAll(".viz-block .viz-title")].map((el) => el.textContent);
+    expect(blocks).toEqual([
+      "未来12个月还款压力",
+      "负债预测走势（按现有还款计划推算）",
+      "各债务余额对比",
+      "债务类型占比",
+    ]);
   });
 });

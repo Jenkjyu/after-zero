@@ -12,7 +12,7 @@
   }
   :root {
     --bg: #EEF0F4; --surface: #FFFFFF; --surface-2: #F6F7FA; --border: #DCE0E8;
-    --text: #23272F; --text-muted: #697082; --accent: #18453B; --accent-soft: #E7F3F1;
+    --text: #23272F; --text-muted: #697082; --accent: #18453B; --accent-soft: #E7F3F1; --accent-mid: #4E9481;
     --critical: #BE3A3A; --critical-soft: #F9E8E8; --warning: #A66A0A; --warning-soft: #FAF0D9;
     --good: #2E5F8A; --good-soft: #E1EBF4; --shadow: 0 2px 10px rgba(30,40,60,.08);
     --fs-xs: 11px; --fs-sm: 11.5px; --fs-base: 14px; --fs-lg: 15.5px; --fs-figure: 18px; --fs-xl: 19px; --fs-xxl: 23px;
@@ -29,7 +29,7 @@
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #101318; --surface: #191D24; --surface-2: #20252E; --border: #2B313B;
-      --text: #E4E8EF; --text-muted: #98A0B0; --accent: #6FBE9E; --accent-soft: #1D2B28;
+      --text: #E4E8EF; --text-muted: #98A0B0; --accent: #6FBE9E; --accent-soft: #1D2B28; --accent-mid: #2F7B65;
       --critical: #E56A6A; --critical-soft: #2E1D1F; --warning: #D69A3C; --warning-soft: #2B2316;
       --good: #6FA8D6; --good-soft: #1E2A33; --shadow: 0 2px 12px rgba(0,0,0,.35);
       --text-faint: #6E7787; --accent-rgb: 111,190,158; --app-grad: linear-gradient(180deg,#12161C,#0C0F14);
@@ -40,7 +40,7 @@
       --glass: rgba(30,36,45,.5); --glass-border: rgba(255,255,255,.09); --glass-hi: rgba(255,255,255,.07); }
   }
   :root[data-theme="light"] { --bg: #EEF0F4; --surface: #FFFFFF; --surface-2: #F6F7FA; --border: #DCE0E8;
-    --text: #23272F; --text-muted: #697082; --accent: #18453B; --accent-soft: #E7F3F1;
+    --text: #23272F; --text-muted: #697082; --accent: #18453B; --accent-soft: #E7F3F1; --accent-mid: #4E9481;
     --critical: #BE3A3A; --critical-soft: #F9E8E8; --warning: #A66A0A; --warning-soft: #FAF0D9;
     --good: #2E5F8A; --good-soft: #E1EBF4; --shadow: 0 2px 10px rgba(30,40,60,.08);
     --text-faint: #9AA3AD; --accent-rgb: 24,69,59; --app-grad: linear-gradient(180deg,#EFF2EF,#E7ECE8);
@@ -52,7 +52,7 @@
     --e3: 0 24px 50px rgba(12,24,18,.26);
     --glass: rgba(255,255,255,.5); --glass-border: rgba(255,255,255,.7); --glass-hi: rgba(255,255,255,.6); }
   :root[data-theme="dark"] { --bg: #101318; --surface: #191D24; --surface-2: #20252E; --border: #2B313B;
-    --text: #E4E8EF; --text-muted: #98A0B0; --accent: #6FBE9E; --accent-soft: #1D2B28;
+    --text: #E4E8EF; --text-muted: #98A0B0; --accent: #6FBE9E; --accent-soft: #1D2B28; --accent-mid: #2F7B65;
     --critical: #E56A6A; --critical-soft: #2E1D1F; --warning: #D69A3C; --warning-soft: #2B2316;
     --good: #6FA8D6; --good-soft: #1E2A33; --shadow: 0 2px 12px rgba(0,0,0,.35);
     --text-faint: #6E7787; --accent-rgb: 111,190,158; --app-grad: linear-gradient(180deg,#12161C,#0C0F14);
@@ -696,6 +696,8 @@
     cursor: pointer; border-radius: 7px; padding: 2px 6px; margin: -2px -6px; transition: background .15s ease;
     -webkit-tap-highlight-color: transparent; }
   .viz-legend-item.active { background: var(--surface-2); font-weight: 700; }
+  .viz-legend-amt { font-family: var(--font-num); font-variant-numeric: tabular-nums;
+    font-weight: 600; color: var(--text-muted); margin-left: 2px; }
   .viz-legend-swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
   .viz-line-svg { width: 100%; height: auto; display: block; }
   /* MonthlyChart.tsx/PayoffLine.tsx共用的"精确值展示行"——chartScrub.ts拖动/点击查看曲线
@@ -708,24 +710,60 @@
      改用--accent/--accent-soft这套PayoffLine已经在用、验证过对比度的现有配色。 */
   .viz-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
   .viz-title-row .viz-title { margin-bottom: 0; }
-  .viz-mode-toggle { display: flex; gap: 2px; background: var(--surface-2); border-radius: 9px; padding: 2px; }
-  .viz-mode-btn { background: none; border: none; padding: 4px 7px; border-radius: 7px; color: var(--text-muted);
-    display: flex; -webkit-tap-highlight-color: transparent; }
-  .viz-mode-btn svg { width: 15px; height: 15px; }
-  .viz-mode-btn.active { background: var(--card-grad); color: var(--accent); box-shadow: var(--e1); }
-  .viz-monthly-bars { display: flex; align-items: flex-end; gap: 3px; height: 90px; }
-  .viz-monthly-col { flex: 1; height: 100%; min-width: 0; cursor: pointer; }
-  .viz-monthly-col-track { position: relative; width: 100%; height: 100%; border-radius: 3px 3px 0 0;
-    background: var(--surface-2); overflow: hidden; }
-  .viz-monthly-seg-actual { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent); }
-  .viz-monthly-seg-scheduled { position: absolute; left: 0; right: 0; background: var(--accent-soft);
-    border-top: 1px dashed var(--accent); }
-  .viz-monthly-col.active .viz-monthly-seg-actual,
-  .viz-monthly-col.active .viz-monthly-seg-scheduled { filter: brightness(1.15); }
-  .viz-table-toggle { font-size: 12px; color: var(--accent); font-weight: 600; margin: 8px 0 0; }
-  .viz-table-toggle table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
-  .viz-table-toggle th, .viz-table-toggle td { padding: 6px 7px; text-align: right; border-bottom: 1px solid var(--border); }
-  .viz-table-toggle th:first-child, .viz-table-toggle td:first-child { text-align: left; }
+  /* ===== 未来12个月还款压力柱状图 (PressureChart.tsx) =====
+     规格逐条对照 dataviz skill：2px surface gap 分隔堆叠段/相邻柱(不画描边)、柱子≤24px粗、
+     顶端4px圆角底端方角、网格线1px实线(不用虚线)、文字一律text token不穿series色。
+     --accent-mid 是跑 validate_palette.js 验出来的第二级绿(对底色≥3:1，跟--accent的
+     normal-vision ΔE≥21)，不是随手挑的——原来的--accent-soft对白底只有1.14:1，等于隐形。 */
+  .pchart-legend { display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); }
+  .pchart-legend span { display: flex; align-items: center; gap: 5px; }
+  .pchart-legend .sw { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+  .pchart-legend .sw.principal { background: var(--accent); }
+  .pchart-legend .sw.interest { background: var(--accent-mid); }
+  .pchart-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-bottom: 12px; }
+  .pchart-stats .k { font-size: 11px; color: var(--text-muted); }
+  .pchart-stats .v { font-size: 14.5px; font-weight: 650; font-family: var(--font-num);
+    font-variant-numeric: tabular-nums; margin-top: 1px; }
+  .pchart-overdue { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+    color: var(--critical); background: var(--critical-soft); border-radius: 10px;
+    padding: 7px 10px; margin-bottom: 10px; }
+  .pchart-overdue svg { width: 14px; height: 14px; flex: none; }
+  .pchart-overdue .sub { margin-left: auto; font-weight: 500; font-size: 10.5px; opacity: .8; }
+  .viz-scrub-readout .dim { color: var(--text-faint); font-weight: 500; }
+  /* 容器高度含x轴band，不用固定高度把轴标签挤掉 */
+  .pchart { margin-top: 2px; }
+  .pchart-plot { position: relative; height: 108px; padding-left: 34px; }
+  .pchart-gridline { position: absolute; left: 34px; right: 0; height: 0;
+    border-top: 1px solid var(--hair); pointer-events: none; }
+  .pchart-gridline span { position: absolute; right: 100%; top: -6px; padding-right: 6px;
+    font-size: 9.5px; color: var(--text-faint); font-family: var(--font-num);
+    font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pchart-bars { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 100%; }
+  .pchart-col { position: relative; flex: 1; min-width: 0; height: 100%;
+    display: flex; align-items: flex-end; -webkit-tap-highlight-color: transparent; }
+  .pchart-stack { width: 100%; max-width: 24px; margin: 0 auto; height: 100%;
+    display: flex; flex-direction: column-reverse; gap: 2px; }
+  .pchart-stack .seg { width: 100%; flex: none; }
+  .pchart-stack .seg.principal { background: var(--accent); }
+  .pchart-stack .seg.interest { background: var(--accent-mid); border-radius: 4px 4px 0 0; }
+  /* 利息为0时圆角要落到本金那一段头上(顶端始终圆角、底端始终方角贴基线) */
+  .pchart-stack .seg.interest.zero { display: none; }
+  .pchart-stack .seg.interest.zero + .seg.principal,
+  .pchart-stack .seg.interest.zero ~ .seg.principal { border-radius: 4px 4px 0 0; }
+  .pchart-col.active .seg { filter: brightness(1.12); }
+  .pchart-col.is-current .pchart-stack { box-shadow: 0 2px 0 0 var(--accent); }
+  .pchart-peak { position: absolute; left: 50%; top: -1px; transform: translateX(-50%);
+    width: 0; height: 0; border-left: 3.5px solid transparent; border-right: 3.5px solid transparent;
+    border-top: 4px solid var(--text-faint); }
+  .pchart-xaxis { display: flex; gap: 2px; padding-left: 34px; margin-top: 5px; }
+  .pchart-xtick { flex: 1; min-width: 0; text-align: center; font-size: 9.5px;
+    color: var(--text-faint); white-space: nowrap; }
+  .pchart-xtick.active { color: var(--text-muted); font-weight: 700; }
+  .pchart-breakdown { margin-top: 12px; border-top: 1px solid var(--hair); padding-top: 10px; }
+  .pchart-bd-row { display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 12px; color: var(--text); padding: 3px 2px; }
+  .pchart-bd-row .num { font-family: var(--font-num); font-variant-numeric: tabular-nums;
+    font-weight: 600; }
   .report-actions { display: flex; gap: 8px; margin: 4px 0 20px; }
   /* 统计tab hero卡右上角"⋮"导出菜单触发器(report/ExportMenu.tsx)——照抄.pay-hero-bell的
      图标按钮定位模式，配色改用hero卡自己的石墨token(不是.pay-hero用的--accent/--text-muted，
