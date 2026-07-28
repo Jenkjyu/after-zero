@@ -688,6 +688,13 @@
   .viz-table-toggle th, .viz-table-toggle td { padding: 6px 7px; text-align: right; border-bottom: 1px solid var(--border); }
   .viz-table-toggle th:first-child, .viz-table-toggle td:first-child { text-align: left; }
   .report-actions { display: flex; gap: 8px; margin: 4px 0 20px; }
+  /* 统计tab hero卡右上角"⋮"导出菜单触发器(report/ExportMenu.tsx)——照抄.pay-hero-bell的
+     图标按钮定位模式，配色改用hero卡自己的石墨token(不是.pay-hero用的--accent/--text-muted，
+     那套是给彩色状态底的hero卡配的，这里的hero常年是石墨底)。 */
+  .report-hero-menu { background: none; border: none; padding: 4px; margin: -4px; border-radius: 8px;
+    color: var(--graphite-dim); display: flex; -webkit-tap-highlight-color: transparent; }
+  .report-hero-menu svg { width: 19px; height: 19px; }
+  .report-hero-menu.on { color: var(--graphite-text); background: rgba(255,255,255,.12); }
 
   /* 共享锚定浮层(react/src/shared/Popover.tsx)——"?"说明弹窗(InfoTip)和"⋮"导出菜单
      (report/ExportMenu.tsx)共用。popover-root给触发器元素做定位锚点，popover-panel贴着
