@@ -668,15 +668,23 @@
   }
   .viz-block { margin-bottom: 22px; }
   .viz-title { font-size: 13.5px; font-weight: 700; margin-bottom: 10px; }
-  .viz-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+  .viz-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px;
+    cursor: pointer; border-radius: 9px; padding: 2px 6px; margin-left: -6px; margin-right: -6px;
+    transition: background .15s ease; -webkit-tap-highlight-color: transparent; }
+  .viz-bar-row.active { background: var(--surface-2); }
+  .viz-bar-row.active .viz-bar-fill { filter: brightness(1.15); }
   .viz-bar-name { width: 84px; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
   .viz-bar-track { flex: 1; background: var(--surface-2); border-radius: 5px; height: 16px; position: relative; overflow: hidden; }
-  .viz-bar-fill { height: 100%; background: var(--accent); border-radius: 5px; }
+  .viz-bar-fill { height: 100%; background: var(--accent); border-radius: 5px; transition: filter .15s ease; }
   .viz-bar-val { width: 74px; flex: none; text-align: right; font-family: var(--font-num); font-weight: 600; }
   .viz-stack { display: flex; height: 26px; border-radius: 7px; overflow: hidden; margin-bottom: 10px; }
-  .viz-stack-seg { height: 100%; }
+  .viz-stack-seg { height: 100%; cursor: pointer; transition: opacity .15s ease; }
+  .viz-stack-seg.dim { opacity: .35; }
   .viz-legend { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-bottom: 4px; }
-  .viz-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text); }
+  .viz-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text);
+    cursor: pointer; border-radius: 7px; padding: 2px 6px; margin: -2px -6px; transition: background .15s ease;
+    -webkit-tap-highlight-color: transparent; }
+  .viz-legend-item.active { background: var(--surface-2); font-weight: 700; }
   .viz-legend-swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
   .viz-line-svg { width: 100%; height: auto; display: block; }
   /* MonthlyChart.tsx/PayoffLine.tsx共用的"精确值展示行"——chartScrub.ts拖动/点击查看曲线

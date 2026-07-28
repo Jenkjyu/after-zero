@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { BalanceBars } from "../src/report/BalanceBars";
 import type { ReportData } from "../src/types";
 
@@ -27,5 +27,29 @@ describe("BalanceBars", () => {
     expect(screen.getByText("信用卡分期还款计划…")).toBeInTheDocument();
     expect(screen.getByText("¥5,000")).toBeInTheDocument();
     expect(screen.getByText("¥1,000")).toBeInTheDocument();
+  });
+
+  it("点击行切换.active，再点一次清除，点其它行只有那一行高亮", () => {
+    const data: ReportData = {
+      ...base,
+      byName: [
+        { name: "网贷A", balance: 5000 },
+        { name: "网贷B", balance: 1000 },
+      ],
+    };
+    const { container } = render(<BalanceBars data={data} />);
+    const rows = container.querySelectorAll(".viz-bar-row");
+    expect(rows[0].className).not.toContain("active");
+
+    fireEvent.click(rows[0]);
+    expect(rows[0].className).toContain("active");
+    expect(rows[1].className).not.toContain("active");
+
+    fireEvent.click(rows[0]);
+    expect(rows[0].className).not.toContain("active");
+
+    fireEvent.click(rows[1]);
+    expect(rows[0].className).not.toContain("active");
+    expect(rows[1].className).toContain("active");
   });
 });

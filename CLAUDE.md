@@ -258,6 +258,8 @@ React组件挂载在同一份`index.html`文档里（不是iframe/独立页面�
 
 ### "统计"tab：纯`data → JSX`翻译，零手势，导出逻辑保持vanilla
 
+> **⚠️ 这一节标题里"零手势"这句话是描述React迁移第三步当时的状态，"统计tab视觉+交互升级"这轮（`react/src/report/`新增`chartScrub.ts`、`BalanceBars.tsx`/`TypeStack.tsx`加了点击高亮状态）之后已经不再成立**——细节以上面"React 迁移"一节末尾"⚠️'统计tab零手势'这句话...不成立"那条说明和下面新增的实施记录为准，这一节保留是为了如实记录当时那一步迁移的真实情况（纯翻译、零状态），不是当前状态。
+
 跟"在还债务"/"还款日"不同，"统计"tab完全没有手势代码，也没有任何tab内部状态（`payFilter`/`jiggleMode`这类）——`renderBalanceBars`/`renderTypeStack`/`renderPayoffLine`/`renderReportTables`这4个vanilla函数原本就是纯粹的"给定`data`（`computeReportData(debts)`的返回值）拼出HTML字符串"，翻译成`react/src/report/`下同名的`.tsx`组件（`BalanceBars.tsx`/`TypeStack.tsx`/`PayoffLine.tsx`/`ReportTables.tsx`）只是把字符串拼接换成JSX，数学/条件分支逻辑一行没改，是这三步迁移里风险最低、最接近"机械翻译"的一次。**JSX的文本插值天然转义，字符串拼接版本里手动调用的`esc()`在JSX版本里不需要了**（不是行为变化，是JSX本身的固有安全特性替代了手动转义这一步）。**导出按钮（`exportReportXlsx`/`exportReportPdf`）本身没有搬进React**——已确认这两个函数零DOM依赖（只读`debts`造Blob），继续100%vanilla，只是新增桥接给React的`ExportActions.tsx`调用，premium门禁判断原样复刻。
 
 ### 已完成的验证 & 还没做的验证
