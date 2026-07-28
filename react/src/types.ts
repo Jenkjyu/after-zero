@@ -118,6 +118,30 @@ export interface MonthlyRepayment {
   scheduled: number;
 }
 
+// computeUpcomingPressure(debts, monthsAhead?, today?)的返回形状(见 www/js/calc.js)——统计tab
+// "未来N个月还款压力"柱状图(PressureChart.tsx)用。跟 MonthlyRepayment 的关键区别：只算在还债务
+// (已结清债务的剩余期次不再被当成"待还")、逾期单独成桶不混进未来月份、窗口从当前月起固定N个月、
+// 金额拆本金/利息两段。手续费没有独立字段(equalfee的手续费直接写进PlanRow.interest)，所以只有
+// 两段、没有第三段——宁可少一个维度也不制造不可信数据。
+export interface UpcomingPressureMonth {
+  month: string;
+  principal: number;
+  interest: number;
+  total: number;
+  // 这个月每笔债务各要还多少(同一笔债务同月多期已合并)，按金额降序——点击某根柱子时展开用。
+  items: { id: string; name: string; amount: number }[];
+}
+export interface UpcomingPressure {
+  // 已逾期未销的期次汇总(date < 今天 且 !paid)——"已经错过"跟"即将要还"是两件事，图上单独一根柱。
+  overdue: { amount: number; principal: number; interest: number; count: number };
+  months: UpcomingPressureMonth[];
+  currentMonth: string;
+  totalAhead: number;
+  monthlyAvg: number;
+  // 窗口内金额最高的月份；全部为0时是null(不返回一个total为0的假峰值)。
+  peak: { month: string; total: number } | null;
+}
+
 // AI 债务顾问历史对话记录（react/src/sheets/AiScreen.tsx用）——第十一步(React迁移收尾)后
 // AI_CHATLOG_KEY整体移交React所有权，直接读写localStorage(不经过bridge，跟SIM_KEY当年
 // 的先例一致)。messages里的role只有"user"/"assistant"两种(跟发给aiAdvisor云函数的history

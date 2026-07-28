@@ -5,7 +5,7 @@
 //
 // 只声明已迁移的React页面实际会调用的几个，不是calc.js全部39个——够用即可，见CLAUDE.md
 // "React 迁移"一节。
-import type { AiConversation, Debt, DebtSummary, GenSpec, MonthlyRepayment, PlanRow, Premium, ReportData, SortKey } from "./types";
+import type { AiConversation, Debt, DebtSummary, GenSpec, MonthlyRepayment, PlanRow, Premium, ReportData, SortKey, UpcomingPressure } from "./types";
 
 declare global {
   interface Window {
@@ -40,6 +40,13 @@ declare global {
     // 统计tab"月还款统计"图(MonthlyChart.tsx)+第4张明细表(ReportTables.tsx)用：按月聚合
     // 已还(actual)/待还(scheduled)金额，不按active过滤、月份连续补0，见calc.js注释。
     computeMonthlyRepayment(debts: Debt[]): MonthlyRepayment[];
+    // 统计tab"累计"口径聚合(Hero.tsx用)——跟summarizeDebts只差"已还本金/利息算全量(含已结清)"
+    // 这一点，返回形状完全相同，所以是drop-in替换。为什么不直接改summarizeDebts：那个函数被
+    // "债务"tab的hero共用且有配套的口径说明footnote，见calc.js注释。
+    summarizeAllTime(debts: Debt[]): DebtSummary;
+    // 统计tab"未来N个月还款压力"柱状图(PressureChart.tsx)用——按active过滤、逾期单独成桶、
+    // 窗口从当前月起固定N个月、拆本金/利息两段，见calc.js注释。today参数只为可测，正常不传。
+    computeUpcomingPressure(debts: Debt[], monthsAhead?: number, today?: Date): UpcomingPressure;
     // editSheet(react/src/sheets/EditSheet.tsx等)用：genPlan是公式生成器4种计息方式共用的
     // 生成函数，impliedAPR从还款计划反推年化利率(#planSum摘要用)，isBadRepeatDay拒绝
     // 29/30/31号(批量设置还款日/公式生成器首期还款日都要拒)，r2是两位小数四舍五入

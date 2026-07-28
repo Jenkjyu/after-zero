@@ -167,9 +167,21 @@ function computeReportData(debts) {
     var restSum = typeList.slice(5).reduce(function (s, x) { return s + x.value; }, 0);
     typeList = typeList.slice(0, 5).concat([{ name: "其他", value: restSum }]);
   }
-  // 负债预测走势：把全部在还债务未来每一期的本金按日期汇总，从今天的总余额开始逐步递减
-  var byDate = {};
-  active.forEach(function (d) { (d.plan || []).forEach(function (r) { if (!r.paid) byDate[r.date] = (byDate[r.date] || 0) + (+r.principal || 0); }); });
+  // 负债预测走势：把全部在还债务未来每一期的本金按日期汇总，从今天的总余额开始逐步递减。
+  // ⚠️逾期未销的期次(date在今天之前)必须归到"今天"这个桶里，不能原样按它自己的过去日期入表——
+  // timeline第一个点固定是今天，后面按日期升序追加，过去的日期会让第二个点的日期早于第一个点，
+  // 折线图上表现为"今天→过去→未来"的时间倒流(真实bug，见test/calc.test.js BUG-3回归用例)。
+  // 归到今天的语义也是对的：逾期的钱今天就该还，投影上按"立即偿还"处理，图上表现为起点处的
+  // 一个陡降(此时会有两个日期同为今天的点，一个是起始余额、一个是扣掉逾期后的余额，这是刻意的)。
+  // 日期缺失/格式不对的行同样归到今天，保证"最后一个点归零"这个不变量不被破坏。
+  var byDate = {}, todayKey = fmtDate(today0());
+  active.forEach(function (d) {
+    (d.plan || []).forEach(function (r) {
+      if (r.paid) return;
+      var dt = /^\d{4}-\d{2}-\d{2}$/.test(r.date || "") && r.date >= todayKey ? r.date : todayKey;
+      byDate[dt] = (byDate[dt] || 0) + (+r.principal || 0);
+    });
+  });
   var dates = Object.keys(byDate).sort();
   var timeline = [{ date: fmtDate(today0()), balance: r2(totalBalance) }], running = totalBalance;
   dates.forEach(function (dt) { running = Math.max(0, running - byDate[dt]); timeline.push({ date: dt, balance: r2(running) }); });
@@ -220,6 +232,31 @@ function summarizeDebts(debts) {
   return { total: r2(total), monthly: r2(monthly), active: active, settled: settled, paidPrincipal: r2(paidPrincipal), paidInterest: r2(paidInterest), pct: pct };
 }
 
+// 统计tab专用的"累计"口径聚合——跟上面的 summarizeDebts 只差一点：已还本金/已还利息算全量
+// (含已结清债务)，其余字段(在还总负债/经常性月供/笔数)口径完全一致。
+//
+// 为什么要单独一个函数而不是改 summarizeDebts：后者被"债务"tab的hero(debts/Summary.tsx)共用，
+// 那张卡片的口径说明footnote明写着"两者都不含已结清的债务"，是它自洽的局部口径。但"统计"tab
+// 语义上要的是真正的累计——用 summarizeDebts 会导致"销掉最后一期→债务结清→已还金额和归零进度
+// 当场倒退"(真实bug，见test/calc.test.js BUG-2回归用例)，用户刚还完一笔钱却看到统计数字变小。
+// 独立成新函数、不动被别处共用的既有函数，跟 computeMonthlyRepayment 当初不并入 computeReportData
+// 是同一个先例。
+//
+// ⚠️口径细节：提前结清(settleFull)只写 settled=true、不标记plan为已还，所以那笔债务的剩余本金
+// 既不在 total(它不再是active)也不在 paidPrincipal(那些行的paid仍是false)——它是"用一笔金额未知的
+// 钱结掉了"，两边都不计是诚实的处理，UI的口径说明里要讲清楚这一点，不能假装它被还了。
+function summarizeAllTime(debts) {
+  var total = 0, monthly = 0, active = 0, settled = 0, paidPrincipal = 0, paidInterest = 0;
+  debts.forEach(function (d) {
+    paidPrincipal += +d.paidPrincipal || 0;
+    paidInterest += +d.paidInterest || 0;
+    if (d.settled) { settled++; return; }
+    active++; total += +d.balance || 0; if (!d.oneTime) monthly += +d.monthly || 0;
+  });
+  var zeroBase = paidPrincipal + total, pct = zeroBase > 0 ? Math.round(paidPrincipal / zeroBase * 100) : 0;
+  return { total: r2(total), monthly: r2(monthly), active: active, settled: settled, paidPrincipal: r2(paidPrincipal), paidInterest: r2(paidInterest), pct: pct };
+}
+
 // 统计tab"月还款统计"图用的月度聚合：按 plan 里每一期的 date 所在月份分组，拆已还(actual)/
 // 待还(scheduled)。故意不塞进 computeReportData() 的返回对象——那个对象被 exportReportXlsx/
 // exportReportPdf（100% vanilla）按字段名精确解构，改形状会同时打断两个导出功能，新维度必须
@@ -250,6 +287,64 @@ function computeMonthlyRepayment(debts) {
   return out;
 }
 
+// 统计tab"未来N个月还款压力"柱状图的数据源(替代 computeMonthlyRepayment 上首页的位置)。
+// 跟 computeMonthlyRepayment 的三处关键区别，每一处都是针对已确认问题的修正：
+//   1. 按 active 过滤——settleFull()只写settled=true、不标记plan为已还，那些剩余期次仍是
+//      {paid:false}，旧函数不过滤会把它们算成"待还"，表现为"已经结清的债务，未来几个月还显示
+//      要还钱"(真实bug，见test/calc.test.js BUG-1回归用例)。
+//   2. 逾期未销的期次(date < 今天)单独进 overdue 桶，不混进未来月份——"已经错过"和"即将要还"
+//      是两件事，混在一起会让"本月待还"虚高，也让柱状图第一根柱子含义不清。这跟"还款日"tab
+//      把逾期单独分档(dueBucket)是同一个判断。
+//   3. 窗口从"当前月"开始固定N个月，不是从数据最早月铺到最晚月——这张图回答的是"接下来的
+//      还款压力"，历史月份不属于它的职责(要看历史去月还款明细/导出)。
+// 拆 principal/interest 两段：PlanRow这两个字段对amort/equalfee/interestfirst三种生成方式都
+// 可靠；手续费没有独立字段(equalfee的pf直接写进interest)，所以只做两段、不做"本金/利息/手续费"
+// 三段——宁可少一个维度，也不为了图表复杂度制造不可信数据。
+// today参数只为可测(默认取today0())，调用方正常不传。
+function computeUpcomingPressure(debts, monthsAhead, today) {
+  var n = monthsAhead > 0 ? monthsAhead : 12;
+  var t0 = today ? new Date(today.getFullYear(), today.getMonth(), today.getDate()) : today0();
+  var todayKey = fmtDate(t0);
+  var overdue = { amount: 0, principal: 0, interest: 0, count: 0 };
+  var buckets = {}, order = [], y = t0.getFullYear(), mo = t0.getMonth() + 1;
+  for (var k = 0; k < n; k++) {
+    var key = y + "-" + pad(mo);
+    buckets[key] = { month: key, principal: 0, interest: 0, total: 0, items: [] };
+    order.push(key);
+    mo++; if (mo > 12) { mo = 1; y++; }
+  }
+  var lastKey = order[order.length - 1];
+  debts.forEach(function (d) {
+    if (d.settled) return;
+    (d.plan || []).forEach(function (r) {
+      if (r.paid) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date || "")) return;
+      var amt = +r.amount || 0, pr = +r.principal || 0, it = +r.interest || 0;
+      if (r.date < todayKey) {
+        overdue.amount = r2(overdue.amount + amt); overdue.principal = r2(overdue.principal + pr);
+        overdue.interest = r2(overdue.interest + it); overdue.count++;
+        return;
+      }
+      var b = buckets[r.date.slice(0, 7)];
+      if (!b) return; // 超出N个月窗口
+      b.principal = r2(b.principal + pr); b.interest = r2(b.interest + it); b.total = r2(b.total + amt);
+      var hit = null;
+      for (var j = 0; j < b.items.length; j++) if (b.items[j].id === d.id) { hit = b.items[j]; break; }
+      if (hit) hit.amount = r2(hit.amount + amt);
+      else b.items.push({ id: d.id, name: d.name || "未命名", amount: r2(amt) });
+    });
+  });
+  var months = order.map(function (key) { return buckets[key]; });
+  months.forEach(function (m) { m.items.sort(function (a, b) { return b.amount - a.amount; }); });
+  var totalAhead = r2(months.reduce(function (s, m) { return s + m.total; }, 0));
+  var peak = null;
+  months.forEach(function (m) { if (m.total > 0 && (!peak || m.total > peak.total)) peak = { month: m.month, total: m.total }; });
+  return {
+    overdue: overdue, months: months, currentMonth: order[0],
+    totalAhead: totalAhead, monthlyAvg: r2(totalAhead / n), peak: peak
+  };
+}
+
 // 会员判断：原来直接读闭包变量 premium，改成显式传参（跟 detectMatchingSort/computeReportData
 // 参数化的道理一样）。premium 的形状是 {premium: {method, at} | null}，见 index.html 里 PREMIUM_KEY
 // 的注释——这里不重新解释那份数据模型，只是把判断逻辑本身搬出来。
@@ -278,7 +373,8 @@ if (typeof module !== "undefined" && module.exports) {
     amortForward: amortForward, simulatePrepay: simulatePrepay, detectMatchingSort: detectMatchingSort,
     urgencyTier: urgencyTier, relLabel: relLabel, dueBucket: dueBucket,
     isBadRepeatDay: isBadRepeatDay, offsetLabel: offsetLabel, computeReportData: computeReportData, summarizeDebts: summarizeDebts,
-    computeMonthlyRepayment: computeMonthlyRepayment,
+    summarizeAllTime: summarizeAllTime,
+    computeMonthlyRepayment: computeMonthlyRepayment, computeUpcomingPressure: computeUpcomingPressure,
     esc: esc, inline: inline, isHr: isHr, mdToHtml: mdToHtml, escSvg: escSvg, truncateLabel: truncateLabel,
     hasPremium: hasPremium, premiumLabel: premiumLabel, findAiConv: findAiConv, bumpAiConvTop: bumpAiConvTop
   };

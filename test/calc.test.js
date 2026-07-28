@@ -458,3 +458,178 @@ test("bumpAiConvTop: 把指定记录挪到数组最前面，已经在最前时�
 function r2sum(rows) {
   return calc.r2(rows.reduce((s, r) => s + (r.principal || 0), 0));
 }
+
+// ===== 统计tab口径修正：3个已确认bug的回归测试 =====
+// 这三条是2026-07-29"统计tab优化"调查阶段用真实数据跑出来的、确认存在的口径问题，
+// 每一条都先于实现写好并确认过是红的，不是事后补的描述性测试。
+
+test("summarizeAllTime: 已结清债务的已还本金/利息计入累计，结清瞬间数字不倒退（BUG-2 回归）", () => {
+  // 场景：一笔债务销掉最后一期→payInstallment把settled置为true。用户视角是"我刚还完一笔"，
+  // 统计页的"累计已还本金"绝不该因此变小。summarizeDebts()故意排除已结清债务（债务tab的
+  // 局部口径，有footnote说明，不动它），统计tab需要的是真正的累计口径。
+  const beforeSettle = { settled: false, oneTime: false, balance: 0, monthly: 0, paidPrincipal: 3000, paidInterest: 300 };
+  const afterSettle = { settled: true, oneTime: false, balance: 0, monthly: 0, paidPrincipal: 3000, paidInterest: 300 };
+  const before = calc.summarizeAllTime([beforeSettle]);
+  const after = calc.summarizeAllTime([afterSettle]);
+  assert.equal(before.paidPrincipal, 3000);
+  assert.equal(after.paidPrincipal, 3000); // 关键：结清前后完全一致，不掉回0
+  assert.equal(after.paidInterest, 300);
+  assert.equal(after.pct, 100); // 全部还完=100%，不是summarizeDebts算出来的0%
+  assert.ok(after.pct >= before.pct, "归零进度不能因为一笔债务结清而倒退");
+  // 同时确认对照组：summarizeDebts 仍然是旧口径（这个函数本轮明确不改）
+  assert.equal(calc.summarizeDebts([afterSettle]).paidPrincipal, 0);
+});
+
+test("summarizeAllTime: 在还总负债/月供/笔数仍只算在还债务，只有累计已还是全量口径", () => {
+  const d1 = { settled: false, oneTime: false, balance: 1000, monthly: 200, paidPrincipal: 500, paidInterest: 50 };
+  const d2 = { settled: false, oneTime: true, balance: 2000, monthly: 2000, paidPrincipal: 0, paidInterest: 0 };
+  const d3 = { settled: true, oneTime: false, balance: 0, monthly: 0, paidPrincipal: 3000, paidInterest: 300 };
+  const s = calc.summarizeAllTime([d1, d2, d3]);
+  assert.equal(s.total, 3000); // 只算在还的balance，跟summarizeDebts一致
+  assert.equal(s.monthly, 200); // oneTime不计入，跟summarizeDebts一致
+  assert.equal(s.active, 2);
+  assert.equal(s.settled, 1);
+  assert.equal(s.paidPrincipal, 3500); // 500 + 已结清的3000 ← 唯一的差异点
+  assert.equal(s.paidInterest, 350); // 50 + 已结清的300
+  assert.equal(s.pct, 54); // 3500/(3500+3000)=53.8%→54
+});
+
+test("computeUpcomingPressure: 提前结清的债务，未来未还期次不再计入待还（BUG-1 回归）", () => {
+  // settleFull()只写settled=true、不标记plan为已还，所以已结清债务的剩余期次仍然是
+  // {paid:false}。computeMonthlyRepayment()不按active过滤，会把它们算成"待还"——
+  // 表现为"已经结清的债务，未来几个月还显示要还钱"。新函数必须按active过滤。
+  const settledDebt = {
+    id: "d1", name: "已结清", settled: true,
+    plan: [
+      { date: "2026-06-10", amount: 1100, principal: 1000, interest: 100, paid: true },
+      { date: "2026-08-10", amount: 1100, principal: 1000, interest: 100, paid: false },
+      { date: "2026-09-10", amount: 1100, principal: 1000, interest: 100, paid: false },
+    ],
+  };
+  const activeDebt = {
+    id: "d2", name: "在还", settled: false,
+    plan: [{ date: "2026-08-10", amount: 500, principal: 450, interest: 50, paid: false }],
+  };
+  const today = new Date(2026, 6, 29); // 2026-07-29
+  const p = calc.computeUpcomingPressure([settledDebt, activeDebt], 12, today);
+  const aug = p.months.find((m) => m.month === "2026-08");
+  assert.equal(aug.total, 500, "8月只该有在还债务的500，不含已结清债务的1100");
+  const sep = p.months.find((m) => m.month === "2026-09");
+  assert.equal(sep.total, 0, "9月已结清债务的期次不该出现");
+  assert.equal(p.totalAhead, 500);
+  // 对照组：旧函数确实会把已结清债务的未来期次算进来（证明这个bug真实存在）
+  const old = calc.computeMonthlyRepayment([settledDebt, activeDebt]);
+  assert.equal(old.find((m) => m.month === "2026-09").scheduled, 1100);
+});
+
+test("computeReportData: 含逾期未销期次时 timeline 日期不倒流（BUG-3 回归）", () => {
+  // timeline第一个点固定是"今天"，随后按未还行日期升序追加——逾期未销的期次日期在今天
+  // 之前，会让第二个点的日期早于第一个点，折线图上表现为"今天→过去→未来"。
+  const d = {
+    id: "d1", name: "有逾期", settled: false,
+    plan: [
+      { date: "2026-01-10", amount: 1100, principal: 1000, interest: 100, paid: false }, // 逾期未销
+      { date: "2026-12-10", amount: 1100, principal: 1000, interest: 100, paid: false },
+    ],
+  };
+  calc.recompute(d);
+  const timeline = calc.computeReportData([d]).timeline;
+  const dates = timeline.map((p) => p.date);
+  assert.deepEqual(dates, dates.slice().sort(), "timeline日期必须单调不减");
+  assert.equal(timeline[0].balance, 2000); // 起点仍是今天的全部未还本金
+  assert.equal(timeline[timeline.length - 1].balance, 0); // 终点仍归零
+});
+
+test("computeUpcomingPressure: 空输入返回N个空月份桶而不是空数组", () => {
+  const p = calc.computeUpcomingPressure([], 12, new Date(2026, 6, 29));
+  assert.equal(p.months.length, 12);
+  assert.equal(p.months[0].month, "2026-07");
+  assert.equal(p.currentMonth, "2026-07");
+  assert.equal(p.totalAhead, 0);
+  assert.equal(p.monthlyAvg, 0);
+  assert.equal(p.peak, null); // 全零时没有峰值月，不返回一个total为0的假峰值
+  assert.deepEqual(p.overdue, { amount: 0, principal: 0, interest: 0, count: 0 });
+});
+
+test("computeUpcomingPressure: 逾期未销期次单独进overdue桶，不混进未来月份", () => {
+  const d = {
+    id: "d1", name: "有逾期", settled: false,
+    plan: [
+      { date: "2026-05-10", amount: 300, principal: 250, interest: 50, paid: false }, // 逾期
+      { date: "2026-07-10", amount: 300, principal: 250, interest: 50, paid: false }, // 本月但已过日子→也算逾期
+      { date: "2026-07-31", amount: 300, principal: 250, interest: 50, paid: false }, // 本月未到期
+    ],
+  };
+  const p = calc.computeUpcomingPressure([d], 12, new Date(2026, 6, 29)); // 今天 2026-07-29
+  assert.equal(p.overdue.count, 2);
+  assert.equal(p.overdue.amount, 600);
+  assert.equal(p.overdue.principal, 500);
+  assert.equal(p.overdue.interest, 100);
+  assert.equal(p.months[0].month, "2026-07");
+  assert.equal(p.months[0].total, 300, "本月桶只含今天及以后未到期的那一期");
+  assert.equal(p.totalAhead, 300, "totalAhead不含逾期");
+});
+
+test("computeUpcomingPressure: 本金/利息两段拆分正确，月份连续补0且跨年", () => {
+  const d = {
+    id: "d1", name: "跨年", settled: false,
+    plan: [
+      { date: "2026-08-10", amount: 1100, principal: 1000, interest: 100, paid: false },
+      { date: "2027-01-10", amount: 1100, principal: 900, interest: 200, paid: false },
+    ],
+  };
+  const p = calc.computeUpcomingPressure([d], 12, new Date(2026, 6, 29));
+  const aug = p.months.find((m) => m.month === "2026-08");
+  assert.equal(aug.principal, 1000);
+  assert.equal(aug.interest, 100);
+  assert.equal(aug.total, 1100);
+  const jan = p.months.find((m) => m.month === "2027-01");
+  assert.equal(jan.principal, 900);
+  assert.equal(jan.interest, 200);
+  // 中间没数据的月份是补0的桶，不是缺失
+  assert.equal(p.months.find((m) => m.month === "2026-10").total, 0);
+  assert.equal(p.months.map((m) => m.month).join(","),
+    "2026-07,2026-08,2026-09,2026-10,2026-11,2026-12,2027-01,2027-02,2027-03,2027-04,2027-05,2027-06");
+});
+
+test("computeUpcomingPressure: 峰值月/月均/窗口外期次被排除", () => {
+  const d = {
+    id: "d1", name: "长期", settled: false,
+    plan: [
+      { date: "2026-08-10", amount: 500, principal: 500, interest: 0, paid: false },
+      { date: "2026-09-10", amount: 2000, principal: 2000, interest: 0, paid: false }, // 峰值
+      { date: "2028-09-10", amount: 9999, principal: 9999, interest: 0, paid: false }, // 12个月窗口外
+    ],
+  };
+  const p = calc.computeUpcomingPressure([d], 12, new Date(2026, 6, 29));
+  assert.deepEqual(p.peak, { month: "2026-09", total: 2000 });
+  assert.equal(p.totalAhead, 2500, "窗口外的9999不计入");
+  assert.equal(p.monthlyAvg, calc.r2(2500 / 12));
+});
+
+test("computeUpcomingPressure: 同一债务同月多期合并成一个items条目，多笔债务各自成条目并按金额降序", () => {
+  const a = {
+    id: "dA", name: "A债", settled: false,
+    plan: [
+      { date: "2026-08-05", amount: 100, principal: 100, interest: 0, paid: false },
+      { date: "2026-08-20", amount: 200, principal: 200, interest: 0, paid: false },
+    ],
+  };
+  const b = { id: "dB", name: "B债", settled: false, plan: [{ date: "2026-08-15", amount: 900, principal: 900, interest: 0, paid: false }] };
+  const p = calc.computeUpcomingPressure([a, b], 12, new Date(2026, 6, 29));
+  const aug = p.months.find((m) => m.month === "2026-08");
+  assert.equal(aug.total, 1200);
+  assert.deepEqual(aug.items, [
+    { id: "dB", name: "B债", amount: 900 },
+    { id: "dA", name: "A债", amount: 300 }, // 同月两期合并
+  ]);
+});
+
+test("computeUpcomingPressure: 已还期次和一次性还清债务的处理", () => {
+  const paidOff = { id: "d1", name: "已还", settled: false, plan: [{ date: "2026-08-10", amount: 500, principal: 500, interest: 0, paid: true }] };
+  const oneTime = { id: "d2", name: "一次性", settled: false, oneTime: true, plan: [{ date: "2026-08-10", amount: 8000, principal: 8000, interest: 0, paid: false }] };
+  const p = calc.computeUpcomingPressure([paidOff, oneTime], 12, new Date(2026, 6, 29));
+  const aug = p.months.find((m) => m.month === "2026-08");
+  assert.equal(aug.total, 8000, "已还期次不计入；一次性还清是真实的当月支出，必须计入");
+  assert.equal(aug.items.length, 1);
+});
