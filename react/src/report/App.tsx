@@ -14,6 +14,10 @@ export function App() {
   const debts = useDebts();
   const premium = usePremium();
   const data = useMemo(() => window.computeReportData(debts), [debts]);
+  // MonthlyChart.tsx(第6步)接入App.tsx留到第8步一次性重新接线，但ReportTables(第7步)
+  // 已经加了"月还款明细"这第4张表，需要这份数据才能编译通过——提前在这里算好传下去，
+  // 不是"半接线"MonthlyChart本身。
+  const monthly = useMemo(() => window.computeMonthlyRepayment(debts), [debts]);
 
   return (
     <>
@@ -24,7 +28,7 @@ export function App() {
         <BalanceBars data={data} />
         <TypeStack data={data} />
         <PayoffLine data={data} />
-        <ReportTables data={data} />
+        <ReportTables data={data} monthly={monthly} />
       </div>
     </>
   );
