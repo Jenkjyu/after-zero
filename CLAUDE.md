@@ -620,7 +620,7 @@ window.__debugPremium("none")         // 清空，恢复"普通用户"
 
 **这里的历史已经翻篇：早期是"我的"页里`hasPremium()`门禁的一张入口卡片、点开是整页浮层`#reportScreen`——现在是底部tabbar第3个主tab（`data-view="report"` → `#view-report`），不再是子页面，也不再有任何门禁。** 这次改动是"导航重排"那轮的一部分（详见下面"导航重排"一节），动机是图表查看本来就已经改成免费（见上面"订阅UI基础设施"一节的免费/付费边界），既然免费又是这个app除债务列表外最值得看的东西，直接提到主tab比藏在"我的"页一张卡片后面曝光率高得多。**导出PDF/Excel依然是Premium权益，没变**——门禁在`reportExportXlsxBtn`/`reportExportPdfBtn`各自的click handler上，未开通直接跳订阅页（不再需要先"关掉当前子页面"这一步，因为现在就在主tab上，没有子页面要关）。
 
-内容（React迁移第三步时）：2个KPI（加权平均利率、预计全部还清日期）+ 3张图（各债务余额对比的横向条形图、债务类型占比的堆叠条形图+图例、负债预测走势折线图）+ 数据明细表（默认直接展开，不折叠），支持导出真正的`.xlsx`和`.pdf`文件。**`renderReportScreen()`函数名字没跟着改**（还叫"Screen"不叫"View"，是历史遗留，不影响功能，以后大改这块时可以顺手改名）——现在挂在`renderAll()`管线里跟`renderSummary()`/`renderDebts()`等一起调用，债务数据一变，统计tab的内容自动跟着刷新，不需要"进入tab时才渲染"这种额外逻辑（因为它不再是"打开"的东西，是常驻的tab）。**⚠️"2个KPI+3张图"这个数字后来变了两次**：先是"统计tab视觉+交互升级"那轮改成可折叠的Hero（2常驻+4展开共6个指标）+4张图；再是"统计tab口径修正"这轮（2026-07-29）把折叠去掉、改成**4个常驻KPI（累计已还本金/经常性月供/归零进度/加权平均利率）+ 笔数降级成一行小字 + 一个"计算口径说明"折叠面板**，见下面"统计tab口径修正"子节。
+内容（React迁移第三步时）：2个KPI（加权平均利率、预计全部还清日期）+ 3张图（各债务余额对比的横向条形图、债务类型占比的堆叠条形图+图例、负债预测走势折线图）+ 数据明细表（默认直接展开，不折叠），支持导出真正的`.xlsx`和`.pdf`文件。**`renderReportScreen()`函数名字没跟着改**（还叫"Screen"不叫"View"，是历史遗留，不影响功能，以后大改这块时可以顺手改名）——现在挂在`renderAll()`管线里跟`renderSummary()`/`renderDebts()`等一起调用，债务数据一变，统计tab的内容自动跟着刷新，不需要"进入tab时才渲染"这种额外逻辑（因为它不再是"打开"的东西，是常驻的tab）。**⚠️"2个KPI+3张图+数据明细表"这个结构后来变了两次，当前真实状态是**：石墨hero（在还总负债+只算本金角标+预计还清日）+ **4个常驻KPI**（累计已还本金/经常性月供/归零进度/加权平均利率）+ 笔数一行小字 + "计算口径说明"折叠 + **4个viz-block**（未来12个月还款压力 → 负债余额走势 → 各债务剩余待还 → 债务类型占比）+ 统计总结卡。**底部那4张平铺明细表已经整个删除**（完整明细由导出Excel/PDF承担）。两轮变化分别见下面"统计tab视觉+交互升级"（已被部分取代的中间态）和"统计tab口径修正"（当前状态）两个子节。
 
 **这是这个项目第一批图表，配色套用了`dataviz` skill的默认8色类别色板**（`.viz-root`里的`--series-1`..`--series-8`，明暗双模式都定义了），**已经用skill自带的`validate_palette.js`对着本项目实际的浅色`#FFFFFF`/深色`#191D24`底色重新验证过**（全部PASS，只有浅色模式下3个色阶低于3:1对比度触发"relief rule"——用可见的图例文字+数据表满足，不单靠颜色）——不是直接照抄skill文档里参考色`#fcfcfb`/`#1a1a19`的验证结果，那个底色跟这个项目不是一回事，swap配色后必须重新跑一遍验证脚本，这条以后加新图表也适用。三张图全部手写（条形图用普通div+百分比宽度，堆叠条+折线图用内联SVG），没有引入任何图表库。
 
@@ -634,6 +634,8 @@ window.__debugPremium("none")         // 清空，恢复"普通用户"
 **PDF现在也包含数据明细表了（不再只是图表摘要）**：早期版本PDF只有图表、明细留给Excel，后来用户要求PDF也带上明细表。因为明细是中文、同样过不了`doc.text()`，走的还是"SVG→PNG"这条路——`buildReportTableRows()`把三张表（各债务余额/类型占比/负债走势）拍平成行，`buildTablePagesSVG()`按每页约34个"行单位"（表头算2个）**分页**成多张SVG（`buildTablePageSVG()`每页一张、高度按行数动态算），`exportReportPdf()`把第1页图表 + 后续N页明细表逐张栅格化后`doc.addPage()`拼进PDF。之所以要分页而不是一张长图，是因为时间线可能几十行，单张超长图贴进A4会被页边裁掉。**屏幕上的数据明细表（`renderReportTables()`）现在也默认直接展开、不折叠了**（去掉了原来的`<details>`/`<summary>`，用户要求"直接展开不要收起"）。
 
 ### 统计tab视觉+交互升级：石墨hero+可折叠KPI+第4张图（月还款统计）+全部图表交互化
+
+> **⚠️ 这一节记录的是2026-07-28那一轮，其中"可折叠KPI头"和"月还款统计"这张图都已经被下一轮（"统计tab口径修正"）取代/删除**——`MonthlyChart.tsx`/`ReportTables.tsx`/`Kpis.tsx`/`ExportActions.tsx`这几个文件现在都不存在了。保留这一节是因为它记录的判断依据仍然成立且还在被沿用：图表交互两个复杂度量级的划分标准、`computeMonthlyRepayment`不并入`computeReportData`的先例、React Portal那个stacking context坑、`.viz-block`卡片外壳。读的时候注意区分"当时做了什么"和"现在长什么样"。
 
 React迁移第三步时"统计"tab是最后一批机械翻译的组件（零手势、零交互、视觉上还停留在"高级统计报表"时代），这轮补齐——参考一木记账的统计页设计（可折叠KPI头、图表可切换+点击/拖动看精确值），但重新翻译成debt语境的信息维度，不照搬记账app的收支词汇（"收支统计"翻译成"月还款统计"——已还/待还两段，不是收入/支出两段）。
 
@@ -658,9 +660,9 @@ React迁移第三步时"统计"tab是最后一批机械翻译的组件（零手�
 
 **验证**（⚠️这段是"视觉+交互升级"那轮的记录；其中"更多指标"折叠在下一轮"统计tab口径修正"里已经删除，换成4个常驻KPI+"计算口径说明"折叠）：桌面Chromium + Playwright（一次性临时`npm install playwright`，用完卸载）：Hero"更多指标"展开/收起、InfoTip打开/关闭、导出菜单打开/关闭+两个premium门禁方向（未开通跳订阅页/已开通直接触发导出）、`MonthlyChart`柱状/折线切换、`BalanceBars`/`TypeStack`点击高亮联动、`MonthlyChart`和`PayoffLine`的桌面鼠标拖动scrub（两者的readout都正确跟着更新、抬手后停留不回弹），light/dark两种主题截图核对（含真实移动端viewport 390×844，不是fullPage长图——**fullPage长图截图对`position:fixed`元素会有已知的拼接假象，曾经一度误以为"还款提醒通知"面板不知为何默认打开着，用普通viewport截图核实后确认只是fullPage截图工具的假象，不是真实bug**，以后排查类似"截图里出现不该出现的东西"，先用非fullPage的普通viewport截图复核一遍再当真）；`npx tsc --noEmit`零错误，`npm run test:react`全绿，`npm test`（calc.js套件）不受影响，`npm run build:react`确认`report.js`产物正常增长（从升级前的8.94kB涨到23kB左右，符合预期——4张图+可折叠KPI头+2个共享UI组件）。
 
-**⚠️还没做的验证：真机触摸手势确认**——`MonthlyChart`/`PayoffLine`的scrub手势是这轮唯一动了真正touch事件的地方（`chartScrub.ts`），桌面Playwright只能验证鼠标模拟的Pointer Events路径不报错、代码逻辑没问题，验证不了真实手指连续拖动的手感、多点触控边界情况、安卓WebView的触摸事件时序——跟这个项目历史上"长按拖拽排序"/"还款日左滑"的教训是同一类要求，**这一步必须真机确认，不能跳过**。已编译好debug APK（`android/app/build/outputs/apk/debug/app-debug.apk`），下一步是装真机验证：两张连续时间序列图的拖动/点击scrub手感、`ExportMenu`/`InfoTip`两个弹层在真机WebView上的定位是否正确（这轮修复的stacking context坑理论上在任何浏览器引擎下都成立，但WebView版本差异值得留意）、light/dark主题下视觉效果、硬件返回键行为不受影响（这轮没有新增/改动任何`.sheet`/`.subpage`，`__handleBackButton`链不需要变动）。
+**⚠️还没做的验证：真机触摸手势确认**——两张连续时间序列图（当时是`MonthlyChart`，现在是`PressureChart`）和`PayoffLine`的scrub手势是这轮唯一动了真正touch事件的地方（`chartScrub.ts`），桌面Playwright只能验证鼠标模拟的Pointer Events路径不报错、代码逻辑没问题，验证不了真实手指连续拖动的手感、多点触控边界情况、安卓WebView的触摸事件时序——跟这个项目历史上"长按拖拽排序"/"还款日左滑"的教训是同一类要求，**这一步必须真机确认，不能跳过**。已编译好debug APK（`android/app/build/outputs/apk/debug/app-debug.apk`），下一步是装真机验证：两张连续时间序列图的拖动/点击scrub手感、`ExportMenu`/`InfoTip`两个弹层在真机WebView上的定位是否正确（这轮修复的stacking context坑理论上在任何浏览器引擎下都成立，但WebView版本差异值得留意）、light/dark主题下视觉效果、硬件返回键行为不受影响（这轮没有新增/改动任何`.sheet`/`.subpage`，`__handleBackButton`链不需要变动）。
 
-### 统计tab口径修正（2026-07-29，进行中）
+### 统计tab口径修正 + 压力图 + 走势时间轴（2026-07-29，P0/P1/P2 已全部完成，只差真机触摸验证）
 
 上一轮"视觉+交互升级"解决的是"好不好看、能不能交互"，**这一轮解决的是"数字对不对"**——调查阶段用真实数据跑出来3个已确认的口径bug（不是代码审查推测出来的，每一个都有先于实现写好、确认过是红的回归测试）。三个bug的成因和修法见上面"纯计算函数"一节`summarizeAllTime`/`computeUpcomingPressure`那两段，这里只记UI层的决定。
 
@@ -688,6 +690,15 @@ React迁移第三步时"统计"tab是最后一批机械翻译的组件（零手�
 - **新增`SummaryCard.tsx`**（底部统计总结），原则是**只放这一页别处看不到的结论**、不复述上面的数字：利率最高的是哪一笔、高息(≥18%，沿用`rateClass()`的既有分档)笔数与合计、剩余待付利息合计、距离还清还有几个月。**刻意不做"查看全部债务>"跳转按钮**——tabbar就在屏幕底部一步可达，为它新增一个跨React树切tab的桥接不划算（切tab目前是vanilla tabbar的职责）。
 
 - 口径说明的内容必须覆盖6条：在还总负债只算本金、累计已还本金含已结清、经常性月供不含一次性还清、归零进度只按本金算、预计还清日期是预测不是承诺、**以及"提前结清"的剩余本金既不计入总负债也不计入累计已还**（实际付了多少钱App并不知道，必须诚实说明，不能假装它被还了）。
+
+**验证**：`npm test` 64个用例（新增`computeUpcomingPressure`/`remainingInterest`/`niceCeil`及3条bug回归）、`npm run test:react` 252个用例（新增`PressureChart.test.tsx` 11条、`SummaryCard.test.tsx` 4条，`BalanceBars`/`PayoffLine`/`ReportHero`/`ReportApp`按新形态重写）、`npx tsc --noEmit`零错误、`npm run build:react`（`report.js` 23.22kB→30.83kB）。桌面Playwright每一步都跑了一轮，light/dark截图核对、零JS报错，且**用真实数据反复对照过屏幕数字与底层`debts`的一致性**（不是只看渲染成功）。
+
+**⚠️还没做的验证：真机触摸手势**——`PressureChart`和`PayoffLine`的scrub是真正的Touch Events，桌面只能验证鼠标模拟的Pointer Events路径。跟这个项目历史上"长按拖拽排序"/"还款日左滑"是同一类要求，必须真机确认。
+
+**这一轮的三个方法论教训（都是真实踩出来的）**：
+1. **"它有文档说明"不构成保留一个反直觉口径的理由**——BUG-2最初判断"债务tab有footnote写明了口径，所以不动它"，用户一上真机就把它当bug报了。文档解释不了的反直觉行为就是bug。
+2. **用户报的现象和真正的bug可能是两回事，但都要查到底**。"9月柱子逼近5000"最后证明是图对了、用户看的是相邻的8月（当时x轴12根柱子只标4个，认不出哪根是哪根）；但为了证伪它而做的像素级不变量检查，顺带挖出了"柱高与Y轴不同口径导致柱子能画到2194%"这个真bug。**复现不出来时不要急着说"没问题"，把量化证据摆出来，然后继续找。**
+3. **图表相关的判断要跑验证器，不要眼看**。`--accent-soft`当填充色对白底只有1.14:1（等于隐形），是跑`dataviz` skill的`validate_palette.js`发现的——这批`-soft`变量是给"卡片浅底"设计的，不是给数据填充设计的。
 
 ## 云备份（Premium）
 
