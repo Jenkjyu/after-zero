@@ -20,15 +20,22 @@ export function Hero({ data, debts, premium }: HeroProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="hero">
-      <div className="hero-top">
-        <div className="hero-label">统计</div>
-        <ExportMenu premium={premium} />
+    <>
+      {/* .hero有overflow:hidden(裁切装饰性的hero-smoke色雾)，ExportMenu的下拉面板挂在
+          Popover内部靠position:fixed逃出这层裁切，所以放在hero-top里没问题；但.summary/
+          note-toggle/展开网格必须是.hero的兄弟节点、不能嵌套在.hero内部——跟debts/Summary.tsx
+          的既有结构一致，Playwright验证时真实踩到过"嵌套进.hero导致InfoTip气泡被裁切/
+          位置错乱"这个坑，见CLAUDE.md记录。 */}
+      <div className="hero">
+        <div className="hero-top">
+          <div className="hero-label">统计</div>
+          <ExportMenu premium={premium} />
+        </div>
+        <div className="hero-amt num"><span className="cur">¥</span>{window.fmt(data.totalBalance)}</div>
+        <div className="hero-pill">预计 {data.payoffDate || "—"} 还清</div>
       </div>
-      <div className="hero-amt num"><span className="cur">¥</span>{window.fmt(data.totalBalance)}</div>
-      <div className="hero-pill">预计 {data.payoffDate || "—"} 还清</div>
 
-      <div className="summary" style={{ marginTop: 14 }}>
+      <div className="summary">
         <div className="kpi half">
           <div className="v num">{data.avgRate ? data.avgRate.toFixed(2) : "0.00"}%</div>
           <div className="k">
@@ -69,6 +76,6 @@ export function Hero({ data, debts, premium }: HeroProps) {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

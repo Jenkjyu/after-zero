@@ -185,7 +185,7 @@ window.__azBridge = {
 
 其余（`ask()`确认弹窗本身等）继续保持private。**详情窗`#detailSheet`、新增/编辑表单`#editSheet`、账户详情`#accountScreen`、订阅页`#premiumScreen`、条款页`#termsScreen`、提前还款模拟器`#simScreen`、通知设置面板`#notifySheet`、档案库`#docsScreen`、云备份`#backupScreen`、AI债务顾问`#aiScreen`+`#aiHistorySheet`这十个subpage/sheet的实际内容全部已经搬进React（分别是第五~十一步）**——至此`window.__azBridge`里再也没有任何`openXScreen`这类trigger-only函数，剩下的全部是①真正的debts数据读写、②不可移植的cloud/native/IO调用两类。
 
-**`exportReportXlsx`/`exportReportPdf`两个函数虽然桥接给了React调用，但函数本身继续100%vanilla、原封不动**——它们已经确认是零DOM依赖的纯函数（只读`debts`、拼Excel/PDF的Blob、调用`window.XLSX`/`window.jspdf`/`saveToDeviceDownloads()`），React这边`ExportActions.tsx`只是原样复刻了vanilla原来两个按钮click handler里的`hasPremium(premium)`门禁判断，然后调用桥接函数触发真正的导出，不是把导出逻辑本身搬进React。**⚠️`ExportActions.tsx`在"统计tab视觉+交互升级"这轮已经删除，门禁逻辑原样吸收进新的`react/src/report/ExportMenu.tsx`（收进右上角"⋮"菜单，不再是两个独立按钮），桥接函数本身没变，见下面"React 迁移"一节末尾的完整说明。**
+**`exportReportXlsx`/`exportReportPdf`两个函数虽然桥接给了React调用，但函数本身继续100%vanilla、原封不动**——它们已经确认是零DOM依赖的纯函数（只读`debts`、拼Excel/PDF的Blob、调用`window.XLSX`/`window.jspdf`/`saveToDeviceDownloads()`），React这边`ExportActions.tsx`只是原样复刻了vanilla原来两个按钮click handler里的`hasPremium(premium)`门禁判断，然后调用桥接函数触发真正的导出，不是把导出逻辑本身搬进React。**⚠️`ExportActions.tsx`在"统计tab视觉+交互升级"这轮已经删除，门禁逻辑原样吸收进新的`react/src/report/ExportMenu.tsx`（收进右上角"⋮"菜单，不再是两个独立按钮），桥接函数本身没变，详见下面"统计"一节"统计tab视觉+交互升级"子节。**
 
 **为什么`getDebts`是函数不是直接暴露变量**：`debts`在`commitReorder`/`applyBackupData`/导入JSON三处会被**整体重新赋值**（`debts = next;`），不是原地mutate。如果React捕获了某一次的数组引用，重新赋值后这个引用就是旧的。用函数包一层，每次调用都读到当前最新的那个引用，避免这个陷阱。
 
@@ -258,7 +258,7 @@ React组件挂载在同一份`index.html`文档里（不是iframe/独立页面�
 
 ### "统计"tab：纯`data → JSX`翻译，零手势，导出逻辑保持vanilla
 
-> **⚠️ 这一节标题里"零手势"这句话是描述React迁移第三步当时的状态，"统计tab视觉+交互升级"这轮（`react/src/report/`新增`chartScrub.ts`、`BalanceBars.tsx`/`TypeStack.tsx`加了点击高亮状态）之后已经不再成立**——细节以上面"React 迁移"一节末尾"⚠️'统计tab零手势'这句话...不成立"那条说明和下面新增的实施记录为准，这一节保留是为了如实记录当时那一步迁移的真实情况（纯翻译、零状态），不是当前状态。
+> **⚠️ 这一节标题里"零手势"这句话是描述React迁移第三步当时的状态，"统计tab视觉+交互升级"这轮（`react/src/report/`新增`chartScrub.ts`、`BalanceBars.tsx`/`TypeStack.tsx`加了点击高亮状态）之后已经不再成立**——完整细节见下面"统计"一节"统计tab视觉+交互升级"子节，这一节保留是为了如实记录当时那一步迁移的真实情况（纯翻译、零状态），不是当前状态。
 
 跟"在还债务"/"还款日"不同，"统计"tab完全没有手势代码，也没有任何tab内部状态（`payFilter`/`jiggleMode`这类）——`renderBalanceBars`/`renderTypeStack`/`renderPayoffLine`/`renderReportTables`这4个vanilla函数原本就是纯粹的"给定`data`（`computeReportData(debts)`的返回值）拼出HTML字符串"，翻译成`react/src/report/`下同名的`.tsx`组件（`BalanceBars.tsx`/`TypeStack.tsx`/`PayoffLine.tsx`/`ReportTables.tsx`）只是把字符串拼接换成JSX，数学/条件分支逻辑一行没改，是这三步迁移里风险最低、最接近"机械翻译"的一次。**JSX的文本插值天然转义，字符串拼接版本里手动调用的`esc()`在JSX版本里不需要了**（不是行为变化，是JSX本身的固有安全特性替代了手动转义这一步）。**导出按钮（`exportReportXlsx`/`exportReportPdf`）本身没有搬进React**——已确认这两个函数零DOM依赖（只读`debts`造Blob），继续100%vanilla，只是新增桥接给React的`ExportActions.tsx`调用，premium门禁判断原样复刻。
 
@@ -281,7 +281,7 @@ React组件挂载在同一份`index.html`文档里（不是iframe/独立页面�
 
 **"统计"和"我的"这两个tab都是零手势的纯data→JSX展示，不需要真机验证，桌面Playwright覆盖已经足够**（跟第二步Summary/AiBanner这类纯视觉组件判定为无需真机是同一个理由）——"我的"tab里"下载/上传备份文件"两个按钮背后的真实原生行为（`SaveFile`插件的"另存为"选择器、真机文件选择器），这次迁移完全没有改动它们的实现，只是把触发入口从vanilla按钮换成React按钮调用同一个函数，不需要为这次迁移重新验证一遍那两个功能本身。`#detailSheet`同理零手势（`initGripDrag`只是4个pointer监听器操作单个DOM节点，不是`gestures.ts`那套长按/滑动状态机），桌面Playwright覆盖已经足够。**"还款日"的左滑手势是目前唯一还留着的真机确认项**——桌面Playwright用鼠标模拟的Pointer Events路径验证了"能触发swiping分支、不报错"，但真实手指触摸的手感、多点触控边界情况、安卓WebView的触摸事件时序，历史上这个项目的教训是"必须真机验证"（见"在还债务自定义排序"一节），这次移植代码逻辑上是逐行照抄，但没有免除真机验证这一步。
 
-> **⚠️ "'统计'tab零手势"这句话从"统计tab视觉+交互升级"这轮（`react/src/report/chartScrub.ts`落地）开始已经不成立**——`PayoffLine.tsx`接入了真正的Touch Events拖动/点击scrub手势（后续`MonthlyChart.tsx`也会共用同一套），"统计"tab从此变成这个项目里第二个有真实触摸手势代码、需要真机验证的tab（"还款日"左滑是第一个）。这轮完成后（含真机验证）要把这段话连同"这两个tab都是零手势"的表述一起改写，见下面"统计（原'高级统计报表'...）"一节末尾会补的验证记录。
+> **⚠️ "'统计'tab零手势"这句话从"统计tab视觉+交互升级"这轮（`react/src/report/chartScrub.ts`落地）开始已经不成立**——`PayoffLine.tsx`/`MonthlyChart.tsx`都接入了真正的Touch Events拖动/点击scrub手势，"统计"tab从此变成这个项目里第二个有真实触摸手势代码、需要真机验证的tab（"还款日"左滑是第一个）。完整细节（含桌面验证记录、真机验证待办）见下面"统计（原'高级统计报表'...）"一节"统计tab视觉+交互升级"子节。
 
 ## 原生插件：`SaveFile`
 
@@ -612,7 +612,7 @@ window.__debugPremium("none")         // 清空，恢复"普通用户"
 
 **这里的历史已经翻篇：早期是"我的"页里`hasPremium()`门禁的一张入口卡片、点开是整页浮层`#reportScreen`——现在是底部tabbar第3个主tab（`data-view="report"` → `#view-report`），不再是子页面，也不再有任何门禁。** 这次改动是"导航重排"那轮的一部分（详见下面"导航重排"一节），动机是图表查看本来就已经改成免费（见上面"订阅UI基础设施"一节的免费/付费边界），既然免费又是这个app除债务列表外最值得看的东西，直接提到主tab比藏在"我的"页一张卡片后面曝光率高得多。**导出PDF/Excel依然是Premium权益，没变**——门禁在`reportExportXlsxBtn`/`reportExportPdfBtn`各自的click handler上，未开通直接跳订阅页（不再需要先"关掉当前子页面"这一步，因为现在就在主tab上，没有子页面要关）。
 
-内容本身没变：2个KPI（加权平均利率、预计全部还清日期）+ 3张图（各债务余额对比的横向条形图、债务类型占比的堆叠条形图+图例、负债预测走势折线图）+ 数据明细表（默认直接展开，不折叠），支持导出真正的`.xlsx`和`.pdf`文件。**`renderReportScreen()`函数名字没跟着改**（还叫"Screen"不叫"View"，是历史遗留，不影响功能，以后大改这块时可以顺手改名）——现在挂在`renderAll()`管线里跟`renderSummary()`/`renderDebts()`等一起调用，债务数据一变，统计tab的内容自动跟着刷新，不需要"进入tab时才渲染"这种额外逻辑（因为它不再是"打开"的东西，是常驻的tab）。
+内容（React迁移第三步时）：2个KPI（加权平均利率、预计全部还清日期）+ 3张图（各债务余额对比的横向条形图、债务类型占比的堆叠条形图+图例、负债预测走势折线图）+ 数据明细表（默认直接展开，不折叠），支持导出真正的`.xlsx`和`.pdf`文件。**`renderReportScreen()`函数名字没跟着改**（还叫"Screen"不叫"View"，是历史遗留，不影响功能，以后大改这块时可以顺手改名）——现在挂在`renderAll()`管线里跟`renderSummary()`/`renderDebts()`等一起调用，债务数据一变，统计tab的内容自动跟着刷新，不需要"进入tab时才渲染"这种额外逻辑（因为它不再是"打开"的东西，是常驻的tab）。**⚠️"2个KPI+3张图"这个数字后来变了——见下面"统计tab视觉+交互升级"一节，KPI头改成了可折叠的Hero+2常驻+4展开共6个指标，图表变成4张。**
 
 **这是这个项目第一批图表，配色套用了`dataviz` skill的默认8色类别色板**（`.viz-root`里的`--series-1`..`--series-8`，明暗双模式都定义了），**已经用skill自带的`validate_palette.js`对着本项目实际的浅色`#FFFFFF`/深色`#191D24`底色重新验证过**（全部PASS，只有浅色模式下3个色阶低于3:1对比度触发"relief rule"——用可见的图例文字+数据表满足，不单靠颜色）——不是直接照抄skill文档里参考色`#fcfcfb`/`#1a1a19`的验证结果，那个底色跟这个项目不是一回事，swap配色后必须重新跑一遍验证脚本，这条以后加新图表也适用。三张图全部手写（条形图用普通div+百分比宽度，堆叠条+折线图用内联SVG），没有引入任何图表库。
 
@@ -624,6 +624,33 @@ window.__debugPremium("none")         // 清空，恢复"普通用户"
 - **PDF导出**（`exportReportPdf()`）：**故意不去克隆屏幕上那份用CSS变量取色的主题化SVG去截图**——序列化成独立SVG文档做光栅化时，`var(--accent)`这类CSS自定义属性脱离了页面样式表的作用域根本解析不出来（渲染出空白/黑色），这是真实会踩的坑，不是猜测。改成`buildExportChartsSVG(data)`单独生成一份**颜色全部写死成字面浅色hex值**的导出专用SVG（不依赖任何CSS变量、不依赖DOM，纯数据驱动），再走`svgStringToPngDataURL()`（Blob→Image→canvas→`toDataURL`）转成PNG，`doc.addImage()`贴进jsPDF页面。**⚠️标题/KPI这几行文字也画进这份SVG里一起栅格化，不用jsPDF的`doc.text()`**——jsPDF内置字体（Helvetica等）不含中文字形，`doc.text()`画中文会整段无法显示（不是排版问题是完全画不出），除非额外内嵌中文字体到vfs（工作量大，不做）。所以整份PDF的中文全程走"SVG→canvas→PNG"这条路，代价是PDF里文字不可选中（是图片）。**PDF固定用浅色配色，不跟随设备当前深色/浅色模式**——打印品在浅色下更易读，这是刻意的取舍。
 
 **PDF现在也包含数据明细表了（不再只是图表摘要）**：早期版本PDF只有图表、明细留给Excel，后来用户要求PDF也带上明细表。因为明细是中文、同样过不了`doc.text()`，走的还是"SVG→PNG"这条路——`buildReportTableRows()`把三张表（各债务余额/类型占比/负债走势）拍平成行，`buildTablePagesSVG()`按每页约34个"行单位"（表头算2个）**分页**成多张SVG（`buildTablePageSVG()`每页一张、高度按行数动态算），`exportReportPdf()`把第1页图表 + 后续N页明细表逐张栅格化后`doc.addPage()`拼进PDF。之所以要分页而不是一张长图，是因为时间线可能几十行，单张超长图贴进A4会被页边裁掉。**屏幕上的数据明细表（`renderReportTables()`）现在也默认直接展开、不折叠了**（去掉了原来的`<details>`/`<summary>`，用户要求"直接展开不要收起"）。
+
+### 统计tab视觉+交互升级：石墨hero+可折叠KPI+第4张图（月还款统计）+全部图表交互化
+
+React迁移第三步时"统计"tab是最后一批机械翻译的组件（零手势、零交互、视觉上还停留在"高级统计报表"时代），这轮补齐——参考一木记账的统计页设计（可折叠KPI头、图表可切换+点击/拖动看精确值），但重新翻译成debt语境的信息维度，不照搬记账app的收支词汇（"收支统计"翻译成"月还款统计"——已还/待还两段，不是收入/支出两段）。
+
+**新增第4张图"月还款统计"，不替换现有"负债预测走势"**：两者性质不同——负债走势是余额随时间递减的投影曲线，月还款统计是每月发生额（已还/待还两段）。现有3张图（`BalanceBars`/`TypeStack`/`PayoffLine`）也都加了交互；导出Excel/PDF从独立按钮收进右上角"⋮"菜单（`ExportMenu.tsx`，替代删除的`ExportActions.tsx`）。
+
+**图表交互分两个复杂度量级，按数据形状（连续时间序列 vs 离散分类）区分，不是所有图表一刀切成同一种手势**：
+- **连续时间序列图**（`MonthlyChart.tsx`新图 + `PayoffLine.tsx`升级）：真正的press+drag scrub手势，共用新的`react/src/report/chartScrub.ts`——`nearestIndexForX(clientX, rect, count)`纯函数算最近索引，`attachChartScrub(el, {count, onIndexChange})`挂Touch Events（`touchmove`必须`{passive:false}`）+桌面`pointerType==='mouse'`网关的Pointer Events，`touchstart`/`pointerdown`落地立即触发一次（"点击=查看精确值"），`touchmove`/`pointermove`持续触发（"拖动=连续更新"）。图表上方常驻`.viz-scrub-readout`文字行，`activeIndex`为`null`时兜底显示默认视图（`PayoffLine`是"今天¥X·date还清"，`MonthlyChart`是最新一个月）。**释放手指后数字停留在最后scrub到的点，不自动回弹**——这样抬手后还能看清刚划到的数字。这个手势比"长按拖拽排序"简单得多：不需要长按计时器、不需要dx/dy方向判断，`touchstart`落在图表内直接开始scrub（代价：图表正上方开始的垂直滑动不会触发页面滚动，这是iOS股票类App图表的标准做法，可接受）。
+- **离散分类图**（`BalanceBars.tsx`/`TypeStack.tsx`）：只需要普通React `onClick`（离散数据每项本来就是完整的一个值，不需要"划过中间任意一点"），不需要Touch Events这套重手势基础设施。`BalanceBars`每行`activeIdx`状态+`.active`类（再点一次取消）；`TypeStack`的堆叠段和图例项联动同步（点任意一个都会高亮另一边），非选中段加`.dim`（`opacity:.35`）。
+
+**`computeMonthlyRepayment(debts)`（calc.js第41个函数）故意不塞进`computeReportData()`的返回对象**——那个对象被`exportReportXlsx`/`exportReportPdf`（100% vanilla）按字段名精确解构，改形状会同时打断两个导出功能。任何要给统计tab加的新数据维度都应该照这个先例独立成新函数，不要碰被解构的对象。不按`active`过滤（已结清债务的历史已还记录仍计入对应月份，否则结清瞬间会让过去月份的柱子突然变矮）；用`amount`（本金+利息合计）不是`principal`（这张图回答"当月要还多少钱"）；月份在数据范围内按月连续补0，不留稀疏空洞。
+
+**`react/src/shared/Popover.tsx`是`shared/`下第一个UI组件**（之前只有`state.ts`纯hook）——"?"说明弹窗（`InfoTip.tsx`）和"⋮"导出菜单（`ExportMenu.tsx`）共用同一个"点图标→弹出贴着图标的小面板→点外面/再点一次关闭"交互模式。
+
+**⚠️踩了一个隐蔽但很有代表性的坑：面板一开始用CSS `position:absolute`相对锚点定位，真机验证前的Playwright桌面测试就已经抓到"点导出菜单里的选项完全没反应"——根因分两层，且比想象的更深**：
+1. **第一层（真的是clipping）**：`ExportMenu`的触发器在`Hero.tsx`的`.hero-top`里，而`.hero`本身有`overflow:hidden`（用来裁切装饰性的`hero-smoke`色雾），绝对定位的下拉面板会被这层`overflow:hidden`直接裁掉/挡住。**改成`position:fixed`+JS用`getBoundingClientRect()`算视口坐标**看似解决了——面板的"定位参照"确实跳到了视口，不再被`.hero`的`overflow:hidden`裁切。
+2. **第二层（真正的根因，比clipping更隐蔽）**：改完`position:fixed`后问题依然复现。用最小复现单独排查后才搞清楚：**`position:fixed`只让元素的定位参照跳到视口，不会让它跳出祖先的stacking context**。`.hero-top`和`.hero-amt`都是`.hero`的直接子元素，都被`.hero > *{position:relative;z-index:1}`这条规则赋予了相同的z-index、各自形成独立的stacking context——面板在DOM树里依然是`.hero-top`这个stacking context的后代，会被整体画在`.hero-top`这层，而DOM顺序更靠后、z-index相同的`.hero-amt`作为兄弟stacking context会整个画在它上层。哪怕面板的视觉坐标已经算到了`.hero-amt`下方的空白区域，**命中测试(hit-test)点到的还是`.hero-amt`**——这是纯CSS定位技巧解决不了的，`position:fixed`元素的"绘制层级"依然由它在DOM/stacking-context树里的位置决定，不是由它最终画在屏幕哪个像素决定。
+3. **最终解法**：用`createPortal(panel, document.body)`把面板真正挂到`document.body`下，让它在DOM树里就不是`.hero`的后代，彻底跳出整条stacking context链——这是这个项目第一次用React Portal。`Popover.tsx`同时保留`position:fixed`+`getBoundingClientRect()`算坐标（打开时机+`resize`/`scroll`时机重新量一次），两者都需要：portal解决"画在谁上面"，fixed+算坐标解决"面板具体显示在哪"。判断"点击面板外关闭"的逻辑也要相应调整——面板挂在body下之后，必须同时检查触发器（`rootRef`）和面板本身（`panelRef`）两处，不能只检查触发器所在的`.popover-root`，否则点面板自己的内容（比如菜单项）会被误判成"点了外面"而立刻关闭。**以后这个项目里任何"贴着触发器展开的浮层"，如果发现"看起来定位对了但点不到"，先怀疑是不是这个stacking context坑，而不是继续调CSS的z-index数值**——加大z-index在这里完全没用，问题不在z-index大小，在DOM树位置。
+
+**`Hero.tsx`结构上还踩过一个更基础的坑：一开始把`.summary`（KPI网格）/`.note-toggle`/展开的KPI网格全部嵌套在`.hero`内部**，跟"债务"tab的`debts/Summary.tsx`（`.hero`和`.summary`是兄弟节点，不是父子）这个既有模式不一致。后果不只是结构不统一——`.summary`里的`InfoTip`弹窗也被嵌套进了`.hero`的`overflow:hidden`里，触发了跟上面`ExportMenu`同一类的裁切问题。修法是把`.hero`（只包含`hero-top`/`hero-amt`/`hero-pill`）改成独立的一个块，`.summary`/`note-toggle`/展开网格作为**兄弟节点**紧跟在后面，跟`debts/Summary.tsx`的结构完全对齐。**这个坑是Playwright验证阶段真实复现"点了'加权平均利率'旁边的说明按钮没反应"之后才定位到的，不是设计阶段就想到的**——以后往这几个hero卡片里加任何新的弹层/浮动内容，先确认它有没有被不小心嵌进了`.hero`这层`overflow:hidden`容器。
+
+**`.viz-block`补上了卡片外壳**（之前一直是裸的`margin-bottom:22px`，没有`background`/`border`/`shadow`）：`background:var(--card-grad);border:1px solid var(--hair);border-radius:18px;padding:14px 16px;box-shadow:var(--e1)`，让5个viz-block（`BalanceBars`/`TypeStack`/`PayoffLine`/`MonthlyChart`/`ReportTables`）都套上跟"债务"/"还款日"两个tab一致的卡片质感。
+
+**验证**：桌面Chromium + Playwright（一次性临时`npm install playwright`，用完卸载）：Hero"更多指标"展开/收起、InfoTip打开/关闭、导出菜单打开/关闭+两个premium门禁方向（未开通跳订阅页/已开通直接触发导出）、`MonthlyChart`柱状/折线切换、`BalanceBars`/`TypeStack`点击高亮联动、`MonthlyChart`和`PayoffLine`的桌面鼠标拖动scrub（两者的readout都正确跟着更新、抬手后停留不回弹），light/dark两种主题截图核对（含真实移动端viewport 390×844，不是fullPage长图——**fullPage长图截图对`position:fixed`元素会有已知的拼接假象，曾经一度误以为"还款提醒通知"面板不知为何默认打开着，用普通viewport截图核实后确认只是fullPage截图工具的假象，不是真实bug**，以后排查类似"截图里出现不该出现的东西"，先用非fullPage的普通viewport截图复核一遍再当真）；`npx tsc --noEmit`零错误，`npm run test:react`全绿，`npm test`（calc.js套件）不受影响，`npm run build:react`确认`report.js`产物正常增长（从升级前的8.94kB涨到23kB左右，符合预期——4张图+可折叠KPI头+2个共享UI组件）。
+
+**⚠️还没做的验证：真机触摸手势确认**——`MonthlyChart`/`PayoffLine`的scrub手势是这轮唯一动了真正touch事件的地方（`chartScrub.ts`），桌面Playwright只能验证鼠标模拟的Pointer Events路径不报错、代码逻辑没问题，验证不了真实手指连续拖动的手感、多点触控边界情况、安卓WebView的触摸事件时序——跟这个项目历史上"长按拖拽排序"/"还款日左滑"的教训是同一类要求，**这一步必须真机确认，不能跳过**。已编译好debug APK（`android/app/build/outputs/apk/debug/app-debug.apk`），下一步是装真机验证：两张连续时间序列图的拖动/点击scrub手感、`ExportMenu`/`InfoTip`两个弹层在真机WebView上的定位是否正确（这轮修复的stacking context坑理论上在任何浏览器引擎下都成立，但WebView版本差异值得留意）、light/dark主题下视觉效果、硬件返回键行为不受影响（这轮没有新增/改动任何`.sheet`/`.subpage`，`__handleBackButton`链不需要变动）。
 
 ## 云备份（Premium）
 

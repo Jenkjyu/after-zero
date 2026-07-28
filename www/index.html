@@ -728,13 +728,15 @@
   .report-hero-menu.on { color: var(--graphite-text); background: rgba(255,255,255,.12); }
 
   /* 共享锚定浮层(react/src/shared/Popover.tsx)——"?"说明弹窗(InfoTip)和"⋮"导出菜单
-     (report/ExportMenu.tsx)共用。popover-root给触发器元素做定位锚点，popover-panel贴着
-     它绝对定位展开，align-start/align-end决定面板从锚点左边还是右边对齐展开。 */
+     (report/ExportMenu.tsx)共用。popover-root给触发器元素做定位锚点；popover-panel用
+     position:fixed，具体top/left/right由组件用getBoundingClientRect()算出后内联写入
+     (不用CSS的align-start/align-end类，那样只能相对普通flow内的锚点定位)——这是踩过坑
+     之后改的：面板如果只是绝对定位挂在锚点旁边，遇到锚点祖先节点有overflow:hidden(比如
+     report/Hero.tsx的.hero，为了裁切装饰性的hero-smoke色雾)会被直接裁掉/位置错乱，改成
+     fixed+JS算坐标后完全不受任何祖先overflow影响。 */
   .popover-root { position: relative; display: inline-flex; }
-  .popover-panel { position: absolute; z-index: 5; top: calc(100% + 6px); background: var(--card-grad);
+  .popover-panel { position: fixed; z-index: 25; background: var(--card-grad);
     border: 1px solid var(--hair); border-radius: 14px; box-shadow: var(--e2); min-width: 160px; }
-  .popover-panel.align-end { right: 0; }
-  .popover-panel.align-start { left: 0; }
   .info-tip-btn { width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--hair);
     background: var(--surface-2); color: var(--text-muted); font-size: 11px; font-weight: 700;
     line-height: 1; display: inline-flex; align-items: center; justify-content: center;
