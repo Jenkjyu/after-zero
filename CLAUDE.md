@@ -618,7 +618,7 @@ window.__debugPremium("none")         // 清空，恢复"普通用户"
 
 **这里的历史已经翻篇：早期是"我的"页里`hasPremium()`门禁的一张入口卡片、点开是整页浮层`#reportScreen`——现在是底部tabbar第3个主tab（`data-view="report"` → `#view-report`），不再是子页面，也不再有任何门禁。** 这次改动是"导航重排"那轮的一部分（详见下面"导航重排"一节），动机是图表查看本来就已经改成免费（见上面"订阅UI基础设施"一节的免费/付费边界），既然免费又是这个app除债务列表外最值得看的东西，直接提到主tab比藏在"我的"页一张卡片后面曝光率高得多。**导出PDF/Excel依然是Premium权益，没变**——门禁在`reportExportXlsxBtn`/`reportExportPdfBtn`各自的click handler上，未开通直接跳订阅页（不再需要先"关掉当前子页面"这一步，因为现在就在主tab上，没有子页面要关）。
 
-内容（React迁移第三步时）：2个KPI（加权平均利率、预计全部还清日期）+ 3张图（各债务余额对比的横向条形图、债务类型占比的堆叠条形图+图例、负债预测走势折线图）+ 数据明细表（默认直接展开，不折叠），支持导出真正的`.xlsx`和`.pdf`文件。**`renderReportScreen()`函数名字没跟着改**（还叫"Screen"不叫"View"，是历史遗留，不影响功能，以后大改这块时可以顺手改名）——现在挂在`renderAll()`管线里跟`renderSummary()`/`renderDebts()`等一起调用，债务数据一变，统计tab的内容自动跟着刷新，不需要"进入tab时才渲染"这种额外逻辑（因为它不再是"打开"的东西，是常驻的tab）。**⚠️"2个KPI+3张图"这个数字后来变了——见下面"统计tab视觉+交互升级"一节，KPI头改成了可折叠的Hero+2常驻+4展开共6个指标，图表变成4张。**
+内容（React迁移第三步时）：2个KPI（加权平均利率、预计全部还清日期）+ 3张图（各债务余额对比的横向条形图、债务类型占比的堆叠条形图+图例、负债预测走势折线图）+ 数据明细表（默认直接展开，不折叠），支持导出真正的`.xlsx`和`.pdf`文件。**`renderReportScreen()`函数名字没跟着改**（还叫"Screen"不叫"View"，是历史遗留，不影响功能，以后大改这块时可以顺手改名）——现在挂在`renderAll()`管线里跟`renderSummary()`/`renderDebts()`等一起调用，债务数据一变，统计tab的内容自动跟着刷新，不需要"进入tab时才渲染"这种额外逻辑（因为它不再是"打开"的东西，是常驻的tab）。**⚠️"2个KPI+3张图"这个数字后来变了两次**：先是"统计tab视觉+交互升级"那轮改成可折叠的Hero（2常驻+4展开共6个指标）+4张图；再是"统计tab口径修正"这轮（2026-07-29）把折叠去掉、改成**4个常驻KPI（累计已还本金/经常性月供/归零进度/加权平均利率）+ 笔数降级成一行小字 + 一个"计算口径说明"折叠面板**，见下面"统计tab口径修正"子节。
 
 **这是这个项目第一批图表，配色套用了`dataviz` skill的默认8色类别色板**（`.viz-root`里的`--series-1`..`--series-8`，明暗双模式都定义了），**已经用skill自带的`validate_palette.js`对着本项目实际的浅色`#FFFFFF`/深色`#191D24`底色重新验证过**（全部PASS，只有浅色模式下3个色阶低于3:1对比度触发"relief rule"——用可见的图例文字+数据表满足，不单靠颜色）——不是直接照抄skill文档里参考色`#fcfcfb`/`#1a1a19`的验证结果，那个底色跟这个项目不是一回事，swap配色后必须重新跑一遍验证脚本，这条以后加新图表也适用。三张图全部手写（条形图用普通div+百分比宽度，堆叠条+折线图用内联SVG），没有引入任何图表库。
 
@@ -654,9 +654,21 @@ React迁移第三步时"统计"tab是最后一批机械翻译的组件（零手�
 
 **`.viz-block`补上了卡片外壳**（之前一直是裸的`margin-bottom:22px`，没有`background`/`border`/`shadow`）：`background:var(--card-grad);border:1px solid var(--hair);border-radius:18px;padding:14px 16px;box-shadow:var(--e1)`，让5个viz-block（`BalanceBars`/`TypeStack`/`PayoffLine`/`MonthlyChart`/`ReportTables`）都套上跟"债务"/"还款日"两个tab一致的卡片质感。
 
-**验证**：桌面Chromium + Playwright（一次性临时`npm install playwright`，用完卸载）：Hero"更多指标"展开/收起、InfoTip打开/关闭、导出菜单打开/关闭+两个premium门禁方向（未开通跳订阅页/已开通直接触发导出）、`MonthlyChart`柱状/折线切换、`BalanceBars`/`TypeStack`点击高亮联动、`MonthlyChart`和`PayoffLine`的桌面鼠标拖动scrub（两者的readout都正确跟着更新、抬手后停留不回弹），light/dark两种主题截图核对（含真实移动端viewport 390×844，不是fullPage长图——**fullPage长图截图对`position:fixed`元素会有已知的拼接假象，曾经一度误以为"还款提醒通知"面板不知为何默认打开着，用普通viewport截图核实后确认只是fullPage截图工具的假象，不是真实bug**，以后排查类似"截图里出现不该出现的东西"，先用非fullPage的普通viewport截图复核一遍再当真）；`npx tsc --noEmit`零错误，`npm run test:react`全绿，`npm test`（calc.js套件）不受影响，`npm run build:react`确认`report.js`产物正常增长（从升级前的8.94kB涨到23kB左右，符合预期——4张图+可折叠KPI头+2个共享UI组件）。
+**验证**（⚠️这段是"视觉+交互升级"那轮的记录；其中"更多指标"折叠在下一轮"统计tab口径修正"里已经删除，换成4个常驻KPI+"计算口径说明"折叠）：桌面Chromium + Playwright（一次性临时`npm install playwright`，用完卸载）：Hero"更多指标"展开/收起、InfoTip打开/关闭、导出菜单打开/关闭+两个premium门禁方向（未开通跳订阅页/已开通直接触发导出）、`MonthlyChart`柱状/折线切换、`BalanceBars`/`TypeStack`点击高亮联动、`MonthlyChart`和`PayoffLine`的桌面鼠标拖动scrub（两者的readout都正确跟着更新、抬手后停留不回弹），light/dark两种主题截图核对（含真实移动端viewport 390×844，不是fullPage长图——**fullPage长图截图对`position:fixed`元素会有已知的拼接假象，曾经一度误以为"还款提醒通知"面板不知为何默认打开着，用普通viewport截图核实后确认只是fullPage截图工具的假象，不是真实bug**，以后排查类似"截图里出现不该出现的东西"，先用非fullPage的普通viewport截图复核一遍再当真）；`npx tsc --noEmit`零错误，`npm run test:react`全绿，`npm test`（calc.js套件）不受影响，`npm run build:react`确认`report.js`产物正常增长（从升级前的8.94kB涨到23kB左右，符合预期——4张图+可折叠KPI头+2个共享UI组件）。
 
 **⚠️还没做的验证：真机触摸手势确认**——`MonthlyChart`/`PayoffLine`的scrub手势是这轮唯一动了真正touch事件的地方（`chartScrub.ts`），桌面Playwright只能验证鼠标模拟的Pointer Events路径不报错、代码逻辑没问题，验证不了真实手指连续拖动的手感、多点触控边界情况、安卓WebView的触摸事件时序——跟这个项目历史上"长按拖拽排序"/"还款日左滑"的教训是同一类要求，**这一步必须真机确认，不能跳过**。已编译好debug APK（`android/app/build/outputs/apk/debug/app-debug.apk`），下一步是装真机验证：两张连续时间序列图的拖动/点击scrub手感、`ExportMenu`/`InfoTip`两个弹层在真机WebView上的定位是否正确（这轮修复的stacking context坑理论上在任何浏览器引擎下都成立，但WebView版本差异值得留意）、light/dark主题下视觉效果、硬件返回键行为不受影响（这轮没有新增/改动任何`.sheet`/`.subpage`，`__handleBackButton`链不需要变动）。
+
+### 统计tab口径修正（2026-07-29，进行中）
+
+上一轮"视觉+交互升级"解决的是"好不好看、能不能交互"，**这一轮解决的是"数字对不对"**——调查阶段用真实数据跑出来3个已确认的口径bug（不是代码审查推测出来的，每一个都有先于实现写好、确认过是红的回归测试）。三个bug的成因和修法见上面"纯计算函数"一节`summarizeAllTime`/`computeUpcomingPressure`那两段，这里只记UI层的决定。
+
+**Hero改版：4个常驻KPI + 笔数一行小字 + 一个"计算口径说明"折叠**，替代原来的"2常驻+4折叠(更多指标)"：
+- **hero大金额补回了标签**。原来`hero-label`是"统计"两个字，一个36px的大金额上方没有任何说明它是什么口径——用户无从得知这是"在还总负债、只算本金"。改成跟"债务"tab一致的"在还总负债"，口径角标放到金额下面的pill行（`hero-top`右侧被`ExportMenu`的"⋮"占着，塞不下"只算本金"那个pill）。
+- **新增`.hero-pills`这个flex容器**——`.hero-pill`本身没设`display`（默认block），在"债务"tab里它是`.hero-top`这个flex行的子元素所以天然收缩到内容宽度，但统计tab的pill只能放在金额下面单独一行，直接放会被拉成整行宽的圆角框。`.hero-pills`就是给它一个能收缩的flex上下文，同时支持并排放多个pill。**Playwright验证里专门加了一条"pill宽度必须明显小于行宽"的断言**盯住这个回归。
+- **4个KPI的选择依据是"金额/利息/进度/利率比笔数更值得占位置"**：累计已还本金（含利息子行）、经常性月供、归零进度、加权平均利率（带`InfoTip`）。在还/已结清笔数降级成`.hero-counts`一行小字——它们原来是2张占满位置的`.kpi`卡片，而且跟"债务"tab的KPI网格完全重复。
+- **`Hero.tsx`读`summarizeAllTime()`不是`summarizeDebts()`**，这是BUG-2的UI落地点，两个函数返回形状相同所以是drop-in替换。
+- **"计算口径说明"折叠面板是新增的**（照抄"债务"tab `.note-toggle`那套）。⚠️**这两个tab的折叠按钮现在文案完全相同（都叫"计算口径说明"）**，运行时不冲突（分属两个`.view`），但**写Playwright脚本时`text=计算口径说明`会同时命中两个、报strict mode violation**——真实踩到过，脚本里所有选择器都要加`#view-report`作用域限定。同理`.hero-label`现在两个tab都是"在还总负债"。
+- 口径说明的内容必须覆盖6条：在还总负债只算本金、累计已还本金含已结清、经常性月供不含一次性还清、归零进度只按本金算、预计还清日期是预测不是承诺、**以及"提前结清"的剩余本金既不计入总负债也不计入累计已还**（实际付了多少钱App并不知道，必须诚实说明，不能假装它被还了）。
 
 ## 云备份（Premium）
 

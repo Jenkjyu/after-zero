@@ -14,8 +14,9 @@ describe("report App", () => {
     ];
     window.__azBridge = makeMockBridge({ debts, premium: { premium: null } });
     render(<App />);
-    // "统计"这个标签现在折进了Hero的hero-label，不再有独立的section-label
-    expect(screen.getByText("统计")).toBeInTheDocument();
+    // hero-label从"统计"改成了"在还总负债"——原来大金额上方没有任何口径标签(见Hero.tsx)
+    expect(screen.getByText("在还总负债")).toBeInTheDocument();
+    expect(screen.getByText("只算本金")).toBeInTheDocument();
     // 已结清的网贷A不计入统计(computeReportData按!d.settled过滤)
     expect(screen.getByText("6.00%")).toBeInTheDocument();
     // 导出按钮收进了右上角"⋮"菜单，默认关闭，点触发器才显示

@@ -130,6 +130,14 @@
   .kpi .v { font-size: 17px; font-weight: 650; margin-top: 3px; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
   .kpi .k { font-size: 11px; color: var(--text-muted); }
   .kpi-sub { font-size: 10.5px; color: var(--text-faint); margin-top: 2px; }
+  /* 统计tab hero专用：一行可换行的pill组。"债务"tab的hero-pill是hero-top这个flex行的子元素、
+     天然收缩到内容宽度；统计tab的hero-top右侧被导出菜单占着，pill只能放到金额下面单独一行，
+     而.hero-pill本身没设display(默认block)，直接放会拉成整行宽的圆角框——这个flex容器就是
+     给它一个能收缩到内容宽度的上下文，同时支持放多个pill(口径角标+预计还清日期)。 */
+  .hero-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  /* 统计tab：在还/已结清笔数降级成的一行小字(原来是2个占满位置的.kpi卡片，跟"债务"tab完全
+     重复；金额/利息/进度/利率的优先级更高，笔数只要能看到就够)。 */
+  .hero-counts { font-size: 11.5px; color: var(--text-muted); margin: -3px 2px 12px; }
   /* 灵动AI入口：对话气泡+魔法棒图标，胶囊描边扫光+呼吸光晕；开通前更克制、不发光。 */
   .ai-banner { position: relative; display: flex; align-items: center; gap: 11px; width: 100%; border: none;
     border-radius: 999px; padding: 12px 16px 12px 12px; background: var(--card-grad); cursor: pointer;
