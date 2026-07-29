@@ -15,6 +15,7 @@
     --text: #23272F; --text-muted: #656C7E; --accent: #18453B; --accent-soft: #E7F3F1; --accent-mid: #4E9481;
     --critical: #BE3A3A; --critical-soft: #F9E8E8; --warning: #A66A0A; --warning-soft: #FAF0D9;
     --good: #2E5F8A; --good-soft: #E1EBF4; --shadow: 0 2px 10px rgba(24,32,46,.10);
+    --accent-fill: #1E715F; --critical-fill: #BE3A3A; --on-accent: #FFFFFF; --on-good: #FFFFFF; --on-critical: #FFFFFF; --on-critical-dim: rgba(255,255,255,.78);
     --fs-xs: 11px; --fs-sm: 11.5px; --fs-base: 14px; --fs-lg: 15.5px; --fs-figure: 18px; --fs-xl: 19px; --fs-xxl: 23px;
     --font-ui: 'Inter var', system-ui, -apple-system, "PingFang SC", "Segoe UI", Roboto, sans-serif;
     --font-num: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
@@ -30,8 +31,9 @@
   @media (prefers-color-scheme: dark) {
     :root { --bg: #0F1319; --surface: #24282F; --surface-2: #2E3239; --border: #3C4047;
       --text: #E4E8EF; --text-muted: #98A0B0; --accent: #6FBE9E; --accent-soft: #283633; --accent-mid: #2F7B65;
-      --critical: #E56A6A; --critical-soft: #402F31; --warning: #D69A3C; --warning-soft: #3A3225;
+      --critical: #EE7B7B; --critical-soft: #402F31; --warning: #D69A3C; --warning-soft: #3A3225;
       --good: #6FA8D6; --good-soft: #29353E; --shadow: 0 2px 12px rgba(0,0,0,.35);
+      --accent-fill: #6FBE9E; --critical-fill: #B04040; --on-accent: #0E2119; --on-good: #0D1C28; --on-critical: #FFFFFF; --on-critical-dim: rgba(255,255,255,.78);
       --text-faint: #6E7787; --accent-rgb: 111,190,158; --app-grad: linear-gradient(180deg,#12161C,#0C0F14);
       --card-grad: linear-gradient(180deg,#282D35,#24282F); --hair: rgba(255,255,255,.07);
       --graphite-a: #333B45; --graphite-b: #161D25; --graphite-text: #F2F5F9; --graphite-dim: #99A4B2;
@@ -43,6 +45,7 @@
     --text: #23272F; --text-muted: #656C7E; --accent: #18453B; --accent-soft: #E7F3F1; --accent-mid: #4E9481;
     --critical: #BE3A3A; --critical-soft: #F9E8E8; --warning: #A66A0A; --warning-soft: #FAF0D9;
     --good: #2E5F8A; --good-soft: #E1EBF4; --shadow: 0 2px 10px rgba(24,32,46,.10);
+    --accent-fill: #1E715F; --on-accent: #FFFFFF; --on-good: #FFFFFF; --on-critical: #FFFFFF; --on-critical-dim: rgba(255,255,255,.78);
     --text-faint: #89929C; --accent-rgb: 24,69,59; --app-grad: linear-gradient(180deg,#E9ECF1,#E2E5EB);
     --card-grad: linear-gradient(180deg,#FFFFFF,#FAFBFD); --hair: rgba(35,42,55,.08);
     --graphite-a: #253039; --graphite-b: #151A20; --graphite-text: #FFFFFF; --graphite-dim: #9BA6B4;
@@ -53,8 +56,9 @@
     --glass: rgba(255,255,255,.62); --glass-border: rgba(255,255,255,.8); --glass-hi: rgba(255,255,255,.7); }
   :root[data-theme="dark"] { --bg: #0F1319; --surface: #24282F; --surface-2: #2E3239; --border: #3C4047;
     --text: #E4E8EF; --text-muted: #98A0B0; --accent: #6FBE9E; --accent-soft: #283633; --accent-mid: #2F7B65;
-    --critical: #E56A6A; --critical-soft: #402F31; --warning: #D69A3C; --warning-soft: #3A3225;
+    --critical: #EE7B7B; --critical-soft: #402F31; --warning: #D69A3C; --warning-soft: #3A3225;
     --good: #6FA8D6; --good-soft: #29353E; --shadow: 0 2px 12px rgba(0,0,0,.35);
+      --accent-fill: #6FBE9E; --on-accent: #0E2119; --on-good: #0D1C28; --on-critical: #2A1113; --on-critical-dim: rgba(42,17,19,.72);
     --text-faint: #6E7787; --accent-rgb: 111,190,158; --app-grad: linear-gradient(180deg,#12161C,#0C0F14);
     --card-grad: linear-gradient(180deg,#282D35,#24282F); --hair: rgba(255,255,255,.07);
     --graphite-a: #333B45; --graphite-b: #161D25; --graphite-text: #F2F5F9; --graphite-dim: #99A4B2;
@@ -240,7 +244,7 @@
   .sort-opt svg { width: 17px; height: 17px; flex: none; }
   .sort-controls { display: flex; align-items: center; gap: 6px; }
   .jiggle-done-btn { display: none; text-transform: none; letter-spacing: normal; font-size: 12px; font-weight: 600;
-    padding: 5px 10px; border-radius: 7px; border: none; background: var(--accent); color: #fff; }
+    padding: 5px 10px; border-radius: 7px; border: none; background: var(--accent-fill); color: var(--on-accent); }
   #view-debts.jiggling .jiggle-done-btn { display: inline-flex; }
   .debt-hint { font-size: 11.5px; color: var(--text-muted); margin: -4px 2px 10px; }
   #view-debts.jiggling .debt-hint { display: none; }
@@ -264,7 +268,7 @@
   /* ⚠️这个宽度必须跟 react/src/debts/gestures.ts 里的 DEBT_REVEAL 常量保持一致——CSS负责"按钮长什么样"、
      JS常量负责"滑动要位移多少像素才露出它"，改一个不改另一个的话，滑到底会露出
      半个按钮或者多出一条空隙。 */
-  .debt-swipe-btn { flex: 0 0 76px; border: none; background: var(--good); color: #fff;
+  .debt-swipe-btn { flex: 0 0 76px; border: none; background: var(--good); color: var(--on-good);
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12.5px; font-weight: 700;
     -webkit-tap-highlight-color: transparent; }
   .debt-swipe-btn svg { width: 18px; height: 18px; }
@@ -303,7 +307,7 @@
   #view-debts.jiggling #addBtn,
   #view-debts.jiggling .settled-item .restore { pointer-events: none; opacity: .45; }
 
-  .add-btn { width: 100%; background: var(--accent-soft); color: var(--accent); border: 1px dashed var(--accent);
+  .add-btn { width: 100%; background: var(--surface); color: var(--accent); border: 1px dashed var(--accent);
     border-radius: 12px; padding: 13px; font-size: 14px; font-weight: 600; margin-top: 4px; }
 
   .settled-wrap { margin-top: 22px; }
@@ -335,7 +339,7 @@
   /* ⚠️这个宽度必须跟 react/src/pay/gestures.ts 里的 PAY_REVEAL 常量保持一致——CSS负责"按钮长什么样"、
      JS常量负责"滑动要位移多少像素才露出它"，改一个不改另一个的话，滑到底会露出
      半个按钮或者多出一条空隙。 */
-  .pay-swipe-btn { flex: 0 0 76px; border: none; background: var(--good); color: #fff;
+  .pay-swipe-btn { flex: 0 0 76px; border: none; background: var(--good); color: var(--on-good);
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12.5px; font-weight: 700;
     -webkit-tap-highlight-color: transparent; }
   .pay-swipe-btn svg { width: 18px; height: 18px; }
@@ -401,17 +405,17 @@
      的终点状态，不需要另设中性灰底把它当成"什么都没有"处理。 */
   .pay-hero.empty { background: var(--good-soft); }
   .pay-hero-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 8px 0 2px; }
-  .pay-hero-empty-ic { width: 42px; height: 42px; border-radius: 50%; background: var(--good); color: #fff;
+  .pay-hero-empty-ic { width: 42px; height: 42px; border-radius: 50%; background: var(--good); color: var(--on-good);
     display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
   .pay-hero-empty-ic svg { width: 21px; height: 21px; }
   .pay-hero-empty-title { font-size: 16px; font-weight: 700; color: var(--good); }
   .pay-hero-empty-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 3px; }
   /* 逾期比crit(临期)更严重，用实心红底而不是淡色底，跟"还没到期但快了"拉开视觉差距 */
-  .pay-hero.overdue { background: var(--critical); }
-  .pay-hero.overdue .pay-hero-label, .pay-hero.overdue .pay-hero-name { color: rgba(255,255,255,.78); }
-  .pay-hero.overdue .pay-hero-daynum, .pay-hero.overdue .pay-hero-rel, .pay-hero.overdue .pay-hero-amt { color: #fff; }
-  .pay-hero.overdue .pay-hero-bell { color: rgba(255,255,255,.78); }
-  .pay-hero.overdue .pay-hero-bell.on { color: #fff; }
+  .pay-hero.overdue { background: var(--critical-fill); }
+  .pay-hero.overdue .pay-hero-label, .pay-hero.overdue .pay-hero-name { color: var(--on-critical-dim); }
+  .pay-hero.overdue .pay-hero-daynum, .pay-hero.overdue .pay-hero-rel, .pay-hero.overdue .pay-hero-amt { color: var(--on-critical); }
+  .pay-hero.overdue .pay-hero-bell { color: var(--on-critical-dim); }
+  .pay-hero.overdue .pay-hero-bell.on { color: var(--on-critical); }
 
   /* 还款列表按"已逾期/本周内/本月内/更晚"分组，逾期单独强调(红字加粗)，不只是排序靠前——
      逾期的实际代价比"还没到但快了"更高，值得从列表里摘出来单独一档(呼应urgencyTier的判断)。 */
@@ -455,7 +459,13 @@
   .btn { border: none; border-radius: 10px; padding: 11px; font-size: var(--fs-base); font-weight: 600; flex: 1;
     display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
   .btn-ic { width: 15px; height: 15px; flex: none; }
-  .btn.primary { background: var(--accent); color: #fff; }
+  /* 按钮分四档，靠"层级"区分主次，不靠"是不是绿的"——一屏最多一个 .primary 实心强调按钮。
+     ①primary=实心(提交整个表单/确认)  ②ghost=中性描边(取消、次要操作)
+     ③danger=淡红底(次要的破坏性操作)  ④tertiary=局部小工具(见 .batch button)
+     ⚠️实心按钮的文字色一律走 --on-* token，绝对不要写死 #fff：深色模式下 --accent/--good/
+     --critical 都会变成浅色调，白字压上去只有 2.2~3.2，远低于 4.5。这个错误历史上在
+     保存/应用到全部/左滑销这期/toast/AI气泡等十来处同时犯过，全部由这批 token 统一修掉。 */
+  .btn.primary { background: var(--accent-fill); color: var(--on-accent); }
   .btn.ghost { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
   .btn.danger { background: var(--critical-soft); color: var(--critical); }
 
@@ -489,12 +499,19 @@
   .req { color: var(--critical); font-weight: 700; }
   .f-day-auto { opacity: .6; }
   .sheet-actions { display: flex; gap: 10px; margin-top: 6px; }
-  .subhead { font-size: 13px; font-weight: 700; margin: 18px 0 8px; color: var(--accent); }
+  /* 段落标题用普通文字色，靠字重/字号表达重要性——强调色要留给真正可交互的东西。
+     用 --accent 时它跟同屏的按钮同色，读起来像是可以点的链接。 */
+  .subhead { font-size: 13px; font-weight: 700; margin: 18px 0 8px; color: var(--text); }
   .sheet-divider { border: none; border-top: 1px solid var(--border); margin: 22px 0 2px; }
-  .plan-mode-toggle { display: flex; gap: 8px; margin-bottom: 12px; }
-  .pm-btn { flex: 1; padding: 8px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-2);
+  /* 分段控件（手动添加/公式生成）：选中态不该长得像按钮。改成"凹槽 + 浮起的滑块"——
+     整条是 --surface-2 凹槽，选中那一段是浮起的 --surface 滑块。原来选中态是
+     "淡绿底 + 绿描边 + 绿字"，跟同屏的绿色标题/绿色实心按钮抢同一个强调色，
+     四个语义完全不同的东西共用一个绿，颜色传达不出任何层级差异。 */
+  .plan-mode-toggle { display: flex; gap: 3px; margin-bottom: 12px; padding: 3px;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 11px; }
+  .pm-btn { flex: 1; padding: 7px; border-radius: 8px; border: none; background: none;
     color: var(--text-muted); font-size: 13px; font-weight: 600; font-family: inherit; }
-  .pm-btn.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+  .pm-btn.active { background: var(--surface); color: var(--text); box-shadow: var(--e1); }
   .checkline { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 12px; color: var(--text); }
   .checkline input { width: 18px; height: 18px; flex: none; }
   .switch-row { display: flex; align-items: center; justify-content: space-between; font-size: 14.5px; font-weight: 600; padding: 4px 0 10px; }
@@ -503,7 +520,7 @@
   .switch-track { position: absolute; inset: 0; background: var(--border); border-radius: 999px; transition: background .18s ease; }
   .switch-track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%;
     background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .18s ease; }
-  .switch input:checked + .switch-track { background: var(--accent); }
+  .switch input:checked + .switch-track { background: var(--accent-fill); }
   .switch input:checked + .switch-track::after { transform: translateX(18px); }
   .notify-add { display: flex; gap: 8px; margin-top: 10px; }
   .notify-add select, .notify-add input[type="time"] { background: var(--surface-2); color: var(--text);
@@ -523,7 +540,11 @@
   .batch { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; background: var(--surface-2); border-radius: 9px; padding: 9px 10px; margin-bottom: 10px; font-size: 12.5px; color: var(--text-muted); }
   .batch select, .batch input { padding: 6px 8px; font-size: 12.5px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); font-family: inherit; }
   .batch input { width: 84px; font-family: var(--font-num); }
-  .batch button { flex: none; background: var(--accent); color: #fff; border: none; border-radius: 7px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; }
+  /* "应用到全部"是批量填充的局部小工具，不是提交整个表单——降到第④档(tertiary)。
+     它以前跟 .btn.primary 的样式一模一样(同样 accent 实心底)，在浅色下是一片浅灰区域里
+     的深色块，比底下真正的"保存"还抢眼。 */
+  .batch button { flex: none; background: var(--surface); color: var(--accent); border: 1px solid var(--border);
+    border-radius: 7px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; }
   .plan-rows { border: 1px solid var(--border); border-radius: 16px; max-height: 360px; overflow: auto; margin-bottom: 8px; }
   .prow { border-top: 1px solid var(--border); padding: 8px 9px; }
   .prow:first-child { border-top: none; }
@@ -635,7 +656,7 @@
   .price-card { border: 2px solid var(--border); border-radius: 16px; padding: 14px; background: var(--surface);
     text-align: left; font-family: inherit; }
   .price-card.selected { border-color: var(--accent); background: var(--accent-soft); }
-  .price-card .pc-badge { display: inline-block; font-size: 10.5px; font-weight: 700; color: #fff; background: var(--accent);
+  .price-card .pc-badge { display: inline-block; font-size: 10.5px; font-weight: 700; color: var(--on-accent); background: var(--accent-fill);
     border-radius: 999px; padding: 2px 8px; margin-bottom: 6px; }
   .price-card .pc-amt { font-size: 19px; font-weight: 700; }
   .price-card .pc-period { font-size: 12px; color: var(--text-muted); }
@@ -684,7 +705,7 @@
   .ai-msg { max-width: 85%; padding: 10px 13px; border-radius: 14px; font-size: 14px; line-height: 1.6;
     white-space: pre-wrap; word-break: break-word; }
   .ai-msg strong { font-weight: 700; }
-  .ai-msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+  .ai-msg.user { align-self: flex-end; background: var(--accent-fill); color: var(--on-accent); border-bottom-right-radius: 4px; }
   .ai-msg.bot { align-self: flex-start; background: var(--surface-2); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
   .ai-msg.pending { color: var(--text-muted); display: flex; align-items: center; gap: 7px; }
   .ai-typing-dots { display: inline-flex; gap: 3px; }
@@ -700,7 +721,7 @@
   .ai-composer textarea { flex: 1; resize: none; border: 1px solid var(--border); background: var(--surface); color: var(--text);
     border-radius: 20px; padding: 10px 15px; font: inherit; font-size: 14px; line-height: 1.4; max-height: 90px; }
   .ai-composer textarea:focus { outline: none; border-color: var(--accent); }
-  .ai-send-btn { width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--accent); color: #fff;
+  .ai-send-btn { width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--accent-fill); color: var(--on-accent);
     display: flex; align-items: center; justify-content: center; flex: none; }
   .ai-send-btn svg { width: 17px; height: 17px; }
   .ai-send-btn:disabled { opacity: .4; }
@@ -732,7 +753,7 @@
   /* 已订阅态：图标块换成实心accent底+白图标——语义是"已拥有的权益"而不是"紧急"，
      所以只强调小图标块，不整卡变色（不采用.pay-hero.overdue那种整卡实心红底的
      处理手法，那是"逾期"这种真正紧急语义专属的最强信号）。 */
-  .premium-entry-card.is-member .premium-entry-ic { background: var(--accent); color: #fff; }
+  .premium-entry-card.is-member .premium-entry-ic { background: var(--accent-fill); color: var(--on-accent); }
 
   .account-detail-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .account-detail-row:last-child { border-bottom: none; }
@@ -959,7 +980,7 @@
   .terms-body .terms-note { font-size: 12px; color: var(--text-muted); margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--border); }
 
   .footnote { text-align: center; font-size: 11.5px; color: var(--text-muted); margin-top: 14px; padding: 0 10px; line-height: 1.5; }
-  .flash { position: fixed; bottom: 92px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--good); color: #fff;
+  .flash { position: fixed; bottom: 92px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--good); color: var(--on-good);
     padding: 9px 20px; border-radius: 999px; font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; transition: all .25s; z-index: 60; max-width: 90%; text-align: center; }
   .flash.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
