@@ -158,7 +158,10 @@
 
   /* ===== 降权的 4 个小指标 ===== */
   .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 13px; }
-  .kpi { background: var(--card-grad); border: 1px solid var(--hair); border-radius: 18px; padding: 12px 14px; box-shadow: var(--e1); }
+  .kpi { position: relative; background: var(--card-grad); border: 1px solid var(--hair);
+    border-radius: 18px; padding: 12px 14px; box-shadow: var(--e2); }
+  .kpi::after { content: ""; position: absolute; inset: 0; border-radius: inherit;
+    pointer-events: none; box-shadow: inset 0 1px 0 var(--glass-hi); }
   .kpi .v { font-size: 17px; font-weight: 650; margin-top: 3px; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
   .kpi .k { font-size: 11px; color: var(--text-muted); }
   .kpi-sub { font-size: 10.5px; color: var(--text-faint); margin-top: 2px; }
@@ -821,8 +824,18 @@
   }
   /* 视觉对齐的关键一步——5个viz-block（3个原有+MonthlyChart+ReportTables）套上跟"债务"/
      "还款日"两个tab一致的卡片质感，之前一直是裸的margin-bottom，没有card外壳。 */
-  .viz-block { margin-bottom: 22px; background: var(--card-grad); border: 1px solid var(--hair);
-    border-radius: 18px; padding: 14px 16px; box-shadow: var(--e1); }
+  /* 图表卡的材质：跟"债务"/"还款日"两个tab的卡片对齐到同一档 elevation（--e2，跟
+     .debt/.pay-row 一致，原来是最轻的 --e1，所以统计页整体看起来比另外两个tab"平"），
+     再补一条顶部内高光——这是让卡片看起来"被打了光"的材质线索，.hero::after 用的是同一招。
+     ⚠️**故意不用磨砂玻璃**（.debt-front 那套 --glass + backdrop-filter），虽然"材质对齐"
+     字面上该抄过来。理由是数据标记需要**稳定可预测的背景**：页面底 --app-grad 是个渐变，
+     玻璃是半透明的，于是同一张图表卡在页面顶部和底部的实际底色不同（实测浅色下
+     #F7F8FA vs #F4F5F7），刚验好的图表对比度会掉到 3:1 以下、而且**随滚动位置漂移**。
+     列表卡片可以用玻璃（它们强调"漂在页面上的可操作物件"），承载数据的容器不行。 */
+  .viz-block { position: relative; margin-bottom: 22px; background: var(--card-grad);
+    border: 1px solid var(--hair); border-radius: 18px; padding: 14px 16px; box-shadow: var(--e2); }
+  .viz-block::after { content: ""; position: absolute; inset: 0; border-radius: inherit;
+    pointer-events: none; box-shadow: inset 0 1px 0 var(--glass-hi); }
   .viz-title { font-size: 13.5px; font-weight: 700; margin-bottom: 10px; }
   .viz-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px;
     cursor: pointer; border-radius: 9px; padding: 2px 6px; margin-left: -6px; margin-right: -6px;
