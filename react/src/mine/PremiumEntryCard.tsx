@@ -12,16 +12,16 @@ export function PremiumEntryCard({ premium }: PremiumEntryCardProps) {
   const label = window.premiumLabel(premium);
 
   return (
-    <div className={"data-card premium-entry-card" + (label ? " is-member" : "")}>
-      <button type="button" className="premium-entry" onClick={openPremiumScreen}>
-        <div className="premium-entry-ic" aria-hidden="true">
+    <div className={"data-card entry-card premium-entry-card" + (label ? " is-member" : "")}>
+      <button type="button" className="entry-row" onClick={openPremiumScreen}>
+        <div className="entry-ic" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2l2.9 6.3L21.5 9l-4.8 4.5 1.3 6.7L12 17l-6 3.2 1.3-6.7L2.5 9l6.6-.7L12 2z" />
           </svg>
         </div>
-        <div className="premium-entry-text">
-          <div className="premium-entry-title">{label || "升级 Premium"}</div>
-          <div className="premium-entry-sub">{label ? "查看会员详情" : "云备份 · 报表导出 · AI 债务顾问"}</div>
+        <div className="entry-text">
+          <div className="entry-title">{label || "升级 Premium"}</div>
+          <div className="entry-sub">{label ? "查看会员详情" : "云备份 · 报表导出 · AI 债务顾问"}</div>
         </div>
         <svg className="account-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <path d="M9 6l6 6-6 6" />

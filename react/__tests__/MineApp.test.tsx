@@ -25,8 +25,8 @@ describe("mine App", () => {
     render(<App />);
     expect(screen.getByText("测试昵称")).toBeInTheDocument();
     expect(screen.getByText("升级 Premium")).toBeInTheDocument();
-    expect(screen.getByText("打开云备份")).toBeInTheDocument();
-    expect(screen.getByText("打开档案库")).toBeInTheDocument();
+    expect(screen.getByText("云备份")).toBeInTheDocument();
+    expect(screen.getByText("档案库")).toBeInTheDocument();
     expect(screen.getByText("下载备份文件")).toBeInTheDocument();
     expect(screen.getByText("上传备份文件")).toBeInTheDocument();
   });
@@ -38,7 +38,7 @@ describe("mine App", () => {
     const docsHook = renderHook(() => useDocsScreenOpen());
     fireEvent.click(screen.getByLabelText("账户"));
     expect(accountHook.result.current).toBe(true);
-    fireEvent.click(screen.getByText("打开档案库"));
+    fireEvent.click(screen.getByText("档案库"));
     expect(docsHook.result.current).toBe(true);
   });
 });

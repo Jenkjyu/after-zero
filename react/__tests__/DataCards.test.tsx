@@ -18,7 +18,7 @@ describe("DataCards", () => {
     render(<DataCards premium={{ premium: null }} />);
     const premiumHook = renderHook(() => usePremiumScreenOpen());
     const backupHook = renderHook(() => useBackupScreenOpen());
-    fireEvent.click(screen.getByText("打开云备份"));
+    fireEvent.click(screen.getByText("云备份"));
     expect(premiumHook.result.current).toBe(true);
     expect(backupHook.result.current).toBe(false);
   });
@@ -28,7 +28,7 @@ describe("DataCards", () => {
     const premium: Premium = { premium: { method: "yearly", at: "2026-01-01" } };
     render(<DataCards premium={premium} />);
     const backupHook = renderHook(() => useBackupScreenOpen());
-    fireEvent.click(screen.getByText("打开云备份"));
+    fireEvent.click(screen.getByText("云备份"));
     expect(backupHook.result.current).toBe(true);
   });
 
@@ -36,7 +36,7 @@ describe("DataCards", () => {
     window.__azBridge = makeMockBridge();
     render(<DataCards premium={{ premium: null }} />);
     const hook = renderHook(() => useDocsScreenOpen());
-    fireEvent.click(screen.getByText("打开档案库"));
+    fireEvent.click(screen.getByText("档案库"));
     expect(hook.result.current).toBe(true);
   });
 

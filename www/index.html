@@ -54,6 +54,19 @@
     --e2: 0 2px 6px rgba(24,32,46,.06), 0 16px 32px rgba(24,32,46,.09);
     --e3: 0 24px 50px rgba(16,24,38,.28);
     --glass: rgba(255,255,255,.62); --glass-border: rgba(255,255,255,.8); --glass-hi: rgba(255,255,255,.7); }
+  /* 图标徽章色家族——**故意只定义一次、不跟着明暗模式换**，跟上面那4个主题块的规矩不同。
+     理由：这些颜色只出现在38px的小圆角方块里（约屏幕面积2%），小面积高饱和在明暗两种底色
+     下都成立，保持恒定反而让App有一个跨主题稳定的色彩signature（Google账号设置页就是这么做的，
+     深色模式下那些紫/绿/蓝徽章原样不变）。这也是这轮定下的核心原则：
+     **颜色的"多样性"和"面积"要反向配比——小面积可以多色相高饱和，大面积必须少色相低饱和。**
+     统计页图表属于"大面积"，要用的是从这个家族派生出来的低饱和档，不是直接拿这几个值去铺。 */
+  :root {
+    --ic-brand-bg: #ACECD4; --ic-brand-fg: #1D6D4F;
+    --ic-blue-bg: #ACCEEC; --ic-blue-fg: #1D486D;
+    --ic-violet-bg: #C6ACEC; --ic-violet-fg: #3D1D6D;
+    --ic-rose-bg: #ECACC1; --ic-rose-fg: #6D1D38;
+    --ic-amber-bg: #ECD2AC; --ic-amber-fg: #6D4D1D;
+  }
   :root[data-theme="dark"] { --bg: #0F1319; --surface: #24282F; --surface-2: #2E3239; --border: #3C4047;
     --text: #E4E8EF; --text-muted: #98A0B0; --accent: #6FBE9E; --accent-soft: #283633; --accent-mid: #2F7B65;
     --critical: #EE7B7B; --critical-soft: #402F31; --warning: #D69A3C; --warning-soft: #3A3225;
@@ -741,19 +754,31 @@
   .account-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex: none; background: var(--surface-2); }
   .account-chevron { width: 18px; height: 18px; flex: none; color: var(--text-muted); }
 
-  .premium-entry-card { padding: 14px 16px; }
-  .premium-entry { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: none;
+  /* "我的"页统一的列表行：图标徽章 + 标题 + 副标题，整行可点、不放按钮。
+     以前只有会员入口卡长这样，四张数据卡是"标题 + 一整段说明 + 一个按钮"的旧写法——
+     同一页里两种卡片语言并存，而且按钮文案把标题又重复了一遍（"云备份"卡里放一个
+     "打开云备份"按钮），高度是现在的两倍多且没有图标、扫视只能逐字读。 */
+  .entry-card { padding: 14px 16px; }
+  .entry-row { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: none;
     padding: 0; text-align: left; color: inherit; -webkit-tap-highlight-color: transparent; font-family: inherit; }
-  .premium-entry-ic { width: 38px; height: 38px; border-radius: 11px; background: var(--accent-soft); color: var(--accent);
+  .entry-ic { width: 38px; height: 38px; border-radius: 11px; background: var(--ic-brand-bg); color: var(--ic-brand-fg);
     display: flex; align-items: center; justify-content: center; flex: none; }
-  .premium-entry-ic svg { width: 20px; height: 20px; }
-  .premium-entry-text { flex: 1; min-width: 0; }
-  .premium-entry-title { font-size: 15px; font-weight: 700; }
-  .premium-entry-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .entry-ic svg { width: 20px; height: 20px; }
+  .entry-ic.ic-blue { background: var(--ic-blue-bg); color: var(--ic-blue-fg); }
+  .entry-ic.ic-violet { background: var(--ic-violet-bg); color: var(--ic-violet-fg); }
+  .entry-ic.ic-rose { background: var(--ic-rose-bg); color: var(--ic-rose-fg); }
+  .entry-ic.ic-amber { background: var(--ic-amber-bg); color: var(--ic-amber-fg); }
+  .entry-text { flex: 1; min-width: 0; }
+  .entry-title { font-size: 15px; font-weight: 700; }
+  .entry-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  /* 语义分组靠间距表达，不加小节标题：组内靠紧(6px)、组间留空(20px)。 */
+  .entry-group { margin-bottom: 20px; }
+  .entry-group .data-card { margin-bottom: 6px; }
+  .entry-group .data-card:last-child { margin-bottom: 0; }
   /* 已订阅态：图标块换成实心accent底+白图标——语义是"已拥有的权益"而不是"紧急"，
      所以只强调小图标块，不整卡变色（不采用.pay-hero.overdue那种整卡实心红底的
      处理手法，那是"逾期"这种真正紧急语义专属的最强信号）。 */
-  .premium-entry-card.is-member .premium-entry-ic { background: var(--accent-fill); color: var(--on-accent); }
+  .premium-entry-card.is-member .entry-ic { background: var(--accent-fill); color: var(--on-accent); }
 
   .account-detail-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .account-detail-row:last-child { border-bottom: none; }
