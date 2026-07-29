@@ -416,6 +416,45 @@ function pressureWindowMonths(debts, today) {
   return Math.max(12, Math.min(60, n));
 }
 
+// ===== 还款提醒调度（纯计算部分） =====
+// syncNotifications()真正调用LocalNotifications插件(getPending/cancel/schedule)的部分留在
+// index.html——那是impure的原生插件调用。"该给哪些期次排哪些提醒"这一步是纯计算，可以单测，
+// 搬到这里。这是CLAUDE.md"已知的数据模型缺口①"的修复：早期syncNotifications只读d.nextDate
+// (每笔债务的下一期)，靠打开App触发renderAll()重排才能滚动到下一期——两个月不开App，后面
+// 几期的提醒全部收不到，而"还款提醒"这个功能恰恰是给不常开App的人设计的。
+// 现在改成一次性把"未来windowMonths个月内"全部未还期次都排上，不再依赖"重新打开App"这个动作。
+// 窗口给6个月：太短跟原来的bug没本质区别，太长会让待触发闹钟堆积——安卓AlarmManager对单个UID
+// 的待触发闹钟数有一个约500个的隐性上限(AOSP源码里的常量，没写进公开文档)，maxCount兜底截断，
+// 按触发时间升序保留最近的那些——离现在越近的提醒越要紧，宁可丢远期的，反正下次同步(任何一次
+// saveAll();renderAll();)它又会被重新排进来。
+function computeNotifySchedule(debts, notify, now, windowMonths, maxCount) {
+  var list = [];
+  if (!notify || !notify.enabled || !notify.rules || !notify.rules.length) return list;
+  var n = windowMonths > 0 ? windowMonths : 6;
+  var cap = maxCount > 0 ? maxCount : 450;
+  var t0 = now ? new Date(now) : new Date();
+  var cutoffKey = fmtDate(addMonths(today0(), n));
+  (debts || []).forEach(function (d) {
+    if (d.settled) return;
+    (d.plan || []).forEach(function (r) {
+      if (r.paid) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date || "")) return;
+      if (r.date > cutoffKey) return;
+      var due = parseDate(r.date);
+      notify.rules.forEach(function (rule) {
+        var fire = new Date(due.getFullYear(), due.getMonth(), due.getDate() - (+rule.offsetDays || 0));
+        var hm = String(rule.time || "09:00").split(":");
+        fire.setHours(+hm[0] || 0, +hm[1] || 0, 0, 0);
+        if (fire.getTime() <= t0.getTime()) return; // 只排未来的
+        list.push({ name: d.name || "", date: r.date, amount: +r.amount || 0, fireAt: fire });
+      });
+    });
+  });
+  list.sort(function (a, b) { return a.fireAt.getTime() - b.fireAt.getTime(); });
+  if (list.length > cap) list = list.slice(0, cap);
+  return list;
+}
+
 // 一笔债务按现有还款计划"还到底还要再付多少利息/手续费"——未还期次的 interest 之和。
 // 统计tab用在两个地方：BalanceBars 的"按剩余利息排序"、以及底部总结卡的"剩余待付利息"合计。
 // ⚠️这个数字对 amort/equalfee/interestfirst 三种生成方式都可靠(它们都会逐期写 interest)，
@@ -470,6 +509,7 @@ if (typeof module !== "undefined" && module.exports) {
     isBadRepeatDay: isBadRepeatDay, offsetLabel: offsetLabel, computeReportData: computeReportData, summarizeDebts: summarizeDebts,
     computeMonthlyRepayment: computeMonthlyRepayment, computeUpcomingPressure: computeUpcomingPressure,
     remainingInterest: remainingInterest, niceCeil: niceCeil, pressureWindowMonths: pressureWindowMonths,
+    computeNotifySchedule: computeNotifySchedule,
     esc: esc, inline: inline, isHr: isHr, mdToHtml: mdToHtml, escSvg: escSvg, truncateLabel: truncateLabel,
     hasPremium: hasPremium, premiumLabel: premiumLabel, findAiConv: findAiConv, bumpAiConvTop: bumpAiConvTop
   };

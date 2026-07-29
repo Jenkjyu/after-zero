@@ -52,22 +52,28 @@
 
 **同一轮还修了`computeReportData()`的`timeline`一个真实bug**：`timeline`第一个点固定是"今天"、随后按未还行日期升序追加，**逾期未销的期次日期在今天之前，会让第二个点的日期早于第一个点**，折线图上表现为"今天→过去→未来"的时间倒流。修法是把逾期未销（以及日期缺失/格式不对）的期次归到"今天"这个桶里——语义上也对，逾期的钱今天就该还，投影上按"立即偿还"处理，图上表现为起点处的一个陡降（此时会有两个日期同为今天的点，一个是起始余额、一个是扣掉逾期后的余额，这是刻意的，保证"起点=当前总余额""终点归零"两个不变量都不破）。**⚠️这个修复会连带改变PDF导出**——`exportReportPdf`通过`buildReportTableRows`/`buildExportChartsSVG`两处都读`timeline`（`exportReportXlsx`和`buildAiSummary`只读`totalBalance`/`avgRate`/`payoffDate`，不受影响）；这是刻意接受的：只修屏幕不修导出会造成"屏幕上对了、导出还是错的"这种更糟的不一致。
 
-## ⚠️已知的数据模型缺口（2026-07-29盘点，都还没修）
+## ⚠️已知的数据模型缺口（2026-07-29盘点，①②已修，③④⑤⑥还没修）
 
-这一节记的是**已经确认存在、但还没动手修**的问题，起因是"还款日"页那个"一行=一笔债务"的缺陷被真机戳破之后，顺着同一个思路把全项目扫了一遍。**共同形状是：`plan`数组一直有逐期数据，但消费者习惯性只读"第一期"或"只读active那部分"**——产品意图往前走了，读取方式没跟上。
+这一节记的是**已经确认存在**的问题，起因是"还款日"页那个"一行=一笔债务"的缺陷被真机戳破之后，顺着同一个思路把全项目扫了一遍。**共同形状是：`plan`数组一直有逐期数据，但消费者习惯性只读"第一期"或"只读active那部分"**——产品意图往前走了，读取方式没跟上。①②风险低（只改读取侧），已经修完；③④是真的要改数据结构，还没动手。
 
-### ① 通知只排每笔债务的下一期（跟已修的还款日页是同一个形状）
+### ①（已修，2026-07-29）通知只排每笔债务的下一期
 
-`syncNotifications()`（`www/index.html`）：
+`syncNotifications()`（`www/index.html`）原来：
 ```js
 debts.forEach(function (d) {
   if (d.settled || !d.nextDate) return;   // ← 只看nextDate，plan里后面几期完全不管
 ```
-每笔债务永远只有"下一期"有待触发的通知，靠`renderAll()`重排滚动到下一期——**而`renderAll()`只在打开App时才跑**。两个月不开App，只会收到一次提醒然后彻底安静。而"还款提醒"这个功能恰恰是给不会天天打开App的人设计的，**这是已承诺的功能在静默失效**。修的时候注意：排太多条通知会撞系统上限（安卓对pending notification有数量限制），需要定一个"往前排几期/几个月"的窗口，不能无脑全排。
+每笔债务永远只有"下一期"有待触发的通知，靠`renderAll()`重排滚动到下一期——**而`renderAll()`只在打开App时才跑**。两个月不开App，只会收到一次提醒然后彻底安静。而"还款提醒"这个功能恰恰是给不会天天打开App的人设计的，是已承诺的功能在静默失效。
 
-### ② 导出的Excel/PDF不含已结清债务
+**修法**：新增`calc.js`的`computeNotifySchedule(debts, notify, now, windowMonths, maxCount)`——纯计算，可单测，跟"该给哪些期次排提醒"这件事本身分开，`syncNotifications()`只留调用`LocalNotifications`插件（`getPending`/`cancel`/`schedule`）这几步impure的部分。改成一次性把"未来`NOTIFY_WINDOW_MONTHS`个月内"（默认6）全部未还期次都排上，不再依赖"重新打开App"这个动作滚动到下一期。`NOTIFY_MAX_PENDING`（默认450）兜底截断——安卓`AlarmManager`对单个UID的待触发闹钟数有一个约500个的隐性上限（AOSP源码里的常量，没写进公开文档），超出时按触发时间升序保留最近的那些（离现在越近的提醒越要紧，宁可丢远期的，反正下次`saveAll();renderAll();`它又会被重排进来）。通知文案里的金额也顺手从`d.monthly`（"最早未还期"的金额，先息后本这类计划会跟其它期不一样）改成了这一期自己的`r.amount`，跟"还款日页改成一行=一期"那次的教训一致。`test/calc.test.js`新增7个用例覆盖：关闭/无规则返回空、真排的是窗口内每一期而不只是下一期、已结清/已还的不参与、窗口边界、多规则+已过去的提醒时间跳过、按触发时间排序、超`maxCount`截断且保留最近的。
 
-`exportReportXlsx()`/`exportReportPdf()`都是`data.active.map(...)`/`data.active.forEach(...)`。模型层`debts`有全部数据，是消费者只取了一部分。想拿导出做年度复盘、或者给别人看"我还掉了多少"，里面一条已结清记录都没有——跟"导出完整债务记录"这个产品意图对不上。
+### ②（已修，2026-07-29）导出的Excel/PDF不含已结清债务
+
+`exportReportXlsx()`/`exportReportPdf()`原来都是`data.active.map(...)`/`data.active.forEach(...)`（`data`=`computeReportData(debts)`，内部先`filter(!settled)`）。模型层`debts`有全部数据，是消费者只取了一部分。想拿导出做年度复盘、或者给别人看"我还掉了多少"，里面一条已结清记录都没有——跟"导出完整债务记录"这个产品意图对不上。
+
+**修法，且刻意分两半**：`computeReportData()`本身**没有改**——它的`byName`/`typeList`/`timeline`是"统计"tab图表的镜像（React `report/App.tsx`也在用），按设计就该只反映在还部分，不是这条缺口要修的对象，改了会连带影响屏幕上的图表语义。真正要改的是导出函数本身：
+- **Excel**：`exportReportXlsx()`的`debtRows`/`planRows`改成直接遍历全部`debts`（不再经过`data.active`），`debtRows`加了"状态"（在还/已结清）和"结清日期"两列，`planRows`加了"备注"列（`settleRow`标"提前结清"）。
+- **PDF**：新增`buildSettledDebtsRows(allDebts)`，只在存在已结清债务时才追加一段"已结清债务"（名称+结清日期+已还本金+已还利息），`buildTablePagesSVG()`把它`concat`进原有的表格行里分页——原来PDF里图表相关的几张表（`buildReportTableRows`）全部来自`data`，从来没有任何地方列出过已结清债务，这段是专门补的。
 
 ### ③ 没有还款流水（这条最深，需要真正加字段）
 

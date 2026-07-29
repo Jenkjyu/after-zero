@@ -1142,6 +1142,10 @@
   // (react/src/debts/useDebtSort.ts)，vanilla这边不再有debtSort/setDebtSort这两个符号。
   // 还款提醒通知设置（全局共享，不按债务区分），独立于上面几个键。
   var NOTIF_KEY = "after-zero-notify-v1";
+  // 通知调度窗口：往前排几个月的未还期次（见下面syncNotifications()/calc.js的
+  // computeNotifySchedule()），NOTIFY_MAX_PENDING是安卓AlarmManager单UID待触发闹钟数隐性
+  // 上限(~500)的兜底截断值，两者都在"已知的数据模型缺口①"那节有完整背景。
+  var NOTIFY_WINDOW_MONTHS = 6, NOTIFY_MAX_PENDING = 450;
   // 订阅状态：单一 Premium 会员（同时提供 ¥98 永久买断 与 ¥5.9/月·¥50/年 订阅，用户自选）。
   // 早期曾是 Premium/Premium+ 两级分级，已合并成一个 tier——原 Premium+ 的功能（AI）全并入
   // Premium。存 { premium: {method:"onetime"|"monthly"|"yearly"|"redeemed", at:ISO} | null }，
@@ -1334,9 +1338,11 @@
   function renderAll() { debts.forEach(recompute); window.dispatchEvent(new CustomEvent("az:state-changed")); syncNotifications(); }
 
   // 通知调度：每次都是"全清再重排"——这个App里没有别的功能用本地通知，全量重算最简单可靠，
-  // 不需要给每条通知发明持久稳定的ID去做增量diff。只排每笔在还债务"下一期"的提醒(不是整条
-  // 未来计划)，还清一期后nextDate自动推进，下次调用这个函数(payInstallment等最终都会走到
-  // saveAll();renderAll();这个收尾模式)规则就自动跟着滚到下一期，不需要额外挂钩子。
+  // 不需要给每条通知发明持久稳定的ID去做增量diff。
+  // ⚠️不再只排每笔债务的"下一期"——那样靠打开App触发renderAll()才能滚动到下一期，两个月不开
+  // App就只收到一次提醒(已知的数据模型缺口①)。现在一次性把未来NOTIFY_WINDOW_MONTHS个月内的
+  // 全部未还期次都排上，具体"该排哪些"这个纯计算挪进了calc.js的computeNotifySchedule()，
+  // 这里只剩真正调用LocalNotifications插件(impure)这一步。
   function syncNotifications() {
     var LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
     if (!LN) return; // 桌面浏览器测试：静默跳过
@@ -1344,23 +1350,15 @@
       var pend = (res && res.notifications) || [];
       if (pend.length) return LN.cancel({ notifications: pend.map(function (n) { return { id: n.id }; }) });
     }).then(function () {
-      if (!notify.enabled || !notify.rules.length) return;
-      var list = [], id = 1000, now = Date.now();
-      debts.forEach(function (d) {
-        if (d.settled || !d.nextDate) return;
-        var due = parseDate(d.nextDate);
-        notify.rules.forEach(function (rule) {
-          var fire = new Date(due.getFullYear(), due.getMonth(), due.getDate() - rule.offsetDays);
-          var hm = String(rule.time || "09:00").split(":");
-          fire.setHours(+hm[0] || 0, +hm[1] || 0, 0, 0);
-          if (fire.getTime() <= now) return; // 只排未来的
-          list.push({
-            id: id++, channelId: "repay", smallIcon: "ic_stat_notify",
-            title: "还款提醒",
-            body: d.name + " · " + (due.getMonth() + 1) + "月" + due.getDate() + "日到期 · ¥" + fmt(d.monthly),
-            schedule: { at: fire }
-          });
-        });
+      var items = computeNotifySchedule(debts, notify, Date.now(), NOTIFY_WINDOW_MONTHS, NOTIFY_MAX_PENDING);
+      var list = items.map(function (it, idx) {
+        var p = it.date.split("-");
+        return {
+          id: 1000 + idx, channelId: "repay", smallIcon: "ic_stat_notify",
+          title: "还款提醒",
+          body: it.name + " · " + (+p[1]) + "月" + (+p[2]) + "日到期 · ¥" + fmt(it.amount),
+          schedule: { at: it.fireAt }
+        };
       });
       if (list.length) return LN.schedule({ notifications: list });
     }).catch(function (e) { console.error("syncNotifications failed", e); });
@@ -1776,10 +1774,30 @@
     if (typeof XLSX === "undefined") { toast("导出组件未就绪，请重启 App 后重试"); return; }
     var data = computeReportData(debts);
     var wb = XLSX.utils.book_new();
-    var debtRows = data.active.map(function (d) { return { 名称: d.name, 出资方: d.funder || "", 类型: d.type || "", 剩余待还: d.balance, 借款金额: d.original, 年化利率: d.rate, 下期还款日: d.nextDate, 已还期数: d.paidTerms, 总期数: d.totalTerms }; });
+    // ⚠️「债务明细」「还款计划明细」两个sheet故意遍历全部debts、不是data.active——
+    // 已知的数据模型缺口②：导出是用户拿来做年度复盘/给别人看"我还掉了多少"的，只有在还
+    // 债务的话已结清的记录一条都看不到。data.active只给KPI/图表用(那些是"统计"tab当前状态
+    // 的镜像，按设计只反映在还部分，不受这次改动影响)。
+    var debtRows = debts.map(function (d) {
+      return {
+        名称: d.name, 出资方: d.funder || "", 类型: d.type || "",
+        状态: d.settled ? "已结清" : "在还",
+        剩余待还: d.balance, 借款金额: d.original, 年化利率: d.rate,
+        下期还款日: d.settled ? "—" : d.nextDate,
+        结清日期: d.settled ? (d.settledDate || "—") : "",
+        已还期数: d.paidTerms, 总期数: d.totalTerms
+      };
+    });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(debtRows), "债务明细");
     var planRows = [];
-    data.active.forEach(function (d) { (d.plan || []).forEach(function (r, idx) { planRows.push({ 债务: d.name, 期次: idx + 1, 日期: r.date, 金额: r.amount, 本金: r.principal, "利息/费": r.interest, 是否已还: r.paid ? "是" : "否" }); }); });
+    debts.forEach(function (d) {
+      (d.plan || []).forEach(function (r, idx) {
+        planRows.push({
+          债务: d.name, 期次: idx + 1, 日期: r.date, 金额: r.amount, 本金: r.principal,
+          "利息/费": r.interest, 是否已还: r.paid ? "是" : "否", 备注: r.settleRow ? "提前结清" : ""
+        });
+      });
+    });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(planRows), "还款计划明细");
     var kpiRows = [{ 指标: "在还总负债", 数值: data.totalBalance }, { 指标: "加权平均利率(%)", 数值: r2(data.avgRate) }, { 指标: "预计全部还清日期", 数值: data.payoffDate || "—" }];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(kpiRows), "汇总KPI");
@@ -1799,6 +1817,21 @@
     data.typeList.forEach(function (x) { rows.push({ l: x.name, r: "¥" + fmt(x.value) }); });
     rows.push({ h: "负债预测走势" });
     data.timeline.forEach(function (p) { rows.push({ l: p.date, r: "¥" + fmt(p.balance) }); });
+    return rows;
+  }
+  // 已知的数据模型缺口②：上面`buildReportTableRows`几张表全部来自`data`(computeReportData的
+  // 返回值，只含在还债务，那是"统计"tab图表的镜像，按设计不该变)，PDF里因此从来没有任何地方
+  // 列出过已结清债务——"想拿导出做年度复盘、看看自己还掉了多少"这个意图在PDF里完全落空。
+  // 这里单独加一段，直接读全部debts(不经过computeReportData)，只有存在已结清债务时才追加，
+  // 没有就不占页面。
+  function buildSettledDebtsRows(allDebts) {
+    var settled = (allDebts || []).filter(function (d) { return d.settled; });
+    if (!settled.length) return [];
+    var rows = [{ h: "已结清债务" }];
+    settled.forEach(function (d) {
+      var label = d.name + (d.settledDate ? "（" + d.settledDate + "结清）" : "");
+      rows.push({ l: label, r: "本金¥" + fmt(d.paidPrincipal) + " · 利息¥" + fmt(d.paidInterest) });
+    });
     return rows;
   }
   function buildTablePageSVG(rows, pageIdx, pageCount) {
@@ -1823,7 +1856,7 @@
     return { svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" font-family="sans-serif"><rect width="' + W + '" height="' + H + '" fill="#FFFFFF"/>' + body.join("") + '</svg>', w: W, h: H };
   }
   function buildTablePagesSVG(data) {
-    var rows = buildReportTableRows(data), pages = [], cur = [], units = 0, cap = 34; // 每页约34个行单位(表头算2个)
+    var rows = buildReportTableRows(data).concat(buildSettledDebtsRows(debts)), pages = [], cur = [], units = 0, cap = 34; // 每页约34个行单位(表头算2个)
     rows.forEach(function (rw) {
       var cost = rw.h !== undefined ? 2 : 1;
       if (units + cost > cap && cur.length) { pages.push(cur); cur = []; units = 0; }

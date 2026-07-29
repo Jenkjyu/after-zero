@@ -806,3 +806,80 @@ test("pressureWindowMonths: 铺到最后一笔未还期次所在的月份，下�
   // 多笔债务取最晚的那个
   assert.equal(calc.pressureWindowMonths([mk(["2027-01-05"]), mk(["2027-07-05"])], today), 13);
 });
+
+// ===== computeNotifySchedule（还款提醒调度，"已知的数据模型缺口①"回归，2026-07-29）=====
+test("computeNotifySchedule: 通知关闭或没有规则时返回空", () => {
+  const d = { id: "d", name: "A", plan: [{ date: "2026-08-10", amount: 100, principal: 100, interest: 0, paid: false }] };
+  const now = new Date(2026, 6, 29).getTime();
+  assert.deepEqual(calc.computeNotifySchedule([d], { enabled: false, rules: [{ offsetDays: 1, time: "09:00" }] }, now, 6, 450), []);
+  assert.deepEqual(calc.computeNotifySchedule([d], { enabled: true, rules: [] }, now, 6, 450), []);
+  assert.deepEqual(calc.computeNotifySchedule([d], null, now, 6, 450), []);
+});
+
+test("computeNotifySchedule: 排的不只是下一期，窗口内每一期未还都排（回归：老版本只排nextDate）", () => {
+  const d = {
+    id: "d", name: "分期贷",
+    plan: [
+      { date: "2026-08-10", amount: 100, principal: 100, interest: 0, paid: false },
+      { date: "2026-09-10", amount: 100, principal: 100, interest: 0, paid: false },
+      { date: "2026-10-10", amount: 100, principal: 100, interest: 0, paid: false },
+    ],
+  };
+  const now = new Date(2026, 6, 29).getTime(); // 2026-07-29
+  const rules = [{ offsetDays: 1, time: "09:00" }];
+  const list = calc.computeNotifySchedule([d], { enabled: true, rules }, now, 6, 450);
+  assert.equal(list.length, 3, "三期各排一条，不是只有下一期");
+  assert.deepEqual(list.map((x) => x.date), ["2026-08-10", "2026-09-10", "2026-10-10"]);
+});
+
+test("computeNotifySchedule: 已结清债务不参与；已还的期次不参与", () => {
+  const settled = { id: "d1", name: "已结清", settled: true, plan: [{ date: "2026-08-10", amount: 100, principal: 100, interest: 0, paid: false }] };
+  const paid = { id: "d2", name: "已还这期", plan: [{ date: "2026-08-10", amount: 100, principal: 100, interest: 0, paid: true }] };
+  const now = new Date(2026, 6, 29).getTime();
+  const list = calc.computeNotifySchedule([settled, paid], { enabled: true, rules: [{ offsetDays: 1, time: "09:00" }] }, now, 6, 450);
+  assert.deepEqual(list, []);
+});
+
+test("computeNotifySchedule: 超出窗口的期次不排；窗口边界当天算在窗口内", () => {
+  const today = new Date(2026, 6, 29); // 2026-07-29
+  const d = {
+    id: "d", name: "长期",
+    plan: [
+      { date: "2027-01-29", amount: 100, principal: 100, interest: 0, paid: false }, // 6个月后，边界内
+      { date: "2027-02-01", amount: 100, principal: 100, interest: 0, paid: false }, // 超出6个月窗口
+    ],
+  };
+  const list = calc.computeNotifySchedule([d], { enabled: true, rules: [{ offsetDays: 0, time: "09:00" }] }, today.getTime(), 6, 450);
+  assert.equal(list.length, 1);
+  assert.equal(list[0].date, "2027-01-29");
+});
+
+test("computeNotifySchedule: 一期配多条规则各自算出正确的提醒时间；已经过去的提醒时间被跳过", () => {
+  const d = { id: "d", name: "A", plan: [{ date: "2026-08-10", amount: 200, principal: 200, interest: 0, paid: false }] };
+  const now = new Date(2026, 7, 9, 12, 0, 0).getTime(); // 2026-08-09 12:00，提前1天9点那条已经过去
+  const rules = [{ offsetDays: 3, time: "09:00" }, { offsetDays: 1, time: "09:00" }, { offsetDays: 0, time: "18:00" }];
+  const list = calc.computeNotifySchedule([d], { enabled: true, rules }, now, 6, 450);
+  // offsetDays:3 → 08-07 09:00（已过去，跳过）；offsetDays:1 → 08-09 09:00（已过去，跳过）；
+  // offsetDays:0 → 08-10 18:00（未来，保留）
+  assert.equal(list.length, 1);
+  assert.equal(list[0].fireAt.getTime(), new Date(2026, 7, 10, 18, 0, 0).getTime());
+});
+
+test("computeNotifySchedule: 结果按触发时间升序排列", () => {
+  const a = { id: "a", name: "A", plan: [{ date: "2026-09-10", amount: 100, principal: 100, interest: 0, paid: false }] };
+  const b = { id: "b", name: "B", plan: [{ date: "2026-08-10", amount: 100, principal: 100, interest: 0, paid: false }] };
+  const now = new Date(2026, 6, 29).getTime();
+  const list = calc.computeNotifySchedule([a, b], { enabled: true, rules: [{ offsetDays: 0, time: "09:00" }] }, now, 6, 450);
+  assert.deepEqual(list.map((x) => x.name), ["B", "A"]); // B(8月)先于A(9月)
+});
+
+test("computeNotifySchedule: 超过maxCount按触发时间截断，保留最近的那些", () => {
+  const plan = [];
+  for (let m = 1; m <= 12; m++) plan.push({ date: "2026-" + String(m).padStart(2, "0") + "-15", amount: 100, principal: 100, interest: 0, paid: false });
+  const d = { id: "d", name: "多期", plan };
+  const now = new Date(2026, 0, 1).getTime(); // 2026-01-01，窗口给12个月覆盖全部
+  const list = calc.computeNotifySchedule([d], { enabled: true, rules: [{ offsetDays: 0, time: "09:00" }] }, now, 12, 5);
+  assert.equal(list.length, 5);
+  assert.equal(list[0].date, "2026-01-15", "截断后保留的是离现在最近的那些，不是随便丢的");
+  assert.equal(list[4].date, "2026-05-15");
+});
