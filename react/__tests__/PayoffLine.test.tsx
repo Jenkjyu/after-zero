@@ -31,7 +31,18 @@ describe("PayoffLine", () => {
     };
     const { container } = render(<PayoffLine data={data} />);
     expect(container.querySelector("svg.viz-line-svg")).toBeInTheDocument();
-    expect(container.querySelector("path[fill='var(--accent-soft)']")).toBeInTheDocument();
+    // 面积填充必须是渐变(引用<defs>里的linearGradient)，不是一块纯色浅底——
+    // 原来用 --accent-soft，对底色只有 1.14:1 等于隐形，这条锁住那个回归。
+    expect(container.querySelector("path[fill='url(#payoffArea)']")).toBeInTheDocument();
+    const grad = container.querySelector("linearGradient#payoffArea");
+    expect(grad).toBeInTheDocument();
+    // 渐变必须从线条色渐隐到透明，且用 userSpaceOnUse——默认的 objectBoundingBox
+    // 在 preserveAspectRatio="none" 非等比拉伸下方向会变形。
+    expect(grad).toHaveAttribute("gradientUnits", "userSpaceOnUse");
+    const stops = grad!.querySelectorAll("stop");
+    expect(stops).toHaveLength(2);
+    stops.forEach((st) => expect(st.getAttribute("stop-color")).toBe("var(--ch-line)"));
+    expect(Number(stops[0].getAttribute("stop-opacity"))).toBeGreaterThan(Number(stops[1].getAttribute("stop-opacity")));
     expect(container.textContent).toContain("今天 ¥1,000");
     expect(container.textContent).toContain("预计 2026-09-25 还清");
   });

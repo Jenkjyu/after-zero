@@ -791,18 +791,33 @@
      深色#191D24重新验证过(不是直接抄skill文档里参考色的验证结果，那是对着skill自己的
      参考底色#fcfcfb/#1a1a19验证的，跟本项目的底色不是一回事)。 */
   .viz-root {
-    --series-1: #2a78d6; --series-2: #008300; --series-3: #e87ba4; --series-4: #eda100;
-    --series-5: #1baf7a; --series-6: #eb6834; --series-7: #4a3aa7; --series-8: #e34948;
+    /* 分类色：色相取自 --ic-* 图标家族，但饱和度压低一档——大面积要少色相低饱和，
+       小面积才能多色相高饱和（见"图标徽章色家族"一节那条原则）。
+       ⚠️替换掉的是 dataviz skill 自带的**品牌中性占位色板**：那套本来就是设计成
+       "先用着、之后换成你自己的品牌派生色"的，我们一直没做那次替换，结果统计页
+       出现"前几张图全是品牌绿、到类型占比突然一片通用彩虹"的割裂感。 */
+    --series-1: #409677; --series-2: #406E96; --series-3: #634096; --series-4: #96405D;
+    --series-5: #967440; --series-6: #408596; --series-7: #569640; --series-8: #964096;
+    /* 本金/利息：**故意不用同色系两级**。同色两级在浅色下有死结——两者都要 >=3:1 对白底，
+       就只能都很深，反而更"闷"，而且对红绿色盲几乎不可分辨。改成绿(本金)/琥珀(利息)：
+       色相差 120 度。四项校验全过：相邻 3.10(浅)/3.06(深)、各自对底 >=3、
+       色盲模拟距离 120(浅)/191(深)——原来同色系两级的色盲距离近乎 0。四档各有分工，别互相顶替：--ch-principal/--ch-interest 只给堆叠柱（前者为了跟琥珀
+       拉开 3:1 被压得很深）；--ch-bar 给单系列横条（不受那条堆叠约束，所以取更轻快的中绿，
+       直接拿 --ch-principal 会把横条画得又闷又重）；--ch-line 给走势图（唯一回答
+       "我在变好吗"的图，给最亮一档）。 */
+    --ch-principal: #184E3A; --ch-interest: #B88B3D; --ch-line: #278663; --ch-bar: #2F7D62;
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) .viz-root {
-      --series-1: #3987e5; --series-2: #008300; --series-3: #d55181; --series-4: #c98500;
-      --series-5: #199e70; --series-6: #d95926; --series-7: #9085e9; --series-8: #e66767;
+      --series-1: #72C0A3; --series-2: #729CC0; --series-3: #9172C0; --series-4: #C0728C;
+      --series-5: #C0A172; --series-6: #72B0C0; --series-7: #86C072; --series-8: #C072C0;
+      --ch-principal: #9ADAC3; --ch-interest: #8C6C36; --ch-line: #6CD0AC; --ch-bar: #7FCBAE;
     }
   }
   :root[data-theme="dark"] .viz-root {
-    --series-1: #3987e5; --series-2: #008300; --series-3: #d55181; --series-4: #c98500;
-    --series-5: #199e70; --series-6: #d95926; --series-7: #9085e9; --series-8: #e66767;
+    --series-1: #72C0A3; --series-2: #729CC0; --series-3: #9172C0; --series-4: #C0728C;
+    --series-5: #C0A172; --series-6: #72B0C0; --series-7: #86C072; --series-8: #C072C0;
+    --ch-principal: #9ADAC3; --ch-interest: #8C6C36; --ch-line: #6CD0AC; --ch-bar: #7FCBAE;
   }
   /* 视觉对齐的关键一步——5个viz-block（3个原有+MonthlyChart+ReportTables）套上跟"债务"/
      "还款日"两个tab一致的卡片质感，之前一直是裸的margin-bottom，没有card外壳。 */
@@ -816,7 +831,7 @@
   .viz-bar-row.active .viz-bar-fill { filter: brightness(1.15); }
   .viz-bar-name { width: 84px; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
   .viz-bar-track { flex: 1; background: var(--surface-2); border-radius: 5px; height: 16px; position: relative; overflow: hidden; }
-  .viz-bar-fill { height: 100%; background: var(--accent); border-radius: 5px; transition: filter .15s ease; }
+  .viz-bar-fill { height: 100%; background: var(--ch-bar); border-radius: 5px; transition: filter .15s ease; }
   .viz-bar-val { width: 74px; flex: none; text-align: right; font-family: var(--font-num); font-weight: 600; }
   .viz-stack { display: flex; height: 26px; border-radius: 7px; overflow: hidden; margin-bottom: 10px; }
   .viz-stack-seg { height: 100%; cursor: pointer; transition: opacity .15s ease; }
@@ -869,8 +884,8 @@
   .pchart-legend { display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); }
   .pchart-legend span { display: flex; align-items: center; gap: 5px; }
   .pchart-legend .sw { width: 9px; height: 9px; border-radius: 2px; flex: none; }
-  .pchart-legend .sw.principal { background: var(--accent); }
-  .pchart-legend .sw.interest { background: var(--accent-mid); }
+  .pchart-legend .sw.principal { background: var(--ch-principal); }
+  .pchart-legend .sw.interest { background: var(--ch-interest); }
   .pchart-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-bottom: 12px; }
   .pchart-stats .k { font-size: 11px; color: var(--text-muted); }
   .pchart-stats .v { font-size: 14.5px; font-weight: 650; font-family: var(--font-num);
@@ -893,7 +908,7 @@
   /* 折线的端点/scrub点用HTML圆点：SVG用了preserveAspectRatio="none"做非等比拉伸，
      里面的<circle>会被拉成椭圆，路径不受影响但圆会。 */
   .chart-dot { position: absolute; width: 7px; height: 7px; border-radius: 50%;
-    background: var(--accent); transform: translate(-50%, 50%); pointer-events: none;
+    background: var(--ch-line); transform: translate(-50%, 50%); pointer-events: none;
     box-shadow: 0 0 0 2px var(--surface); }
   .chart-dot.active { width: 9px; height: 9px; }
   .chart-gridline { position: absolute; left: 34px; right: 0; height: 0;
@@ -923,8 +938,8 @@
   .pchart-stack { width: 100%; max-width: 24px; margin: 0 auto; height: 100%;
     display: flex; flex-direction: column-reverse; gap: 2px; }
   .pchart-stack .seg { width: 100%; flex: none; }
-  .pchart-stack .seg.principal { background: var(--accent); }
-  .pchart-stack .seg.interest { background: var(--accent-mid); border-radius: 4px 4px 0 0; }
+  .pchart-stack .seg.principal { background: var(--ch-principal); }
+  .pchart-stack .seg.interest { background: var(--ch-interest); border-radius: 4px 4px 0 0; }
   /* 利息为0时圆角要落到本金那一段头上(顶端始终圆角、底端始终方角贴基线) */
   .pchart-stack .seg.interest.zero { display: none; }
   .pchart-stack .seg.interest.zero + .seg.principal,

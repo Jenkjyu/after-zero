@@ -88,8 +88,20 @@ export function PayoffLine({ data }: PayoffLineProps) {
               身上(否则手指落点映射到的索引同样整体偏34px，最左边那个点几乎点不到)。 */}
           <div className="chart-area" ref={chartRef}>
           <svg className="viz-line-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-            <path d={area} fill="var(--accent-soft)" />
-            <path d={line} fill="none" stroke="var(--accent)" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+            {/* 面积填充用"线条色渐隐到透明"的渐变，不是一块纯色浅底。原来用 --accent-soft，
+                对底色只有 1.14(浅)/1.15(深)——等于隐形，既不是有效的视觉锚点也不是装饰。
+                ⚠️这里刻意不追 3:1：面积不是用来读数值的标记(数值由线条和刻度承担)，拉到 3:1
+                反而会盖过线条本身；目标是"看得见但不抢戏"。
+                gradientUnits="userSpaceOnUse" 是必须的——默认的 objectBoundingBox 在
+                preserveAspectRatio="none" 非等比拉伸下方向会跟着变形。 */}
+            <defs>
+              <linearGradient id="payoffArea" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={H}>
+                <stop offset="0%" stopColor="var(--ch-line)" stopOpacity="0.28" />
+                <stop offset="100%" stopColor="var(--ch-line)" stopOpacity="0.02" />
+              </linearGradient>
+            </defs>
+            <path d={area} fill="url(#payoffArea)" />
+            <path d={line} fill="none" stroke="var(--ch-line)" strokeWidth={2} vectorEffect="non-scaling-stroke" />
             {activeCoord && (
               <line
                 x1={activeCoord[0].toFixed(1)} y1={0} x2={activeCoord[0].toFixed(1)} y2={H}
