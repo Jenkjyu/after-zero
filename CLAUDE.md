@@ -636,11 +636,36 @@ ActionBar消失后，WebView内容直接从状态栏正后方开始铺，配合�
 
 **编辑模式期间`#addBtn`（新增一笔）、已结清区域的"恢复"按钮、`#debtSortSel`下拉框都会被禁用**（CSS靠`#view-debts.jiggling`这个类切换），目的是保证编辑模式期间不会有别的sheet被同时打开——这也是为什么`window.__handleBackButton`里`jiggleMode`的判断可以放在最前面、跟其余判断互斥（见上面"返回键处理"一节）。
 
+## 表面层级体系（2026-07-30建立）：改任何底色/卡片色之前必读
+
+起因是用户反馈"统计页很low、深色模式尤其"，顺着查下去发现根因不在配色好不好看，在**表面之间根本没拉开层级**。当时实测：
+
+| | 改之前 | 改之后 |
+|---|---|---|
+| 深色 卡片/页面底 | **1.07** | 1.23 |
+| 浅色 卡片/页面底 | 1.13 | 1.18 |
+| 浅色 输入框/卡片 | **1.07** | 1.13 |
+| 深色 输入框/卡片 | 1.10 | 1.15 |
+
+**⚠️第一条最容易搞错的事：四个tab的页面底色是`--app-grad`，不是`--bg`。** `--bg`只用在`.subpage`/`.tabbar`/`.login-gate`/`body`；`.app`（四个tab的内容容器）用的是`--app-grad`。**衡量"卡片够不够浮起"必须拿卡片跟`--app-grad`比**，拿`--bg`比会得到偏乐观的数字（当时就是这么先量错了一轮）。两者应该保持同一色温，早前浅色下`--bg`是偏蓝的而`--app-grad`是偏绿的，导致tab页和子页面底色温度不一致，这次统一成了冷灰。
+
+**⚠️第二条：明暗两套模式的层级方向是相反的，不能一套算出来另一套推导。**
+- **浅色**：石墨hero（很暗）＜＜ 页面底（浅冷灰）＜ 卡片（纯白）。"浮起"＝更亮。
+- **深色**：页面底（近黑）＜ 卡片 ＜ 石墨hero（**最亮**）。同样"浮起＝更亮"，但因为hero在浅色是最暗、在深色是最亮，两套模式里hero跟卡片的相对位置正好调个个儿。深色模式靠明度台阶表达层级，**不能靠阴影**——黑色阴影压在深色底上几乎不可见，那是浅色模式的思路。
+
+**⚠️第三条（这次真踩到的连带坑）：深色模式抬高`--surface`之后，有四类东西会跟着"塌陷"，必须一起抬，否则会出现"本该高亮的东西看起来像个凹陷的洞"。**
+1. **`--glass`**（`.debt-front`/`.pay`磨砂玻璃卡用的，**不读`--surface`**）——它是半透明色叠在页面底上，`--surface`抬了它不会自动跟着抬，结果就是"债务tab的玻璃卡明显比我的tab的实心卡暗"。要按"叠加后的实际颜色 ≈ 新的`--surface`"反推alpha和底色。
+2. **四个`*-soft`淡色底**（`--accent-soft`/`--critical-soft`/`--warning-soft`/`--good-soft`）——它们原本是按旧的（更暗的）卡片色调的，卡片一抬就变得比卡片还暗，`.pm-btn.active`这类"选中高亮"会看起来像凹进去。
+3. **`--card-grad`**（`.kpi`/`.viz-block`/`.popover-panel`等用它而不是`--surface`）——不同步改的话同一页里会出现两种卡片色。
+4. **`--graphite-a/b`**（石墨hero）——卡片抬上来之后hero跟卡片只差1.10，几乎糊在一起，要跟着往上让位。
+
+**验证方法上的教训：只验"每个颜色对底色"是不够的，必须验相邻的那一对。** 早前跑`validate_palette.js`验的全是"色 vs 背景"，所以本金/利息两段绿各自对底色都过（7.67和3.33），但**它们俩贴在一起只有2.30**（低于相邻填充要求的3:1）——这个漏洞就是这么来的。`/private/tmp/.../scratchpad/`下这轮用的几个小脚本是一次性的，没进git，但方法要记住：**改配色时列出所有真实相邻的组合逐对验，不要只验对底色。**
+
 ## 在还债务主页视觉改版：石墨hero卡 + 磨砂玻璃债务卡 + 灵动AI入口
 
 顶部区域（原来是"债务管理"标题+5张平级KPI+朴素AI banner）整体重做过一轮，目标是解决"没有设计感、像默认样式堆出来的"这条反馈。改动只在视觉/交互层，`renderSummary()`/`renderDebts()`算的数字、`openDetail`/`payInstallment`这些底层函数完全没动。
 
-**新增的一批CSS变量**（`--hair`/`--card-grad`/`--app-grad`/`--e1`/`--e2`/`--e3`/`--glass`/`--glass-border`/`--glass-hi`/`--graphite-a`/`--graphite-b`/`--graphite-text`/`--graphite-dim`/`--graphite-sheen`/`--text-faint`/`--accent-rgb`）——**三处都要同步加**（裸`:root`+`prefers-color-scheme:dark`媒体查询里的`:root`、`:root[data-theme="light"]`、`:root[data-theme="dark"]`），这是这个文件一直以来的既有模式（明暗色靠系统偏好和手动切换两条路都要覆盖到），别漏改其中一处。`--e1/e2/e3`是三档elevation阴影（列表最轻、卡片中等、hero最重），跟原有全局唯一的`--shadow`并存，`--shadow`继续给这轮没碰的其它组件（sheet、modal、价格卡等）用，不要把它们批量替换成新token。
+**新增的一批CSS变量**（`--hair`/`--card-grad`/`--app-grad`/`--e1`/`--e2`/`--e3`/`--glass`/`--glass-border`/`--glass-hi`/`--graphite-a`/`--graphite-b`/`--graphite-text`/`--graphite-dim`/`--graphite-sheen`/`--text-faint`/`--accent-rgb`）——**四个块都要同步改**（裸`:root`+`prefers-color-scheme:dark`媒体查询里的`:root`、`:root[data-theme="light"]`、`:root[data-theme="dark"]`；早前这里写的是"三处"，是笔误，实际浅色深色各有两个块），这是这个文件一直以来的既有模式（明暗色靠系统偏好和手动切换两条路都要覆盖到），别漏改其中一处。`--e1/e2/e3`是三档elevation阴影（列表最轻、卡片中等、hero最重），跟原有全局唯一的`--shadow`并存，`--shadow`继续给这轮没碰的其它组件（sheet、modal、价格卡等）用，不要把它们批量替换成新token。
 
 **顶部header**：原来的`<h1>债务管理</h1>`+`.asof`换成了手写"After Zero" wordmark + 圆形头像入口（`#topAvatarBtn`，点击复用"我的"页已有的`openAccountScreen()`）。**wordmark这个SVG是直接复用登录门`.gate-hw`那9个字母的`d`路径数据**（详见"登录门"一节），但渲染方式不同：登录门那份是`fill:none; stroke:currentColor`配合`stroke-dasharray`做逐笔画出的动画，这里是静态logo，去掉了`--i`/`--len`这两个动画专用属性和`hw-letter`class，直接`fill="currentColor"`把提取出的字形轮廓当实心字画——不用重新走一遍fontTools提取流程，两个地方的路径数据必须保持一致（以后如果改了登录门那份文案/字体，这里要跟着重新提取）。
 

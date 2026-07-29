@@ -11,56 +11,56 @@
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
   }
   :root {
-    --bg: #EEF0F4; --surface: #FFFFFF; --surface-2: #F6F7FA; --border: #DCE0E8;
-    --text: #23272F; --text-muted: #697082; --accent: #18453B; --accent-soft: #E7F3F1; --accent-mid: #4E9481;
+    --bg: #E7EAEF; --surface: #FFFFFF; --surface-2: #EFF1F6; --border: #CED2DB;
+    --text: #23272F; --text-muted: #656C7E; --accent: #18453B; --accent-soft: #E7F3F1; --accent-mid: #4E9481;
     --critical: #BE3A3A; --critical-soft: #F9E8E8; --warning: #A66A0A; --warning-soft: #FAF0D9;
-    --good: #2E5F8A; --good-soft: #E1EBF4; --shadow: 0 2px 10px rgba(30,40,60,.08);
+    --good: #2E5F8A; --good-soft: #E1EBF4; --shadow: 0 2px 10px rgba(24,32,46,.10);
     --fs-xs: 11px; --fs-sm: 11.5px; --fs-base: 14px; --fs-lg: 15.5px; --fs-figure: 18px; --fs-xl: 19px; --fs-xxl: 23px;
     --font-ui: 'Inter var', system-ui, -apple-system, "PingFang SC", "Segoe UI", Roboto, sans-serif;
     --font-num: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
-    --text-faint: #9AA3AD; --accent-rgb: 24,69,59; --app-grad: linear-gradient(180deg,#EFF2EF,#E7ECE8);
-    --card-grad: linear-gradient(180deg,#FFFFFF,#FBFCFB); --hair: rgba(26,42,35,.06);
+    --text-faint: #89929C; --accent-rgb: 24,69,59; --app-grad: linear-gradient(180deg,#E9ECF1,#E2E5EB);
+    --card-grad: linear-gradient(180deg,#FFFFFF,#FAFBFD); --hair: rgba(35,42,55,.08);
     --graphite-a: #253039; --graphite-b: #151A20; --graphite-text: #FFFFFF; --graphite-dim: #9BA6B4;
     --graphite-sheen: rgba(111,190,158,.18);
-    --e1: 0 1px 2px rgba(22,38,32,.04), 0 4px 10px rgba(22,38,32,.045);
-    --e2: 0 2px 6px rgba(22,38,32,.05), 0 16px 32px rgba(22,38,32,.08);
-    --e3: 0 24px 50px rgba(12,24,18,.26);
-    --glass: rgba(255,255,255,.5); --glass-border: rgba(255,255,255,.7); --glass-hi: rgba(255,255,255,.6);
+    --e1: 0 1px 2px rgba(24,32,46,.05), 0 4px 10px rgba(24,32,46,.055);
+    --e2: 0 2px 6px rgba(24,32,46,.06), 0 16px 32px rgba(24,32,46,.09);
+    --e3: 0 24px 50px rgba(16,24,38,.28);
+    --glass: rgba(255,255,255,.62); --glass-border: rgba(255,255,255,.8); --glass-hi: rgba(255,255,255,.7);
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #101318; --surface: #191D24; --surface-2: #20252E; --border: #2B313B;
-      --text: #E4E8EF; --text-muted: #98A0B0; --accent: #6FBE9E; --accent-soft: #1D2B28; --accent-mid: #2F7B65;
-      --critical: #E56A6A; --critical-soft: #2E1D1F; --warning: #D69A3C; --warning-soft: #2B2316;
-      --good: #6FA8D6; --good-soft: #1E2A33; --shadow: 0 2px 12px rgba(0,0,0,.35);
+    :root { --bg: #0F1319; --surface: #24282F; --surface-2: #2E3239; --border: #3C4047;
+      --text: #E4E8EF; --text-muted: #98A0B0; --accent: #6FBE9E; --accent-soft: #283633; --accent-mid: #2F7B65;
+      --critical: #E56A6A; --critical-soft: #402F31; --warning: #D69A3C; --warning-soft: #3A3225;
+      --good: #6FA8D6; --good-soft: #29353E; --shadow: 0 2px 12px rgba(0,0,0,.35);
       --text-faint: #6E7787; --accent-rgb: 111,190,158; --app-grad: linear-gradient(180deg,#12161C,#0C0F14);
-      --card-grad: linear-gradient(180deg,#1E232B,#191D24); --hair: rgba(255,255,255,.05);
-      --graphite-a: #272F3A; --graphite-b: #171C24; --graphite-text: #F2F5F9; --graphite-dim: #99A4B2;
+      --card-grad: linear-gradient(180deg,#282D35,#24282F); --hair: rgba(255,255,255,.07);
+      --graphite-a: #333B45; --graphite-b: #161D25; --graphite-text: #F2F5F9; --graphite-dim: #99A4B2;
       --graphite-sheen: rgba(111,190,158,.22);
       --e1: 0 1px 2px rgba(0,0,0,.35); --e2: 0 4px 18px rgba(0,0,0,.4); --e3: 0 22px 46px rgba(0,0,0,.55);
-      --glass: rgba(30,36,45,.5); --glass-border: rgba(255,255,255,.09); --glass-hi: rgba(255,255,255,.07); }
+      --glass: rgba(54,58,66,.55); --glass-border: rgba(255,255,255,.10); --glass-hi: rgba(255,255,255,.08); }
   }
-  :root[data-theme="light"] { --bg: #EEF0F4; --surface: #FFFFFF; --surface-2: #F6F7FA; --border: #DCE0E8;
-    --text: #23272F; --text-muted: #697082; --accent: #18453B; --accent-soft: #E7F3F1; --accent-mid: #4E9481;
+  :root[data-theme="light"] { --bg: #E7EAEF; --surface: #FFFFFF; --surface-2: #EFF1F6; --border: #CED2DB;
+    --text: #23272F; --text-muted: #656C7E; --accent: #18453B; --accent-soft: #E7F3F1; --accent-mid: #4E9481;
     --critical: #BE3A3A; --critical-soft: #F9E8E8; --warning: #A66A0A; --warning-soft: #FAF0D9;
-    --good: #2E5F8A; --good-soft: #E1EBF4; --shadow: 0 2px 10px rgba(30,40,60,.08);
-    --text-faint: #9AA3AD; --accent-rgb: 24,69,59; --app-grad: linear-gradient(180deg,#EFF2EF,#E7ECE8);
-    --card-grad: linear-gradient(180deg,#FFFFFF,#FBFCFB); --hair: rgba(26,42,35,.06);
+    --good: #2E5F8A; --good-soft: #E1EBF4; --shadow: 0 2px 10px rgba(24,32,46,.10);
+    --text-faint: #89929C; --accent-rgb: 24,69,59; --app-grad: linear-gradient(180deg,#E9ECF1,#E2E5EB);
+    --card-grad: linear-gradient(180deg,#FFFFFF,#FAFBFD); --hair: rgba(35,42,55,.08);
     --graphite-a: #253039; --graphite-b: #151A20; --graphite-text: #FFFFFF; --graphite-dim: #9BA6B4;
     --graphite-sheen: rgba(111,190,158,.18);
-    --e1: 0 1px 2px rgba(22,38,32,.04), 0 4px 10px rgba(22,38,32,.045);
-    --e2: 0 2px 6px rgba(22,38,32,.05), 0 16px 32px rgba(22,38,32,.08);
-    --e3: 0 24px 50px rgba(12,24,18,.26);
-    --glass: rgba(255,255,255,.5); --glass-border: rgba(255,255,255,.7); --glass-hi: rgba(255,255,255,.6); }
-  :root[data-theme="dark"] { --bg: #101318; --surface: #191D24; --surface-2: #20252E; --border: #2B313B;
-    --text: #E4E8EF; --text-muted: #98A0B0; --accent: #6FBE9E; --accent-soft: #1D2B28; --accent-mid: #2F7B65;
-    --critical: #E56A6A; --critical-soft: #2E1D1F; --warning: #D69A3C; --warning-soft: #2B2316;
-    --good: #6FA8D6; --good-soft: #1E2A33; --shadow: 0 2px 12px rgba(0,0,0,.35);
+    --e1: 0 1px 2px rgba(24,32,46,.05), 0 4px 10px rgba(24,32,46,.055);
+    --e2: 0 2px 6px rgba(24,32,46,.06), 0 16px 32px rgba(24,32,46,.09);
+    --e3: 0 24px 50px rgba(16,24,38,.28);
+    --glass: rgba(255,255,255,.62); --glass-border: rgba(255,255,255,.8); --glass-hi: rgba(255,255,255,.7); }
+  :root[data-theme="dark"] { --bg: #0F1319; --surface: #24282F; --surface-2: #2E3239; --border: #3C4047;
+    --text: #E4E8EF; --text-muted: #98A0B0; --accent: #6FBE9E; --accent-soft: #283633; --accent-mid: #2F7B65;
+    --critical: #E56A6A; --critical-soft: #402F31; --warning: #D69A3C; --warning-soft: #3A3225;
+    --good: #6FA8D6; --good-soft: #29353E; --shadow: 0 2px 12px rgba(0,0,0,.35);
     --text-faint: #6E7787; --accent-rgb: 111,190,158; --app-grad: linear-gradient(180deg,#12161C,#0C0F14);
-    --card-grad: linear-gradient(180deg,#1E232B,#191D24); --hair: rgba(255,255,255,.05);
-    --graphite-a: #272F3A; --graphite-b: #171C24; --graphite-text: #F2F5F9; --graphite-dim: #99A4B2;
+    --card-grad: linear-gradient(180deg,#282D35,#24282F); --hair: rgba(255,255,255,.07);
+    --graphite-a: #333B45; --graphite-b: #161D25; --graphite-text: #F2F5F9; --graphite-dim: #99A4B2;
     --graphite-sheen: rgba(111,190,158,.22);
     --e1: 0 1px 2px rgba(0,0,0,.35); --e2: 0 4px 18px rgba(0,0,0,.4); --e3: 0 22px 46px rgba(0,0,0,.55);
-    --glass: rgba(30,36,45,.5); --glass-border: rgba(255,255,255,.09); --glass-hi: rgba(255,255,255,.07); }
+    --glass: rgba(54,58,66,.55); --glass-border: rgba(255,255,255,.10); --glass-hi: rgba(255,255,255,.08); }
 
   * { box-sizing: border-box; }
   /* 全局禁掉长按选中/复制文字，只在真正的文字输入框(input/textarea)里保留——
