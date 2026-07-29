@@ -177,7 +177,6 @@ export function EditSheet() {
     // 只要第1期日期填了(下面这个循环会连带校验)，这里就一定有值。
     const firstDateObj = window.parseDate(editingPlan[0].date);
     if (!firstDateObj) { window.__azBridge.toast("第 1 期的还款日期必须填写"); return; }
-    const fday = firstDateObj.getDate();
     for (let k = 0; k < editingPlan.length; k++) {
       const r = editingPlan[k];
       if (r.amount < 0 || r.principal < 0 || r.interest < 0) { window.__azBridge.toast("第 " + (k + 1) + " 期的金额/本金/利息不能是负数"); return; }
@@ -206,7 +205,7 @@ export function EditSheet() {
     // 跟vanilla saveForm()构建的obj一样，这几个字段本来就不该由这里算。obj不带id——id永远
     // 由vanilla的setDebt()赋值/保留(见types.ts的Omit<Debt,"id">)。
     const obj: Omit<Debt, "id"> = {
-      name: trimmedName, funder: funder.trim(), type, opened, day: fday, notes: notes.trim(),
+      name: trimmedName, funder: funder.trim(), type, opened, notes: notes.trim(),
       oneTime: oneTime || editingPlan.length === 1, plan: window.clone(editingPlan), gen: g,
       original: null, balance: 0, paidPrincipal: 0, paidInterest: 0,
       totalTerms: 0, paidTerms: 0, terms: 0, monthly: 0, nextDate: null, rate: 0,

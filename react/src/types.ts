@@ -47,7 +47,6 @@ export interface Debt {
   funder?: string;
   type?: string;
   opened?: string;
-  day?: number;
   notes?: string;
   oneTime?: boolean;
   plan: PlanRow[];
