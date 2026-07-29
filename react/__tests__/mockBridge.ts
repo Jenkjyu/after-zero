@@ -29,6 +29,7 @@ export function makeMockBridge(overrides?: {
     saveAll: vi.fn(),
     renderAll: vi.fn(),
     settleFull: vi.fn(),
+    waiveInstallment: vi.fn(),
     getNotify: vi.fn(() => notify),
     exportReportXlsx: vi.fn(),
     exportReportPdf: vi.fn(),

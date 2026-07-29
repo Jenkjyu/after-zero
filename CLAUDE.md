@@ -52,9 +52,9 @@
 
 **同一轮还修了`computeReportData()`的`timeline`一个真实bug**：`timeline`第一个点固定是"今天"、随后按未还行日期升序追加，**逾期未销的期次日期在今天之前，会让第二个点的日期早于第一个点**，折线图上表现为"今天→过去→未来"的时间倒流。修法是把逾期未销（以及日期缺失/格式不对）的期次归到"今天"这个桶里——语义上也对，逾期的钱今天就该还，投影上按"立即偿还"处理，图上表现为起点处的一个陡降（此时会有两个日期同为今天的点，一个是起始余额、一个是扣掉逾期后的余额，这是刻意的，保证"起点=当前总余额""终点归零"两个不变量都不破）。**⚠️这个修复会连带改变PDF导出**——`exportReportPdf`通过`buildReportTableRows`/`buildExportChartsSVG`两处都读`timeline`（`exportReportXlsx`和`buildAiSummary`只读`totalBalance`/`avgRate`/`payoffDate`，不受影响）；这是刻意接受的：只修屏幕不修导出会造成"屏幕上对了、导出还是错的"这种更糟的不一致。
 
-## ⚠️已知的数据模型缺口（2026-07-29盘点，①②已修，③④⑤⑥还没修）
+## ⚠️已知的数据模型缺口（2026-07-29盘点，①②③④已修，⑤（另一个worktree并行处理中）⑥还没修）
 
-这一节记的是**已经确认存在**的问题，起因是"还款日"页那个"一行=一笔债务"的缺陷被真机戳破之后，顺着同一个思路把全项目扫了一遍。**共同形状是：`plan`数组一直有逐期数据，但消费者习惯性只读"第一期"或"只读active那部分"**——产品意图往前走了，读取方式没跟上。①②风险低（只改读取侧），已经修完；③④是真的要改数据结构，还没动手。
+这一节记的是**已经确认存在**的问题，起因是"还款日"页那个"一行=一笔债务"的缺陷被真机戳破之后，顺着同一个思路把全项目扫了一遍。**共同形状是：`plan`数组一直有逐期数据，但消费者习惯性只读"第一期"或"只读active那部分"**——产品意图往前走了，读取方式没跟上。①②风险低（只改读取侧），③④是真的要改数据结构（`PlanRow`加字段），三者都已修完；⑤在独立git worktree（`feature/amount-consistency-check`分支）由另一个session并行处理，⑥还没动。
 
 ### ①（已修，2026-07-29）通知只排每笔债务的下一期
 
@@ -75,18 +75,29 @@ debts.forEach(function (d) {
 - **Excel**：`exportReportXlsx()`的`debtRows`/`planRows`改成直接遍历全部`debts`（不再经过`data.active`），`debtRows`加了"状态"（在还/已结清）和"结清日期"两列，`planRows`加了"备注"列（`settleRow`标"提前结清"）。
 - **PDF**：新增`buildSettledDebtsRows(allDebts)`，只在存在已结清债务时才追加一段"已结清债务"（名称+结清日期+已还本金+已还利息），`buildTablePagesSVG()`把它`concat`进原有的表格行里分页——原来PDF里图表相关的几张表（`buildReportTableRows`）全部来自`data`，从来没有任何地方列出过已结清债务，这段是专门补的。
 
-### ③ 没有还款流水（这条最深，需要真正加字段）
+### ③（已修，2026-07-29）没有还款流水
 
-`PlanRow`是`{date, amount, principal, interest, paid: boolean}`——**`date`是计划日期不是实付日期，`paid`只是个布尔**。后果：
-- 画不出真实的历史负债曲线。统计页`PayoffLine`那条footnote"本App不保存历史余额、这条线不是实际走过的轨迹"，诚实归诚实，**背后就是这个缺口**
-- 算不出"这个月我实际还了多少钱"
-- 讽刺的是，2026-07-29新加的提前结清记录（`settleRow`，`date`=结清当天）反而是全项目**唯一**带真实日期的还款事件
+`PlanRow`原来是`{date, amount, principal, interest, paid: boolean}`——**`date`是计划日期不是实付日期，`paid`只是个布尔**，算不出"这个月我实际还了多少钱"，也画不出真实的历史负债曲线（统计页`PayoffLine`那条footnote"本App不保存历史余额"诚实归诚实，背后就是这个缺口——这条footnote**依然成立**，这次只是加了字段，没有回填历史数据或新做一张真实走势图，那是数据攒够之后才有意义的独立工作）。
 
-要修就是给`PlanRow`加`paidAt`。这是"专业债务管理"这个定位里最关键的一块——没有还款流水，这个App只能告诉用户"计划是什么"，不能告诉他"你实际做到了什么"。
+**修法**：`PlanRow`加`paidAt?: string`（"YYYY-MM-DD"，只有**真实发生的还款事件**才写）。写入点只有calc.js的`recordPayment()`/`waivePeriod()`（见④）、`applySettle()`的结清行（`date`本来就是真实结清日，一并写进`paidAt`保持字段含义统一）——手动编辑器（`PlanRows.tsx`）勾选"已还"**不**自动盖章，那是编辑历史数据，不是真实发生的事件；但取消勾选时会顺手清掉`paidAt`/`paidAmount`，不留"标着实付日期但又不算已还"的自相矛盾中间态（`undoSettle()`释放最后一期已还标记时同样处理）。展示：`DetailSheet.tsx`计划表加了"实付日期"列（提前结清行的"日期"列本身已经是真实付款日，这一列显示"—"避免重复）；Excel导出`planRows`同步加了这一列。
 
-### ④ 不支持部分还款
+### ④（已修，2026-07-29）不支持部分还款
 
-`payInstallment`只能`r.paid = true`，一期要么全还要么没还。现实里少还一点、拖几天补齐、协商减免都很常见。
+`payInstallment`原来只能`r.paid = true`，一期要么全还要么没还。现实里少还一点、拖几天补齐、协商减免都很常见。
+
+**修法**：`PlanRow`加`paidAmount?: number`（这一期累计已经收到多少钱）。`principal`/`interest`这两个字段本身**永远不因为部分还款/减免而改变**（那是原计划，`d.original`/年化利率要用）——"已还本金/利息算多少"由`recompute()`按`paidAmount`**利息优先分摊**（先冲抵这期的利息，剩下的才冲本金，跟银行/信用卡账单的通行做法一致）。逾期滞纳金**刻意不自动计算**——跟`equalfee`手续费"没有独立字段、直接写进`interest`"是同一个先例，用户自己把这一期的金额/利息手动改高即可，不新增第三条轴、不发明一个大概率算错的公式。
+
+两个新的calc.js纯函数，都只操作"当前最早的未还期次"（沿用"销这期只能销最早那期"这条铁律）：
+- **`recordPayment(d, amount, todayString)`**——`payInstallment()`（vanilla，DebtCard/DetailSheet/PayRow三处唯一入口）背后的新逻辑：从"直接问是不是要销"变成"问这次还多少钱"（默认=`rowRemaining(r)`，没部分还过时就是整期金额，对全款用户几乎无感）。够了：跟老行为一致，标`paid=true`+盖`paidAt`（`paidAmount`封顶在`amount`，多付不结转到下一期）；不够：`paidAmount`累加，这期继续留在未还列表里，之后可以再调用同一个入口继续补——"少还一点"和"拖几天补齐"这两个需求用同一个入口解决，不新增按钮。
+- **`waivePeriod(d, amount, todayString)`**——新按钮"协商减免这一期"（只在`DetailSheet.tsx`，跟"提前结清"并排，`d.terms>0`时才显示）背后的逻辑：不管填多少都强制关闭当前最早的未还期次，差额自动通过`recompute()`的利息优先分摊算成"少收的那部分"，不追问。这个弹窗问的是"这期最终一共收了多少"（合计，不是这次新增多少）——已经部分还过时默认值=已收的钱（暗示"不再多收，就此结清"），没还过时默认值=整期金额（暗示"按原计划全额收"），跟`applySettle()`（整笔债务提前结清）问"实付多少钱"是同一个套路。
+
+`rowRemaining(r)`（calc.js纯函数）＝这一期还欠多少钱＝`amount - (paidAmount||0)`，UI（弹窗默认值、详情窗部分还款提示）和`computeUpcomingPressure()`都用它，不重新拿`principal+interest`相加——这样保留了"`amount`是独立填写的一条轴"这个既有假设，不跟"`amount`应不应该等于`principal+interest`"（下面⑤）这条另一个缺口绑在一起。
+
+**连带修的一处**：`computeUpcomingPressure()`（"未来还款压力"图，`PressureChart.tsx`在用）原来对未还期次一律按`r.amount`/`r.principal`/`r.interest`算，部分还款之后会把已经收到的钱也算进"还欠多少"，虚高。已经按同样的利息优先分摊+`rowRemaining()`改过。`computeMonthlyRepayment()`没有改——这个函数虽然还在`calc.js`/`module.exports`里，但`grep`确认现在没有任何React组件实际调用它（"统计tab视觉+交互升级"那轮`MonthlyChart.tsx`被`PressureChart.tsx`取代后就成了死代码，只是还没清理），不影响任何可见界面。
+
+**详情窗计划表新增的小字提示**（`partialNote()`，`DetailSheet.tsx`）：还没还完但已经攒了钱的行显示"已还¥X，欠¥Y"；被"协商减免"强制关闭的行（`paid`且`paidAmount`显式小于`amount`，且不是提前结清行）显示"实收¥X，减免¥Y"——这两种状态`principal`/`interest`两列本身依然显示原计划的数字（没被这次改动动过），不加这行小字的话，"本金80/利息20"和"这行钱包只收了15"两件事对不上，容易看不懂。
+
+验证：`test/calc.test.js`新增21个用例（`rowRemaining`/`recompute`的部分还款+协商减免分摊/`recordPayment`的累加与自动结清/`waivePeriod`的强制关闭/`computeUpcomingPressure`的部分还款不虚高/`undoSettle`清理`paidAt`/`paidAmount`的回归），95个全绿；`react/__tests__/DetailSheet.test.tsx`+6、`EditSheet.test.tsx`+2，285个全绿；`tsc --noEmit`零错误；`build:react`正常（`sheets.js`从收尾阶段的93.68KB涨到95.91KB）。
 
 ### ⑤ `amount` 和 `principal + interest` 是两条独立填写的轴，没有一致性校验
 
@@ -223,6 +234,7 @@ window.__azBridge = {
   payInstallment: payInstallment, unsettle: unsettle,
   commitReorder: commitReorder, saveAll: saveAll, renderAll: renderAll,
   settleFull: settleFull,
+  waiveInstallment: waiveInstallment,
   getNotify: function () { return notify; },
   exportReportXlsx: exportReportXlsx,
   exportReportPdf: exportReportPdf,
@@ -247,6 +259,8 @@ window.__azBridge = {
 `downloadBackupFile`/`triggerImportFilePicker`是"我的"tab（`react/src/mine/DataCards.tsx`）专用的trigger-only函数——`downloadBackupFile`是把原来`dlBackupBtn`的inline click handler抽成的具名函数；`triggerImportFilePicker`是新写的一行`$("importFileInput").click()`，用来间接点开依然留在vanilla DOM里的`#importFileInput`（这个input和它的`change`监听器完整保留在vanilla，只是从`#view-data`内部搬到了折叠后的挂载点外面）。
 
 **⚠️`payInstallment`/`unsettle`/`settleFull`/`deleteDebt`/`setDebt`这几个单笔债务寻址的函数，参数后来从下标`i: number`换成了id`string`**（见"债务对象加了真正的id字段"一节）——上面代码块里的写法（`payInstallment: payInstallment`这种直接引用）没有变化，变的是这些函数自身的参数类型和内部实现（改成`debts.find(x => x.id === id)`现查，不再是`debts[i]`）。
+
+**`waiveInstallment`是React迁移全部完成之后新增的一个bridge函数**（2026-07-29，修"已知的数据模型缺口④"部分还款那轮加的，不属于第一~十一步任何一步）——`DetailSheet.tsx`新增的"协商减免这一期"按钮触发，内部自己弹`askAsync`问金额，跟`settleFull`同一个套路（详见上面"已知的数据模型缺口④"一节）。这也是`__azBridge`收尾（第十一步）之后第一次再有新函数加入，说明"只在迁移步骤里加桥接函数"这条不是铁律——凡是vanilla需要暴露新的写操作给React调用，任何时候都可以照着现有几十个例子的模式加。
 
 `setDebt`/`deleteDebt`/`toast`/`confirmAsync`这4个是`#editSheet`（`react/src/sheets/EditSheet.tsx`等）专用——`setDebt(id, obj)`是`saveForm()`删除后唯一保留的narrow写入函数（`id`非空时按id查到对应下标覆盖并合并`old.id`/`old.settled`/`old.settledDate`，`id`为`null`是push新增并生成新id，内部调`recompute(obj)`但不调`saveAll`/`renderAll`，React保存时自己依次调这三个桥接函数，跟`commitReorder`那套细粒度调用惯例一致）；`deleteDebt`是原样暴露的既有vanilla函数（自带`ask()`确认+按id查下标+splice+saveAll+renderAll）；`toast`是`#flash`单例的简单passthrough；`confirmAsync`是`ask()`的Promise外壳（详见上面"第六步"）。
 

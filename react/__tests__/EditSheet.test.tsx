@@ -74,6 +74,39 @@ describe("一次性还清(oneTimeStash)", () => {
   });
 });
 
+describe("手动逐行编辑(PlanRows)——已知的数据模型缺口③", () => {
+  it("手动取消勾选已还，顺手清掉paidAt/paidAmount(不留矛盾中间态)", () => {
+    const debts: Debt[] = [makeDebt({
+      opened: "2026-01-01",
+      plan: [{ date: "2026-02-01", amount: 500, principal: 480, interest: 20, paid: true, paidAt: "2026-02-03", paidAmount: 500 }],
+    })];
+    window.__azBridge = makeMockBridge({ debts });
+    const { container } = render(<EditSheet />);
+    act(() => { openEditSheet(debts[0].id); });
+    fireEvent.click(screen.getByLabelText("已还"));
+    fireEvent.submit(getForm(container));
+    const [, obj] = (window.__azBridge.setDebt as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(obj.plan[0].paid).toBe(false);
+    expect(obj.plan[0].paidAt).toBeUndefined();
+    expect(obj.plan[0].paidAmount).toBeUndefined();
+  });
+
+  it("手动勾选已还不自动盖paidAt(编辑历史数据不是真实还款事件)", () => {
+    const debts: Debt[] = [makeDebt({
+      opened: "2026-01-01",
+      plan: [{ date: "2026-02-01", amount: 500, principal: 480, interest: 20, paid: false }],
+    })];
+    window.__azBridge = makeMockBridge({ debts });
+    const { container } = render(<EditSheet />);
+    act(() => { openEditSheet(debts[0].id); });
+    fireEvent.click(screen.getByLabelText("已还"));
+    fireEvent.submit(getForm(container));
+    const [, obj] = (window.__azBridge.setDebt as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(obj.plan[0].paid).toBe(true);
+    expect(obj.plan[0].paidAt).toBeUndefined();
+  });
+});
+
 describe("保存校验", () => {
   it("名称为空：不调用setDebt", () => {
     window.__azBridge = makeMockBridge();

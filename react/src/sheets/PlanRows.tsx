@@ -34,6 +34,14 @@ export function PlanRows({ plan, oneTime, planMode, onChange }: PlanRowsProps) {
   function handleAmount(idx: number, v: string) {
     updateRow(idx, { amount: parseFloat(v) || 0 });
   }
+  // 手动勾选"已还"不盖paidAt(已知的数据模型缺口③)——这是编辑历史数据，不是真实发生的
+  // 还款事件，只有calc.js的recordPayment()/waivePeriod()/applySettle()这几个真正的还款
+  // 动作才会盖章。取消勾选时顺手清掉paidAt/paidAmount，不然会留下"标着实付日期/部分还款
+  // 金额，但又不算已还"的自相矛盾中间态(跟undoSettle()释放最后一期已还标记是同一个道理)。
+  function handlePaidChange(idx: number, checked: boolean) {
+    if (checked) updateRow(idx, { paid: true });
+    else updateRow(idx, { paid: false, paidAt: undefined, paidAmount: undefined });
+  }
   function handleDelete(idx: number) {
     const next = plan.slice();
     next.splice(idx, 1);
@@ -55,7 +63,7 @@ export function PlanRows({ plan, oneTime, planMode, onChange }: PlanRowsProps) {
               <span className="pn">第{idx + 1}期</span>
               <input type="date" value={r.date || ""} onChange={(e) => updateRow(idx, { date: e.target.value })} />
               <label className="chk">
-                <input type="checkbox" checked={!!r.paid} onChange={(e) => updateRow(idx, { paid: e.target.checked })} />已还
+                <input type="checkbox" checked={!!r.paid} onChange={(e) => handlePaidChange(idx, e.target.checked)} />已还
               </label>
               <button type="button" className="del" onClick={() => handleDelete(idx)}>✕</button>
             </div>

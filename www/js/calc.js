@@ -58,13 +58,49 @@ function impliedAPR(plan) {
   return r2(((lo + hi) / 2) * 1200);
 }
 
+// 一期"利息优先"分摊一笔实付金额：先冲抵这期的利息，剩下的才冲本金——银行/信用卡账单的
+// 通行做法，也是这个项目"部分还款"(已知的数据模型缺口④)的分摊规则。cap本金部分不超过
+// principal，避免paidAmt异常(比如超过amount)时算出负数或超额。
+function splitPaidInterestFirst(principal, interest, paidAmt) {
+  var interestPart = Math.min(paidAmt, interest);
+  var principalPart = Math.min(principal, Math.max(0, paidAmt - interest));
+  return { principal: r2(principalPart), interest: r2(interestPart) };
+}
+// 这一期还欠多少钱——部分还款还没还完时，"应还金额"要扣掉已经攒的那部分；一分没还过就是
+// 全额。UI(详情窗/销这期弹窗)用这个而不是直接读r.amount，否则部分还款之后再打开还是显示
+// 全额，跟"剩余待还"这个总数对不上。
+function rowRemaining(r) {
+  return r2((+r.amount || 0) - (+r.paidAmount || 0));
+}
+
 function recompute(d) {
   var plan = d.plan || [];
   var borrow = 0, remaining = 0, paidCount = 0, paidPrincipal = 0, paidInterest = 0;
   plan.forEach(function (r) {
     borrow += +r.principal || 0;
-    if (r.paid) { paidCount++; paidPrincipal += +r.principal || 0; paidInterest += +r.interest || 0; }
-    else remaining += +r.principal || 0;
+    if (r.paid) {
+      // 正常情况(没有部分还款痕迹、或paidAmount已经达到amount)：按计划全额算，跟老逻辑
+      // 完全一致，老数据(没有paidAmount字段)也走这条分支。只有"协商减免"关闭的期次
+      // (paidAmount显式存在且小于amount，见下面waivePeriod())才按实际收到的钱做利息优先
+      // 分摊——principal/interest这两个字段本身永远不改(那是原计划，d.original/年化利率
+      // 要用)，只是"算作已还了多少"改用真实收到的钱，不能当成收满了，否则"已还利息"会
+      // 显示一笔从没真正发生过的钱，跟当年"提前结清"改口径是同一类问题。
+      if (r.paidAmount != null && r.paidAmount < r.amount - 0.005) {
+        var wsplit = splitPaidInterestFirst(+r.principal || 0, +r.interest || 0, +r.paidAmount || 0);
+        paidCount++; paidPrincipal += wsplit.principal; paidInterest += wsplit.interest;
+      } else {
+        paidCount++; paidPrincipal += +r.principal || 0; paidInterest += +r.interest || 0;
+      }
+    } else if (r.paidAmount) {
+      // 还没还完，但已经攒了部分还款(见下面recordPayment())：利息优先算出这部分钱冲抵了
+      // 多少本金，"已还本金/利息"要把这部分计进去、"剩余待还"本金相应减少——不然钱已经
+      // 付出去了，"已还"这个数字却纹丝不动，直到这期整个还清才跳一下，是反直觉的口径。
+      var psplit = splitPaidInterestFirst(+r.principal || 0, +r.interest || 0, +r.paidAmount || 0);
+      paidPrincipal += psplit.principal; paidInterest += psplit.interest;
+      remaining += r2((+r.principal || 0) - psplit.principal);
+    } else {
+      remaining += +r.principal || 0;
+    }
   });
   d.original = plan.length ? r2(borrow) : null;
   d.balance = r2(remaining);
@@ -101,6 +137,9 @@ function recompute(d) {
 // 用；而d.settledDate沿用的是已结清列表一直在显示的短格式("M/D"，payInstallment那条
 // 自动结清路径用的todayStr()就是这个格式)，这里从todayString切出来而不是再传一个参数，
 // 保证两者永远指向同一天、也不会让调用方有机会传成两个不同的日子。
+// shortDateFromISO()是这条切法的公共提取——applySettle/recordPayment/waivePeriod三处
+// 都要从"YYYY-MM-DD"切出"M/D"给d.settledDate用，避免三份重复的slice代码写岔。
+function shortDateFromISO(iso) { return (+iso.slice(5, 7)) + "/" + (+iso.slice(8, 10)); }
 function applySettle(d, paidAmount, todayString) {
   var plan = d.plan || [];
   var kept = [], stash = [], remainP = 0;
@@ -115,7 +154,7 @@ function applySettle(d, paidAmount, todayString) {
   d.settleStash = stash;
   d.plan = kept;
   d.settled = true;
-  d.settledDate = (+todayString.slice(5, 7)) + "/" + (+todayString.slice(8, 10));
+  d.settledDate = shortDateFromISO(todayString);
   recompute(d);
   return true;
 }
@@ -130,11 +169,64 @@ function undoSettle(d) {
     // 另一条结清路径：销掉最后一期后plan全部paid、d.terms归0，debt被自动标记成已结清。
     // 这种情况下只清settled标记会留下一条"每期都已还、剩余待还¥0"的僵尸债务挂在在还列表里
     // (真机实测到的bug)——"恢复"的语义是撤销"让它结清的那一步"，所以最后一期的已还标记
-    // 也要一并释放，让它回到"还剩1期没还"的状态。
+    // 也要一并释放，让它回到"还剩1期没还"的状态。paidAt/paidAmount也要一并清掉(见下面
+    // recordPayment())——"恢复"是撤销这一步付款事件，不能留下"这期还标着实付日期/部分
+    // 还款金额，但又不算已还"这种自相矛盾的中间态。
     var hasUnpaid = plan.some(function (r) { return !r.paid; });
-    if (!hasUnpaid && plan.length) plan[plan.length - 1].paid = false;
+    if (!hasUnpaid && plan.length) {
+      var last = plan[plan.length - 1];
+      last.paid = false;
+      delete last.paidAt;
+      delete last.paidAmount;
+    }
   }
   recompute(d);
+}
+
+// ===== 部分还款（已知的数据模型缺口④）=====
+// 现实里"少还一点、拖几天补齐"很常见，但`payInstallment`原来只能整期打勾。这两个函数是
+// "销这期"(recordPayment)和详情窗新增的"协商减免"(waivePeriod)背后的数据变换，都只操作
+// 债务当前最早的未还期次(销这期一直遵守"只能销最早那期"这条规则，见"还款日"一节)。
+// principal/interest这两个字段本身永远不改(那是原计划)，"利息优先"分摊的算法在recompute()
+// 里，这两个函数只负责写paidAmount/paid/paidAt。
+//
+// recordPayment：这次还的钱不够这期(cumulative<amount，容差0.005)就只累加paidAmount、这期
+// 继续留在未还列表里，可以之后再调一次继续补(对应"拖几天补齐")；够了就跟老的payInstallment
+// 行为一致——标paid=true、盖paidAt、paidAmount封顶在amount(多付的部分不结转到下一期，
+// 想抵下一期的话得用户自己去改那一期的数据)。返回null表示这笔债务已经没有未还期次。
+function recordPayment(d, amount, todayString) {
+  var plan = d.plan || [], idx = -1;
+  for (var k = 0; k < plan.length; k++) { if (!plan[k].paid) { idx = k; break; } }
+  if (idx < 0) return null;
+  var r = plan[idx];
+  var x = r2(+amount || 0);
+  var cumulative = r2((+r.paidAmount || 0) + x);
+  if (cumulative >= r.amount - 0.005) {
+    r.paidAmount = r.amount;
+    r.paid = true;
+    r.paidAt = todayString;
+    recompute(d);
+    if (d.terms <= 0) { d.settled = true; d.settledDate = shortDateFromISO(todayString); }
+    return { idx: idx, full: true };
+  }
+  r.paidAmount = cumulative;
+  recompute(d);
+  return { idx: idx, full: false, remaining: r2(r.amount - cumulative) };
+}
+// waivePeriod：协商减免——不管实付多少，强制把当前最早的未还期次标记为已还，差额自动通过
+// recompute()的利息优先分摊算成"少还的那部分"(不会凭空多算一笔从没发生过的已还)。
+// 跟applySettle()"如实记录真实付款、差额算减免"是同一个思路，只是范围从整笔债务缩小到一期。
+function waivePeriod(d, amount, todayString) {
+  var plan = d.plan || [], idx = -1;
+  for (var k = 0; k < plan.length; k++) { if (!plan[k].paid) { idx = k; break; } }
+  if (idx < 0) return null;
+  var r = plan[idx];
+  r.paidAmount = r2(Math.max(0, +amount || 0));
+  r.paid = true;
+  r.paidAt = todayString;
+  recompute(d);
+  if (d.terms <= 0) { d.settled = true; d.settledDate = shortDateFromISO(todayString); }
+  return { idx: idx };
 }
 function markPaidThrough(plan, n) { for (var k = 0; k < plan.length; k++) plan[k].paid = k < n; }
 // 债务对象的稳定id——创建时生成一次，往后不变。前缀"d"专属债务(备份用"b"/上传用"u"/AI对话
@@ -369,6 +461,16 @@ function computeUpcomingPressure(debts, monthsAhead, today) {
       if (r.paid) return;
       if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date || "")) return;
       var amt = +r.amount || 0, pr = +r.principal || 0, it = +r.interest || 0;
+      // 部分还款(已知的数据模型缺口④)——已经攒了钱的期次，这张图回答"接下来还欠多少"，
+      // 不能还按整期的原始金额算，否则会虚高。利息优先分摊跟recompute()同一套算法，
+      // amt用rowRemaining()(=amount-paidAmount)而不是重新拿pr+it相加——保留"amount是
+      // 独立填写的一条轴"这个既有假设，不跟"amount应该等于principal+interest"这条(另一个
+      // 已知缺口⑤，读CLAUDE.md)绑在一起。
+      if (r.paidAmount) {
+        var pSplit = splitPaidInterestFirst(pr, it, +r.paidAmount || 0);
+        pr = r2(pr - pSplit.principal); it = r2(it - pSplit.interest);
+        amt = rowRemaining(r);
+      }
       if (r.date < todayKey) {
         overdue.amount = r2(overdue.amount + amt); overdue.principal = r2(overdue.principal + pr);
         overdue.interest = r2(overdue.interest + it); overdue.count++;
@@ -503,7 +605,8 @@ if (typeof module !== "undefined" && module.exports) {
     pad: pad, parseDate: parseDate, addMonths: addMonths, fmtDate: fmtDate, today0: today0,
     rateClass: rateClass, isActive: isActive, genPlan: genPlan, npv: npv, impliedAPR: impliedAPR,
     recompute: recompute, markPaidThrough: markPaidThrough, normalize: normalize, genDebtId: genDebtId,
-    applySettle: applySettle, undoSettle: undoSettle,
+    applySettle: applySettle, undoSettle: undoSettle, shortDateFromISO: shortDateFromISO,
+    rowRemaining: rowRemaining, recordPayment: recordPayment, waivePeriod: waivePeriod,
     amortForward: amortForward, simulatePrepay: simulatePrepay, detectMatchingSort: detectMatchingSort,
     urgencyTier: urgencyTier, relLabel: relLabel, dueBucket: dueBucket,
     isBadRepeatDay: isBadRepeatDay, offsetLabel: offsetLabel, computeReportData: computeReportData, summarizeDebts: summarizeDebts,

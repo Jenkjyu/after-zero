@@ -58,6 +58,9 @@ declare global {
     // 推算下一期默认日期用。
     genPlan(spec: GenSpec): PlanRow[];
     impliedAPR(plan: PlanRow[]): number;
+    // detailSheet(react/src/sheets/DetailSheet.tsx)用：已知的数据模型缺口④(部分还款)——
+    // 这一期还欠多少钱=amount减去已经攒的paidAmount，没还过就是全额。
+    rowRemaining(r: PlanRow): number;
     // simScreen(react/src/sheets/SimScreen.tsx)用：按标准等额本息模型模拟"多还一笔"的效果，
     // 月供不足以覆盖利息(无法收敛)时返回null，UI层需要单独toast提示。
     simulatePrepay(

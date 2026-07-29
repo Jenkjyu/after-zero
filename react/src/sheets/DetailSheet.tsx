@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 import { closeDetailSheet, openEditSheet, openSimScreen, useDebts, useDetailSheetId } from "../shared/state";
 import { makeGripDragState, onGripPointerDown, onGripPointerEnd, onGripPointerMove } from "./gripDrag";
+import type { PlanRow } from "../types";
 
 function kv(k: string, v: string) {
   return (
@@ -112,11 +113,27 @@ export function DetailSheet() {
     if (displayId === null) return;
     window.__azBridge.settleFull(displayId);
   }
+  function onWaive() {
+    if (displayId === null) return;
+    window.__azBridge.waiveInstallment(displayId);
+  }
 
   let nextNo = -1;
   const plan = d && d.plan ? d.plan : [];
   for (let k = 0; k < plan.length; k++) {
     if (!plan[k].paid) { nextNo = k; break; }
+  }
+  // 部分还款(已知的数据模型缺口④)的小字提示——还没还完但已经攒了钱的行显示"已还/欠"，
+  // 被"协商减免"强制关闭的行(paidAmount显式小于amount、且不是提前结清行)显示"实收/减免"。
+  // principal/interest这两个字段本身没被这次改动动过(那是原计划)，所以这里单独算一遍
+  // 实际收到的钱，不能直接读表格里本金/利息那两列。
+  function partialNote(r: PlanRow): string | null {
+    if (r.settleRow) return null;
+    if (!r.paid && r.paidAmount) return "已还 ¥" + window.money(r.paidAmount) + "，欠 ¥" + window.money(window.rowRemaining(r));
+    if (r.paid && r.paidAmount != null && r.paidAmount < r.amount - 0.005) {
+      return "实收 ¥" + window.money(r.paidAmount) + "，减免 ¥" + window.money(r.amount - r.paidAmount);
+    }
+    return null;
   }
   let rembal = (d && d.original) || 0;
   // 原始期数：提前结清过的债务，plan里剩下的是"已还期次 + 一条结清行"，被收走的期次在
@@ -160,12 +177,13 @@ export function DetailSheet() {
                     <div className="sch-wrap">
                       <table className="sch">
                         <thead>
-                          <tr><th>期次</th><th>日期</th><th>金额</th><th>本金</th><th>利息/费</th><th>剩余本金</th></tr>
+                          <tr><th>期次</th><th>日期</th><th>实付日期</th><th>金额</th><th>本金</th><th>利息/费</th><th>剩余本金</th></tr>
                         </thead>
                         <tbody>
                           {plan.map((r, idx) => {
                             rembal -= +r.principal || 0;
                             const cls = r.paid ? "paidrow" : idx === nextNo ? "nextrow" : "";
+                            const note = partialNote(r);
                             return (
                               <tr key={idx} className={cls}>
                                 {/* 提前结清行不是原计划里的期次，标"结清"不标期次号。其余行的分母用
@@ -174,7 +192,14 @@ export function DetailSheet() {
                                     拿它当分母会显示成"✓ 2/3"这种跟原计划对不上的数字。 */}
                                 <td className="per">{r.settleRow ? "✓ 结清" : (r.paid ? "✓ " : "") + (idx + 1) + "/" + origTerms}</td>
                                 <td className="num">{r.date}</td>
-                                <td className="num">{window.money(r.amount)}</td>
+                                {/* 结清行的"日期"本身就是真实付款日(applySettle()把today写进那一行
+                                    的date)，这里再重复显示同一个日期没有意义，留空；其余行(普通
+                                    已还/部分还款/协商减免)按paidAt(已知的数据模型缺口③)显示。 */}
+                                <td className="num">{r.settleRow ? "—" : r.paidAt || "—"}</td>
+                                <td className="num">
+                                  {window.money(r.amount)}
+                                  {note ? <div className="sub" style={{ fontSize: 10.5, color: "var(--text-muted)", fontWeight: 400 }}>{note}</div> : null}
+                                </td>
                                 <td className="num">{window.money(r.principal)}</td>
                                 {/* 结清行的利息可能是负数(协商减免：实付 < 剩余本金)。直接显示
                                     "-100.00"虽然跟本金相加正好等于实付、总账对得上，但在"利息/费"
@@ -212,6 +237,11 @@ export function DetailSheet() {
           <div className="sheet-actions" style={{ marginTop: 10 }}>
             <button type="button" className="btn ghost" onClick={onSimulate}>提前还款模拟</button>
           </div>
+          {d && d.terms > 0 ? (
+            <div className="sheet-actions" style={{ marginTop: 10 }}>
+              <button type="button" className="btn ghost" onClick={onWaive}>协商减免这一期</button>
+            </div>
+          ) : null}
           <div className="sheet-actions" style={{ marginTop: 10 }}>
             <button type="button" className="btn danger" onClick={onSettle}>提前结清</button>
             <button type="button" className="btn ghost" onClick={closeDetailSheet}>关闭</button>

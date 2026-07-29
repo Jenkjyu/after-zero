@@ -1399,25 +1399,65 @@
     grip.addEventListener("pointercancel", endDrag);
   }
 
+  // "销这期"：改成先问这次还多少钱(默认=这期还欠的全部，见calc.js rowRemaining())——对
+  // 全款用户几乎没变化(默认值就是老的整期金额，直接确认即可)，但现在够不够都能处理：
+  // 够了跟老行为一致(标已还+盖实付日期)；不够就用calc.js的recordPayment()把这次的钱记上，
+  // 这期继续留在未还列表里，欠款变少，之后可以再点"销这期"继续补("少还一点"和"拖几天补齐"
+  // 这两个真实需求用同一个入口解决，见"已知的数据模型缺口④")。真正的数据变换(利息优先
+  // 分摊/是否达到整期/是否连带结清整笔债务)全在calc.js的recordPayment()里，这里只负责
+  // 弹窗、校验输入、存盘重渲染。
   function payInstallment(id) {
     var d = debts.find(function (x) { return x.id === id; });
     if (!d) return;
     var plan = d.plan || [], idx = -1;
     for (var k = 0; k < plan.length; k++) { if (!plan[k].paid) { idx = k; break; } }
     if (idx < 0) { toast("已全部还清"); return; }
-    var r = plan[idx], isLast = true;
+    var r = plan[idx], isLast = true, owed = rowRemaining(r);
     for (var j = idx + 1; j < plan.length; j++) if (!plan[j].paid) { isLast = false; break; }
     var title = d.oneTime ? "一次性结清" : (isLast ? "最后一期" : "销这一期");
-    var body = "销第 " + (idx + 1) + "/" + plan.length + " 期（" + r.date + "）\n金额 ¥" + money(r.amount) + "（本金 " + money(r.principal) + " + 利息/费 " + money(r.interest) + "）" + (isLast ? "\n这是最后一期，还完即结清。" : "");
-    ask(title, body, function () {
-      r.paid = true; recompute(d);
-      if (d.terms <= 0) { d.settled = true; d.settledDate = todayStr(); }
+    var partialNote = owed < r.amount - 0.005 ? "之前已还 ¥" + money(r.amount - owed) + "，还差 ¥" + money(owed) + "。\n" : "";
+    var body = "第 " + (idx + 1) + "/" + plan.length + " 期（" + r.date + "）\n" + partialNote + "这次还多少钱？" + (isLast ? "\n这是最后一期，还完即结清。" : "");
+    askAsync(title, body, { amount: owed, amountHint: owed < r.amount - 0.005 ? "默认 ¥" + money(owed) + "＝一次补齐剩下的" : "默认 ¥" + money(owed) + "＝本金 ¥" + money(r.principal) + " + 利息/费 ¥" + money(r.interest) }).then(function (val) {
+      if (val === null) return; // 用户取消
+      var x = parseFloat(val);
+      if (!isFinite(x) || x <= 0) { toast("请输入有效的还款金额"); return; }
+      var res = recordPayment(d, x, fmtDate(today0()));
+      if (!res) { toast("已全部还清"); return; }
       // 原来这里还有"结清就closeDetail()、没结清就openDetail(i)原地刷新"这行——详情窗迁移
       // React后不再需要：React的DetailSheet组件订阅同一份debts数据，renderAll()派发的
       // az:state-changed会让它自动重渲染(没结清=原地看到新数据)，结清时也有自己的effect
       // 自动关闭(见react/src/sheets/DetailSheet.tsx)，vanilla这边不用再操心detailSheet。
       saveAll(); renderAll();
-      toast(d.settled ? d.name + " 已还清 🎉" : "已销第 " + (idx + 1) + " 期 · 本金 -¥" + fmt(r.principal));
+      if (res.full) {
+        toast(d.settled ? d.name + " 已还清 🎉" : "已销第 " + (idx + 1) + " 期 · 本金 -¥" + fmt(r.principal));
+      } else {
+        toast("已记录 ¥" + fmt(x) + "，这期还差 ¥" + fmt(res.remaining));
+      }
+    });
+  }
+  // 协商减免：不管这次填多少，确认后直接强制关闭当前最早的未还期次，差额自动通过calc.js
+  // waivePeriod()的利息优先分摊算成"少收的那部分"——这跟payInstallment()"不够就继续留着
+  // 以后补"是两种不同的语义，所以是独立的入口，不是同一个弹窗多问一句。这里问的是"这期
+  // 最终一共收了多少"(合计，不是这次新增多少)，跟settleFull()问"实付多少钱"是同一个套路。
+  function waiveInstallment(id) {
+    var d = debts.find(function (x) { return x.id === id; });
+    if (!d) return;
+    var plan = d.plan || [], idx = -1;
+    for (var k = 0; k < plan.length; k++) { if (!plan[k].paid) { idx = k; break; } }
+    if (idx < 0) { toast("已全部还清"); return; }
+    var r = plan[idx], already = +r.paidAmount || 0, defaultTotal = already > 0 ? already : r.amount;
+    askAsync("协商减免这一期",
+      "第 " + (idx + 1) + "/" + plan.length + " 期（" + r.date + "），原计划 ¥" + money(r.amount) + (already > 0 ? "，已收 ¥" + money(already) : "") + "。\n填这期最终一共收了多少钱，确认后立刻按此结清这一期，差额算作减免。",
+      { amount: defaultTotal, amountHint: already > 0 ? "默认 ¥" + money(already) + "＝不再多收，就按已收的结清" : "默认 ¥" + money(r.amount) + "＝按原计划全额收" }
+    ).then(function (val) {
+      if (val === null) return;
+      var x = parseFloat(val);
+      if (!isFinite(x) || x < 0) { toast("请输入有效的金额"); return; }
+      var res = waivePeriod(d, x, fmtDate(today0()));
+      if (!res) { toast("已全部还清"); return; }
+      saveAll(); renderAll();
+      var shortfall = r2(r.amount - x);
+      toast(d.settled ? d.name + " 已还清 🎉" : (shortfall > 0.005 ? "已减免这一期 ¥" + fmt(shortfall) : "已销第 " + (idx + 1) + " 期"));
     });
   }
   // 提前结清：先问用户实际付出去多少钱，再把剩余期次收进快照、追加一条真实的结清记录。
@@ -1792,9 +1832,16 @@
     var planRows = [];
     debts.forEach(function (d) {
       (d.plan || []).forEach(function (r, idx) {
+        // 备注：settleRow(提前结清)不变；协商减免关闭(paid且paidAmount显式小于amount)/还没
+        // 还完但已经攒了部分还款，这两种"已知的数据模型缺口④"新增的状态也标出来，别让人
+        // 看着表格数字对不上却不知道为什么。
+        var note = r.settleRow ? "提前结清"
+          : (r.paid && r.paidAmount != null && r.paidAmount < r.amount - 0.005) ? "协商减免"
+          : (!r.paid && r.paidAmount) ? "部分还款中" : "";
         planRows.push({
-          债务: d.name, 期次: idx + 1, 日期: r.date, 金额: r.amount, 本金: r.principal,
-          "利息/费": r.interest, 是否已还: r.paid ? "是" : "否", 备注: r.settleRow ? "提前结清" : ""
+          债务: d.name, 期次: idx + 1, 日期: r.date, 实付日期: r.settleRow ? "" : (r.paidAt || ""),
+          金额: r.amount, 本金: r.principal, "利息/费": r.interest, 是否已还: r.paid ? "是" : "否",
+          备注: note
         });
       });
     });
@@ -2357,6 +2404,9 @@
     // detailSheet(react/src/sheets/)新增：#dSettle以前只在vanilla内部调用，现在按钮由React
     // 渲染，需要显式桥接。openSimScreen已删除——第八步(simScreen)迁移React后不再经过桥接。
     settleFull: settleFull,
+    // detailSheet新增"协商减免"按钮(已知的数据模型缺口④)：不管实付多少都强制关闭当前最早
+    // 的未还期次，跟settleFull(整笔债务提前结清)是不同粒度的两个操作，不能合并。
+    waiveInstallment: waiveInstallment,
     getNotify: function () { return notify; },
     exportReportXlsx: exportReportXlsx,
     exportReportPdf: exportReportPdf,

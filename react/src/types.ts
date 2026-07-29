@@ -9,6 +9,16 @@ export interface PlanRow {
   // principal=当时的剩余本金、interest=实付金额减剩余本金(多付记正、协商减免记负)。
   // 详情页的还款计划表靠这个标记把期次号显示成"结清"而不是"n/m"。
   settleRow?: boolean;
+  // 已知的数据模型缺口③——真实还款事件才写("YYYY-MM-DD")，date是计划日期，paidAt是实付
+  // 日期，两者不是一回事。只有calc.js的recordPayment()/waivePeriod()/applySettle()(结清行)
+  // 这几个"真实发生的还款事件"会写这个字段，手动编辑器(PlanRows.tsx)勾选/取消"已还"不会
+  // 自动盖章——那是编辑历史数据，不是真实发生的事件。
+  paidAt?: string;
+  // 已知的数据模型缺口④(部分还款)——这一期累计已经收到多少钱，配合calc.js的recordPayment()
+  // (少还一点/拖几天补齐，这期继续留在未还里)/waivePeriod()(协商减免，不管收了多少强制
+  // 关闭这一期)。principal/interest这两个字段本身永远不因为部分还款/减免而改变(那是原计划，
+  // d.original/年化利率要用)，"已还本金/利息算多少"由recompute()按paidAmount利息优先分摊。
+  paidAmount?: number;
 }
 
 // 公式生成器4种计息方式共用的spec形状(genPlan(spec)的入参，calc.js里定义)——react/src/sheets/
@@ -201,6 +211,11 @@ export interface AzBridge {
   // React渲染，需要显式桥接。openSimScreen已删除——第八步(simScreen)迁移React后，打开
   // 这个screen不再经过bridge，改成shared/state.ts的openSimScreen(i)(模式同openDetailSheet)。
   settleFull(id: string): void;
+  // detailSheet新增"协商减免"按钮(已知的数据模型缺口④)：不管实付多少都强制关闭当前最早的
+  // 未还期次(不像payInstallment那样"不够就继续留着以后补")，跟settleFull(整笔债务提前
+  // 结清)是不同粒度的两个操作。内部自己弹askAsync问"这期最终一共收了多少"，跟settleFull
+  // 同一个套路，不需要React这边额外传参。
+  waiveInstallment(id: string): void;
   // 还款日tab新增：getNotify()仍然是bridge——notify这份数据的调度(syncNotifications)
   // 依赖vanilla的debts/renderAll()管线，必须留在vanilla，React只读它。openNotifySheet已
   // 删除——第八步(notifySheet)迁移React后，打开这个sheet不再经过bridge。

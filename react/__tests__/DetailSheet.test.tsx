@@ -160,6 +160,73 @@ describe("DetailSheet", () => {
     expect(container.querySelector(".sheet.open")).toBeNull();
   });
 
+  it("terms<=0时不渲染协商减免按钮", () => {
+    const debts: Debt[] = [makeDebt({ terms: 0 })];
+    window.__azBridge = makeMockBridge({ debts });
+    render(<DetailSheet />);
+    act(() => { openDetailSheet(debts[0].id); });
+    expect(screen.queryByText("协商减免这一期")).not.toBeInTheDocument();
+  });
+
+  it("点协商减免：调用waiveInstallment(id)(已知的数据模型缺口④)", () => {
+    const debts: Debt[] = [makeDebt()];
+    window.__azBridge = makeMockBridge({ debts });
+    render(<DetailSheet />);
+    act(() => { openDetailSheet(debts[0].id); });
+    fireEvent.click(screen.getByText("协商减免这一期"));
+    expect(window.__azBridge.waiveInstallment).toHaveBeenCalledWith(debts[0].id);
+  });
+
+  it("计划表加了实付日期列——已还且有paidAt的行显示实付日期，没有的显示—(已知的数据模型缺口③)", () => {
+    const debts: Debt[] = [makeDebt({
+      plan: [
+        { date: "2026-07-01", amount: 500, principal: 480, interest: 20, paid: true, paidAt: "2026-07-03" },
+        { date: "2026-08-01", amount: 500, principal: 480, interest: 20, paid: false },
+      ],
+      totalTerms: 2, paidTerms: 1, terms: 1,
+    })];
+    window.__azBridge = makeMockBridge({ debts });
+    render(<DetailSheet />);
+    act(() => { openDetailSheet(debts[0].id); });
+    expect(screen.getByText("2026-07-03")).toBeInTheDocument(); // 第1期的实付日期
+    const rows = screen.getAllByRole("row");
+    expect(rows[2]).toHaveTextContent("—"); // 第2期(未还)没有实付日期
+  });
+
+  it("部分还款(还没还完)的行显示已还/欠的小字提示——已知的数据模型缺口④", () => {
+    const debts: Debt[] = [makeDebt({
+      plan: [{ date: "2026-08-01", amount: 100, principal: 80, interest: 20, paid: false, paidAmount: 40 }],
+    })];
+    window.__azBridge = makeMockBridge({ debts });
+    render(<DetailSheet />);
+    act(() => { openDetailSheet(debts[0].id); });
+    expect(screen.getByText("已还 ¥40.00，欠 ¥60.00")).toBeInTheDocument();
+  });
+
+  it("协商减免关闭的行(paid=true但paidAmount小于amount)显示实收/减免的小字提示，不是部分还款那条文案", () => {
+    const debts: Debt[] = [makeDebt({
+      plan: [{ date: "2026-08-01", amount: 100, principal: 80, interest: 20, paid: true, paidAt: "2026-08-05", paidAmount: 40 }],
+      totalTerms: 1, paidTerms: 1, terms: 0,
+    })];
+    window.__azBridge = makeMockBridge({ debts });
+    render(<DetailSheet />);
+    act(() => { openDetailSheet(debts[0].id); });
+    expect(screen.getByText("实收 ¥40.00，减免 ¥60.00")).toBeInTheDocument();
+  });
+
+  it("提前结清行(settleRow)不显示部分还款/减免小字提示，实付日期列显示—(日期列本身已经是真实付款日)", () => {
+    const debts: Debt[] = [makeDebt({
+      plan: [{ date: "2026-08-05", amount: 500, principal: 480, interest: 20, paid: true, settleRow: true }],
+      totalTerms: 1, paidTerms: 1, terms: 0, settled: true, settledDate: "8/5",
+    })];
+    window.__azBridge = makeMockBridge({ debts });
+    render(<DetailSheet />);
+    act(() => { openDetailSheet(debts[0].id); });
+    const rows = screen.getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("—"); // 实付日期列
+    expect(screen.queryByText(/已还 ¥|实收 ¥/)).not.toBeInTheDocument();
+  });
+
   it("删除的不是数组最后一条时也能正确按id判断、自动关闭——detailSheet现在跟EditSheet共享同一个不受splice下标顺移影响的判断", () => {
     // 这个场景是EditSheet.test.tsx当年那个真实bug的镜像验证：两笔债务，打开第一笔的详情窗，
     // 从别处删除它(debts.splice(0,1)让第二笔顺移到下标0)——按id查找不受这次顺移影响，

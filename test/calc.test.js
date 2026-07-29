@@ -630,6 +630,18 @@ test("computeUpcomingPressure: 已还期次和一次性还清债务的处理", (
   assert.equal(aug.items.length, 1);
 });
 
+test("computeUpcomingPressure: 部分还款(已知的数据模型缺口④)的期次只算还欠的那部分，不虚高", () => {
+  // 100元=本金80+利息20，已经还了40：利息优先分摊后本金欠60、利息欠0，这一期在压力图里
+  // 应该只算¥60(rowRemaining)，不是原始的¥100。
+  const d = { id: "d1", name: "分期", plan: [{ date: "2026-08-10", amount: 100, principal: 80, interest: 20, paid: false, paidAmount: 40 }] };
+  const p = calc.computeUpcomingPressure([d], 12, new Date(2026, 6, 29));
+  const aug = p.months.find((m) => m.month === "2026-08");
+  assert.equal(aug.total, 60);
+  assert.equal(aug.principal, 60);
+  assert.equal(aug.interest, 0);
+  assert.equal(aug.items[0].amount, 60);
+});
+
 test("remainingInterest: 只累加未还期次的利息/手续费", () => {
   const d = { plan: [
     { interest: 100, paid: true }, { interest: 90, paid: true },
@@ -751,7 +763,7 @@ test("undoSettle: 提前结清后撤销，精确回到结清前那一刻", () =>
 
 test("undoSettle: 销完最后一期自动结清的债务，恢复后不能留下待还¥0的僵尸", () => {
   // 真机报的bug：只有1期的债务销掉那一期→自动结清→点"恢复"→挂在在还列表里但剩余待还是0
-  const d = { id: "d1", name: "一次性", oneTime: true, plan: [{ date: "2026-07-01", amount: 100, principal: 100, interest: 0, paid: true }] };
+  const d = { id: "d1", name: "一次性", oneTime: true, plan: [{ date: "2026-07-01", amount: 100, principal: 100, interest: 0, paid: true, paidAt: "2026-07-01" }] };
   d.settled = true; d.settledDate = "7/1";
   calc.recompute(d);
   assert.equal(d.balance, 0); // 结清状态下确实是0
@@ -761,6 +773,9 @@ test("undoSettle: 销完最后一期自动结清的债务，恢复后不能留�
   assert.equal(d.plan[0].paid, false); // 最后一期的已还标记被释放了
   assert.equal(d.balance, 100);        // 恢复成"还有100没还"，不再是僵尸
   assert.equal(d.terms, 1);
+  // "恢复"是撤销这一步付款事件，不能留下"标着实付日期/部分还款金额，但又不算已还"的矛盾中间态
+  assert.equal(d.plan[0].paidAt, undefined);
+  assert.equal(d.plan[0].paidAmount, undefined);
 });
 
 test("undoSettle: 多期债务销完最后一期后恢复，只释放最后一期(原来已还几期还是几期)", () => {
@@ -771,6 +786,134 @@ test("undoSettle: 多期债务销完最后一期后恢复，只释放最后一�
   assert.equal(d.terms, 1);
   assert.equal(d.plan[10].paid, true);
   assert.equal(d.plan[11].paid, false);
+});
+
+// ===== 还款流水(paidAt) + 部分还款(recordPayment/waivePeriod)（已知的数据模型缺口③④）=====
+test("rowRemaining: 没还过就是全额，还了一部分就扣掉那部分", () => {
+  assert.equal(calc.rowRemaining({ amount: 100 }), 100);
+  assert.equal(calc.rowRemaining({ amount: 100, paidAmount: 40 }), 60);
+  assert.equal(calc.rowRemaining({ amount: 100, paidAmount: 100 }), 0);
+});
+
+test("recompute: 未还期次有部分还款时，按利息优先分摊已还本金/利息，剩余待还本金相应减少", () => {
+  // 100元=本金80+利息20，只还了40：利息优先先冲满20利息，剩下20冲本金
+  const d = { id: "d", plan: [{ date: "2026-08-10", amount: 100, principal: 80, interest: 20, paid: false, paidAmount: 40 }] };
+  calc.recompute(d);
+  assert.equal(d.paidPrincipal, 20);
+  assert.equal(d.paidInterest, 20);
+  assert.equal(d.balance, 60); // 本金80-20
+  assert.equal(d.paidTerms, 0);
+  assert.equal(d.terms, 1); // 还没还完，依然算1期未还
+});
+
+test("recompute: 部分还款不够利息时，全部冲抵利息、本金分文未减", () => {
+  // 本金80利息20，只还了15：15全部冲利息(还差5)，本金一分没动
+  const d = { id: "d", plan: [{ date: "2026-08-10", amount: 100, principal: 80, interest: 20, paid: false, paidAmount: 15 }] };
+  calc.recompute(d);
+  assert.equal(d.paidPrincipal, 0);
+  assert.equal(d.paidInterest, 15);
+  assert.equal(d.balance, 80);
+});
+
+test("recompute: 老数据(paid=true但没有paidAmount字段)按计划全额算，行为不变", () => {
+  const d = { id: "d", plan: [{ date: "2026-08-10", amount: 100, principal: 80, interest: 20, paid: true }] };
+  calc.recompute(d);
+  assert.equal(d.paidPrincipal, 80);
+  assert.equal(d.paidInterest, 20);
+  assert.equal(d.balance, 0);
+});
+
+test("recompute: 已还期次paidAmount达到amount(不是协商减免)按计划全额算，不触发分摊", () => {
+  const d = { id: "d", plan: [{ date: "2026-08-10", amount: 100, principal: 80, interest: 20, paid: true, paidAmount: 100 }] };
+  calc.recompute(d);
+  assert.equal(d.paidPrincipal, 80);
+  assert.equal(d.paidInterest, 20);
+});
+
+test("recompute: 已还期次paidAmount小于amount(协商减免关闭)按实付金额利息优先分摊，不是全额", () => {
+  // 本金80利息20，减免关闭时只记了15：15全部冲利息，已还本金=0，跟"老数据全额算"的80/20明显不同
+  const d = { id: "d", plan: [{ date: "2026-08-10", amount: 100, principal: 80, interest: 20, paid: true, paidAmount: 15 }] };
+  calc.recompute(d);
+  assert.equal(d.paidPrincipal, 0);
+  assert.equal(d.paidInterest, 15);
+  assert.equal(d.balance, 0); // 已还的期次(不管是不是减免)都不再算进剩余待还
+  // ⚠️principal/interest这两个原计划字段本身不能被这次改动动过——它们还要给d.original/年化利率用
+  assert.equal(d.plan[0].principal, 80);
+  assert.equal(d.plan[0].interest, 20);
+});
+
+function planDebt(rows, extra) {
+  return Object.assign({ id: "d", name: "测试债务", plan: rows }, extra || {});
+}
+
+test("recordPayment: 还的钱不够这期，累加paidAmount、这期继续留在未还里，可以之后再补", () => {
+  const d = planDebt([{ date: "2026-08-10", amount: 100, principal: 80, interest: 20, paid: false }]);
+  const res = calc.recordPayment(d, 40, "2026-07-29");
+  assert.deepEqual(res, { idx: 0, full: false, remaining: 60 });
+  assert.equal(d.plan[0].paid, false);
+  assert.equal(d.plan[0].paidAmount, 40);
+  assert.equal(d.plan[0].paidAt, undefined); // 没还完，不盖实付日期
+  assert.equal(d.balance, 60);
+});
+
+test("recordPayment: 分两次补齐，第二次凑够金额后自动标记已还+盖实付日期", () => {
+  const d = planDebt([{ date: "2026-08-10", amount: 100, principal: 80, interest: 20, paid: false }]);
+  calc.recordPayment(d, 40, "2026-07-29");
+  const res = calc.recordPayment(d, 60, "2026-08-05"); // 拖了几天后补齐剩下的60
+  assert.equal(res.full, true);
+  assert.equal(d.plan[0].paid, true);
+  assert.equal(d.plan[0].paidAt, "2026-08-05"); // 盖的是"真正还清那天"，不是第一次付款那天
+  assert.equal(d.plan[0].paidAmount, 100);
+  assert.equal(d.paidPrincipal, 80);
+  assert.equal(d.paidInterest, 20);
+});
+
+test("recordPayment: 一次性还够/超额，直接标记已还，paidAmount封顶在amount(多付不结转)", () => {
+  const d = planDebt([{ date: "2026-08-10", amount: 100, principal: 80, interest: 20, paid: false }]);
+  const res = calc.recordPayment(d, 150, "2026-07-29");
+  assert.equal(res.full, true);
+  assert.equal(d.plan[0].paid, true);
+  assert.equal(d.plan[0].paidAmount, 100); // 不是150
+});
+
+test("recordPayment: 最后一期还清后，跟payInstallment一样自动整体结清债务", () => {
+  const d = planDebt([{ date: "2026-08-10", amount: 100, principal: 100, interest: 0, paid: false }]);
+  const res = calc.recordPayment(d, 100, "2026-07-29");
+  assert.equal(res.full, true);
+  assert.equal(d.settled, true);
+  assert.equal(d.settledDate, "7/29");
+});
+
+test("recordPayment: 已经没有未还期次时返回null", () => {
+  const d = planDebt([{ date: "2026-08-10", amount: 100, principal: 100, interest: 0, paid: true }]);
+  assert.equal(calc.recordPayment(d, 50, "2026-07-29"), null);
+});
+
+test("waivePeriod: 协商减免——不管实付多少都强制关闭这一期，差额自动体现为少算的已还", () => {
+  const d = planDebt([{ date: "2026-08-10", amount: 100, principal: 80, interest: 20, paid: false }]);
+  const res = calc.waivePeriod(d, 40, "2026-07-29");
+  assert.deepEqual(res, { idx: 0 });
+  assert.equal(d.plan[0].paid, true);
+  assert.equal(d.plan[0].paidAt, "2026-07-29");
+  assert.equal(d.plan[0].paidAmount, 40);
+  assert.equal(d.paidPrincipal, 20); // 利息优先分摊：40-20利息=20冲本金
+  assert.equal(d.paidInterest, 20);
+  assert.equal(d.balance, 0); // 减免关闭后不再算进剩余待还
+  assert.equal(d.terms, 0);
+  // 原计划字段不变——差额是"少算的已还"体现出来的，不是把principal/interest本身改小
+  assert.equal(d.plan[0].principal, 80);
+});
+
+test("waivePeriod: 最后一期减免关闭后，整体债务自动结清", () => {
+  const d = planDebt([{ date: "2026-08-10", amount: 100, principal: 80, interest: 20, paid: false }]);
+  calc.waivePeriod(d, 30, "2026-07-29");
+  assert.equal(d.settled, true);
+  assert.equal(d.settledDate, "7/29");
+});
+
+test("waivePeriod: 已经没有未还期次时返回null", () => {
+  const d = planDebt([{ date: "2026-08-10", amount: 100, principal: 100, interest: 0, paid: true }]);
+  assert.equal(calc.waivePeriod(d, 50, "2026-07-29"), null);
 });
 
 // ===== pressureWindowMonths（"未来还款压力"图的窗口长度，2026-07-29）=====
