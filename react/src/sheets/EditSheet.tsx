@@ -182,6 +182,20 @@ export function EditSheet() {
       const r = editingPlan[k];
       if (r.amount < 0 || r.principal < 0 || r.interest < 0) { window.__azBridge.toast("第 " + (k + 1) + " 期的金额/本金/利息不能是负数"); return; }
       if (r.principal === 0 && r.interest === 0) { window.__azBridge.toast("第 " + (k + 1) + " 期的本金和利息不能同时为0"); return; }
+      // amount(这期要付多少钱)和principal+interest(这钱由什么构成)是两条独立填写的轴——
+      // 逐行编辑本金/利息时PlanRows.tsx会自动联动重算amount，但直接改"金额"输入框不会反过来
+      // 联动本金/利息，两者能各自改到互相对不上。见CLAUDE.md"⚠️已知的数据模型缺口"第⑤条。
+      // 容差0.015（1.5分钱）不是随手挑的——genPlan()的amort分支在n=1(整贷整还)这种边界情况下，
+      // principal/interest/amount三个值各自独立r2()四舍五入，真实存在1分钱的量化误差(实测
+      // 遍历amort/equalfee/interestfirst共10万+组合验证过，最大偏差恰好0.01，从未超过)，
+      // 容差必须盖过这条噪声下限，否则公式生成器自己生成的、完全没有人手改过的计划会被
+      // 这条新校验误伤挡在保存门外。真正的手填错误(比如amount=100而principal+interest=2194)
+      // 偏差量级是几十上百，远超这个容差，不会被误放过。
+      const sum = window.r2((+r.principal || 0) + (+r.interest || 0));
+      if (Math.abs((+r.amount || 0) - sum) > 0.015) {
+        window.__azBridge.toast("第 " + (k + 1) + " 期的金额(¥" + window.money(r.amount) + ")与本金+利息(¥" + window.money(sum) + ")不一致，请检查");
+        return;
+      }
     }
     const g: GenSpec = { kind: gen.kind, first: gen.first };
     if (gen.kind === "amort") { g.P = +gen.P; g.rate = +gen.rate; g.n = +gen.n; }

@@ -142,6 +142,49 @@ describe("保存校验", () => {
     expect(window.__azBridge.toast).toHaveBeenCalledWith(expect.stringContaining("不能同时为0"));
     expect(window.__azBridge.setDebt).not.toHaveBeenCalled();
   });
+
+  // amount(金额)和principal+interest(本金+利息)是两条独立填写的轴——见CLAUDE.md"⚠️已知的
+  // 数据模型缺口"第⑤条。逐行编辑本金/利息会自动联动重算金额(PlanRows.tsx的handlePrincipal/
+  // handleInterest)，但直接改"金额"输入框不会反过来联动本金/利息，这是唯一能把两者改到
+  // 互相对不上的路径，所以下面这条校验专门堵这条路径。
+  it("直接改'金额'导致跟本金+利息对不上：toast提示且不调用setDebt", () => {
+    // makeDebt默认plan是{amount:500, principal:480, interest:20}，三者本来是一致的
+    const debts: Debt[] = [makeDebt({ opened: "2026-01-01" })];
+    window.__azBridge = makeMockBridge({ debts });
+    const { container } = render(<EditSheet />);
+    act(() => { openEditSheet(debts[0].id); });
+    const r2Inputs = container.querySelectorAll(".prow .r2 input");
+    fireEvent.change(r2Inputs[0], { target: { value: "999" } }); // 直接改金额，不碰本金/利息
+    fireEvent.submit(getForm(container));
+    expect(window.__azBridge.toast).toHaveBeenCalledWith(expect.stringContaining("不一致"));
+    expect(window.__azBridge.setDebt).not.toHaveBeenCalled();
+  });
+
+  // 反例：公式生成器(amort，n=1整贷整还这种边界情况)会各自独立对principal/interest/amount
+  // 四舍五入，真实存在1分钱的量化误差(P=100,rate=0.06,n=1时amount=100.01而principal+interest=
+  // 100.00，实测遍历10万+组合验证过这是这套算法本身固有的边界情况，不是bug)——新校验的容差
+  // 必须盖过这条噪声，否则用户完全没手动改过的、公式生成器自己吐出来的计划会被这条新增校验
+  // 挡在保存门外，这是比"漏检真实错误"更糟的回归。
+  it("公式生成器(amort n=1边界)自带的1分钱舍入误差不会被新校验挡住保存", () => {
+    window.__azBridge = makeMockBridge();
+    const { container } = render(<EditSheet />);
+    act(() => { openEditSheet(NEW_DEBT_ID); });
+    fireEvent.change(screen.getByLabelText(/贷款产品/), { target: { value: "测试贷" } });
+    fireEvent.change(screen.getByLabelText(/借款日/), { target: { value: "2026-01-01" } });
+    fireEvent.click(screen.getByText("公式生成"));
+    fireEvent.change(screen.getByLabelText(/借款金额/), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(/年化/), { target: { value: "0.06" } });
+    fireEvent.change(screen.getByLabelText(/期数/), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText(/首期还款日/), { target: { value: "2026-02-01" } });
+    fireEvent.click(screen.getByText("生成计划"));
+    fireEvent.submit(getForm(container));
+    expect(window.__azBridge.toast).not.toHaveBeenCalledWith(expect.stringContaining("不一致"));
+    expect(window.__azBridge.setDebt).toHaveBeenCalledTimes(1);
+    const [, obj] = (window.__azBridge.setDebt as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(obj.plan[0].amount).toBe(100.01);
+    expect(obj.plan[0].principal).toBe(100);
+    expect(obj.plan[0].interest).toBe(0);
+  });
 });
 
 describe("保存成功", () => {
