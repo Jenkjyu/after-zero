@@ -657,3 +657,152 @@ test("niceCeil: 取整到好看的刻度数字，档位够细不会把柱子压�
     assert.equal((s * 1000) / 2 % 1, 0, `档位${s}k的一半不是整数`);
   });
 });
+
+// ===== 提前结清 / 撤销结清（applySettle / undoSettle）=====
+// 这两个函数是2026-07-29"零散bug修复轮"第2项的核心：提前结清不再是"只写settled=true"，
+// 而是把剩余期次收进快照、追加一条记录了实付金额的结清行。见 calc.js 里那段长注释。
+function makeDebt(paidCount) {
+  const d = {
+    id: "dtest", name: "测试债务",
+    plan: calc.genPlan({ kind: "amort", P: 12000, rate: 12, n: 12, first: "2026-01-15" }),
+  };
+  calc.markPaidThrough(d.plan, paidCount);
+  calc.recompute(d);
+  return d;
+}
+
+test("applySettle: 实付=剩余本金时，本金全额计入已还、利息为0", () => {
+  const d = makeDebt(3);
+  const remain = d.balance;
+  const paidPrincipalBefore = d.paidPrincipal;
+  const paidInterestBefore = d.paidInterest;
+
+  assert.equal(calc.applySettle(d, remain, "2026-07-29"), true);
+  assert.equal(d.settled, true);
+  assert.equal(d.settledDate, "7/29"); // 已结清列表用的短格式，不是"2026-07-29"
+  assert.equal(d.plan.length, 4);      // 3条已还 + 1条结清行
+  assert.equal(d.plan[3].settleRow, true);
+  assert.equal(d.plan[3].date, "2026-07-29");
+  assert.equal(d.settleStash.length, 9);
+  // 剩余本金整个进了已还本金，利息一分没多
+  assert.equal(d.paidPrincipal, calc.r2(paidPrincipalBefore + remain));
+  assert.equal(d.paidInterest, paidInterestBefore);
+  assert.equal(d.balance, 0);
+  assert.equal(d.terms, 0);
+  // 借款总额不变——结清行的本金恰好补上被收走那些期的本金
+  assert.equal(d.original, makeDebt(3).original);
+});
+
+test("applySettle: 多付的部分记成利息", () => {
+  const d = makeDebt(2);
+  const remain = d.balance;
+  const paidInterestBefore = d.paidInterest;
+  calc.applySettle(d, remain + 125, "2026-07-29");
+  assert.equal(d.plan[d.plan.length - 1].interest, 125);
+  assert.equal(d.paidInterest, calc.r2(paidInterestBefore + 125));
+  assert.equal(d.paidPrincipal, calc.r2(d.original - 0)); // 全部本金都还完了
+});
+
+test("applySettle: 协商减免时利息记负数，本金照实算（两栏加起来=真实付出去的钱）", () => {
+  const d = makeDebt(2);
+  const remain = d.balance;
+  calc.applySettle(d, remain - 100, "2026-07-29");
+  const row = d.plan[d.plan.length - 1];
+  assert.equal(row.principal, remain);
+  assert.equal(row.interest, -100);
+  assert.equal(calc.r2(row.principal + row.interest), calc.r2(remain - 100)); // 总账对得上
+});
+
+test("applySettle: 已经没有未还期次时返回false、不做任何改动", () => {
+  const d = makeDebt(12);
+  const before = JSON.stringify(d.plan);
+  assert.equal(calc.applySettle(d, 100, "2026-07-29"), false);
+  assert.equal(JSON.stringify(d.plan), before);
+  assert.equal(d.settleStash, undefined);
+});
+
+test("applySettle: 年化利率仍按原始完整计划反推，不被结清行带偏", () => {
+  const d = makeDebt(3);
+  const rateBefore = d.rate;
+  calc.applySettle(d, d.balance + 500, "2026-07-29");
+  assert.equal(d.rate, rateBefore);
+  // 再recompute一次(模拟reload时normalize走一遍)也要稳定，不能每次算出不同的值
+  calc.recompute(d);
+  assert.equal(d.rate, rateBefore);
+});
+
+test("undoSettle: 提前结清后撤销，精确回到结清前那一刻", () => {
+  const before = makeDebt(3);
+  const d = makeDebt(3);
+  calc.applySettle(d, d.balance + 300, "2026-07-29");
+  calc.undoSettle(d);
+
+  assert.equal(d.settled, false);
+  assert.equal(d.settleStash, undefined);
+  assert.equal(d.plan.length, 12);
+  assert.equal(d.plan.some((r) => r.settleRow), false);
+  assert.equal(d.balance, before.balance);
+  assert.equal(d.paidPrincipal, before.paidPrincipal);
+  assert.equal(d.paidInterest, before.paidInterest);
+  assert.equal(d.terms, before.terms);
+  assert.equal(d.nextDate, before.nextDate);
+  assert.deepEqual(d.plan, before.plan);
+});
+
+test("undoSettle: 销完最后一期自动结清的债务，恢复后不能留下待还¥0的僵尸", () => {
+  // 真机报的bug：只有1期的债务销掉那一期→自动结清→点"恢复"→挂在在还列表里但剩余待还是0
+  const d = { id: "d1", name: "一次性", oneTime: true, plan: [{ date: "2026-07-01", amount: 100, principal: 100, interest: 0, paid: true }] };
+  d.settled = true; d.settledDate = "7/1";
+  calc.recompute(d);
+  assert.equal(d.balance, 0); // 结清状态下确实是0
+
+  calc.undoSettle(d);
+  assert.equal(d.settled, false);
+  assert.equal(d.plan[0].paid, false); // 最后一期的已还标记被释放了
+  assert.equal(d.balance, 100);        // 恢复成"还有100没还"，不再是僵尸
+  assert.equal(d.terms, 1);
+});
+
+test("undoSettle: 多期债务销完最后一期后恢复，只释放最后一期(原来已还几期还是几期)", () => {
+  const d = makeDebt(12); // 12期全部已还
+  d.settled = true; d.settledDate = "7/29";
+  calc.undoSettle(d);
+  assert.equal(d.paidTerms, 11); // 只放开了最后一期
+  assert.equal(d.terms, 1);
+  assert.equal(d.plan[10].paid, true);
+  assert.equal(d.plan[11].paid, false);
+});
+
+// ===== pressureWindowMonths（"未来还款压力"图的窗口长度，2026-07-29）=====
+test("pressureWindowMonths: 铺到最后一笔未还期次所在的月份，下限12上限60", () => {
+  const today = new Date(2026, 6, 15); // 2026-07-15
+  const mk = (dates, extra) => Object.assign({
+    id: "d", plan: dates.map((dt) => ({ date: dt, amount: 100, principal: 100, interest: 0, paid: false })),
+  }, extra || {});
+
+  // 没有任何未还期次 → 兜底12
+  assert.equal(calc.pressureWindowMonths([], today), 12);
+  assert.equal(calc.pressureWindowMonths([mk([])], today), 12);
+
+  // 最后一期在3个月后 → 不足12，仍取下限12
+  assert.equal(calc.pressureWindowMonths([mk(["2026-10-10"])], today), 12);
+
+  // 最后一期在2028-07 → 2026-07到2028-07共25个月
+  assert.equal(calc.pressureWindowMonths([mk(["2028-07-01"])], today), 25);
+
+  // 超过5年 → 钳到60
+  assert.equal(calc.pressureWindowMonths([mk(["2040-01-01"])], today), 60);
+
+  // 已结清的债务不参与
+  assert.equal(calc.pressureWindowMonths([mk(["2030-01-01"], { settled: true })], today), 12);
+
+  // 已还的期次不参与；逾期(日期在今天之前)也不参与——它在图里是单独一条提示行
+  const paidLate = { id: "d", plan: [
+    { date: "2030-01-01", amount: 100, principal: 100, interest: 0, paid: true },
+    { date: "2026-01-01", amount: 100, principal: 100, interest: 0, paid: false },
+  ] };
+  assert.equal(calc.pressureWindowMonths([paidLate], today), 12);
+
+  // 多笔债务取最晚的那个
+  assert.equal(calc.pressureWindowMonths([mk(["2027-01-05"]), mk(["2027-07-05"])], today), 13);
+});

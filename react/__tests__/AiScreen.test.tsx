@@ -43,6 +43,40 @@ describe("AiScreen", () => {
     expect(screen.getByText("这是分析报告")).toBeInTheDocument();
   });
 
+  // 真机bug回归(2026-07-29)：发出消息后、AI回复到达之前，两个气泡短暂"挤在中间"，
+  // "思考中"三个字被压成竖排，等长回复到了才各自回到两侧。根因在CSS(.ai-thread在
+  // flex-column父容器里带margin:0 auto，交叉轴auto margin取消了stretch，宽度退化成
+  // fit-content)，已经在www/index.html里补了width:100%。
+  // ⚠️jsdom不做布局，这条测试锁不住那个CSS属性本身，它锁的是**另一半契约**：靠左/靠右
+  // 完全由.ai-msg上的user/bot两个类决定，而这两个类从消息发出的第一帧起就必须是对的
+  // (不是等回复回来才补上)。真正的视觉验证只能靠Playwright/真机截图。
+  it("消息发出的那一刻，用户气泡和思考中气泡就已经带上正确的左右类名", async () => {
+    const bridge = makeMockBridge();
+    let resolveReply: (v: string) => void = () => {};
+    bridge.callAiAdvisor = vi.fn(() => new Promise<string>((res) => { resolveReply = res; }));
+    window.__azBridge = bridge;
+    const { container } = render(<AiScreen />);
+    act(() => { openAiScreen(); });
+    await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
+
+    // 还在等回复的这一刻
+    const pendingMsgs = container.querySelectorAll(".ai-msg");
+    expect(pendingMsgs.length).toBe(2);
+    expect(pendingMsgs[0]).toHaveClass("user");   // 用户那条靠右
+    expect(pendingMsgs[1]).toHaveClass("bot");    // 思考中那条靠左
+    expect(pendingMsgs[1]).toHaveClass("pending");
+    expect(pendingMsgs[1].textContent).toContain("思考中");
+
+    // 回复到达后，占位气泡原地换成真实回复，类名不变(依然靠左)
+    await act(async () => { resolveReply("先还利率最高的那笔"); });
+    const doneMsgs = container.querySelectorAll(".ai-msg");
+    expect(doneMsgs.length).toBe(2);
+    expect(doneMsgs[0]).toHaveClass("user");
+    expect(doneMsgs[1]).toHaveClass("bot");
+    expect(doneMsgs[1]).not.toHaveClass("pending");
+    expect(doneMsgs[1].textContent).toContain("先还利率最高的那笔");
+  });
+
   it("点常见问题芯片：以chat模式发送对应问题", async () => {
     const bridge = makeMockBridge();
     bridge.callAiAdvisor = vi.fn(() => Promise.resolve("先还利率最高的那笔"));

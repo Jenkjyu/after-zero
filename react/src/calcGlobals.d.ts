@@ -43,6 +43,7 @@ declare global {
     // 统计tab"未来N个月还款压力"柱状图(PressureChart.tsx)用——按active过滤、逾期单独成桶、
     // 窗口从当前月起固定N个月、拆本金/利息两段，见calc.js注释。today参数只为可测，正常不传。
     computeUpcomingPressure(debts: Debt[], monthsAhead?: number, today?: Date): UpcomingPressure;
+    pressureWindowMonths(debts: Debt[], today?: Date): number;
     // 一笔债务按现有计划还到底还要再付多少利息/手续费(未还期次的interest之和)——BalanceBars的
     // "按剩余利息排序"和总结卡的合计用。自定义计划没拆本息时会低估成0，见calc.js注释。
     remainingInterest(d: Debt): number;

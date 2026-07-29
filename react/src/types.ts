@@ -5,6 +5,10 @@ export interface PlanRow {
   principal: number;
   interest: number;
   paid: boolean;
+  // 提前结清时追加的那一条"真实结清记录"(calc.js applySettle())，不是原计划里的期次：
+  // principal=当时的剩余本金、interest=实付金额减剩余本金(多付记正、协商减免记负)。
+  // 详情页的还款计划表靠这个标记把期次号显示成"结清"而不是"n/m"。
+  settleRow?: boolean;
 }
 
 // 公式生成器4种计息方式共用的spec形状(genPlan(spec)的入参，calc.js里定义)——react/src/sheets/
@@ -40,6 +44,9 @@ export interface Debt {
   gen?: GenSpec;
   settled?: boolean;
   settledDate?: string;
+  // 提前结清时被整体收走的剩余未还期次(calc.js applySettle())。点"恢复"时原样放回
+  // (undoSettle())，所以撤销结清能精确回到结清前那一刻。没提前结清过的债务没有这个字段。
+  settleStash?: PlanRow[];
   // recompute() 派生字段，只读——不要在React这边手写覆盖，一律通过vanilla桥接的commitReorder
   // 之类的写路径改动debts数组本身，再等az:state-changed事件回来重新读。
   original: number | null;
@@ -213,13 +220,13 @@ export interface AzBridge {
   // Omit<Debt,"id">——id永远由vanilla赋值/保留，React这边保存时不该也不需要造一个id出来。
   // deleteDebt是原样暴露的既有vanilla函数(自带ask()确认+splice+saveAll+renderAll)。toast是
   // #flash单例的简单passthrough。confirmAsync是vanilla共享确认弹窗ask()的Promise外壳——
-  // opts.month有值时确认返回选中的月份字符串、取消返回null；没有opts.month时确认返回true、
-  // 取消返回false。特意复用这一份弹窗UI而不是在React里另建一套，见CLAUDE.md"React 迁移"
+  // 带输入控件时(month日期月份/date日期/amount金额，三者互斥)确认返回输入框的字符串值、
+  // 取消返回null；不带输入控件时确认返回true、取消返回false。特意复用这一份弹窗UI而不是在React里另建一套，见CLAUDE.md"React 迁移"
   // 一节"第六步"。
   setDebt(id: string | null, obj: Omit<Debt, "id">): void;
   deleteDebt(id: string): void;
   toast(msg: string): void;
-  confirmAsync(title: string, body: string, opts?: { month?: string }): Promise<string | boolean | null>;
+  confirmAsync(title: string, body: string, opts?: { month?: string; date?: string; dateMin?: string; amount?: number; amountHint?: string }): Promise<string | boolean | null>;
   // 第七步(accountScreen/premiumScreen)新增：这三个都是真实的cloud/native调用或者共享状态
   // 变更，不能重写成纯React——wxLogout()清本地账号态+CloudBase signOut；deleteAccount()调
   // deleteAccount云函数(不信任客户端参数，身份来自已认证会话)；redeemCode(code)查

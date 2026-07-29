@@ -1,6 +1,8 @@
-// 共享手势逻辑——被 MonthlyChart.tsx（下一步）和 PayoffLine.tsx（本文件下方升级）共用，
-// 两者是同一类图表（连续时间序列，"读不准确切值"是真实痛点），照抄两遍Touch Events手势
-// 基础设施是这个项目一直避免的重复劳动。
+// 连续时间序列图的press+drag scrub手势。**当前唯一的消费者是 PayoffLine.tsx**——
+// 当初是给它和 MonthlyChart.tsx 两张图共用而抽出来的，MonthlyChart已删除，接替它的
+// PressureChart 在2026-07-29改成了"横向滚动看更多月份 + 点柱子读数"，横滑让给了原生
+// 滚动，不能再叠一层拦截滚动的scrub(两者会直接打架)，所以它不用这个文件。
+// 保留这份抽象是因为它依然是"连续序列图怎么读精确值"的标准答案，以后再加同类图表直接复用。
 //
 // ⚠️必须用原生Touch Events + {passive:false}，不能用JSX的onTouchMove——React合成触摸事件
 // 默认passive，preventDefault()不会真正阻止原生滚动，这是这个项目反复踩过的坑（见CLAUDE.md

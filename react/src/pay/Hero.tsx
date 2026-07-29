@@ -44,7 +44,7 @@ export function Hero({ soonest, notifyEnabled, onBellClick }: HeroProps) {
       </div>
     );
   }
-  const { d, next, diff } = soonest;
+  const { d, next, diff, amount } = soonest;
   return (
     <div className={"pay-hero " + window.urgencyTier(diff)}>
       <div className="pay-hero-top">
@@ -56,7 +56,7 @@ export function Hero({ soonest, notifyEnabled, onBellClick }: HeroProps) {
           <span className="pay-hero-daynum num">{next.getMonth() + 1}月{next.getDate()}日</span>
           <span className="pay-hero-rel">{window.relLabel(diff)}</span>
         </div>
-        <div className="pay-hero-amt num">¥{window.fmt(d.monthly)}</div>
+        <div className="pay-hero-amt num">¥{window.fmt(amount)}</div>
       </div>
       <div className="pay-hero-name">{d.name}</div>
     </div>

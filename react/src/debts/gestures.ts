@@ -11,9 +11,18 @@
 import type { Debt } from "../types";
 import type { MutableRefObject } from "react";
 
-export const DEBT_REVEAL = 92;
+export const DEBT_REVEAL = 76;
 const JIGGLE_EDGE = 60;
 const JIGGLE_MAXSPD = 14;
+// 已经在抖动编辑模式里时，"按住不动"再多等这么久就当成"长按退出编辑模式"(等同点"保存")。
+// 时间从拖拽真正开始(dragDelay的120ms)之后再算，所以从手指落下到退出总共约570ms。
+// 为什么要用第二段计时而不是直接把dragDelay拉长：编辑模式下"按住就能拖"是主操作，不能为了
+// 让路给退出手势而让每次拖拽都先等半秒；分成两段之后，想拖的人一动就取消退出计时(见moved)，
+// 想退出的人按住别动即可，两个手势互不打扰。
+const JIGGLE_EXIT_HOLD = 450;
+// 判定"按住没动"的位移容差——手指静止时的自然抖动通常在几px内，8px比拖拽判定的10px阈值
+// 略小，保证"稍微动一点就算想拖、不算想退出"。
+const JIGGLE_EXIT_SLOP = 8;
 
 interface DragCtx {
   el: HTMLElement;
@@ -41,6 +50,9 @@ export interface GestureCtx {
   jiggleModeRef: MutableRefObject<boolean>;
   openSwipeRowRef: MutableRefObject<HTMLElement | null>;
   enterJiggle: () => void;
+  // 长按退出编辑模式用(等同点"保存")。DebtList里的实现会先finishDrag(ctx,false)丢弃
+  // 这次没提交的拖拽、再setJiggleMode(false)。
+  exitJiggle: () => void;
   onCommitReorder: (newOrder: Debt[]) => void;
 }
 
@@ -166,7 +178,11 @@ export function onCardTouchStart(e: TouchEvent, el: HTMLElement, row: HTMLElemen
   const t0 = e.touches[0];
   const sx = t0.clientX, sy = t0.clientY, id = t0.identifier;
   let timer: ReturnType<typeof setTimeout>;
-  let active = false, swiping = false;
+  let holdTimer: ReturnType<typeof setTimeout> | undefined;
+  let active = false, swiping = false, moved = false;
+  // 手指落下这一刻是不是已经在编辑模式里——决定这次长按是"进入"还是"退出"。
+  // 必须在这里快照，不能等timer回调里再读ctx.jiggleModeRef(那时可能已经被自己改掉了)。
+  const wasJiggling = ctx.jiggleModeRef.current;
   const swipeBase = row.dataset.open === "1" ? -DEBT_REVEAL : 0;
 
   function tOf(ev: TouchEvent) {
@@ -179,6 +195,10 @@ export function onCardTouchStart(e: TouchEvent, el: HTMLElement, row: HTMLElemen
     if (active) {
       if (!ctx.dragCtxRef.current) { cleanup(); return; }
       ev.preventDefault();
+      // 一动就取消"长按退出"计时：这次手势的意图是拖动排序，不是退出编辑模式。
+      if (!moved && (Math.abs(t.clientX - sx) > JIGGLE_EXIT_SLOP || Math.abs(t.clientY - sy) > JIGGLE_EXIT_SLOP)) {
+        moved = true; clearTimeout(holdTimer);
+      }
       ctx.dragCtxRef.current.lastClientY = t.clientY;
       applyDragFrame(ctx);
       return;
@@ -208,6 +228,7 @@ export function onCardTouchStart(e: TouchEvent, el: HTMLElement, row: HTMLElemen
   }
   function cleanup() {
     clearTimeout(timer);
+    clearTimeout(holdTimer);
     el.removeEventListener("touchmove", onMove as EventListener);
     el.removeEventListener("touchend", onEnd as EventListener);
     el.removeEventListener("touchcancel", onCancel as EventListener);
@@ -215,9 +236,21 @@ export function onCardTouchStart(e: TouchEvent, el: HTMLElement, row: HTMLElemen
   timer = setTimeout(() => {
     if (swiping) return;
     active = true;
-    if (!ctx.jiggleModeRef.current) ctx.enterJiggle();
+    if (!wasJiggling) ctx.enterJiggle();
     beginDrag(ctx, el, sy);
+    if (wasJiggling) holdTimer = setTimeout(exitByHold, JIGGLE_EXIT_HOLD);
   }, dragDelay(ctx.jiggleModeRef));
+  // 已在编辑模式里、按住又一直没动 → 当成"长按退出"，等同点"保存"。
+  // ⚠️必须把__justDragged标成true：这次手势全程零位移，浏览器松手时**会**补发一个click，
+  // 不拦的话DebtCard的click监听器会顺手把这笔债务的详情窗打开(退出编辑模式的同时弹出详情，
+  // 明显不是用户想要的)。这跟"还款日左滑"当年那条教训是同一类问题的反面：那次是带位移的
+  // 拖拽**不会**补发click导致标记位永远清不掉，这次是零位移**会**补发所以必须主动设上。
+  function exitByHold() {
+    if (moved || !ctx.dragCtxRef.current) return;
+    (row as CardEl & { __justDragged?: boolean }).__justDragged = true;
+    ctx.exitJiggle();
+    cleanup();
+  }
   el.addEventListener("touchmove", onMove as EventListener, { passive: false });
   el.addEventListener("touchend", onEnd as EventListener);
   el.addEventListener("touchcancel", onCancel as EventListener);
@@ -230,12 +263,20 @@ export function onCardPointerDown(e: PointerEvent, el: HTMLElement, row: HTMLEle
   (row as CardEl & { __justDragged?: boolean }).__justDragged = false;
   const sx = e.clientX, sy = e.clientY, pid = e.pointerId;
   let timer: ReturnType<typeof setTimeout>;
-  let active = false, swiping = false;
+  let holdTimer: ReturnType<typeof setTimeout> | undefined;
+  let active = false, swiping = false, moved = false;
+  const wasJiggling = ctx.jiggleModeRef.current;
   const swipeBase = row.dataset.open === "1" ? -DEBT_REVEAL : 0;
 
   function onMove(ev: PointerEvent) {
     if (ev.pointerId !== pid) return;
-    if (active) { if (ctx.dragCtxRef.current) { ctx.dragCtxRef.current.lastClientY = ev.clientY; applyDragFrame(ctx); } return; }
+    if (active) {
+      if (!moved && (Math.abs(ev.clientX - sx) > JIGGLE_EXIT_SLOP || Math.abs(ev.clientY - sy) > JIGGLE_EXIT_SLOP)) {
+        moved = true; clearTimeout(holdTimer);
+      }
+      if (ctx.dragCtxRef.current) { ctx.dragCtxRef.current.lastClientY = ev.clientY; applyDragFrame(ctx); }
+      return;
+    }
     if (swiping) {
       row.style.transition = "none";
       row.style.transform = "translateX(" + Math.min(0, Math.max(-DEBT_REVEAL, swipeBase + (ev.clientX - sx))) + "px)";
@@ -259,6 +300,7 @@ export function onCardPointerDown(e: PointerEvent, el: HTMLElement, row: HTMLEle
   }
   function cleanup() {
     clearTimeout(timer);
+    clearTimeout(holdTimer);
     el.removeEventListener("pointermove", onMove as EventListener);
     el.removeEventListener("pointerup", onUp as EventListener);
     el.removeEventListener("pointercancel", onCancelP as EventListener);
@@ -266,9 +308,17 @@ export function onCardPointerDown(e: PointerEvent, el: HTMLElement, row: HTMLEle
   timer = setTimeout(() => {
     if (swiping) return;
     active = true;
-    if (!ctx.jiggleModeRef.current) ctx.enterJiggle();
+    if (!wasJiggling) ctx.enterJiggle();
     beginDrag(ctx, el, sy);
+    if (wasJiggling) holdTimer = setTimeout(exitByHold, JIGGLE_EXIT_HOLD);
   }, dragDelay(ctx.jiggleModeRef));
+  // 同touch分支：已在编辑模式里按住不动 → 退出编辑模式，并拦掉随后补发的click。
+  function exitByHold() {
+    if (moved || !ctx.dragCtxRef.current) return;
+    (row as CardEl & { __justDragged?: boolean }).__justDragged = true;
+    ctx.exitJiggle();
+    cleanup();
+  }
   el.addEventListener("pointermove", onMove as EventListener);
   el.addEventListener("pointerup", onUp as EventListener);
   el.addEventListener("pointercancel", onCancelP as EventListener);

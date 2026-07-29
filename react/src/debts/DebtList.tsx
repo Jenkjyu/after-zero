@@ -12,9 +12,11 @@ import type { GestureCtx } from "./gestures";
 import { closeDebtSwipe, finishDrag } from "./gestures";
 import { DebtCard } from "./DebtCard";
 import { SettledList } from "./SettledList";
+import { SortSheet } from "./SortSheet";
+import type { SortOption } from "./SortSheet";
 import { NEW_DEBT_ID, openEditSheet } from "../shared/state";
 
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+const SORT_OPTIONS: SortOption[] = [
   { value: "rate-desc", label: "利率 高→低" },
   { value: "rate-asc", label: "利率 低→高" },
   { value: "orig-desc", label: "借款金额 高→低" },
@@ -35,6 +37,11 @@ export interface DebtListProps {
 export function DebtList({ debts }: DebtListProps) {
   const [sort, setSort] = useDebtSort();
   const [jiggleMode, setJiggleMode] = useState(false);
+  const [sortSheetOpen, setSortSheetOpen] = useState(false);
+  // 返回键链要读到最新的开关状态，但那个回调只注册一次(见下面的useEffect)，闭包捕获的
+  // state会永远停在false——所以这里跟jiggleModeRef同一个处理方式，额外挂一个ref。
+  const sortSheetOpenRef = useRef(sortSheetOpen);
+  useEffect(() => { sortSheetOpenRef.current = sortSheetOpen; }, [sortSheetOpen]);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const dragCtxRef = useRef<GestureCtx["dragCtxRef"]["current"]>(null);
@@ -74,7 +81,7 @@ export function DebtList({ debts }: DebtListProps) {
   // 所以可以只建一次，不用在每次依赖变化时重建——这样DebtCard里"只attach一次"的手势监听器
   // effect捕获的ctx永远是同一个对象，不会有闭包过期的风险。
   const ctx: GestureCtx = useMemo(
-    () => ({ containerRef, dragCtxRef, jiggleModeRef, openSwipeRowRef, enterJiggle, onCommitReorder }),
+    () => ({ containerRef, dragCtxRef, jiggleModeRef, openSwipeRowRef, enterJiggle, exitJiggle, onCommitReorder }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
@@ -101,6 +108,8 @@ export function DebtList({ debts }: DebtListProps) {
   // 由vanilla继续往下判断别的浮层。
   useEffect(() => {
     window.__azDebtsBack = function () {
+      // "最上层先关"：排序面板是盖在债务列表之上的sheet，比编辑模式更靠上，先判它。
+      if (sortSheetOpenRef.current) { setSortSheetOpen(false); return true; }
       if (!ctx.jiggleModeRef.current) return false;
       exitJiggle();
       return true;
@@ -108,6 +117,10 @@ export function DebtList({ debts }: DebtListProps) {
     return () => { delete window.__azDebtsBack; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 存进localStorage的排序键理论上可能是个已经不在选项表里的旧值(手改过、或者以后删过某个
+   // 预设)，兜底显示成第一项而不是空白按钮。
+  const currentSortLabel = (SORT_OPTIONS.find((o) => o.value === sort) || SORT_OPTIONS[0]).label;
 
   const active = debts.filter((d) => window.isActive(d));
   const settled = debts.filter((d) => !!d.settled);
@@ -123,17 +136,29 @@ export function DebtList({ debts }: DebtListProps) {
         <span>在还债务</span>
         <div className="sort-controls">
           <button type="button" id="jiggleDoneBtn" className="jiggle-done-btn" onClick={exitJiggle}>保存</button>
-          <select
+          <button
+            type="button"
             id="debtSortSel"
             className="sort-sel"
-            value={sort}
             disabled={jiggleMode}
-            onChange={(e) => setSort(e.target.value as SortKey)}
+            aria-haspopup="dialog"
+            aria-expanded={sortSheetOpen}
+            onClick={() => setSortSheetOpen(true)}
           >
-            {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+            <span>{currentSortLabel}</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
         </div>
       </div>
+      <SortSheet
+        open={sortSheetOpen}
+        value={sort}
+        options={SORT_OPTIONS}
+        onPick={setSort}
+        onClose={() => setSortSheetOpen(false)}
+      />
       <div className="debt-hint">长按卡片可拖动排序</div>
       <div id="debtList" ref={containerRef}>
         {sorted.map((d) => (

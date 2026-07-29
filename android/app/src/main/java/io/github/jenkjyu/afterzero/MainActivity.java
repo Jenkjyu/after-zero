@@ -41,6 +41,15 @@ public class MainActivity extends BridgeActivity {
         // 这里直接关掉WebView这个View的触感反馈能力，从源头上摁住震动。
         bridge.getWebView().setHapticFeedbackEnabled(false);
 
+        // 页面滚到顶/滚到底之后继续滑，不要再有"拉扯"回弹。安卓12+的WebView默认overscroll
+        // 效果是stretch(整个渲染表面被拉伸)，真机上连position:fixed的tabbar都会跟着一起被
+        // 拽走，观感像是整个App被拖动了。
+        // ⚠️这里跟www/index.html里的"html,body{overscroll-behavior-y:none}"是两层独立的开关，
+        // 两层都要有：CSS那层管的是"文档滚动容器要不要产生overscroll事件"，这里OVER_SCROLL_NEVER
+        // 管的是"WebView这个原生View自己要不要画overscroll效果"——只关一层，另一层在某些
+        // 机型/WebView版本上依然会把拉伸效果画出来。
+        bridge.getWebView().setOverScrollMode(android.view.View.OVER_SCROLL_NEVER);
+
         // targetSdkVersion 36：安卓的手势/预测性返回走的是 OnBackPressedDispatcher，
         // 不再可靠地触发老式 Activity.onBackPressed() 覆写，所以用新API接管返回键。
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {

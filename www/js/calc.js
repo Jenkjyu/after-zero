@@ -74,7 +74,67 @@ function recompute(d) {
   var next = null; for (var k = 0; k < plan.length; k++) { if (!plan[k].paid) { next = plan[k]; break; } }
   d.monthly = next ? (+next.amount || 0) : 0;
   d.nextDate = next ? next.date : null;
-  d.rate = impliedAPR(plan);
+  // 提前结清过的债务(见下面applySettle)：年化要用"原始完整计划"(已还期次 + 快照里被收走的
+  // 剩余期次)反推，不能用当前这份带结清行的plan——结清行是一笔大额一次性支付，混进IRR会
+  // 算出一个跟这笔债务原本利率毫无关系的数字，详情页上会显示成一个明显错误的年化。
+  // 这样写还有个好处：它是从d自己的字段推出来的，每次reload重新recompute都能自愈，
+  // 不需要把"结清前的利率"另存一个字段再想办法保持同步。
+  var ratePlan = plan;
+  if (d.settleStash && d.settleStash.length) {
+    ratePlan = plan.filter(function (r) { return !r.settleRow; }).concat(d.settleStash);
+  }
+  d.rate = impliedAPR(ratePlan);
+}
+
+// ===== 提前结清 / 撤销结清 =====
+// ⚠️这里刻意**不是**"把每一期都打勾已还"。那个做法有个死结：未来那些期原本的利息会被
+// 算进d.paidInterest，而提前结清现实中恰恰是免掉未来利息的——统计页会显示你多付了一笔
+// 根本没发生的利息。改成把它记成一次真实发生的还款事件：剩余未还期次整体移进d.settleStash，
+// plan末尾追加一条 {principal: 剩余本金P, interest: 实付X - P} 的结清行(settleRow:true)。
+// · 已还本金 +P —— 这P确实被还掉了，归零进度该往前走
+// · 已还利息 +(X-P) —— X>P 是多付的手续费/违约金；X<P 是协商减免，记**负数**，
+//   这样"本金+利息"两栏加起来恰好等于真实付出去的X，总账不会对不上
+// · 详情页的还款计划表一眼看得出"这笔是被一次性结清掉的、花了多少钱"，而不是伪装成每期
+//   都按原计划按时还了(那是往用户自己的账里写假数据)
+// undoSettle()把快照原样放回、删掉结清行，完全回到结清前那一刻，一期不多一期不少。
+// todayString是**计划行格式**的日期("YYYY-MM-DD")，因为它要当成plan里一条真实期次的date
+// 用；而d.settledDate沿用的是已结清列表一直在显示的短格式("M/D"，payInstallment那条
+// 自动结清路径用的todayStr()就是这个格式)，这里从todayString切出来而不是再传一个参数，
+// 保证两者永远指向同一天、也不会让调用方有机会传成两个不同的日子。
+function applySettle(d, paidAmount, todayString) {
+  var plan = d.plan || [];
+  var kept = [], stash = [], remainP = 0;
+  plan.forEach(function (r) {
+    if (r.paid) kept.push(r);
+    else { stash.push(r); remainP += +r.principal || 0; }
+  });
+  if (!stash.length) return false;
+  remainP = r2(remainP);
+  var x = r2(paidAmount);
+  kept.push({ date: todayString, amount: x, principal: remainP, interest: r2(x - remainP), paid: true, settleRow: true });
+  d.settleStash = stash;
+  d.plan = kept;
+  d.settled = true;
+  d.settledDate = (+todayString.slice(5, 7)) + "/" + (+todayString.slice(8, 10));
+  recompute(d);
+  return true;
+}
+function undoSettle(d) {
+  var plan = d.plan || [];
+  d.settled = false;
+  d.settledDate = "";
+  if (d.settleStash && d.settleStash.length) {
+    d.plan = plan.filter(function (r) { return !r.settleRow; }).concat(d.settleStash);
+    delete d.settleStash;
+  } else {
+    // 另一条结清路径：销掉最后一期后plan全部paid、d.terms归0，debt被自动标记成已结清。
+    // 这种情况下只清settled标记会留下一条"每期都已还、剩余待还¥0"的僵尸债务挂在在还列表里
+    // (真机实测到的bug)——"恢复"的语义是撤销"让它结清的那一步"，所以最后一期的已还标记
+    // 也要一并释放，让它回到"还剩1期没还"的状态。
+    var hasUnpaid = plan.some(function (r) { return !r.paid; });
+    if (!hasUnpaid && plan.length) plan[plan.length - 1].paid = false;
+  }
+  recompute(d);
 }
 function markPaidThrough(plan, n) { for (var k = 0; k < plan.length; k++) plan[k].paid = k < n; }
 // 债务对象的稳定id——创建时生成一次，往后不变。前缀"d"专属债务(备份用"b"/上传用"u"/AI对话
@@ -334,6 +394,28 @@ function computeUpcomingPressure(debts, monthsAhead, today) {
   };
 }
 
+// "未来还款压力"图要铺多少个月——铺到最后一笔未还期次所在的那个月为止。
+// 下限12个月：窗口太短会让图退化成两三根柱子，看不出"哪个月最难过"这件事。
+// 上限60个月(5年)：再长横向滚动也没人看得完，而且这个App记的债务基本都在5年内；
+// 真有超过5年的，前60个月已经足够回答"接下来哪段时间最紧"这个问题。
+// 逾期期次(日期已经在今天之前)不参与——它们在图里是单独一条提示行，不占月份桶。
+function pressureWindowMonths(debts, today) {
+  var t0 = today ? new Date(today.getFullYear(), today.getMonth(), today.getDate()) : today0();
+  var todayKey = fmtDate(t0), last = null;
+  (debts || []).forEach(function (d) {
+    if (d.settled) return;
+    (d.plan || []).forEach(function (r) {
+      if (r.paid) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date || "")) return;
+      if (r.date < todayKey) return;
+      if (!last || r.date > last) last = r.date;
+    });
+  });
+  if (!last) return 12;
+  var n = (+last.slice(0, 4) - t0.getFullYear()) * 12 + (+last.slice(5, 7) - (t0.getMonth() + 1)) + 1;
+  return Math.max(12, Math.min(60, n));
+}
+
 // 一笔债务按现有还款计划"还到底还要再付多少利息/手续费"——未还期次的 interest 之和。
 // 统计tab用在两个地方：BalanceBars 的"按剩余利息排序"、以及底部总结卡的"剩余待付利息"合计。
 // ⚠️这个数字对 amort/equalfee/interestfirst 三种生成方式都可靠(它们都会逐期写 interest)，
@@ -382,11 +464,12 @@ if (typeof module !== "undefined" && module.exports) {
     pad: pad, parseDate: parseDate, addMonths: addMonths, fmtDate: fmtDate, today0: today0,
     rateClass: rateClass, isActive: isActive, genPlan: genPlan, npv: npv, impliedAPR: impliedAPR,
     recompute: recompute, markPaidThrough: markPaidThrough, normalize: normalize, genDebtId: genDebtId,
+    applySettle: applySettle, undoSettle: undoSettle,
     amortForward: amortForward, simulatePrepay: simulatePrepay, detectMatchingSort: detectMatchingSort,
     urgencyTier: urgencyTier, relLabel: relLabel, dueBucket: dueBucket,
     isBadRepeatDay: isBadRepeatDay, offsetLabel: offsetLabel, computeReportData: computeReportData, summarizeDebts: summarizeDebts,
     computeMonthlyRepayment: computeMonthlyRepayment, computeUpcomingPressure: computeUpcomingPressure,
-    remainingInterest: remainingInterest, niceCeil: niceCeil,
+    remainingInterest: remainingInterest, niceCeil: niceCeil, pressureWindowMonths: pressureWindowMonths,
     esc: esc, inline: inline, isHr: isHr, mdToHtml: mdToHtml, escSvg: escSvg, truncateLabel: truncateLabel,
     hasPremium: hasPremium, premiumLabel: premiumLabel, findAiConv: findAiConv, bumpAiConvTop: bumpAiConvTop
   };

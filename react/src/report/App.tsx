@@ -20,7 +20,12 @@ export function App() {
   const debts = useDebts();
   const premium = usePremium();
   const data = useMemo(() => window.computeReportData(debts), [debts]);
-  const pressure = useMemo(() => window.computeUpcomingPressure(debts, 12), [debts]);
+  // 窗口长度不再写死12——铺到最后一笔未还期次所在的月份(下限12/上限60，见calc.js的
+  // pressureWindowMonths)，装不下的部分由图表内部横向滚动。
+  const pressure = useMemo(
+    () => window.computeUpcomingPressure(debts, window.pressureWindowMonths(debts)),
+    [debts]
+  );
 
   return (
     <>

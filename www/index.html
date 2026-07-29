@@ -68,12 +68,27 @@
      (弹出选中手柄+复制菜单)，我们自己JS写的长按拖拽排序逻辑根本收不到后续的
      pointermove，表现就是"长按之后卡片压根拖不动"。user-select是继承属性，
      这里在body上关一次，除了input/textarea，全站(含SVG文字)都会跟着继承关闭。 */
+  /* 到顶/到底之后继续滑不要再有"拉扯"回弹——安卓12+的WebView默认是stretch overscroll，
+     它拉伸的是整个渲染表面，连position:fixed的tabbar都会跟着一起被拽走(真机实测)。
+     overscroll-behavior-y:none关掉根滚动容器这个效果；内部自己滚动的容器(.sheet/.subpage/
+     .ai-thread等)用contain，既不产生自己的拉扯、也不把滚动链传给底下的页面。
+     ⚠️只写CSS不够，原生那边还配了WebView.setOverScrollMode(OVER_SCROLL_NEVER)兜底，
+     见MainActivity.java——两层都要有，别只改一处。 */
+  html, body { overscroll-behavior-y: none; }
   body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-ui); line-height: 1.5; -webkit-font-smoothing: antialiased;
     -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
   input, textarea { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
   .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+  /* 安卓WebView默认会给"可点击元素"画一层半透明蓝色的点按高亮。原来只在button上关掉它，
+     结果每新增一个可点击的<div>(债务卡片、档案库文件行、AI历史对话行……)就要单独补一次，
+     漏了就是"长按/点击时闪一下蓝底"——这个bug在真机上已经被报过三轮了。
+     ⚠️-webkit-tap-highlight-color是**继承属性**，在body上设一次就覆盖全站所有后代，
+     不需要逐个class去补。下面button/.debt那几处保留着是无害的冗余(也顺便说明意图)。
+     关掉原生高亮之后，"按下去有反应"这件事由本项目自己的:active规则负责(见下一行)，
+     不依赖系统那层蓝色。 */
+  body { -webkit-tap-highlight-color: transparent; }
   button { font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  button:active, .file-row:active { filter: brightness(.94); transition: filter .1s; }
+  button:active, .file-row:active, .backup-row:active { filter: brightness(.94); transition: filter .1s; }
   button:disabled { opacity: .5; pointer-events: none; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 
@@ -144,7 +159,14 @@
     margin: 0 0 20px; text-align: left; color: inherit; isolation: isolate; overflow: hidden; box-shadow: var(--e2); font-family: inherit; }
   .ai-banner::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.4px;
     background: linear-gradient(120deg, rgba(var(--accent-rgb),.14), rgba(var(--accent-rgb),.6), rgba(var(--accent-rgb),.14));
-    background-size: 220% 100%; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    background-size: 220% 100%;
+    /* "渐变描边"技巧：整块渐变铺满，再用两层mask(一层只覆盖content-box、一层覆盖整个border-box)
+       做异或，只留下padding那一圈=描边。-webkit-前缀和标准属性必须成对写：老WebView只认
+       -webkit-mask/-webkit-mask-composite:xor，新引擎认标准的mask/mask-composite:exclude
+       (两者的关键字名不一样，xor↔exclude，不是同一个词的前缀版)。只写前缀版会在未来某个
+       只支持标准属性的引擎上整圈描边消失。 */
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor; mask-composite: exclude; animation: aiSheen 5s linear infinite; }
   .ai-banner::after { content: ""; position: absolute; inset: -30%; z-index: -1; border-radius: 50%;
     background: radial-gradient(circle, rgba(var(--accent-rgb),.14), transparent 65%); animation: aiGlow 3.6s ease-in-out infinite; }
@@ -196,15 +218,26 @@
   .view { display: none; } .view.active { display: block; }
   .section-label { font-size: var(--fs-sm); letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted);
     font-weight: 600; margin: 4px 2px 8px; display: flex; justify-content: space-between; align-items: center; }
-  /* -webkit-user-select:none在body上设过一次，但安卓WebView对<select>这类原生表单控件的
-     长按选中经常不听页面CSS的（浏览器把它当"原生chrome"处理，不完全遵守user-select），
-     必须在select自己身上再显式设一次才压得住；长按弹出的绿色边框是全局:focus-visible规则
-     (line 77附近)在select上被WebView判定成"需要可见焦点"触发的，这个控件是纯点按操作、
-     不存在键盘导航场景，单独关掉这个控件的focus-visible效果即可，不动全局规则。 */
-  .sort-sel { text-transform: none; letter-spacing: normal; font-size: 12px; font-weight: 600; padding: 6px 8px;
+  /* .sort-sel从原生<select>换成了普通<button>(点击弹出自绘的.sort-sheet底部面板，
+     见react/src/debts/SortSheet.tsx)——原生select在安卓WebView里弹的是系统全屏列表，
+     跟这个App的视觉完全脱节。换成button之后，当年为了摁住select长按副作用打的那几条补丁
+     (显式再设一次user-select、单独关掉:focus-visible的绿色描边)其实已经没有必要了，
+     但保留着无害，也省得以后有人又把某个自定义控件做成看起来能长按选中的样子。 */
+  .sort-sel { display: inline-flex; align-items: center; gap: 4px;
+    text-transform: none; letter-spacing: normal; font-size: 12px; font-weight: 600; padding: 6px 8px;
     border: 1px solid var(--hair); border-radius: 9px; background: var(--card-grad); color: var(--text); font-family: inherit;
     box-shadow: var(--e1); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .sort-sel svg { width: 13px; height: 13px; color: var(--text-muted); flex: none; }
   .sort-sel:focus-visible { outline: none; }
+  /* 排序面板：复用.sheet那套底部弹出外壳，只加内部列表的样式。选中项用"强调色文字+对勾"
+     而不是原生radio圆点，跟.pm-btn.active/.file-row[aria-current]那套选中态配方一致。 */
+  .sort-sheet .sort-opt-list { margin: 6px 0 2px; }
+  .sort-opt { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;
+    padding: 13px 4px; border: none; background: none; color: var(--text); font-family: inherit;
+    font-size: 14.5px; text-align: left; border-bottom: 1px solid var(--hair); }
+  .sort-opt:last-child { border-bottom: none; }
+  .sort-opt.active { color: var(--accent); font-weight: 700; }
+  .sort-opt svg { width: 17px; height: 17px; flex: none; }
   .sort-controls { display: flex; align-items: center; gap: 6px; }
   .jiggle-done-btn { display: none; text-transform: none; letter-spacing: normal; font-size: 12px; font-weight: 600;
     padding: 5px 10px; border-radius: 7px; border: none; background: var(--accent); color: #fff; }
@@ -228,7 +261,10 @@
   .debt { position: relative; border-radius: 18px; margin-bottom: 11px; overflow: hidden; box-shadow: var(--e2);
     -webkit-tap-highlight-color: transparent; }
   .debt-row { display: flex; align-items: stretch; -webkit-tap-highlight-color: transparent; }
-  .debt-swipe-btn { flex: 0 0 92px; border: none; background: var(--good); color: #fff;
+  /* ⚠️这个宽度必须跟 react/src/debts/gestures.ts 里的 DEBT_REVEAL 常量保持一致——CSS负责"按钮长什么样"、
+     JS常量负责"滑动要位移多少像素才露出它"，改一个不改另一个的话，滑到底会露出
+     半个按钮或者多出一条空隙。 */
+  .debt-swipe-btn { flex: 0 0 76px; border: none; background: var(--good); color: #fff;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12.5px; font-weight: 700;
     -webkit-tap-highlight-color: transparent; }
   .debt-swipe-btn svg { width: 18px; height: 18px; }
@@ -296,22 +332,49 @@
   .pay-row.overdue .pay::before { background: linear-gradient(135deg, rgba(190,58,58,.2), transparent 52%); }
   .pay::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
     box-shadow: inset 0 1px 0 var(--glass-hi); }
-  .pay-swipe-btn { flex: 0 0 92px; border: none; background: var(--good); color: #fff;
+  /* ⚠️这个宽度必须跟 react/src/pay/gestures.ts 里的 PAY_REVEAL 常量保持一致——CSS负责"按钮长什么样"、
+     JS常量负责"滑动要位移多少像素才露出它"，改一个不改另一个的话，滑到底会露出
+     半个按钮或者多出一条空隙。 */
+  .pay-swipe-btn { flex: 0 0 76px; border: none; background: var(--good); color: #fff;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12.5px; font-weight: 700;
     -webkit-tap-highlight-color: transparent; }
   .pay-swipe-btn svg { width: 18px; height: 18px; }
+  /* 非"最早未还期"的行：payInstallment只能销最早那一期，跳期销在数据模型上不成立，
+     所以按钮置灰。⚠️用.is-disabled类而不是disabled属性——全局button:disabled带
+     pointer-events:none，那样点了完全没反应，用户会以为是bug；这里保留可点，
+     点了toast一句说明原因(见PayRow.tsx)。 */
+  .pay-swipe-btn.is-disabled { background: var(--border); color: var(--text-faint); }
   .pay .d { width: 62px; flex: none; }
   .pay .d .day { font-weight: 700; font-size: 15px; }
   .pay .d .rel { font-size: 11px; color: var(--text-muted); }
   .pay .w { flex: 1; font-size: 14px; }
   .pay .a { font-weight: 700; font-size: 15px; }
 
-  .pay-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 16px; }
+  /* 三档(7/15/30天内)——跟筛选条的档位一一对应，点了筛选要能在上面找到对应的总额。
+     三列在390px宽的手机上每格约115px，字号比两列时略小一点才不换行。 */
+  .pay-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-bottom: 16px; }
+  .pay-stats .kpi { padding: 10px 10px 9px; }
+  .pay-stats .kpi .v { font-size: 15.5px; }
+  .pay-stats .kpi .k { font-size: 10.5px; }
 
-  .pay-filter { display: flex; gap: 8px; margin-bottom: 12px; }
-  .pf-btn { flex: 1; padding: 8px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-2);
-    color: var(--text-muted); font-size: 12.5px; font-weight: 600; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+  /* 筛选条 = 可横向滑动的一排芯片 + 固定不滚的日历按钮。芯片加到5个之后一行放不下，
+     等分挤压会让每个芯片的字都换行；改成滚动之后"30天内"要往右滑一点才露出来(跟用户
+     确认过的取舍)。日历按钮**不能**进滚动区——它是常驻入口，滑走了等于没有。 */
+  .pay-filter { display: flex; align-items: stretch; gap: 8px; margin-bottom: 12px; }
+  .pf-scroll { flex: 1; min-width: 0; display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .pf-scroll::-webkit-scrollbar { display: none; }
+  /* 滚动区里的芯片按内容宽度排布(不再flex:1等分)，white-space:nowrap防止窄屏下字被折行 */
+  .pf-btn { flex: 0 0 auto; padding: 8px 13px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-2);
+    color: var(--text-muted); font-size: 12.5px; font-weight: 600; font-family: inherit; white-space: nowrap;
+    -webkit-tap-highlight-color: transparent; }
   .pf-btn.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+  .pf-cal { flex: none; display: flex; align-items: center; gap: 5px; padding: 8px 10px; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--surface-2); color: var(--text-muted);
+    font-size: 12.5px; font-weight: 600; font-family: inherit; white-space: nowrap;
+    -webkit-tap-highlight-color: transparent; }
+  .pf-cal svg { width: 15px; height: 15px; flex: none; }
+  .pf-cal.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
 
   .pay-hero { border-radius: 22px; padding: 16px 18px 15px; margin-bottom: 16px; box-shadow: var(--e3); }
   .pay-hero-top { display: flex; align-items: center; justify-content: space-between; }
@@ -398,9 +461,19 @@
 
   .scrim { position: fixed; inset: 0; background: rgba(15,20,30,.55); z-index: 30; display: none; }
   .scrim.open { display: block; }
+  /* ⚠️滚动必须在内层(.sheet-scroll)，不能直接挂在.sheet上——深色模式真机实测到的bug：
+     .sheet同时具备"圆角 + overflow-y:auto + transform"这三样时，Chromium把它当成不透明的
+     合成滚动层，圆角外那几个像素直接留了图层的默认白底，表现为把抽屉往上拖到内容真正需要
+     滚动的高度之后，左上/右上两个圆角位置露出白边。浅色模式下--surface本来就是白的所以
+     一直看不出来，只有深色才露馅(这也是为什么"只有深色模式有这个问题")。
+     把滚动挪到内层之后，.sheet只剩圆角+overflow:hidden+transform，不再是合成滚动容器，
+     这个组合就不成立了。顺带的好处：grip留在滚动区外，拖动条永远在顶部不会被内容滚走。 */
   .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; background: var(--surface); border-radius: 24px 24px 0 0;
-    max-width: 560px; margin: 0 auto; max-height: 94vh; overflow-y: auto; transform: translateY(100%);
-    transition: transform .28s cubic-bezier(.2,.7,.3,1); padding: 8px 16px calc(24px + env(safe-area-inset-bottom)); }
+    max-width: 560px; margin: 0 auto; max-height: 94vh; overflow: hidden; transform: translateY(100%);
+    transition: transform .28s cubic-bezier(.2,.7,.3,1); padding: 8px 16px calc(24px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; }
+  /* min-height:0是flex子元素能收缩、让overflow-y:auto真正生效的必要条件(同#aiScreen .ai-thread) */
+  .sheet-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   .sheet.open { transform: translateY(0); }
   @media (prefers-reduced-motion: reduce) { .sheet { transition: none; } }
   .grip { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 8px auto 12px; padding: 10px 24px; background-clip: content-box; box-sizing: content-box; touch-action: none; }
@@ -486,8 +559,12 @@
   .modal { background: var(--surface); border-radius: 22px; max-width: 380px; width: 100%; padding: 20px; box-shadow: 0 8px 40px rgba(0,0,0,.3); }
   .modal .mtitle { font-size: 16px; font-weight: 700; margin-bottom: 8px; overflow-wrap: break-word; word-break: break-word; }
   .modal .mbody { font-size: 13.5px; color: var(--text); white-space: pre-line; margin-bottom: 18px; line-height: 1.55; overflow-wrap: break-word; word-break: break-word; }
-  #mMonthInput { width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+  #mMonthInput, #mAmountInput, #mDateInput { width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
     border-radius: 9px; padding: 10px 11px; font-size: 15px; font-family: inherit; margin: -8px 0 18px; }
+  /* 金额输入框下面那行解释默认值含义的小字(提前结清用："默认¥X = 只还本金、利息为0")。
+     跟输入框是两个独立元素、各自控制显隐——ask()的opts.amountHint没传就不显示这一行。 */
+  #mAmountInput { margin-bottom: 6px; }
+  .modal .mhint { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin: 0 2px 16px; }
   .modal-actions { display: flex; gap: 10px; }
 
   /* 登录门默认(纯CSS，不依赖任何JS执行时机)就是display:flex可见的——这是刻意的"fail-closed"设计。
@@ -573,9 +650,16 @@
      flex:1+overflow-y:auto滚动，.ai-composer作为普通flex子元素——flex:1的中间区域会精确
      吃掉剩余空间，把它推到真实底边，不需要再猜任何高度常量。 */
   #aiScreen.subpage { display: flex; flex-direction: column; overflow: hidden; }
-  #aiScreen .ai-thread { flex: 1; overflow-y: auto; min-height: 0; }
+  /* ⚠️width:100%不能省。#aiScreen是flex-column容器，.ai-thread作为它的flex子元素带着
+     "margin:0 auto"——flex布局里交叉轴上的auto margin优先级高于align-items:stretch，会
+     直接取消拉伸、把宽度退化成fit-content再居中。真机上的表现是：消息很短时(比如刚发出
+     一个"1"、AI还在"思考中")整条thread被缩成一根窄条居中，两个气泡看着像居中排列、
+     "思考中"三个字还被挤成竖排；等AI回了一大段长文本，fit-content撑满可用宽度，气泡才
+     "自己"回到左右两侧。加上width:100%后宽度恒定是100%(上限560px)，气泡从第一条起就
+     稳定贴边。.ai-composer当年就写了width:100%所以没露出这个问题，这里是漏了。 */
   /* min-height:0是flex子元素能正常收缩、让overflow-y:auto生效的必要条件——flex item默认
      min-height:auto，会被内容撑开导致.ai-thread长过父容器、外层出现整页滚动而不是内部滚动。 */
+  #aiScreen .ai-thread { flex: 1; width: 100%; overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
   .ai-thread { padding: 4px 16px 8px; max-width: 560px; margin: 0 auto; }
   .ai-welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
     gap: 14px; padding: 22px 14px 10px; height: 100%; }
@@ -771,8 +855,24 @@
   .chart-gridline span { position: absolute; right: 100%; top: -6px; padding-right: 6px;
     font-size: 9.5px; color: var(--text-faint); font-family: var(--font-num);
     font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .pchart-bars { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 100%; }
+  /* 压力图专属的"横向滚动"外壳(PayoffLine不用这套，它继续用.chart-plot/.chart-area)：
+     .pchart-viewport 负责34px刻度槽；.pchart-grid 是**不滚动**的刻度线层(横滑时刻度是
+     不动的参照系)；.pchart-scroll 是唯一的滚动容器，柱子和x轴标签一起放在它里面的
+     .pchart-track 上，保证滑动时两者永远对齐。 */
+  .pchart-viewport { position: relative; padding-left: 34px; }
+  .pchart-grid { position: absolute; left: 34px; right: 0; top: 0; height: 108px; pointer-events: none; }
+  .pchart-grid .chart-gridline { left: 0; right: 0; }
+  .pchart-scroll { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .pchart-scroll::-webkit-scrollbar { display: none; }
+  /* width:100%+min-width：月份少、容器装得下时铺满宽度(不缩成左边一小撮)，装不下才溢出滚动。
+     min-width由组件按月份数×每根柱子的宽度内联算出。 */
+  .pchart-track { width: 100%; }
+  .pchart-track .chart-xaxis { padding-left: 0; }
+  .pchart-bars { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 108px; }
+  /* 柱子是<button>(点击读数)，要清掉按钮的默认外观 */
   .pchart-col { position: relative; flex: 1; min-width: 0; height: 100%;
+    padding: 0; border: none; background: none; font-family: inherit;
     display: flex; align-items: flex-end; -webkit-tap-highlight-color: transparent; }
   .pchart-stack { width: 100%; max-width: 24px; margin: 0 auto; height: 100%;
     display: flex; flex-direction: column-reverse; gap: 2px; }
@@ -818,8 +918,11 @@
      report/Hero.tsx的.hero，为了裁切装饰性的hero-smoke色雾)会被直接裁掉/位置错乱，改成
      fixed+JS算坐标后完全不受任何祖先overflow影响。 */
   .popover-root { position: relative; display: inline-flex; }
+  /* max-width兜底：组件那边会按视口钳制left，但前提是面板本身不能比视口还宽——
+     否则钳出来的位置只能保证左边不溢出、右边照样跑出屏幕。 */
   .popover-panel { position: fixed; z-index: 25; background: var(--card-grad);
-    border: 1px solid var(--hair); border-radius: 14px; box-shadow: var(--e2); min-width: 160px; }
+    border: 1px solid var(--hair); border-radius: 14px; box-shadow: var(--e2); min-width: 160px;
+    max-width: calc(100vw - 20px); }
   .info-tip-btn { width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--hair);
     background: var(--surface-2); color: var(--text-muted); font-size: 11px; font-weight: 700;
     line-height: 1; display: inline-flex; align-items: center; justify-content: center;
@@ -990,6 +1093,9 @@
     <div class="mtitle" id="mTitle">确认</div>
     <div class="mbody" id="mBody"></div>
     <input type="month" id="mMonthInput" style="display:none">
+    <input type="date" id="mDateInput" style="display:none">
+    <input type="number" inputmode="decimal" step="0.01" min="0" id="mAmountInput" style="display:none">
+    <div class="mhint" id="mAmountHint" style="display:none"></div>
     <div class="modal-actions">
       <button class="btn ghost" id="mCancel">取消</button>
       <button class="btn primary" id="mOk">确认</button>
@@ -1139,6 +1245,20 @@
     $("mTitle").textContent = title; $("mBody").textContent = body; _onOk = onOk; _onCancel = null; _confirmed = false;
     var mi = $("mMonthInput");
     if (opts && opts.month !== undefined) { mi.style.display = ""; mi.value = opts.month || ""; } else { mi.style.display = "none"; mi.value = ""; }
+    // opts.date：日期输入框(还款日页"自定义天数"筛选，点日历图标弹出)。
+    var di = $("mDateInput");
+    if (opts && opts.date !== undefined) {
+      di.style.display = ""; di.value = opts.date || "";
+      if (opts.dateMin) di.min = opts.dateMin; else di.removeAttribute("min");
+    } else { di.style.display = "none"; di.value = ""; di.removeAttribute("min"); }
+    // opts.amount：数字输入框(提前结清问"实付了多少钱")。跟opts.month/opts.date是同一个套路的
+    // 可选输入控件，三者**互斥使用**——目前没有哪个调用点需要同时要两种输入，下面取值时是
+    // "月份→日期→金额"的固定优先级，真要同时用得先改mOk那个handler。
+    var ai = $("mAmountInput"), ah = $("mAmountHint");
+    if (opts && opts.amount !== undefined) {
+      ai.style.display = ""; ai.value = opts.amount === null ? "" : String(opts.amount);
+      ah.style.display = opts.amountHint ? "" : "none"; ah.textContent = opts.amountHint || "";
+    } else { ai.style.display = "none"; ai.value = ""; ah.style.display = "none"; ah.textContent = ""; }
     $("modalScrim").classList.add("open"); lockScroll();
   }
   // ask()的Promise外壳，给React用(#editSheet批量设置还款日/金额需要在纯React状态上await结果，
@@ -1147,10 +1267,13 @@
   // 永远是空操作。opts.month有值时：确认返回选中的月份字符串，取消返回null；没有opts.month时：
   // 确认返回true，取消返回false。
   function askAsync(title, body, opts) {
+    // 带输入控件时(month或amount)：确认返回输入框的值、取消返回null；不带输入控件时：
+    // 确认true、取消false。加amount这一路没有改变month那一路的任何行为。
+    var wantsValue = !!(opts && (opts.month !== undefined || opts.date !== undefined || opts.amount !== undefined));
     return new Promise(function (resolve) {
-      _onCancel = function () { resolve(opts && opts.month !== undefined ? null : false); };
-      ask(title, body, function (monthVal) {
-        resolve(opts && opts.month !== undefined ? monthVal : true);
+      _onCancel = function () { resolve(wantsValue ? null : false); };
+      ask(title, body, function (inputVal) {
+        resolve(wantsValue ? inputVal : true);
       }, opts);
     });
   }
@@ -1158,11 +1281,18 @@
     if (!$("modalScrim").classList.contains("open")) return;
     $("modalScrim").classList.remove("open");
     if (!_confirmed && _onCancel) { var c = _onCancel; _onCancel = null; c(); }
-    _onOk = null; _onCancel = null; $("mMonthInput").style.display = "none"; unlockScroll();
+    _onOk = null; _onCancel = null;
+    $("mMonthInput").style.display = "none";
+    $("mDateInput").style.display = "none";
+    $("mAmountInput").style.display = "none"; $("mAmountHint").style.display = "none";
+    unlockScroll();
   }
   $("mOk").addEventListener("click", function () {
-    var f = _onOk, monthVal = $("mMonthInput").style.display !== "none" ? $("mMonthInput").value : undefined;
-    _confirmed = true; closeModal(); if (f) f(monthVal);
+    var f = _onOk, inputVal;
+    if ($("mMonthInput").style.display !== "none") inputVal = $("mMonthInput").value;
+    else if ($("mDateInput").style.display !== "none") inputVal = $("mDateInput").value;
+    else if ($("mAmountInput").style.display !== "none") inputVal = $("mAmountInput").value;
+    _confirmed = true; closeModal(); if (f) f(inputVal);
   });
   $("mCancel").addEventListener("click", closeModal);
   $("modalScrim").addEventListener("click", function (e) { if (e.target === $("modalScrim")) closeModal(); });
@@ -1292,19 +1422,35 @@
       toast(d.settled ? d.name + " 已还清 🎉" : "已销第 " + (idx + 1) + " 期 · 本金 -¥" + fmt(r.principal));
     });
   }
+  // 提前结清：先问用户实际付出去多少钱，再把剩余期次收进快照、追加一条真实的结清记录。
+  // 真正的数据变换在calc.js的applySettle()里(纯函数、有node:test覆盖)，这里只负责弹窗、
+  // 校验输入、存盘重渲染。为什么不是"把每一期都打勾已还"，见applySettle()上面那段注释。
   function settleFull(id) {
     var d = debts.find(function (x) { return x.id === id; });
     if (!d) return;
-    ask("提前结清", "把「" + d.name + "」标记为已结清？\n不再计入在还总债（可在列表底部恢复）。", function () {
+    if (!(d.terms > 0)) { toast("这笔已经没有未还期次了"); return; }
+    var remainP = d.balance;
+    askAsync("提前结清",
+      "把「" + d.name + "」一次性结清？\n还剩 " + d.terms + " 期未还，剩余本金 ¥" + money(remainP) + "。\n\n下面填你实际付出去的钱：多付的部分记成利息/手续费，少付的部分（协商减免）记成负数，两栏加起来正好等于你真实花掉的钱。",
+      { amount: remainP, amountHint: "默认 ¥" + money(remainP) + "＝只还本金、利息为 0" }
+    ).then(function (val) {
+      if (val === null) return;            // 用户取消
+      var x = parseFloat(val);
+      if (!isFinite(x) || x < 0) { toast("请输入有效的实付金额"); return; }
+      if (!applySettle(d, x, fmtDate(new Date()))) { toast("这笔已经没有未还期次了"); return; }
       // closeDetail()/closeEdit()都已删除——detailSheet/editSheet现在都是React拥有的sheet，
       // 各自靠自己的effect监听debts变化自动关闭(结清/被删除)，vanilla不需要再显式回调。
-      d.settled = true; d.settledDate = todayStr(); saveAll(); renderAll(); toast(d.name + " 已结清 🎉");
+      saveAll(); renderAll();
+      var extra = r2(x - remainP);
+      toast(d.name + " 已结清 🎉" + (extra > 0 ? "（额外利息/费 ¥" + fmt(extra) + "）" : extra < 0 ? "（减免 ¥" + fmt(-extra) + "）" : ""));
     });
   }
   function unsettle(id) {
     var d = debts.find(function (x) { return x.id === id; });
     if (!d) return;
-    d.settled = false; recompute(d); saveAll(); renderAll(); toast("已恢复到在还");
+    // 两条结清路径的撤销逻辑都在calc.js的undoSettle()里：提前结清的放回快照，
+    // "销完最后一期自动结清"的释放最后一期的已还标记(否则会留下待还¥0的僵尸债务)。
+    undoSettle(d); saveAll(); renderAll(); toast("已恢复到在还");
   }
 
   // ===== edit + plan editor =====
@@ -2037,7 +2183,7 @@
     });
   });
   // 计算口径说明默认折叠——三条公式现在大多已经在KPI卡片本身交代清楚了（hero的"只算本金"角标、
-  // 已还金额的"另付利息"子行、经常性月供的"不含一次性还清"子行），这段文字变成了给较真用户看的
+  // 已还本金的"另付利息"子行、经常性月供的"不含一次性还清"子行），这段文字变成了给较真用户看的
   // 补充细则，不需要默认占位置。(这段折叠逻辑已经随"在还债务"页一起搬进React——见
   // react/src/debts/Summary.tsx——这里不再有#sumNoteToggle这个vanilla元素。)
   // 安卓WebView长按默认会触发系统级"上下文菜单"手势(震动反馈+可能弹出菜单)，

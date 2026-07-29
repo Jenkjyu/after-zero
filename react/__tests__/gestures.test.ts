@@ -3,7 +3,7 @@
 // "在还债务自定义排序"一节)，这里只测试不依赖真实触摸序列、可以直接调用验证的部分：
 // 滑块开合的DOM效果、拖拽提交(finishDrag)按DOM顺序正确读出新排列并调用回调。
 import { describe, expect, it, vi } from "vitest";
-import { closeDebtSwipe, DEBT_REVEAL, finishDrag, openDebtSwipeTo } from "../src/debts/gestures";
+import { closeDebtSwipe, DEBT_REVEAL, finishDrag, onCardPointerDown, openDebtSwipeTo } from "../src/debts/gestures";
 import type { CardEl, GestureCtx } from "../src/debts/gestures";
 import { makeDebt } from "./mockBridge";
 
@@ -14,6 +14,7 @@ function makeCtx(overrides?: Partial<GestureCtx>): GestureCtx {
     jiggleModeRef: { current: true },
     openSwipeRowRef: { current: null },
     enterJiggle: () => {},
+    exitJiggle: () => {},
     onCommitReorder: vi.fn(),
     ...overrides,
   };
@@ -104,5 +105,70 @@ describe("finishDrag", () => {
     });
     finishDrag(ctx, false);
     expect(el.classList.contains("jiggle")).toBe(true);
+  });
+});
+
+// ===== 编辑模式下"按住不动"退出（2026-07-29新增）=====
+// 这里用真实的PointerEvent走onCardPointerDown那条桌面分支——jsdom对PointerEvent的支持
+// 比TouchEvent完整得多(TouchEvent在jsdom里构造不出带identifier的changedTouches，所以
+// 这个文件开头就说明了触摸序列不在这里测)。两条分支的退出逻辑是逐行同构的，测桌面这条
+// 等于同时锁住了触摸那条的行为契约。
+describe("编辑模式下长按不动 = 退出编辑模式", () => {
+  function setup(jiggling: boolean) {
+    const el = document.createElement("div");
+    const row = document.createElement("div");
+    document.body.appendChild(el);
+    const exitJiggle = vi.fn();
+    const enterJiggle = vi.fn();
+    const container = document.createElement("div");
+    container.appendChild(el);
+    const ctx = makeCtx({
+      containerRef: { current: container },
+      jiggleModeRef: { current: jiggling },
+      enterJiggle,
+      exitJiggle,
+    });
+    return { el, row, ctx, exitJiggle, enterJiggle };
+  }
+  function press(el: HTMLElement, clientY = 100) {
+    const ev = new PointerEvent("pointerdown", { pointerId: 1, clientX: 50, clientY, bubbles: true });
+    Object.defineProperty(ev, "pointerType", { value: "mouse" });
+    return ev;
+  }
+
+  it("已在编辑模式：按住不动到时间→调exitJiggle，并标记__justDragged拦掉补发的click", () => {
+    vi.useFakeTimers();
+    const { el, row, ctx, exitJiggle } = setup(true);
+    onCardPointerDown(press(el), el, row, ctx);
+    vi.advanceTimersByTime(120);          // 拖拽起步
+    expect(ctx.dragCtxRef.current).not.toBeNull();
+    expect(exitJiggle).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(450);          // 再按住不动
+    expect(exitJiggle).toHaveBeenCalledTimes(1);
+    // 零位移的手势松手时浏览器会补发click，不拦的话会顺手打开详情窗
+    expect((row as HTMLElement & { __justDragged?: boolean }).__justDragged).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it("已在编辑模式：按住后移动了→当成拖拽，不退出", () => {
+    vi.useFakeTimers();
+    const { el, row, ctx, exitJiggle } = setup(true);
+    onCardPointerDown(press(el), el, row, ctx);
+    vi.advanceTimersByTime(120);
+    el.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, clientX: 50, clientY: 160, bubbles: true }));
+    vi.advanceTimersByTime(1000);
+    expect(exitJiggle).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("还没进编辑模式：长按只进入编辑模式，不会立刻又退出", () => {
+    vi.useFakeTimers();
+    const { el, row, ctx, exitJiggle, enterJiggle } = setup(false);
+    onCardPointerDown(press(el), el, row, ctx);
+    vi.advanceTimersByTime(500);          // 未进入编辑模式时的长按判定是500ms
+    expect(enterJiggle).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(2000);
+    expect(exitJiggle).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 });

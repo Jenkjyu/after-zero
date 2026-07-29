@@ -27,14 +27,14 @@ describe("report App", () => {
     expect(screen.getByText("导出 Excel")).toBeInTheDocument();
     expect(screen.getByText("导出 PDF")).toBeInTheDocument();
     // PressureChart取代了MonthlyChart，且排在viz-root第一位（"未来压力"是这一页最该先看到的）
-    expect(screen.getByText("未来12个月还款压力")).toBeInTheDocument();
+    expect(screen.getByText("未来还款压力")).toBeInTheDocument();
     expect(screen.queryByText("月还款统计")).not.toBeInTheDocument();
     // ReportTables(底部4张平铺明细表)整个删除——完整明细由导出Excel/PDF承担
     expect(screen.queryByText("数据明细表")).not.toBeInTheDocument();
     expect(screen.queryByText("月还款明细")).not.toBeInTheDocument();
     const blocks = [...document.querySelectorAll(".viz-block .viz-title")].map((el) => el.textContent);
     expect(blocks).toEqual([
-      "未来12个月还款压力",
+      "未来还款压力",
       "负债余额走势",
       "各债务剩余待还",
       "债务类型占比",

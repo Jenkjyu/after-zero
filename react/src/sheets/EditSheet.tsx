@@ -217,51 +217,56 @@ export function EditSheet() {
       <div className={"scrim" + (isOpen ? " open" : "")} onClick={closeEditSheet} />
       <div ref={sheetRef} className={"sheet" + (isOpen ? " open" : "")} role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
         <div ref={gripRef} className="grip" />
-        <h2 id="sheetTitle">{isNew ? "新增债务" : "编辑债务"}</h2>
-        <form id="debtForm" onSubmit={handleSave}>
-          <div className="field"><label htmlFor="f-name">贷款产品 <span className="req">*</span></label><input id="f-name" required value={name} onChange={(e) => setName(e.target.value)} /></div>
-          <div className="field two">
-            <div className="field"><label htmlFor="f-funder">出资方</label><input id="f-funder" value={funder} onChange={(e) => setFunder(e.target.value)} /></div>
-            <div className="field">
-              <label htmlFor="f-type">借款类型</label>
-              <select id="f-type" value={type} onChange={(e) => setType(e.target.value)}>
-                <option>银行贷</option><option>信用卡分期</option><option>网贷</option><option>私人借款</option>
-              </select>
+        {/* 滚动放在这层、不放在.sheet上——.sheet同时有圆角+overflow:auto+transform时
+            会被判定成不透明合成滚动层，深色模式下圆角处会露白底(见www/index.html里
+            .sheet那段注释)。grip留在这层外面，拖动条永远在顶部不被内容滚走。 */}
+        <div className="sheet-scroll">
+          <h2 id="sheetTitle">{isNew ? "新增债务" : "编辑债务"}</h2>
+          <form id="debtForm" onSubmit={handleSave}>
+            <div className="field"><label htmlFor="f-name">贷款产品 <span className="req">*</span></label><input id="f-name" required value={name} onChange={(e) => setName(e.target.value)} /></div>
+            <div className="field two">
+              <div className="field"><label htmlFor="f-funder">出资方</label><input id="f-funder" value={funder} onChange={(e) => setFunder(e.target.value)} /></div>
+              <div className="field">
+                <label htmlFor="f-type">借款类型</label>
+                <select id="f-type" value={type} onChange={(e) => setType(e.target.value)}>
+                  <option>银行贷</option><option>信用卡分期</option><option>网贷</option><option>私人借款</option>
+                </select>
+              </div>
             </div>
-          </div>
-          <div className="field two">
-            <div className="field"><label htmlFor="f-opened">借款日 <span className="req">*</span></label><input id="f-opened" type="date" required value={opened} onChange={(e) => setOpened(e.target.value)} /></div>
-            <div className="field"><label htmlFor="f-day">还款日（几号）</label><input id="f-day" type="number" min={1} max={31} inputMode="numeric" readOnly className="f-day-auto" value={fDay} /></div>
-          </div>
-          <label className="checkline"><input type="checkbox" id="f-oneTime" checked={oneTime} onChange={(e) => handleOneTimeChange(e.target.checked)} />一次性还清（不计入经常性月供，销项即结清）</label>
-          <div className="field"><label htmlFor="f-notes">备注</label><textarea id="f-notes" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
-
-          <hr className="sheet-divider" />
-          <div className="subhead">还款计划（这是源头，其它自动推算）</div>
-          <div className="plan-sum" id="planSum">
-            <span className="c">借款金额 <b>¥{window.fmt(borrow)}</b></span>
-            <span className="c">剩余待还 <b>¥{window.fmt(remaining)}</b></span>
-            <span className="c">年化 <b>{apr ? apr.toFixed(2) + "%" : "0%"}</b></span>
-            <span className="c">共 <b>{editingPlan.length}</b> 期 · 已还 <b>{paidc}</b></span>
-          </div>
-          {!oneTime ? (
-            <div className="plan-mode-toggle" id="planModeToggle">
-              <button type="button" className={"pm-btn" + (planMode === "manual" ? " active" : "")} onClick={() => setPlanMode("manual")}>手动添加</button>
-              <button type="button" className={"pm-btn" + (planMode === "gen" ? " active" : "")} onClick={() => setPlanMode("gen")}>公式生成</button>
+            <div className="field two">
+              <div className="field"><label htmlFor="f-opened">借款日 <span className="req">*</span></label><input id="f-opened" type="date" required value={opened} onChange={(e) => setOpened(e.target.value)} /></div>
+              <div className="field"><label htmlFor="f-day">还款日（几号）</label><input id="f-day" type="number" min={1} max={31} inputMode="numeric" readOnly className="f-day-auto" value={fDay} /></div>
             </div>
-          ) : null}
-          {!oneTime && planMode === "gen" ? (
-            <GenPanel fields={gen} onPatch={patchGen} onGenerate={(plan) => { setEditingPlan(plan); setPlanMode("manual"); }} />
-          ) : null}
-          {!oneTime ? <BatchBlock plan={editingPlan} onChange={setEditingPlan} /> : null}
-          <PlanRows plan={editingPlan} oneTime={oneTime} planMode={planMode} onChange={setEditingPlan} />
+            <label className="checkline"><input type="checkbox" id="f-oneTime" checked={oneTime} onChange={(e) => handleOneTimeChange(e.target.checked)} />一次性还清（不计入经常性月供，销项即结清）</label>
+            <div className="field"><label htmlFor="f-notes">备注</label><textarea id="f-notes" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
 
-          <div className="sheet-actions">
-            {!isNew ? <button type="button" className="btn danger" id="deleteBtn" onClick={handleDelete}>删除</button> : null}
-            <button type="button" className="btn ghost" id="cancelBtn" onClick={closeEditSheet}>取消</button>
-            <button type="submit" className="btn primary">保存</button>
-          </div>
-        </form>
+            <hr className="sheet-divider" />
+            <div className="subhead">还款计划（这是源头，其它自动推算）</div>
+            <div className="plan-sum" id="planSum">
+              <span className="c">借款金额 <b>¥{window.fmt(borrow)}</b></span>
+              <span className="c">剩余待还 <b>¥{window.fmt(remaining)}</b></span>
+              <span className="c">年化 <b>{apr ? apr.toFixed(2) + "%" : "0%"}</b></span>
+              <span className="c">共 <b>{editingPlan.length}</b> 期 · 已还 <b>{paidc}</b></span>
+            </div>
+            {!oneTime ? (
+              <div className="plan-mode-toggle" id="planModeToggle">
+                <button type="button" className={"pm-btn" + (planMode === "manual" ? " active" : "")} onClick={() => setPlanMode("manual")}>手动添加</button>
+                <button type="button" className={"pm-btn" + (planMode === "gen" ? " active" : "")} onClick={() => setPlanMode("gen")}>公式生成</button>
+              </div>
+            ) : null}
+            {!oneTime && planMode === "gen" ? (
+              <GenPanel fields={gen} onPatch={patchGen} onGenerate={(plan) => { setEditingPlan(plan); setPlanMode("manual"); }} />
+            ) : null}
+            {!oneTime ? <BatchBlock plan={editingPlan} onChange={setEditingPlan} /> : null}
+            <PlanRows plan={editingPlan} oneTime={oneTime} planMode={planMode} onChange={setEditingPlan} />
+
+            <div className="sheet-actions">
+              {!isNew ? <button type="button" className="btn danger" id="deleteBtn" onClick={handleDelete}>删除</button> : null}
+              <button type="button" className="btn ghost" id="cancelBtn" onClick={closeEditSheet}>取消</button>
+              <button type="submit" className="btn primary">保存</button>
+            </div>
+          </form>
+        </div>
       </div>
     </>
   );

@@ -1,4 +1,6 @@
-// 未来12个月还款压力柱状图（替代已删除的MonthlyChart.test.tsx）。
+// "未来还款压力"柱状图（替代已删除的MonthlyChart.test.tsx）。
+// 2026-07-29起窗口长度不再固定12个月(见calc.js的pressureWindowMonths)、读数从拖动scrub
+// 改成点柱子(横滑让给原生滚动)——这些测试构造数据时仍显式传12，锁的是图表本身的行为。
 //
 // 走真实的window.computeUpcomingPressure(debts, 12, today)而不是手造fixture——固定today参数
 // 让断言可复现(这正是那个函数留第3个参数的原因)，同时保证组件测的是真实数据形状，不会跟
@@ -21,7 +23,7 @@ function row(date: string, principal: number, interest: number, paid = false) {
 describe("report/PressureChart", () => {
   it("没有任何待还款项时显示空状态，不画空图表", () => {
     render(<PressureChart data={pressureOf([])} />);
-    expect(screen.getByText("未来12个月没有待还款项")).toBeInTheDocument();
+    expect(screen.getByText("未来没有待还款项")).toBeInTheDocument();
     expect(document.querySelector(".pchart")).toBeNull();
   });
 
@@ -32,7 +34,7 @@ describe("report/PressureChart", () => {
     render(<PressureChart data={pressureOf(debts)} />);
     // 限定在摘要行里断言——同样的金额也会出现在下方"当月要还的债务"里，全局查会撞上
     const stats = [...document.querySelectorAll(".pchart-stats .v")].map((el) => el.textContent);
-    expect(stats).toEqual(["¥1,000", "¥3,000", "¥250", "11月 ¥2,000"]);
+    expect(stats).toEqual(["¥1,000", "¥3,000", "¥250", "26年11月 ¥2,000"]);
   });
 
   it("12根柱子，每根按本金/利息两段堆叠，柱子数量固定不随数据稀疏而变", () => {
@@ -60,13 +62,13 @@ describe("report/PressureChart", () => {
     expect(screen.queryByText("已结清")).not.toBeInTheDocument();
   });
 
-  it("逾期单独一条提示行，明说未计入下方12个月", () => {
+  it("逾期单独一条提示行，明说未计入下方", () => {
     const debts = [
       makeDebt({ id: "d1", plan: [row("2026-05-10", 300, 50), row("2026-09-10", 100, 0)] }),
     ];
     render(<PressureChart data={pressureOf(debts)} />);
     expect(screen.getByText(/已逾期 1 期 · ¥350/)).toBeInTheDocument();
-    expect(screen.getByText("未计入下方12个月")).toBeInTheDocument();
+    expect(screen.getByText("未计入下方")).toBeInTheDocument();
     expect(screen.getByText("¥100")).toBeInTheDocument(); // 12个月共不含逾期
   });
 
@@ -83,20 +85,42 @@ describe("report/PressureChart", () => {
     ];
     render(<PressureChart data={pressureOf(debts)} />);
     // 默认当前月(7月)
-    expect(screen.getByText(/7月待还 ¥500/)).toBeInTheDocument();
-    expect(screen.getByText("7月要还的债务")).toBeInTheDocument();
+    expect(screen.getByText(/26年7月待还 ¥500/)).toBeInTheDocument();
+    expect(screen.getByText("26年7月要还的债务")).toBeInTheDocument();
 
-    // 点9月那根柱子(index 2)——chartScrub挂在.chart-plot上，用pointer事件模拟
-    const plot = document.querySelector(".pchart-bars") as HTMLElement;
-    plot.getBoundingClientRect = () => ({ left: 0, width: 120, top: 0, height: 100, right: 120, bottom: 100, x: 0, y: 0, toJSON: () => ({}) });
-    // 12个点均分120px：index 2 落在 2/11*120 ≈ 21.8
-    fireEvent.pointerDown(plot, { pointerType: "mouse", pointerId: 1, clientX: 22 });
-    expect(screen.getByText(/9月待还 ¥1,000/)).toBeInTheDocument();
+    // 点9月那根柱子(index 2)。现在柱子本身是<button>、直接onClick选中——横滑已经让给
+    // 原生滚动，不再走chartScrub那套按坐标映射索引的手势(见组件里那段注释)。
+    const cols = document.querySelectorAll(".pchart-col");
+    fireEvent.click(cols[2]);
+    expect(screen.getByText(/26年9月待还 ¥1,000/)).toBeInTheDocument();
     expect(screen.getByText(/本金 ¥900 · 利息 ¥100/)).toBeInTheDocument();
     // 当月组成按金额降序
-    expect(screen.getByText("9月要还的债务")).toBeInTheDocument();
+    expect(screen.getByText("26年9月要还的债务")).toBeInTheDocument();
     const rows = [...document.querySelectorAll(".pchart-bd-row")].map((r) => r.textContent);
     expect(rows).toEqual(["招行贷¥800", "借呗¥200"]);
+  });
+
+  it("再点一次同一根柱子取消选中，readout回到默认的当前月", () => {
+    const debts = [
+      makeDebt({ id: "d1", plan: [row("2026-07-31", 500, 0), row("2026-09-10", 700, 100)] }),
+    ];
+    render(<PressureChart data={pressureOf(debts)} />);
+    const cols = document.querySelectorAll(".pchart-col");
+    fireEvent.click(cols[2]);
+    expect(screen.getByText(/26年9月待还 ¥800/)).toBeInTheDocument();
+    fireEvent.click(cols[2]);
+    expect(screen.getByText(/26年7月待还 ¥500/)).toBeInTheDocument();
+  });
+
+  it("柱子和x轴标签在同一个滚动容器里(横滑时不会互相错位)", () => {
+    const debts = [makeDebt({ id: "d1", plan: [row("2026-09-10", 100, 10)] })];
+    render(<PressureChart data={pressureOf(debts)} />);
+    const scroll = document.querySelector(".pchart-scroll")!;
+    expect(scroll.querySelector(".pchart-bars")).toBeTruthy();
+    expect(scroll.querySelector(".chart-xaxis")).toBeTruthy();
+    // 刻度线层必须在滚动容器外——横滑时它是不动的参照系
+    expect(scroll.querySelector(".pchart-grid")).toBeNull();
+    expect(document.querySelector(".pchart-grid")).toBeTruthy();
   });
 
   it("图例常驻（两个系列的身份不能只靠颜色区分）", () => {

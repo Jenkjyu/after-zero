@@ -20,6 +20,7 @@ function makeCtx(): GestureCtx {
     jiggleModeRef: { current: false },
     openSwipeRowRef: { current: null },
     enterJiggle: () => {},
+    exitJiggle: () => {},
     onCommitReorder: () => {},
   };
 }

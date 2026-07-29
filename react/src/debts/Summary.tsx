@@ -29,7 +29,7 @@ export function Summary({ debts, premium, onAiBannerClick }: SummaryProps) {
         <div className="hero-prog">
           <div className="hero-prog-track"><div className="hero-prog-fill" style={{ width: s.pct + "%" }} /></div>
           <div className="hero-prog-row">
-            <span className="l num">已归还本金 ¥{window.fmt(s.paidPrincipal)}</span>
+            <span className="l num">已还本金 ¥{window.fmt(s.paidPrincipal)}</span>
             <span className="r num">已完成 {s.pct}%</span>
           </div>
         </div>
@@ -38,7 +38,7 @@ export function Summary({ debts, premium, onAiBannerClick }: SummaryProps) {
       <div className="summary" id="summary">
         <div className="kpi">
           <div className="v num">¥{window.fmt(s.paidPrincipal)}</div>
-          <div className="k">已还金额</div>
+          <div className="k">已还本金</div>
           <div className="kpi-sub num">另付利息 ¥{window.fmt(s.paidInterest)}</div>
         </div>
         <div className="kpi">
@@ -70,9 +70,9 @@ export function Summary({ debts, premium, onAiBannerClick }: SummaryProps) {
         style={{ display: noteOpen ? "" : "none", marginTop: -2, marginBottom: 16, textAlign: "left", padding: "0 2px" }}
       >
         在还总负债 = 各未结清债务「未还本金」之和（只算本金、不含未来利息/手续费）。<br />
-        已还金额 = 全部债务（<b>含已结清</b>）「已还期数」的本金之和；另付利息 = 这些已还期数对应的利息/手续费之和。<br />
+        已还本金 = 全部债务（<b>含已结清</b>）「已还期数」的本金之和；另付利息 = 这些已还期数对应的利息/手续费之和。<br />
         经常性月供 = 各未结清债务下一期应还之和（不含标记为「一次性还清」的借款）。<br />
-        已完成% = 已还金额 ÷（已还金额 + 在还总负债）。标记为「提前结清」的债务，剩余期次没有被逐期销掉，所以那部分本金两边都不计入——实际付了多少钱 App 并不知道。
+        已完成% = 已还本金 ÷（已还本金 + 在还总负债）。「提前结清」会问你实际付了多少钱，剩余本金计入已还本金，实付超出的部分计入另付利息（协商减免记为负数）。
       </div>
     </div>
   );

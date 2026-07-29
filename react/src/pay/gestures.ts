@@ -1,4 +1,5 @@
-// 还款日卡片左滑露出"标记已还"——原样照抄自 www/index.html 的
+// 还款日卡片左滑露出"销这期"(2026-07-29从"标记已还"改名——同一个动作在债务页/详情窗都叫
+// "销这期"，同义不同名会让人以为是两回事)——原样照抄自 www/index.html 的
 // initPaySwipe/closePaySwipe/openPaySwipeTo/paySwipeSettle，不借这次迁移"用更React的方式
 // 重写"(同一条决定见CLAUDE.md"在还债务自定义排序"/"React 迁移"两节"手势代码原样照抄"的原则)。
 //
@@ -11,7 +12,7 @@
 // 事件默认passive，preventDefault()不会真正阻止原生滚动，这是React本身的限制。
 import type { MutableRefObject } from "react";
 
-export const PAY_REVEAL = 92;
+export const PAY_REVEAL = 76;
 
 export interface PayGestureCtx {
   openSwipeRowRef: MutableRefObject<HTMLElement | null>;

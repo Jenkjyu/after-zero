@@ -30,7 +30,7 @@ describe("report/Hero", () => {
     ];
     const data = window.computeReportData(debts);
     render(<Hero data={data} debts={debts} premium={{ premium: null }} />);
-    expect(screen.getByText("累计已还本金")).toBeInTheDocument();
+    expect(screen.getByText("已还本金")).toBeInTheDocument();
     expect(screen.getByText("经常性月供")).toBeInTheDocument();
     expect(screen.getByText("归零进度")).toBeInTheDocument();
     expect(screen.getByText("加权平均利率")).toBeInTheDocument();
@@ -78,8 +78,9 @@ describe("report/Hero", () => {
     expect(screen.getByText(/只算本金，不含未来的利息/)).toBeInTheDocument();
     expect(screen.getByText(/已标记为「已还」期次的本金之和/)).toBeInTheDocument();
     expect(screen.getByText(/不含标记为「一次性还清」的借款/)).toBeInTheDocument();
-    // 提前结清那部分钱去哪了——必须诚实说明，不能假装它被还了
-    expect(screen.getByText(/既不计入在还总负债、也不计入累计已还本金/)).toBeInTheDocument();
+    // 提前结清那部分钱去哪了——必须诚实说明。2026-07-29起口径变了：结清时会问实付金额，
+    // 剩余本金计入已还本金、多付的部分计入利息，不再是"两边都不计"。
+    expect(screen.getByText(/剩余本金计入已还本金/)).toBeInTheDocument();
   });
 
   it("加权平均利率旁有InfoTip说明按钮", () => {

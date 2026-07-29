@@ -50,7 +50,7 @@ export function Hero({ data, debts, premium }: HeroProps) {
       <div className="summary">
         <div className="kpi">
           <div className="v num">¥{window.fmt(s.paidPrincipal)}</div>
-          <div className="k">累计已还本金</div>
+          <div className="k">已还本金</div>
           <div className="kpi-sub num">另付利息 ¥{window.fmt(s.paidInterest)}</div>
         </div>
         <div className="kpi">
@@ -87,11 +87,11 @@ export function Hero({ data, debts, premium }: HeroProps) {
       {noteOpen && (
         <div className="footnote" style={{ marginTop: -2, marginBottom: 16, textAlign: "left", padding: "0 2px" }}>
           在还总负债 = 各未结清债务「未还本金」之和（只算本金，不含未来的利息/手续费）。<br />
-          累计已还本金 = 全部债务（<b>含已结清</b>）已标记为「已还」期次的本金之和；另付利息 = 这些期次对应的利息/手续费之和。<br />
+          已还本金 = 全部债务（<b>含已结清</b>）已标记为「已还」期次的本金之和；另付利息 = 这些期次对应的利息/手续费之和。<br />
           经常性月供 = 各未结清债务下一期应还金额之和（不含标记为「一次性还清」的借款）。<br />
-          归零进度 = 累计已还本金 ÷（累计已还本金 + 在还总负债），只按本金计算。<br />
+          归零进度 = 已还本金 ÷（已还本金 + 在还总负债），只按本金计算。<br />
           预计还清日期 = 按现有还款计划里最晚的未还期次推算，<b>是预测不是承诺</b>，没有把提前还款算进去。<br />
-          标记为「提前结清」的债务，剩余期次并没有被逐期销掉，所以那部分本金既不计入在还总负债、也不计入累计已还本金——实际付了多少钱App并不知道。
+          「提前结清」会问你实际付了多少钱，并把剩余期次合并成一条结清记录：剩余本金计入已还本金，实付超出剩余本金的部分计入另付利息（协商减免则记为负数）。未来那些期原本的利息不会被算成你付过——提前结清本来就免掉了它们。
         </div>
       )}
     </>

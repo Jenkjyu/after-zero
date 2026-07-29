@@ -22,13 +22,16 @@
 //   混进同一个scale会把12根柱子压扁。改成图表上方一条 --critical 提示行，并明说"未计入下方"。
 // · 每个数值都不只靠手势才能读到(anti-pattern: tooltip as the only way to read a value)——
 //   Y轴刻度 + 摘要行 + 点击展开的当月债务组成 + 导出Excel/PDF 四条路径都能拿到具体数字。
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { UpcomingPressure } from "../types";
-import { attachChartScrub } from "./chartScrub";
 
 export interface PressureChartProps {
   data: UpcomingPressure;
 }
+
+// 每根柱子在"需要横向滚动"时占的宽度(24px柱身 + 2px间隙)。窗口短、容器装得下时不会用到
+// 这个值——轨道是 width:100% + min-width:count*COL_W，装得下就铺满、装不下才溢出滚动。
+const COL_W = 26;
 
 // Y轴刻度取整到"好看数字"，否则刻度会是 ¥1,733 这种没法快速心算的值。档位要够细——
 // 只有 1/2/2.5/5/10 的话，最大月2,760会被抬到5,000，最高的柱子只有半格高，一眼看过去
@@ -42,11 +45,14 @@ function niceCeil(v: number): number {
   return (NICE_STEPS.find((s) => n <= s) || 10) * mag;
 }
 
-// "2026-08" → "8月"。1月带上年份("27年1月")——12个月的窗口必然跨年，光写"1月"看不出是哪年。
-// 这个用在readout和摘要行里(有足够宽度)；x轴上用下面的monthTick()，只写数字。
+// "2026-08" → "26年8月"。**每个月都带年份**：窗口现在最长能到60个月、必然跨好几年，
+// 只有1月带年份(改之前的写法)的话，滑到后面看到"9月待还"根本分不清是哪一年的9月——
+// 真机上第一时间就被指出来了。用两位年份而不是"2026年8月"，是因为这几个标签挤在
+// readout行和摘要行里，短一点不容易换行。
+// 这个用在readout/摘要行/当月债务组成标题(都有足够宽度)；x轴上用下面的monthTick()，
+// 只写月份数字——那里每个刻度只有约24px，塞不下年份，跨年靠柱子上那条竖分隔线区分。
 function monthLabel(m: string): string {
-  const mo = +m.slice(5, 7);
-  return mo === 1 ? m.slice(2, 4) + "年1月" : mo + "月";
+  return m.slice(2, 4) + "年" + (+m.slice(5, 7)) + "月";
 }
 // x轴刻度只写月份数字。12根柱子的间距约24px，"9"/"12"这种1~2字符稳稳放得下，所以**每个月都标**——
 // 原来只标i%3===0那4个，"哪根柱子是9月"得靠自己数，是真实的可用性问题。跨年靠1月柱子左边
@@ -57,22 +63,15 @@ function monthTick(m: string): string {
 
 export function PressureChart({ data }: PressureChartProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const plotRef = useRef<HTMLDivElement | null>(null);
   const months = data.months;
   const n = months.length;
-
-  useEffect(() => {
-    const el = plotRef.current;
-    if (!el || n < 1) return;
-    return attachChartScrub(el, { count: n, onIndexChange: setActiveIndex });
-  }, [n]);
 
   const hasAny = data.totalAhead > 0 || data.overdue.count > 0;
   if (!n || !hasAny) {
     return (
       <div className="viz-block">
-        <div className="viz-title">未来12个月还款压力</div>
-        <div className="footnote" style={{ textAlign: "left" }}>未来12个月没有待还款项</div>
+        <div className="viz-title">未来还款压力</div>
+        <div className="footnote" style={{ textAlign: "left" }}>未来没有待还款项</div>
       </div>
     );
   }
@@ -100,7 +99,7 @@ export function PressureChart({ data }: PressureChartProps) {
   return (
     <div className="viz-block">
       <div className="viz-title-row">
-        <div className="viz-title">未来12个月还款压力</div>
+        <div className="viz-title">未来还款压力</div>
         {/* 两个系列必须常驻图例——身份不能只靠颜色区分 */}
         <div className="pchart-legend">
           <span><i className="sw principal" />本金</span>
@@ -110,7 +109,7 @@ export function PressureChart({ data }: PressureChartProps) {
 
       <div className="pchart-stats">
         <div><div className="k">本月待还</div><div className="v num">¥{window.fmt(months[0].total)}</div></div>
-        <div><div className="k">12个月共</div><div className="v num">¥{window.fmt(data.totalAhead)}</div></div>
+        <div><div className="k">{n}个月共</div><div className="v num">¥{window.fmt(data.totalAhead)}</div></div>
         <div><div className="k">月均</div><div className="v num">¥{window.fmt(data.monthlyAvg)}</div></div>
         <div>
           <div className="k">压力最大</div>
@@ -124,7 +123,7 @@ export function PressureChart({ data }: PressureChartProps) {
             <circle cx="12" cy="12" r="9" /><path d="M12 7v6" /><path d="M12 16.5v.01" />
           </svg>
           已逾期 {data.overdue.count} 期 · ¥{window.fmt(data.overdue.amount)}
-          <span className="sub">未计入下方12个月</span>
+          <span className="sub">未计入下方</span>
         </div>
       )}
 
@@ -135,45 +134,59 @@ export function PressureChart({ data }: PressureChartProps) {
         )}
       </div>
 
+      {/* 窗口不再固定12个月(见calc.js的pressureWindowMonths)，装不下就横向滚动。
+          ⚠️柱子和x轴标签必须放在**同一个**滚动容器里——分成两个各自滚动的容器，滑动时
+          标签和柱子会错位；而Y轴刻度线/刻度值要留在滚动容器**外面**(.pchart-grid)，
+          横滑时刻度是不动的参照系，跟着一起滑就失去意义了。
+          手势上这里刻意**不用chartScrub那套Touch Events**：横滑已经被原生滚动占用，
+          再叠一层拦截滚动的scrub会直接打架。读数改成点柱子(离散选择，跟BalanceBars/
+          TypeStack同一类轻交互)，PayoffLine那张连续折线图继续用scrub，不受影响。 */}
       <div className="pchart">
-        <div className="chart-plot">
-          {[0, 0.5, 1].map((f) => (
-            <div key={f} className="chart-gridline" style={{ bottom: f * 100 + "%" }}>
-              <span className="num">{f === 0 ? "0" : window.fmt(top * f)}</span>
-            </div>
-          ))}
-          {/* ⚠️scrub绑在.pchart-bars不是.chart-plot——后者含34px的刻度槽(padding-left)，
-              手指落点映射到的索引会整体偏移，最左边那根柱子几乎点不到 */}
-          <div className="pchart-bars" ref={plotRef}>
-            {months.map((m, i) => {
-              const { pH, iH } = segHeights(m);
-              return (
-                <div
-                  key={m.month}
-                  className={
-                    "pchart-col" + (i === idx ? " active" : "") + (i === 0 ? " is-current" : "") +
-                    // 1月柱子左边一条竖分隔线表示跨年（x轴标签只写月份数字，年份靠这条线区分）
-                    (m.month.slice(5, 7) === "01" && i > 0 ? " year-break" : "")
-                  }
-                >
-                  {i === peakIdx && <span className="pchart-peak" aria-hidden="true" />}
-                  <div className="pchart-stack">
-                    <div className="seg principal" style={{ height: pH + "%" }} />
-                    <div className={"seg interest" + (iH <= 0 ? " zero" : "")} style={{ height: iH + "%" }} />
-                  </div>
-                </div>
-              );
-            })}
+        <div className="pchart-viewport">
+          <div className="pchart-grid">
+            {[0, 0.5, 1].map((f) => (
+              <div key={f} className="chart-gridline" style={{ bottom: f * 100 + "%" }}>
+                <span className="num">{f === 0 ? "0" : window.fmt(top * f)}</span>
+              </div>
+            ))}
           </div>
-        </div>
-        {/* x轴标签band在容器内部，不靠固定高度挤掉它(anti-pattern)。每个月都标(只写数字，
-            约24px的柱距放得下)，跨年靠柱子上那条竖分隔线区分，见monthTick()的注释。 */}
-        <div className="chart-xaxis">
-          {months.map((m, i) => (
-            <div key={m.month} className={"chart-xtick" + (i === idx ? " active" : "")}>
-              {monthTick(m.month)}
+          <div className="pchart-scroll">
+            <div className="pchart-track" style={{ minWidth: n * COL_W }}>
+              <div className="pchart-bars">
+                {months.map((m, i) => {
+                  const { pH, iH } = segHeights(m);
+                  return (
+                    <button
+                      type="button"
+                      key={m.month}
+                      aria-label={monthLabel(m.month) + "待还 ¥" + window.fmt(m.total)}
+                      onClick={() => setActiveIndex(i === activeIndex ? null : i)}
+                      className={
+                        "pchart-col" + (i === idx ? " active" : "") + (i === 0 ? " is-current" : "") +
+                        // 1月柱子左边一条竖分隔线表示跨年（x轴标签只写月份数字，年份靠这条线区分）
+                        (m.month.slice(5, 7) === "01" && i > 0 ? " year-break" : "")
+                      }
+                    >
+                      {i === peakIdx && <span className="pchart-peak" aria-hidden="true" />}
+                      <div className="pchart-stack">
+                        <div className="seg principal" style={{ height: pH + "%" }} />
+                        <div className={"seg interest" + (iH <= 0 ? " zero" : "")} style={{ height: iH + "%" }} />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* x轴标签band在容器内部，不靠固定高度挤掉它(anti-pattern)。每个月都标(只写数字，
+                  约24px的柱距放得下)，跨年靠柱子上那条竖分隔线区分，见monthTick()的注释。 */}
+              <div className="chart-xaxis">
+                {months.map((m, i) => (
+                  <div key={m.month} className={"chart-xtick" + (i === idx ? " active" : "")}>
+                    {monthTick(m.month)}
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
+          </div>
         </div>
       </div>
 

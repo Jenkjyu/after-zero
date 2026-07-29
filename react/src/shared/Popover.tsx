@@ -33,9 +33,13 @@ export interface PopoverProps {
 
 interface PanelPos {
   top: number;
-  left?: number;
-  right?: number;
+  left: number;
 }
+
+// 面板离视口边缘至少留这么多，别贴边贴到看起来像被裁了
+const VIEWPORT_MARGIN = 10;
+// 面板跟触发器之间的间隙
+const ANCHOR_GAP = 6;
 
 export function Popover({ renderTrigger, renderContent, align = "end", panelClassName }: PopoverProps) {
   const [open, setOpen] = useState(false);
@@ -53,17 +57,35 @@ export function Popover({ renderTrigger, renderContent, align = "end", panelClas
   // 每次打开、或打开期间视口滚动/尺寸变化，都重新量一次触发器的位置——这个面板本来就是
   // "点一下即用即关"的短生命周期交互，不需要跟"手势拖拽"那样帧级实时跟手，用普通事件监听
   // 足够，不需要走chartScrub.ts那套Touch Events基础设施。
+  //
+  // ⚠️定位分两趟，且**必须同时量面板自己的尺寸**：只按触发器的位置算(原来的写法，align==="end"
+  // 时直接给right、"start"时直接给left)，面板一旦比触发器到那一侧边缘的距离还宽，就会整块
+  // 溢出屏幕外——真机上"加权平均利率"那个问号点开后内容跑到屏幕外就是这么来的。现在改成
+  // 算出理想left之后按视口做钳制，纵向放不下时翻到触发器上方；面板尺寸只有渲染出来才量得到，
+  // 所以第一趟先以visibility:hidden渲染(不闪)，量完再定位并显示。
   useLayoutEffect(() => {
-    if (!open) return;
+    if (!open) { setPos(null); return; }
     function updatePos() {
-      const root = rootRef.current;
-      if (!root) return;
-      const rect = root.getBoundingClientRect();
-      if (align === "end") {
-        setPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
-      } else {
-        setPos({ top: rect.bottom + 6, left: rect.left });
+      const root = rootRef.current, panel = panelRef.current;
+      if (!root || !panel) return;
+      const r = root.getBoundingClientRect();
+      const pw = panel.offsetWidth, ph = panel.offsetHeight;
+      const vw = window.innerWidth, vh = window.innerHeight;
+
+      // 横向：先按对齐方式算理想位置，再钳进视口。面板比视口还宽时(理论上被CSS的max-width
+      // 挡住不会发生)也至少保证左边贴着margin，不会算出负数。
+      const ideal = align === "end" ? r.right - pw : r.left;
+      const maxLeft = Math.max(VIEWPORT_MARGIN, vw - pw - VIEWPORT_MARGIN);
+      const left = Math.min(Math.max(ideal, VIEWPORT_MARGIN), maxLeft);
+
+      // 纵向：默认挂在触发器下方；下方放不下就翻到上方；上下都放不下(面板比视口还高)
+      // 就贴着底部margin，让面板自己的滚动/换行去处理。
+      let top = r.bottom + ANCHOR_GAP;
+      if (top + ph > vh - VIEWPORT_MARGIN) {
+        const above = r.top - ph - ANCHOR_GAP;
+        top = above >= VIEWPORT_MARGIN ? above : Math.max(VIEWPORT_MARGIN, vh - ph - VIEWPORT_MARGIN);
       }
+      setPos({ top, left });
     }
     updatePos();
     window.addEventListener("resize", updatePos);
@@ -92,11 +114,13 @@ export function Popover({ renderTrigger, renderContent, align = "end", panelClas
   return (
     <div className="popover-root" ref={rootRef}>
       {renderTrigger({ open, toggle })}
-      {open && pos && createPortal(
+      {open && createPortal(
         <div
           ref={panelRef}
           className={"popover-panel" + (panelClassName ? " " + panelClassName : "")}
-          style={{ top: pos.top, left: pos.left, right: pos.right }}
+          // pos为null=还没量过尺寸的第一趟渲染：先放左上角、visibility:hidden，量完立刻
+          // 定位并显示。用visibility不用display:none——后者量不到offsetWidth/offsetHeight。
+          style={{ top: pos ? pos.top : 0, left: pos ? pos.left : 0, visibility: pos ? "visible" : "hidden" }}
         >
           {renderContent({ close })}
         </div>,
