@@ -1216,6 +1216,21 @@
      共享全局作用域的普通<script src>，不是ES module，主脚本里不再重复声明这些同名函数，
      靠JS作用域链找到这里定义的全局函数——必须排在主<script>之前。 -->
 <script src="js/calc.js"></script>
+<!-- 档案库PDF预览用：pdf.js（Mozilla开源PDF渲染库，pdfjs-dist@6.2.108的legacy构建，
+     兼容性优先于体积——这个App minSdk24覆盖到安卓7，legacy构建面向不支持最新JS特性的
+     环境，比默认build更保守）。本地打包在www/js/下，不走CDN，跟jspdf/xlsx同一个理由；
+     不是npm依赖（不进package.json），只是把pdfjs-dist包里两个构建产物原样复制过来，
+     跟jspdf/xlsx"手动下载的静态文件"是同一类。这里必须是ES module（pdf.min.mjs本身用
+     export语法），不能用classic<script src>——用行内type="module"把它转成window.pdfjsLib
+     全局，好让下面react-debts/sheets.js（DocsScreen.tsx的PDF预览）能直接读到；workerSrc
+     设成文档相对路径的纯字符串（不是import specifier），new Worker()按文档baseURL解析，
+     跟"js/calc.js"这类路径是同一个解析方式。必须放在react-debts那几个module script之前——
+     type="module"脚本按文档顺序依次执行，这条要先于sheets.js跑完，它才能读到window.pdfjsLib。 -->
+<script type="module">
+  import * as pdfjsLib from "./js/pdf.min.mjs";
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "js/pdf.worker.min.mjs";
+  window.pdfjsLib = pdfjsLib;
+</script>
 <!-- "在还债务"页的React实现(react/src/debts/，Vite库模式打包，见react/vite.config.ts)。
      type="module"脚本天然延迟到文档解析完、且晚于它之前所有阻塞性classic script执行完才运行，
      所以不需要手动保证"下面这几个React入口跑的时候window.__azBridge/calc.js全局函数都已就绪"这件事——

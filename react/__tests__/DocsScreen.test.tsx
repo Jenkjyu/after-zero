@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { DocsScreen } from "../src/sheets/DocsScreen";
 import { closeDocsScreen, openDocsScreen, useDocsScreenOpen } from "../src/shared/state";
 import { makeMockBridge } from "./mockBridge";
@@ -7,7 +7,21 @@ import type { FileItem } from "../src/types";
 
 afterEach(() => {
   closeDocsScreen(); // docsScreenOpen是模块级状态，重置避免测试间互相污染
+  delete window.pdfjsLib;
 });
+
+// PdfPreview用真实fetch(it.url)拿ArrayBuffer、真实window.pdfjsLib.getDocument解析——
+// jsdom既不能fetch真实的blob: URL也没有window.pdfjsLib，两者都要打桩。numPages控制
+// getPage会被调用几次(=渲染出几个canvas)，render()本身在jsdom里因为canvas.getContext("2d")
+// 返回null(见DocsScreen.tsx注释)永远不会被真正调用，这里的render mock只是让类型/调用链完整。
+function mockPdfjs(numPages: number) {
+  const page = { getViewport: vi.fn(({ scale }: { scale: number }) => ({ width: 100 * scale, height: 140 * scale })), render: vi.fn(() => ({ promise: Promise.resolve() })) };
+  const doc = { numPages, getPage: vi.fn(() => Promise.resolve(page)), destroy: vi.fn(() => Promise.resolve()) };
+  return { getDocument: vi.fn(() => ({ promise: Promise.resolve(doc) })) };
+}
+function mockFetchOk() {
+  return vi.fn(() => Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) })) as unknown as typeof fetch;
+}
 
 const docFile: FileItem = { id: "doc:0", upload: false, name: "note.md", mime: "", label: "我的笔记", content: "# 标题" };
 const imgFile: FileItem = { id: "up:1", upload: true, name: "photo.jpg", mime: "image/jpeg", label: "photo.jpg", url: "blob:img" };
@@ -72,8 +86,8 @@ describe("DocsScreen", () => {
     expect(container.querySelector("#docContent h2")).toBeTruthy(); // calc.js的mdToHtml：单个#是h2(不是h1)
   });
 
-  it("图片预览渲染img，pdf预览渲染embed，其它类型显示分享按钮", () => {
-    window.__azBridge = makeMockBridge({ files: [imgFile, pdfFile, otherFile] });
+  it("图片预览渲染img，其它类型显示分享按钮", () => {
+    window.__azBridge = makeMockBridge({ files: [imgFile, otherFile] });
     const { container } = render(<DocsScreen />);
     act(() => { openDocsScreen(); });
     const rows = container.querySelectorAll(".file-row");
@@ -81,12 +95,52 @@ describe("DocsScreen", () => {
     expect(container.querySelector("#docContent img")).toHaveAttribute("src", "blob:img");
     fireEvent.click(rows[0]); // 取消选中
     fireEvent.click(rows[1]);
-    expect(container.querySelector("#docContent embed")).toHaveAttribute("src", "blob:pdf");
-    fireEvent.click(rows[1]);
-    fireEvent.click(rows[2]);
     expect(screen.getByText("分享 / 保存")).toBeInTheDocument();
     fireEvent.click(screen.getByText("分享 / 保存"));
     expect(window.__azBridge.shareArchiveFile).toHaveBeenCalledWith("up:3");
+  });
+
+  // <embed type="application/pdf">在安卓WebView里是空白的(WebView没有内置PDF插件，
+  // 桌面Chrome有所以桌面测的时候看着是好的)，PDF预览改成了用pdf.js把每页解码画到<canvas>上，
+  // 见DocsScreen.tsx里PdfPreview组件的注释。
+  it("pdf预览：加载中显示提示，加载完成后按页数渲染canvas", async () => {
+    window.__azBridge = makeMockBridge({ files: [pdfFile] });
+    window.fetch = mockFetchOk();
+    window.pdfjsLib = mockPdfjs(2);
+    const { container } = render(<DocsScreen />);
+    act(() => { openDocsScreen(); });
+    fireEvent.click(container.querySelector(".file-row")!);
+    expect(screen.getByText("正在加载 PDF…")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(container.querySelectorAll("#docContent canvas")).toHaveLength(2);
+    });
+    expect(window.pdfjsLib!.getDocument).toHaveBeenCalled();
+    expect(screen.queryByText("正在加载 PDF…")).not.toBeInTheDocument();
+  });
+
+  it("pdf预览：window.pdfjsLib缺失(加载失败)时显示分享兜底", async () => {
+    window.__azBridge = makeMockBridge({ files: [pdfFile] });
+    delete window.pdfjsLib;
+    const { container } = render(<DocsScreen />);
+    act(() => { openDocsScreen(); });
+    fireEvent.click(container.querySelector(".file-row")!);
+    await waitFor(() => {
+      expect(screen.getByText(/PDF 预览失败/)).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("分享 / 保存"));
+    expect(window.__azBridge.shareArchiveFile).toHaveBeenCalledWith("up:2");
+  });
+
+  it("pdf预览：解析失败(getDocument reject)时显示分享兜底", async () => {
+    window.__azBridge = makeMockBridge({ files: [pdfFile] });
+    window.fetch = mockFetchOk();
+    window.pdfjsLib = { getDocument: vi.fn(() => ({ promise: Promise.reject(new Error("bad pdf")) })) };
+    const { container } = render(<DocsScreen />);
+    act(() => { openDocsScreen(); });
+    fireEvent.click(container.querySelector(".file-row")!);
+    await waitFor(() => {
+      expect(screen.getByText(/PDF 预览失败/)).toBeInTheDocument();
+    });
   });
 
   it("下载：调用downloadArchiveFile(id)，进行中禁用按钮", async () => {

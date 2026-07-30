@@ -117,6 +117,27 @@ declare global {
     // 排在backupScreen之前、termsScreen之后。
     __azAiScreenBack?: () => boolean;
     __azAiHistorySheetBack?: () => boolean;
+    // 档案库PDF预览(react/src/sheets/DocsScreen.tsx)用：pdf.js的legacy构建，通过
+    // www/index.html里一段行内type="module"脚本挂到window上(不是npm依赖，不参与
+    // Vite打包，见index.html里那段注释)——这里只声明DocsScreen.tsx实际用到的
+    // getDocument/PDFPageProxy这几个方法，不是pdf.js完整API表面。可能不存在
+    // (旧安装/加载失败)，所以是可选属性，调用前要判空。
+    pdfjsLib?: {
+      getDocument(src: { data: ArrayBuffer }): {
+        promise: Promise<PdfjsDocumentProxy>;
+      };
+    };
+  }
+
+  interface PdfjsDocumentProxy {
+    numPages: number;
+    getPage(pageNumber: number): Promise<PdfjsPageProxy>;
+    destroy(): Promise<void>;
+  }
+
+  interface PdfjsPageProxy {
+    getViewport(params: { scale: number }): { width: number; height: number };
+    render(params: { canvasContext: CanvasRenderingContext2D; viewport: { width: number; height: number } }): { promise: Promise<void> };
   }
 }
 

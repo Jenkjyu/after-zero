@@ -132,12 +132,7 @@ function PreviewBody({ it }: { it: FileItem }) {
     );
   }
   if (it.upload && /pdf/.test(it.mime)) {
-    return (
-      <div className="doc-body">
-        <embed src={it.url} type="application/pdf" style={{ width: "100%", height: "70vh", border: "1px solid var(--border)", borderRadius: 10, background: "var(--surface-2)" }} />
-        <div className="footnote" style={{ textAlign: "left", marginTop: 8, padding: 0 }}>长按预览区可保存到手机 / 通过分享菜单发送；若空白说明此设备浏览器不支持内嵌 PDF 预览。</div>
-      </div>
-    );
+    return <PdfPreview it={it} />;
   }
   if (it.upload) {
     return (
@@ -148,4 +143,82 @@ function PreviewBody({ it }: { it: FileItem }) {
     );
   }
   return <div className="doc-body md-body" dangerouslySetInnerHTML={{ __html: window.mdToHtml(it.content || "") }} />;
+}
+
+// 安卓WebView没有内置的PDF渲染插件(<embed type="application/pdf">在桌面Chrome能显示是因为桌面
+// Chrome自带PDFium插件，安卓WebView从AOSP层面就没有这个东西，不是品牌定制导致的差异)，之前
+// 用<embed>只能拿到一片空白。这里改成用pdf.js(见www/index.html里挂到window.pdfjsLib那段
+// 注释)把每一页真正解码画到<canvas>上，多页纵向堆叠、页面body本身可滚动，是真正的内嵌预览，
+// 不再依赖设备浏览器有没有PDF插件。
+function PdfPreview({ it }: { it: FileItem }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    let doc: PdfjsDocumentProxy | null = null;
+    setStatus("loading");
+    const pdfjsLib = window.pdfjsLib;
+    if (!pdfjsLib || !it.url) { setStatus("error"); return; }
+
+    fetch(it.url)
+      .then((r) => r.arrayBuffer())
+      .then((buf) => pdfjsLib.getDocument({ data: buf }).promise)
+      .then(async (loadedDoc) => {
+        doc = loadedDoc;
+        const container = containerRef.current;
+        if (cancelled || !container) return;
+        container.innerHTML = "";
+        const dpr = window.devicePixelRatio || 1;
+        const containerWidth = container.clientWidth || 320;
+        for (let n = 1; n <= loadedDoc.numPages; n++) {
+          if (cancelled) return;
+          const page = await loadedDoc.getPage(n);
+          const baseViewport = page.getViewport({ scale: 1 });
+          const scale = (containerWidth / baseViewport.width) * dpr;
+          const viewport = page.getViewport({ scale });
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.ceil(viewport.width);
+          canvas.height = Math.ceil(viewport.height);
+          canvas.style.width = "100%";
+          canvas.style.display = "block";
+          canvas.style.marginBottom = n < loadedDoc.numPages ? "8px" : "0";
+          canvas.style.borderRadius = "6px";
+          container.appendChild(canvas);
+          // jsdom测试环境里getContext("2d")返回null(没有真实canvas实现)，这里判空跳过实际
+          // 渲染调用——真机/真实浏览器里ctx永远非空，不影响生产行为，只是让组件在测试里
+          // 能安全跑到"渲染出N个canvas"这一步而不报错。
+          const ctx = canvas.getContext("2d");
+          if (ctx) await page.render({ canvasContext: ctx, viewport }).promise;
+        }
+      })
+      .then(() => { if (!cancelled) setStatus("ready"); })
+      .catch(() => { if (!cancelled) setStatus("error"); });
+
+    return () => {
+      cancelled = true;
+      if (doc) doc.destroy();
+    };
+  }, [it.url]);
+
+  return (
+    <div className="doc-body">
+      <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10, padding: status === "ready" ? 8 : 16, minHeight: status === "ready" ? undefined : 80 }}>
+        {status === "loading" ? <div className="footnote" style={{ textAlign: "left", padding: 0 }}>正在加载 PDF…</div> : null}
+        {/* 这个div永远不由React渲染任何子节点(JSX里从来不给它塞内容)——canvas是effect里
+            container.appendChild()直接塞进真实DOM的，跟React的虚拟DOM完全脱节。踩过一次坑：
+            最早把"正在加载"文字也塞进这同一个节点里，effect的container.innerHTML=""会把
+            React自己渲染的这个子节点也清掉，等status变化触发重渲染、React想去移除它记忆里
+            那个子节点时，那个节点早就被我们自己删了，报NotFoundError。分离成兄弟节点后，
+            这个div对React来说"子节点列表永远是空的"，React不会再尝试去碰里面任何东西。 */}
+        <div ref={containerRef} className="pdf-preview" />
+      </div>
+      {status === "error" ? (
+        <>
+          <div className="footnote" style={{ textAlign: "left", marginTop: 8, padding: 0, marginBottom: 10 }}>PDF 预览失败，可点下方按钮分享/保存后用其他应用打开。</div>
+          <div className="data-actions"><button type="button" className="btn primary" onClick={() => window.__azBridge.shareArchiveFile(it.id)}>分享 / 保存</button></div>
+        </>
+      ) : null}
+    </div>
+  );
 }

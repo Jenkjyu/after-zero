@@ -1001,6 +1001,25 @@ ActionBar消失后，WebView内容直接从状态栏正后方开始铺，配合�
 
 **桌面浏览器测试的边界，容易想当然**：CLAUDE.md早先记录的"用`ACCOUNT_KEY`localStorage小技巧跳过登录门"**只是伪造本地`account`对象、隐藏`#loginGate`，从来没有真正跑通`signInWithCustomTicket()`**——这个状态下`cbAuth()`根本没有真实的CloudBase已认证会话，任何`callFunction({name:"backupCreate"/"backupList"/...})`调用在服务端都会因为鉴权失败被拒（`auth.getUserInfo().customUserId`拿不到值）。**⚠️注意：现在`ensureCbAuthReady()`用`if (account) return;`判断是否已登录（见上面那条降级坑的修法）——桌面浏览器伪造`account`会让它误以为"已登录"从而跳过`signInAnonymously()`，于是连匿名会话都没有，`callFunction`可能直接踩中SDK的null凭证崩溃或鉴权失败。这不是bug，正是"云备份必须真机验证"的另一个体现：桌面伪造`account`这条老调试手法对云备份不适用（对债务/档案库等纯本地功能仍然好用）。**真正的ticket只能来自真实微信OAuth换来的`code`，只有真机走通原生插件才能拿到。**所以模拟器、报表图表/导出、Premium/Premium+订阅页UI、兑换码这几个功能可以完整在桌面浏览器验证，但云备份的真实端到端往返（创建/列表/恢复/删除）必须是装了真实微信登录的真机**，跟当初微信登录本身的验证要求一模一样，没有捷径。
 
+## 档案库PDF预览：`<embed type="application/pdf">`在安卓WebView里天生是空白的，改用pdf.js真正渲染（2026-07-30）
+
+档案库（`react/src/sheets/DocsScreen.tsx`）点开一个PDF文件，原来的预览是`<embed src={objectURL} type="application/pdf">`——桌面Chrome测试时看着是好的，真机上点开是一片空白，用户报了上来。
+
+**根因是AOSP层面的能力缺口，不是哪个品牌的定制问题**：`<embed>`/`<object>`能不能显示PDF内容，取决于浏览器有没有内置PDF渲染插件——桌面Chrome自带PDFium插件，安卓系统WebView从来没有这个东西。这跟"哪个手机牌子"无关，装什么ROM都一样，纯粹是WebView这个组件本身的缺口。代码里当年其实留了一句"若空白说明此设备浏览器不支持内嵌PDF预览"的footnote，说明这是当时就知道、但没真正解决的一个缺口。
+
+**修法：本地打包pdf.js（Mozilla开源PDF渲染库），把每一页真正解码画到`<canvas>`上，多页纵向堆叠**，不再依赖设备浏览器有没有PDF插件。具体做法刻意跟`jspdf`/`xlsx`那两个既有的本地库走**不同**的接入方式：
+
+- **不是npm依赖，不参与Vite打包**——`www/js/pdf.min.mjs`（主库）+`www/js/pdf.worker.min.mjs`（worker）是从`pdfjs-dist@6.2.108`包里手动复制出来的构建产物两个文件（`legacy/build/`目录下那两个，不是默认的`build/`目录），跟`jspdf.umd.min.js`/`xlsx.full.min.js`同一类"本地静态资源、进git、不进`package.json`"。**用`legacy`构建不用默认构建**——这个App的minSdk覆盖到安卓7，`legacy`构建是pdf.js官方专门为"不支持最新JS特性的环境"准备的更保守版本，兼容性优先于体积。
+- **必须用ES module方式引入，不能像jspdf/xlsx那样用classic `<script src>`**——`pdf.mjs`本身是`export`语法写的ES模块，`www/index.html`里用一段行内`<script type="module">`把它`import`进来、挂成`window.pdfjsLib`全局（`pdfjsLib.GlobalWorkerOptions.workerSrc = "js/pdf.worker.min.mjs"`），供`sheets.js`（React代码）跨模块边界读取。**这段module script必须排在react-debts那几个module script之前**——`type="module"`脚本按文档里出现的相对顺序依次执行，这条要先跑完，`window.pdfjsLib`才能在`DocsScreen.tsx`的effect跑之前就绪。
+  - `workerSrc`设成纯字符串`"js/pdf.worker.min.mjs"`（不是`import`specifier，是运行时传给`new Worker()`的一个值）——pdf.js内部会自动用`new Worker(workerSrc, {type:"module"})`创建worker（已读源码确认，不需要额外配置`type:"module"`），这个字符串按**文档baseURL**解析（不是按调用它的那个JS文件的URL解析），跟`<script src="js/calc.js">`这类路径是同一个解析方式，所以能直接写成相对路径。
+- pdf.js本身没有静态导入其它文件（读源码确认过，只有一处跟sandbox相关的动态`import()`，普通PDF预览用不到，不影响）。
+
+**桌面Playwright真实验证过（不是只跑单元测试）**：本地http server起服务，用`setInputFiles`上传一份真实生成的测试PDF（单页+3页两种都测过），检查渲染出的canvas数量匹配页数、且用`getImageData`确认canvas里画了真实非空白像素（不是空画布）、截图肉眼确认PDF文字内容确实显示出来了，深色模式下背景正确跟随主题（PDF页面内容本身固定白底黑字，这是PDF文件原本的样子，不需要跟着App主题变色，等同一张扫描件）。**这次没有引入npm测试依赖**——`react/__tests__/DocsScreen.test.tsx`的单元测试用`vi.fn()`打桩`window.pdfjsLib`和`window.fetch`（jsdom既不能真的`fetch(blob:)`也没有`window.pdfjsLib`），`canvas.getContext("2d")`在jsdom里恒为`null`（没装`canvas`这个npm包），组件对此已有判空保护(`if (ctx) await page.render(...)`)，测试断言止步于"渲染出了正确数量的canvas元素"，真实像素级验证只在上面这轮桌面Playwright手工验证里做。
+
+**⚠️踩了一个React+命令式DOM混用的坑，类型是"React的虚拟DOM和手工DOM操作互相打架"**：第一版把"正在加载PDF…"这行提示和`containerRef`绑定的canvas容器塞进了**同一个**DOM节点里——effect里`container.innerHTML = ""`会把React自己渲染的那个提示`<div>`也清空掉，等`status`变化触发重渲染、React想去移除它记忆中的那个子节点时，那个节点早被我们自己删了，报`NotFoundError: The node to be removed is not a child of this node`。**修法：把"加载中"提示挪成`containerRef`那个div的兄弟节点，`containerRef`绑的div在JSX里永远不渲染任何子节点**——这样对React来说这个div的子节点列表永远是空的，重渲染时压根不会去碰它内部任何东西，我们才能放心用`appendChild`/`innerHTML`直接操作它。**以后凡是"React管理的容器 + 里面还要塞命令式操作的DOM内容"（这个项目里`gestures.ts`/`chartScrub.ts`也是同一类模式），那个被命令式操作的DOM节点的JSX里必须永远保持零子节点，任何声明式渲染的兄弟内容都不能塞进同一个节点，哪怕看起来只是"加一行提示文字"这么小的改动。**
+
+**真机验证仍然待做**：桌面Chromium和安卓WebView都是Chromium内核，`fetch(blob:)`/`Worker(type:"module")`这两个真正跨设备风险点在桌面已经验证是通的，理论上真机大概率一致；但按这个项目一贯的规矩（"必须真机验证"这条红线只对`SaveFile`/`WeChatLogin`等原生插件严格适用，PDF预览走的是纯Web标准API不是原生插件），这次没有走完整的编译APK真机流程，建议下次装机测试时顺手点开档案库里的PDF确认一遍。
+
 ## 字体：`www/fonts/`
 
 `www/fonts/Inter-Variable-Latin.woff2`（+ `OFL.txt`许可证文本）不是随手丢进去的孤立文件，是`www/index.html`里`@font-face`引用的本地字体资源，`npx cap sync`会把整个`www/`文件夹（不只是`index.html`一个文件）打包进APK，所以这样引用没问题。**只包含拉丁字母/数字（`unicode-range`限定），不含中文字形**——这是故意的：完整内嵌一个覆盖几千汉字的中文字体体积会到几MB到十几MB，塞进这个项目不现实。中文文字会自动落到`--font-ui`变量里排在后面的系统字体（`"PingFang SC"`等），不受这个字体文件影响。别看着这个目录只有两个文件就以为是没清理干净的临时产物。
