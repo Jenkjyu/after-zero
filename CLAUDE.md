@@ -4,6 +4,8 @@
 
 **如果项目根目录下有 `PROGRESS.md`，先看那个文件。** 那是不进git、按时间记录"哪天做了什么、现在卡在哪一步"的进度日志（这份CLAUDE.md记的是相对稳定的技术细节，不记当前进度）——不是每个clone/checkout都会有这个文件（它是gitignored、因机器而异的本地文件），没有的话说明是全新环境，忽略这条即可。
 
+**⚠️`PROGRESS.md`只需要读最近的部分，不要整份读完**——它是按时间顺序累加的日志，早期条目的结论基本都已经沉淀进了这份CLAUDE.md，继续留着只是为了给"哪天做过什么"提供可追溯的存档，不是每次都要重新加载的上下文。**按"最近的自然日"定边界，不是按`## `标题数——同一天常常有好几个"续/再续/三续..."编号的子条目（活跃的日子一天能有七八个甚至十几个），数标题个数会跟"最近几天"对不上。** 做法：`grep -n "^## 20" PROGRESS.md | tail -20` 看最近这些标题都是哪天的，找到最近这个日期第一次出现的那一行，从那里读到文件末尾（通常就是最后1~2个自然日，含当天全部"续"条目）；如果这天内容明显偏短，往前再带一天。只有明确要追溯更早某次具体决策的完整经过时，才按关键词/日期搜更早的部分，不要因为"先看那个文件"这条规则就默认从头读到尾。
+
 ## 项目是什么
 
 **After Zero**——一个记债务的个人工具，用 [Capacitor](https://capacitorjs.com/) 把一个自包含的HTML app（`www/index.html`）包成安卓原生app。
@@ -839,41 +841,9 @@ ActionBar消失后，WebView内容直接从状态栏正后方开始铺，配合�
 > - **免费/付费边界（重划后）**：图表查看、提前还款模拟器 → **免费**（零成本、桌面级、口碑引擎，删了门禁）；高级统计报表**导出 PDF/Excel**、云备份、AI → **付费**（导出在 `reportExportXlsxBtn`/`reportExportPdfBtn` 的 click handler 里判 `hasPremium()`，查看图表无门禁）。判断标准：有真实成本（服务器/算力）才收费，纯客户端零成本的不设障碍。
 > - **兑换码**：`REDEEM_CODES = {"0000":"premium"}`；`applyRedeemTier` 写 `premium.premium={method:"redeemed",at}`。`__debugPremium` 状态只剩 `"premium"`/`"none"`。
 
-## （以下为旧版分级设计的记录，多数已作废，读时对照上面的框）Premium(一次性买断) + Premium+(月付/年付，分级包含Premium)
+## （旧版分级设计，已作废，仅存档）Premium(买断) + Premium+(月付/年付，分级)
 
-"我的"页"账户"卡片和"全部数据"卡片之间有一张Premium入口卡片（`#premiumEntryCard`），"在还债务"页顶部KPI卡片下方有一条低调的AI入口banner（`#aiBannerBtn`），两者都会跳到同一个新的整页浮层`#premiumScreen`（Premium/Premium+两个tab切换）。**这轮只做UI展示层，没有接真实支付**——App还没上架任何应用商店，接不了Google Play Billing/华为应用内购这类真实购买流程，"订阅并支付"按钮点了只会弹"暂未开放真实支付"的提示框（`ask()`, `onOk`传`null`）。以后App真正上架后，要把这个按钮换成真实购买流程，再决定`premium.premium`/`premium.premiumPlus`要不要补充到期时间等字段。
-
-**⚠️ 这两级会员名字最早叫"Pro"/"AI"，后来改成了"Premium"/"Premium+"，且关系从"两条互相独立的产品线"改成了"分级"**——早期`hasPro()`/`hasAI()`是正交的（可以只买一个、也可以两个都买，互不包含）；现在`hasPremiumPlus()`（对应老的`hasAI()`）和`hasPremium()`（对应老的`hasPro()`）是**分级**关系：`hasPremium()`的实现是`hasPremiumPlus() || !!premium.premium`，买了Premium+就自动被判定为拥有Premium的全部功能，不需要再单独持有一份`premium.premium`记录去"凑"这个包含关系。以后如果在代码里看到`hasPro`/`hasAI`这两个名字，那是没改完的遗留，应该统一改成`hasPremium`/`hasPremiumPlus`。
-
-**数据模型依然是两个独立的可空字段，不是单一tier枚举**：`PREMIUM_KEY`（`after-zero-premium-v1`）存的是`{premium, premiumPlus}`，`premium.premium`形状是`{purchasedAt}`（一次性买断，没有"到期"概念），`premium.premiumPlus`形状是`{billing:"monthly"|"yearly"|"redeemed", startedAt}`。拆成两个字段而不是`tier:"free"|"premium"|"premiumPlus"`纯粹是历史沿革（当年Pro/AI是正交产品线时就这么设计的），现在虽然逻辑上是分级，但没必要为了"看起来更像tier"去重构存储形状——`hasPremium()`/`hasPremiumPlus()`/`premiumLabel()`三个helper已经把分级关系封装好了，"我的"页入口卡片、账户详情页"会员"行、AI banner三处渲染都调这三个函数，不要各写一套if/else，也不要绕开这两个helper直接读`premium.premium`/`premium.premiumPlus`。
-
-**开发/测试阶段没有真实支付可以验证"已订阅"UI，用`window.__debugPremium(state)`这个调试钩子**（跟CLAUDE.md早先记录的"手写localStorage跳过登录门"是同一类调试手法，但这个额外包成了函数）：
-
-```js
-window.__debugPremium("premium")      // 模拟已买断Premium
-window.__debugPremium("premiumPlus")  // 模拟已订阅Premium+（自动包含Premium的全部功能）
-window.__debugPremium("none")         // 清空，恢复"普通用户"
-```
-
-调用后会立即重渲染"我的"页入口卡片、账户详情页"会员"行、AI banner这三处UI，不需要手动刷新页面——桌面浏览器或真机WebView的devtools console里都能执行。
-
-**兑换码：`#premiumScreen`底部"我有兑换码"入口，这一批只做了最小可用的调试功能，不是真实的兑换系统**——点开会展开一个文本输入框+"兑换"按钮，`REDEEM_CODES`是一个硬编码的`{code: tier}`映射表，目前只有一条：`"0000"`兑换`"premiumPlus"`。兑换成功会调`applyRedeemTier(tier)`直接在本地写`premium.premiumPlus`（`billing:"redeemed"`，跟真实购买的`"monthly"|"yearly"`区分开，方便以后排查这份数据是不是调试凑出来的），没有任何服务端校验、没有一次性使用限制、没有真实的码库。**App正式上线、接入真实支付渠道后，这条硬编码必须删掉**，换成真正的后端兑换码系统（生成、核销、防止重复使用、绑定具体商品）——现在这个只是给开发者自己在没有真实支付的情况下快速切到Premium+效果看的，跟`window.__debugPremium()`是同一类"临时调试手段"，只是换了个从UI里也能触发的入口。
-
-**订阅页价格是占位数字**（Premium ¥98一次性、Premium+ ¥18/月或¥120/年），已经跟用户确认过接受占位、以后接入应用内购时再定真实定价和商品ID，代码里也注释了这一点。Premium+既然分级包含Premium，未来定真实价格时，Premium+的定价逻辑上应该体现"Premium价格+差价"而不是两个完全独立算出来的数字——这次占位数字没有体现这层关系，上线定价时要重新算。
-
-**`.subpage#premiumScreen`是这个项目第二个"整页推入"型浮层**（第一个是`#accountScreen`，见上面"返回键处理"一节），完全照抄它的`.subpage`/`.subpage-header`/`.subpage-body`骨架，也同样加进了`window.__handleBackButton`那条"最上层先关"的判断链——加在`accountScreen`判断**之前**（`modalScrim`判断之后），因为`premiumScreen`在HTML里插在`accountScreen`之后，两者同为`.subpage`（z-index:35）时DOM顺序更靠后的绘制在上层，返回键要先关视觉上在最上层的那个。
-
-**Premium tab的"强调"没有照搬`.pay-hero.overdue`那种整卡实心红底的处理手法**——那是"逾期"这种真正紧急语义专属的最强视觉信号，订阅是转化场景，语义严重级别低得多，用了跟`.pm-btn.active`/`.file-row[aria-current]`同一套"描边+浅底"选中态配方，不专门为订阅页发明新的强调手法。
-
-**兑换码输入框默认收起，每次进订阅页都强制复位成收起**：`#redeemInputWrap`默认`display:none`，点"我有兑换码"（`#redeemToggleBtn`）才展开。`openPremiumScreen()`里显式把它`display="none"`+清空输入框——不这么做的话，上次展开过、关掉订阅页再进来会残留成"一进来就展开"的观感（用户当bug报过）。以后订阅页里任何"点开才显示"的东西，都在`openPremiumScreen()`里复位初始态，别只依赖HTML的默认属性。
-
-**《购买者服务条款》是订阅页footnote里一个高亮可点的链接（`.terms-link`/`#termsLink`），点开进整页浮层`#termsScreen`看真实条款**：条款正文（`www/index.html`里`#termsScreen .terms-body`）目前是**初稿**——覆盖适用范围/会员类型/价格支付/自动续订与取消/退款/兑换码/变更终止/数据免责/更新等条目，末尾明确标注"初稿、仅占位、非最终法律文本"。App正式接入真实支付、上架前要把这份换成正式版本（措辞、退款政策要对齐实际接入的应用商店规则）。`#termsScreen`是继`accountScreen`/`premiumScreen`之后又一个`.subpage`整页浮层，已加进`__handleBackButton`判断链（见下面那条）。
-
-**"我的"页顶部账户区已从"带框的横排（头像+昵称+右箭头）"改成"无框竖排：头像居中、昵称在头像下方居中"**（`.account-head`/`.account-avatar-btn`/`.account-avatar-lg`/`.account-name-c`，替换掉原来的`.data-card#accountCard`+`.account-row`）——**点头像**（`#accountAvatarBtn`）进"账户"详情页`#accountScreen`（原来是点整条`#accountRowBtn`）。注意`.account-avatar`这个class（44px）现在只剩账户详情页在用了，别删；账户区头像用的是新的`.account-avatar-lg`（78px）。`renderAccountUI()`往`#accountAvatarImg`/`#accountNameText`塞头像和昵称，这两个id没变。
-
-**"更大档案库空间"这条Premium功能文案已删除**：档案库文件存在设备本地，开发者没有服务器成本要摊销，人为设一个容量上限纯粹是为了逼氪制造障碍，经不起"这明明不花你一分钱为什么要限制我"的质疑，跟"云备份"（有真实服务器成本）、"OCR识别"/"智能问答"（有真实算力成本）这几条不是一回事。以后再给Premium/Premium+列功能点，先想清楚这条是不是有真实成本支撑，不要照抄"更大空间/无限XX"这类通用套路。
-
-**`__handleBackButton`那条"最上层先关"判断链，当前完整顺序是** `modalScrim` → `termsScreen` → `aiHistorySheet` → `aiScreen` → `backupScreen` → `docsScreen` → `simScreen` → `premiumScreen` → `accountScreen` → `notifySheet` → `editSheet` → `detailSheet`（`aiScreen`=AI 债务顾问整页浮层，DOM 里插在 `backupScreen` 之后、`termsScreen` 之前，所以判断排在 `backupScreen` 之前、`termsScreen` 之后；`aiHistorySheet`=从`aiScreen`内部打开的历史对话sheet，必须排在`aiScreen`判断**之前**，因为它视觉上盖在`aiScreen`上层——这是"最上层先关"规则第一次出现在"sheet挂在subpage内部"这种场景，不是简单按DOM先后顺序套用，而是按实际视觉层级：`aiHistorySheet`的z-index被手动提到36、比`aiScreen`所在的35更高，见上面"AI 债务顾问"一节）。**`docsScreen`（档案库，见下面"导航重排"一节）是"高级统计报表"升级成主tab之后腾出来的subpage槽位——原来这个DOM位置是`reportScreen`，`reportScreen`已经不再是subpage，`docsScreen`原样占了它的位置和链上的判断顺序，没有引入新的DOM排序问题。** 判断依据不变——这几个`.subpage`在HTML里都插在`premiumScreen`之后（`simScreen`最先、`docsScreen`次之、`backupScreen`、`termsScreen`最后），DOM顺序更靠后的在同z-index下画在上层，返回键要先判视觉上在最上层的那个。以后再加新的`.subpage`，永远加在它在DOM里紧邻的"后一个已有subpage"判断之前，不要图省事加到链尾。（`termsScreen`=购买者服务条款页，是订阅页里"《购买者服务条款》"链接点开的整页浮层，DOM里插在`backupScreen`之后，所以判断排在`backupScreen`之前、`modalScrim`之后。）
+早期是两级会员（更早之前是"Pro"/"AI"正交产品线，后改成"Premium"/"Premium+"分级：`hasPremium() = hasPremiumPlus() || !!premium.premium`），`PREMIUM_KEY`存`{premium, premiumPlus}`两个独立字段（一次性买断 vs `{billing:"monthly"|"yearly"|"redeemed"}`），调试钩子是`window.__debugPremium("premium"|"premiumPlus"|"none")`，兑换码`"0000"`兑换`"premiumPlus"`。`#premiumScreen`（Premium/Premium+两个tab切换）、`.terms-link`点开的`#termsScreen`等UI结构也已随React迁移收尾整体重做。完整设计细节、`Popover`/subpage返回键链等已作废的实现描述见git log（`git log -p -S "hasPremiumPlus" -- www/index.html`），当前状态以本节最上方的框为准。
 
 ## 提前还款收益模拟器（Premium）
 
@@ -924,34 +894,14 @@ window.__debugPremium("none")         // 清空，恢复"普通用户"
 
 **PDF现在也包含数据明细表了（不再只是图表摘要）**：早期版本PDF只有图表、明细留给Excel，后来用户要求PDF也带上明细表。因为明细是中文、同样过不了`doc.text()`，走的还是"SVG→PNG"这条路——`buildReportTableRows()`把三张表（各债务余额/类型占比/负债走势）拍平成行，`buildTablePagesSVG()`按每页约34个"行单位"（表头算2个）**分页**成多张SVG（`buildTablePageSVG()`每页一张、高度按行数动态算），`exportReportPdf()`把第1页图表 + 后续N页明细表逐张栅格化后`doc.addPage()`拼进PDF。之所以要分页而不是一张长图，是因为时间线可能几十行，单张超长图贴进A4会被页边裁掉。**屏幕上的数据明细表（`renderReportTables()`）现在也默认直接展开、不折叠了**（去掉了原来的`<details>`/`<summary>`，用户要求"直接展开不要收起"）。
 
-### 统计tab视觉+交互升级：石墨hero+可折叠KPI+第4张图（月还款统计）+全部图表交互化
+### 统计tab图表交互踩坑（2026-07-28那轮，多数细节已作废，仅保留仍适用的判断依据）
 
-> **⚠️ 这一节记录的是2026-07-28那一轮，其中"可折叠KPI头"和"月还款统计"这张图都已经被下一轮（"统计tab口径修正"）取代/删除**——`MonthlyChart.tsx`/`ReportTables.tsx`/`Kpis.tsx`/`ExportActions.tsx`这几个文件现在都不存在了。保留这一节是因为它记录的判断依据仍然成立且还在被沿用：图表交互两个复杂度量级的划分标准、`computeMonthlyRepayment`不并入`computeReportData`的先例、React Portal那个stacking context坑、`.viz-block`卡片外壳。读的时候注意区分"当时做了什么"和"现在长什么样"。
+> **⚠️ 这一节原记录"石墨hero+可折叠KPI+第4张图(月还款统计)+全部图表交互化"那轮改动，"可折叠KPI头"和"月还款统计"图都已被下一轮（"统计tab口径修正"）取代/删除**（`MonthlyChart.tsx`/`ReportTables.tsx`/`Kpis.tsx`/`ExportActions.tsx`已不存在，完整过程见git log）。仍然适用的判断依据：
 
-React迁移第三步时"统计"tab是最后一批机械翻译的组件（零手势、零交互、视觉上还停留在"高级统计报表"时代），这轮补齐——参考一木记账的统计页设计（可折叠KPI头、图表可切换+点击/拖动看精确值），但重新翻译成debt语境的信息维度，不照搬记账app的收支词汇（"收支统计"翻译成"月还款统计"——已还/待还两段，不是收入/支出两段）。
-
-**新增第4张图"月还款统计"，不替换现有"负债预测走势"**：两者性质不同——负债走势是余额随时间递减的投影曲线，月还款统计是每月发生额（已还/待还两段）。现有3张图（`BalanceBars`/`TypeStack`/`PayoffLine`）也都加了交互；导出Excel/PDF从独立按钮收进右上角"⋮"菜单（`ExportMenu.tsx`，替代删除的`ExportActions.tsx`）。
-
-**图表交互分两个复杂度量级，按数据形状（连续时间序列 vs 离散分类）区分，不是所有图表一刀切成同一种手势**：
-- **连续时间序列图**（`MonthlyChart.tsx`新图 + `PayoffLine.tsx`升级）：真正的press+drag scrub手势，共用新的`react/src/report/chartScrub.ts`——`nearestIndexForX(clientX, rect, count)`纯函数算最近索引，`attachChartScrub(el, {count, onIndexChange})`挂Touch Events（`touchmove`必须`{passive:false}`）+桌面`pointerType==='mouse'`网关的Pointer Events，`touchstart`/`pointerdown`落地立即触发一次（"点击=查看精确值"），`touchmove`/`pointermove`持续触发（"拖动=连续更新"）。图表上方常驻`.viz-scrub-readout`文字行，`activeIndex`为`null`时兜底显示默认视图（`PayoffLine`是"今天¥X·date还清"，`MonthlyChart`是最新一个月）。**释放手指后数字停留在最后scrub到的点，不自动回弹**——这样抬手后还能看清刚划到的数字。这个手势比"长按拖拽排序"简单得多：不需要长按计时器、不需要dx/dy方向判断，`touchstart`落在图表内直接开始scrub（代价：图表正上方开始的垂直滑动不会触发页面滚动，这是iOS股票类App图表的标准做法，可接受）。
-- **离散分类图**（`BalanceBars.tsx`/`TypeStack.tsx`）：只需要普通React `onClick`（离散数据每项本来就是完整的一个值，不需要"划过中间任意一点"），不需要Touch Events这套重手势基础设施。`BalanceBars`每行`activeIdx`状态+`.active`类（再点一次取消）；`TypeStack`的堆叠段和图例项联动同步（点任意一个都会高亮另一边），非选中段加`.dim`（`opacity:.35`）。
-
-**`computeMonthlyRepayment(debts)`（calc.js第41个函数）故意不塞进`computeReportData()`的返回对象**——那个对象被`exportReportXlsx`/`exportReportPdf`（100% vanilla）按字段名精确解构，改形状会同时打断两个导出功能。任何要给统计tab加的新数据维度都应该照这个先例独立成新函数，不要碰被解构的对象。不按`active`过滤（已结清债务的历史已还记录仍计入对应月份，否则结清瞬间会让过去月份的柱子突然变矮）；用`amount`（本金+利息合计）不是`principal`（这张图回答"当月要还多少钱"）；月份在数据范围内按月连续补0，不留稀疏空洞。
-
-**`react/src/shared/Popover.tsx`是`shared/`下第一个UI组件**（之前只有`state.ts`纯hook）——"?"说明弹窗（`InfoTip.tsx`）和"⋮"导出菜单（`ExportMenu.tsx`）共用同一个"点图标→弹出贴着图标的小面板→点外面/再点一次关闭"交互模式。
-
-**⚠️踩了一个隐蔽但很有代表性的坑：面板一开始用CSS `position:absolute`相对锚点定位，真机验证前的Playwright桌面测试就已经抓到"点导出菜单里的选项完全没反应"——根因分两层，且比想象的更深**：
-1. **第一层（真的是clipping）**：`ExportMenu`的触发器在`Hero.tsx`的`.hero-top`里，而`.hero`本身有`overflow:hidden`（用来裁切装饰性的`hero-smoke`色雾），绝对定位的下拉面板会被这层`overflow:hidden`直接裁掉/挡住。**改成`position:fixed`+JS用`getBoundingClientRect()`算视口坐标**看似解决了——面板的"定位参照"确实跳到了视口，不再被`.hero`的`overflow:hidden`裁切。
-2. **第二层（真正的根因，比clipping更隐蔽）**：改完`position:fixed`后问题依然复现。用最小复现单独排查后才搞清楚：**`position:fixed`只让元素的定位参照跳到视口，不会让它跳出祖先的stacking context**。`.hero-top`和`.hero-amt`都是`.hero`的直接子元素，都被`.hero > *{position:relative;z-index:1}`这条规则赋予了相同的z-index、各自形成独立的stacking context——面板在DOM树里依然是`.hero-top`这个stacking context的后代，会被整体画在`.hero-top`这层，而DOM顺序更靠后、z-index相同的`.hero-amt`作为兄弟stacking context会整个画在它上层。哪怕面板的视觉坐标已经算到了`.hero-amt`下方的空白区域，**命中测试(hit-test)点到的还是`.hero-amt`**——这是纯CSS定位技巧解决不了的，`position:fixed`元素的"绘制层级"依然由它在DOM/stacking-context树里的位置决定，不是由它最终画在屏幕哪个像素决定。
-3. **最终解法**：用`createPortal(panel, document.body)`把面板真正挂到`document.body`下，让它在DOM树里就不是`.hero`的后代，彻底跳出整条stacking context链——这是这个项目第一次用React Portal。`Popover.tsx`同时保留`position:fixed`+`getBoundingClientRect()`算坐标（打开时机+`resize`/`scroll`时机重新量一次），两者都需要：portal解决"画在谁上面"，fixed+算坐标解决"面板具体显示在哪"。判断"点击面板外关闭"的逻辑也要相应调整——面板挂在body下之后，必须同时检查触发器（`rootRef`）和面板本身（`panelRef`）两处，不能只检查触发器所在的`.popover-root`，否则点面板自己的内容（比如菜单项）会被误判成"点了外面"而立刻关闭。**以后这个项目里任何"贴着触发器展开的浮层"，如果发现"看起来定位对了但点不到"，先怀疑是不是这个stacking context坑，而不是继续调CSS的z-index数值**——加大z-index在这里完全没用，问题不在z-index大小，在DOM树位置。
-
-**`Hero.tsx`结构上还踩过一个更基础的坑：一开始把`.summary`（KPI网格）/`.note-toggle`/展开的KPI网格全部嵌套在`.hero`内部**，跟"债务"tab的`debts/Summary.tsx`（`.hero`和`.summary`是兄弟节点，不是父子）这个既有模式不一致。后果不只是结构不统一——`.summary`里的`InfoTip`弹窗也被嵌套进了`.hero`的`overflow:hidden`里，触发了跟上面`ExportMenu`同一类的裁切问题。修法是把`.hero`（只包含`hero-top`/`hero-amt`/`hero-pill`）改成独立的一个块，`.summary`/`note-toggle`/展开网格作为**兄弟节点**紧跟在后面，跟`debts/Summary.tsx`的结构完全对齐。**这个坑是Playwright验证阶段真实复现"点了'加权平均利率'旁边的说明按钮没反应"之后才定位到的，不是设计阶段就想到的**——以后往这几个hero卡片里加任何新的弹层/浮动内容，先确认它有没有被不小心嵌进了`.hero`这层`overflow:hidden`容器。
-
-**`.viz-block`补上了卡片外壳**（之前一直是裸的`margin-bottom:22px`，没有`background`/`border`/`shadow`）：`background:var(--card-grad);border:1px solid var(--hair);border-radius:18px;padding:14px 16px;box-shadow:var(--e1)`，让5个viz-block（`BalanceBars`/`TypeStack`/`PayoffLine`/`MonthlyChart`/`ReportTables`）都套上跟"债务"/"还款日"两个tab一致的卡片质感。
-
-**验证**（⚠️这段是"视觉+交互升级"那轮的记录；其中"更多指标"折叠在下一轮"统计tab口径修正"里已经删除，换成4个常驻KPI+"计算口径说明"折叠）：桌面Chromium + Playwright（一次性临时`npm install playwright`，用完卸载）：Hero"更多指标"展开/收起、InfoTip打开/关闭、导出菜单打开/关闭+两个premium门禁方向（未开通跳订阅页/已开通直接触发导出）、`MonthlyChart`柱状/折线切换、`BalanceBars`/`TypeStack`点击高亮联动、`MonthlyChart`和`PayoffLine`的桌面鼠标拖动scrub（两者的readout都正确跟着更新、抬手后停留不回弹），light/dark两种主题截图核对（含真实移动端viewport 390×844，不是fullPage长图——**fullPage长图截图对`position:fixed`元素会有已知的拼接假象，曾经一度误以为"还款提醒通知"面板不知为何默认打开着，用普通viewport截图核实后确认只是fullPage截图工具的假象，不是真实bug**，以后排查类似"截图里出现不该出现的东西"，先用非fullPage的普通viewport截图复核一遍再当真）；`npx tsc --noEmit`零错误，`npm run test:react`全绿，`npm test`（calc.js套件）不受影响，`npm run build:react`确认`report.js`产物正常增长（从升级前的8.94kB涨到23kB左右，符合预期——4张图+可折叠KPI头+2个共享UI组件）。
-
-**⚠️还没做的验证：真机触摸手势确认**——两张连续时间序列图（当时是`MonthlyChart`，现在是`PressureChart`）和`PayoffLine`的scrub手势是这轮唯一动了真正touch事件的地方（`chartScrub.ts`），桌面Playwright只能验证鼠标模拟的Pointer Events路径不报错、代码逻辑没问题，验证不了真实手指连续拖动的手感、多点触控边界情况、安卓WebView的触摸事件时序——跟这个项目历史上"长按拖拽排序"/"还款日左滑"的教训是同一类要求，**这一步必须真机确认，不能跳过**。已编译好debug APK（`android/app/build/outputs/apk/debug/app-debug.apk`），下一步是装真机验证：两张连续时间序列图的拖动/点击scrub手感、`ExportMenu`/`InfoTip`两个弹层在真机WebView上的定位是否正确（这轮修复的stacking context坑理论上在任何浏览器引擎下都成立，但WebView版本差异值得留意）、light/dark主题下视觉效果、硬件返回键行为不受影响（这轮没有新增/改动任何`.sheet`/`.subpage`，`__handleBackButton`链不需要变动）。
+- **图表交互按数据形状分两档，不是所有图表一刀切成同一种手势**：连续时间序列图（如`PayoffLine`）用真正的press+drag scrub手势（`react/src/report/chartScrub.ts`，Touch Events + `{passive:false}`，`touchstart`落地立即触发一次、拖动持续更新、抬手停留不回弹）；离散分类图（`BalanceBars`/`TypeStack`）只需要普通React `onClick`高亮，不需要这套重手势基础设施。
+- **`computeMonthlyRepayment`这类新增数据维度，故意不塞进`computeReportData()`的返回对象**——那个对象被`exportReportXlsx`/`exportReportPdf`按字段名精确解构，改形状会同时打断两个导出功能。以后统计tab要加新的数据维度，照这个先例独立成新函数，不要碰被解构的对象。
+- **`react/src/shared/Popover.tsx`踩过的stacking context坑**：`position:fixed`只让元素的定位参照跳到视口，不会让它跳出祖先的stacking context——挂在`overflow:hidden`容器内的兄弟节点即使视觉坐标算对了，命中测试依然会被同级stacking context挡住，加大z-index没用。解法是`createPortal(panel, document.body)`真正把面板挂到`document.body`下，`position:fixed`+`getBoundingClientRect()`只负责算坐标，判断"点外面关闭"要同时检查触发器和面板两处引用。**以后任何"贴着触发器展开的浮层"如果"看起来定位对了但点不到"，先怀疑这个坑。**
+- **`.viz-block`需要卡片外壳**（`background`/`border`/`shadow`），不能是裸的`margin-bottom`块，否则跟其它tab的卡片质感不一致。
 
 ### 统计tab口径修正 + 压力图 + 走势时间轴（2026-07-29，P0/P1/P2 已全部完成，只差真机触摸验证）
 
