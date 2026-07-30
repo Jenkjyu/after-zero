@@ -38,14 +38,14 @@ const ICON_UPLOAD = (
 );
 
 interface EntryCardProps {
-  hue: "blue" | "violet" | "rose" | "amber";
+  hue: "brand" | "blue" | "violet" | "rose" | "amber";
   icon: ReactNode;
   title: string;
   sub: string;
   onClick: () => void;
 }
 
-function EntryCard({ hue, icon, title, sub, onClick }: EntryCardProps) {
+export function EntryCard({ hue, icon, title, sub, onClick }: EntryCardProps) {
   return (
     <div className="data-card entry-card">
       <button type="button" className="entry-row" onClick={onClick}>

@@ -592,6 +592,20 @@ ActionBar消失后，WebView内容直接从状态栏正后方开始铺，配合�
 
 两者管的**不是**同一件事：CSS那层管"文档滚动容器要不要产生overscroll行为"，原生那层管"WebView这个原生View自己要不要画overscroll效果"。只关一层的话，另一层在某些机型/WebView版本上依然会把拉伸效果画出来。**以后再遇到"滑到底还在动"这类反馈，先确认这两处是不是都还在，别只改CSS就以为完事。**
 
+## 焦点环（`:focus-visible`）必须用`box-shadow`画，不能用`outline`——圆角会对不上（2026-07-31修）
+
+用户截图报的bug：新增/编辑债务表单里"还款日（几号）""备注"这两个字段点击后，绿色焦点描边**左右溢出**，明显比输入框本身宽出一截。这不是这两处独有的问题——根因在全局规则上，**所有输入框/下拉框/按钮点了都有同样的问题，只是这两处先被发现**。
+
+**根因**：全局规则原来是`:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }`（`www/index.html`）。`outline`的圆角是浏览器按`outline-width`/`outline-offset`跟元素自身`border-radius`近似猜出来的一条曲线，**不保证精确贴合**——`.field input`等实际圆角是9px，`outline-offset:2px`把描边往外推之后，浏览器给这条描边算出来的圆角半径明显比"9px+2px offset"该有的更小，直线边那段就会比输入框本身宽出一截，圆角处反而显得内缩，看起来就是"左右溢出"。这条规则里的`border-radius: 4px`其实从来没生效过（`.field input`那条更具体的选择器优先级更高，元素自己的圆角一直是9px），真正的病根纯粹是outline+offset+圆角这个组合在浏览器里的近似渲染算法。
+
+**修法**：改用`box-shadow`画焦点环——`box-shadow`是照着元素**当前实际生效**的`border-radius`整个描边画的，不存在"近似猜"这一步，不管元素圆角是几都贴合：
+```css
+:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
+```
+**⚠️这是全局规则，牵一发动全身，改的时候要连带检查有没有专门"关掉焦点环"的例外**——这个项目里已经有两处（`.sort-sel:focus-visible`、`.ai-composer textarea:focus`）因为别的原因显式把焦点环关掉，原来只写了`outline: none`，换成box-shadow方案后必须同时补上`box-shadow: none`，不然这两处会意外重新长出一圈之前特意去掉的环。以后再新增类似"这个控件不需要焦点环"的例外，两个属性都要关，别只关一个。
+
+**验证**：Playwright依次focus"新增债务"表单里的input（贷款产品）、input（还款日）、textarea（备注）、select（借款类型）四种控件，`getComputedStyle`确认`outlineStyle:none`+`boxShadow`是贴合圆角的`0 0 0 2px`，深色模式截图确认描边紧贴边框、零溢出，控制台零报错。
+
 ## 返回键处理（安卓硬件/手势返回）
 
 弹窗关闭 + 退出App这两件事，走的是"原生问JS，JS说了算"的桥接，两头都有各自的坑：
@@ -605,6 +619,8 @@ ActionBar消失后，WebView内容直接从状态栏正后方开始铺，配合�
 **`#loginGate`（登录门）反而故意不加进这条链**——它没有关闭函数，设计上就是不可关闭的。登录门显示时，上面几个`if`全部为false，自然落到`return false`，原生层`finish()`退出App，这正是想要的"没什么可关的，直接退出"效果，不是漏加。
 
 **`.subpage`是这个项目第一个"整页推入"型浮层**（账户详情页`#accountScreen`用的就是这个class），跟原有的`.scrim`/`.sheet`底部弹出模式不同——从右侧滑入、覆盖满屏（含tabbar）、带返回箭头+标题的头部，不是从底部弹出的卡片。z-index分层：`.tabbar`=20 < `.scrim`=30 < `.sheet`=31 < `.subpage`=35 < `.login-gate`=40 < `.modal-scrim`=50 < `.flash`(toast)=60。以后再加类似的整页浮层，按这个顺序找自己的位置插进去，不用重新摸索。
+
+**⚠️同一个z-index下，谁画在上层由DOM顺序决定，不是靠"感觉上谁该在上面"——2026-07-31新增`AboutScreen`时真实踩过，且是两处独立的坑，都要过**：所有`.subpage`共享同一个z-index=35（除非像`#aiHistorySheet`那样手动覆盖），层叠顺序纯靠"后出现在DOM里的画在上层"。`AboutScreen`（"我的"页新入口）第一版在`react/src/sheets/App.tsx`里写在`TermsScreen`后面，结果"关于我们→会员服务协议"这条路径点开`TermsScreen`后，它的返回箭头被同层级、仍然`open`着的`AboutScreen`截胡（Playwright报`intercepts pointer events`）——因为`AboutScreen`在JSX里排得更后，反而盖住了应该在上层的`TermsScreen`。**这跟`window.__handleBackButton`的优先级链是两件独立的事，一个管"点击测试选中谁"（JSX挂载顺序/z-index），一个管"按返回键先关谁"（链里判断的先后顺序），这次两个都真的各踩了一次**：把`AboutScreen`挪到`TermsScreen`/`PrivacyScreen`/`AgreementScreen`/`AccountScreen`前面后，`__handleBackButton`链里原来`__azAccountScreenBack`排在新加的`__azAboutScreenBack`判断*之后*——`AboutScreen`新增了"账户与登录信息"入口会打开`AccountScreen`，链里顺序不对会导致按返回键先把底下还开着的`AboutScreen`关掉、上层的`AccountScreen`纹丝不动。**规则统一成一句话：凡是"screen X会从screen Y内部被打开"，X在JSX挂载顺序里要排在Y后面，X对应的`__azXScreenBack`在`__handleBackButton`链里也要排在Y前面**——两处顺序方向刚好相反（JSX是"后来者居上"，返回键链是"上层先关"），改的时候容易顾此失彼，两个都要对着检查一遍，别改完一个就以为完事。详见`react/src/sheets/App.tsx`和`www/index.html`里`__handleBackButton`对应的注释。
 
 ## 在还债务自定义排序：长按拖拽 + 抖动编辑模式
 
@@ -1071,6 +1087,22 @@ ActionBar消失后，WebView内容直接从状态栏正后方开始铺，配合�
 **历史对话sheet的z-index是手动提高过的，不能沿用其它`.sheet`默认的31**：`.sheet`默认z-index是31、`.subpage`是35（见下面"返回键处理"一节的z-index分层表），这个历史sheet是从`#aiScreen`（一个`.subpage`）内部打开的，如果沿用默认31会被35的`#aiScreen`本身盖住、点开跟没点一样——`#aiHistorySheet, #scrimAiHistory { z-index: 36; }`这条CSS专门覆盖，这是这个项目第一次出现"从subpage内部打开sheet"的场景，以后如果再有类似场景（sheet挂在某个subpage下面），记得同样需要手动把z-index提到35以上（但别超过`.login-gate`的40）。`__handleBackButton`链里这个sheet的判断插在`aiScreen`判断**之前**（"最上层先关"），`closeAiScreen()`内部也会先调一次`closeAiHistorySheet()`，防止用户点页面自带的返回箭头（不是硬件返回键）关闭`#aiScreen`时把历史sheet晾在半空。
 
 **桌面浏览器测不了真实 AI 往返**：跟云备份完全一样——伪造 `account` 没有真实 CloudBase 已认证会话，`callFunction({name:"aiAdvisor"})` 在服务端 `getUserInfo().customUserId` 拿不到值被拒。免费/付费门禁、订阅页 UI、`__debugPremium` 切状态这些能在桌面验；**真实 AI 生成/追问必须真机（release 包 + 微信登录）**。
+
+## 隐私政策 / 用户服务协议 / 会员服务协议 + "关于我们"入口（2026-07-31新增）
+
+App 之前**完全没有**任何地方展示《隐私政策》《用户协议》——微信登录+处理个人信息的 App 理论上该有，且`react/src/sheets/TermsScreen.tsx`原来显示的是一份假设"应用商店计费"的占位条款（用户自己确认"当时是乱写的"）。这一轮把三份真正的法律文档接了进去，源文本在`docs/legal/`（`隐私政策.md`/`用户服务协议.md`/`会员服务协议.md`），基于一木记账同类文档的结构参考+App当前真实功能整理，不是照抄，也不虚构不存在的数据收集行为（比如没有一木那些微博/QQ/友盟/百度语音/支付宝SDK，就没往里塞）。
+
+**"个人信息收集清单"调研结论，决定了这次没照抄一木的做法**：查过工信部/网信办App专项治理系列文件，法定强制要求的是**隐私政策正文本身**逐一列出收集的个人信息类型/目的/方式/范围，没有查到"必须再单独拆成一个可导航的清单页面"这条强制规定——一木记账那套"账号信息/订单信息/服务内容信息"三级菜单是自愿选择的呈现方式，不是合规红线。这次判断：不做独立清单页（隐私政策正文已完整覆盖），"关于我们"里"账户与登录信息"这一行直接复用已有的`AccountScreen`（点开就能看到我们从微信拿到的真实数据自证），不新建页面；也没做"订单信息"占位入口——代码库里压根没有订单/交易数据模型，做一个点开空空如也的入口是负分体验，真正的"预留"落在《会员服务协议》"当前状态说明"那段文字里（如实写明价格是占位、真实支付渠道接入后会更新协议）。
+
+**新增/改动的文件**：`react/src/sheets/PrivacyScreen.tsx`、`AgreementScreen.tsx`（全新）+ `TermsScreen.tsx`（内容整段替换成《会员服务协议》，**内部标识符`TermsScreen`/`openTermsScreen`/`closeTermsScreen`/`useTermsScreenOpen`/`window.__azTermsScreenBack`/`id="termsScreen"`全部保留原名不改**——参照`renderReportScreen()`那条先例，内部名字没跟着改不影响功能，是历史遗留，以后大改这块UI时可以顺手改名）。`react/src/sheets/AboutScreen.tsx`（新，"我的"页新入口，见下方）。`react/src/shared/state.ts`新增`aboutScreen`/`privacyScreen`/`agreementScreen`三对开关，完全照抄`accountScreen`/`premiumScreen`/`termsScreen`那套已有模式（布尔开关+独立`az:x-screen-changed`事件），没有发明新模式。`react/src/mine/DataCards.tsx`里原来模块内部的`EntryCard`改成了具名导出，供`AboutScreen.tsx`和`mine/App.tsx`共同复用。
+
+**`AboutScreen`内容**：App图标+版本号（写死字符串常量`"1.0"`，需要跟`android/app/build.gradle`的`versionName`手动保持同步——这个项目没有任何"构建时把版本号注入JS"的机制）+ 联系邮箱 + 三份协议入口 + "账户与登录信息"（复用`AccountScreen`）。`PremiumScreen.tsx`那句"开通即表示你同意《购买者服务条款》…费用从你的应用商店账户中扣除"的footnote同一时间也改掉了——跟`onSubscribe()`里早就如实说明的"After Zero 还未上架应用商店"自相矛盾，是同一类"假设应用商店计费"的过时文案。
+
+**Playwright验证时挖出两个真实bug（DOM挂载顺序+返回键链顺序都要对），详细成因和修法见上面"返回键处理"一节的"⚠️同一个z-index下…"那段**，这里不重复。
+
+**正文排版**：三份新screen都用`className="terms-body"`（`TermsScreen.tsx`已有的排版规则），隐私政策"委托处理"那张SDK表格用`.md-tbl`包裹（现成的表格样式，档案库markdown预览也在用）。`.terms-body`原来只有`h3`/`p`/`.terms-note`三条规则，这次给富文本条款补了`h4`（二级小标题，比如"（一）账号登录信息"）和`ul`/`ol`/`li`（没有的话`<ul><li>`会退化成浏览器默认样式，跟其它段落字号不一致），`www/index.html`里CSS已经加上。**不搬运**每份`.md`源文件开头的"📝 起草说明"块——那是给开发者自己看的草稿备注，不是给最终用户看的内容。
+
+**验证**：`test:react`306个用例全绿（新增`PrivacyScreen.test.tsx`/`AgreementScreen.test.tsx`/`AboutScreen.test.tsx`，更新`TermsScreen.test.tsx`/`PremiumScreen.test.tsx`/`MineApp.test.tsx`）、`tsc --noEmit`零错误、`build:react`正常（`sheets.js`93.68KB→138.99KB，符合新增大段法律文本的预期）、`npm test`（calc.js套件）102个不受影响。Playwright桌面验证：三份文档来回打开关闭、四层返回键（Privacy/Agreement/Terms/Account相对About）逐层正确回退，light/dark主题截图确认排版正常（SDK表格在窄屏下自动压缩换行，不溢出，是Playwright量出`scrollWidth===clientWidth`确认过的，不是眼看）。
 
 ## 云函数源码：`cloudbase/`
 

@@ -9,14 +9,14 @@ afterEach(() => {
 });
 
 describe("TermsScreen", () => {
-  it("未打开时不带open class，打开后渲染条款标题+初稿声明", () => {
+  it("未打开时不带open class，打开后渲染标题+正文关键内容", () => {
     window.__azBridge = makeMockBridge();
     const { container } = render(<TermsScreen />);
     expect(container.querySelector("#termsScreen")).not.toHaveClass("open");
     act(() => { openTermsScreen(); });
     expect(container.querySelector("#termsScreen")).toHaveClass("open");
-    expect(screen.getByText("购买者服务条款")).toBeInTheDocument();
-    expect(screen.getByText(/仅用于产品占位与体验展示/)).toBeInTheDocument();
+    expect(screen.getByText("会员服务协议")).toBeInTheDocument();
+    expect(screen.getByText(/尚未接入真实的支付渠道/)).toBeInTheDocument();
   });
 
   it("点返回箭头关闭", () => {

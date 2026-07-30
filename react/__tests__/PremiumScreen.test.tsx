@@ -85,12 +85,12 @@ describe("PremiumScreen", () => {
     expect(screen.queryByPlaceholderText("输入兑换码")).not.toBeInTheDocument();
   });
 
-  it("点《购买者服务条款》打开termsScreen(纯React状态)", () => {
+  it("点《会员服务协议》打开termsScreen(纯React状态)", () => {
     window.__azBridge = makeMockBridge();
     render(<PremiumScreen />);
     act(() => { openPremiumScreen(); });
     const termsHook = renderHook(() => useTermsScreenOpen());
-    fireEvent.click(screen.getByText("《购买者服务条款》"));
+    fireEvent.click(screen.getByText("《会员服务协议》"));
     expect(termsHook.result.current).toBe(true);
   });
 

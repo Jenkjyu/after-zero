@@ -190,6 +190,63 @@ export function useTermsScreenOpen(): boolean {
 
 // 提前还款模拟器——第八步(React迁移收尾)新增，跟detailSheet/editSheet同一个模式，但需要
 // 债务id参数(模拟哪笔债务)，所以是useDetailSheetId()那种风格而不是布尔开关。
+// 关于我们/隐私政策/用户服务协议——2026-07-31新增，跟accountScreen/premiumScreen/termsScreen
+// 同一个模式(布尔开关，全局只有一份，不需要"打开哪一个"这种参数)。aboutScreen是"我的"tab新增
+// 的入口，privacyScreen/agreementScreen则是从aboutScreen内部再打开的下一层subpage——跟
+// premiumScreen到termsScreen(旧#termsScreen，内容已换成《会员服务协议》，见TermsScreen.tsx
+// 顶部注释)是同一种"外层screen里链接到另一个独立screen"的关系，不是嵌套渲染，纯粹靠各自
+// 独立的布尔状态加返回键优先级链表达"谁盖在谁上面"。
+let aboutScreenOpen = false;
+function subscribeAboutScreen(callback: () => void) {
+  window.addEventListener("az:about-screen-changed", callback);
+  return () => window.removeEventListener("az:about-screen-changed", callback);
+}
+export function openAboutScreen() {
+  aboutScreenOpen = true;
+  window.dispatchEvent(new CustomEvent("az:about-screen-changed"));
+}
+export function closeAboutScreen() {
+  aboutScreenOpen = false;
+  window.dispatchEvent(new CustomEvent("az:about-screen-changed"));
+}
+export function useAboutScreenOpen(): boolean {
+  return useSyncExternalStore(subscribeAboutScreen, () => aboutScreenOpen);
+}
+
+let privacyScreenOpen = false;
+function subscribePrivacyScreen(callback: () => void) {
+  window.addEventListener("az:privacy-screen-changed", callback);
+  return () => window.removeEventListener("az:privacy-screen-changed", callback);
+}
+export function openPrivacyScreen() {
+  privacyScreenOpen = true;
+  window.dispatchEvent(new CustomEvent("az:privacy-screen-changed"));
+}
+export function closePrivacyScreen() {
+  privacyScreenOpen = false;
+  window.dispatchEvent(new CustomEvent("az:privacy-screen-changed"));
+}
+export function usePrivacyScreenOpen(): boolean {
+  return useSyncExternalStore(subscribePrivacyScreen, () => privacyScreenOpen);
+}
+
+let agreementScreenOpen = false;
+function subscribeAgreementScreen(callback: () => void) {
+  window.addEventListener("az:agreement-screen-changed", callback);
+  return () => window.removeEventListener("az:agreement-screen-changed", callback);
+}
+export function openAgreementScreen() {
+  agreementScreenOpen = true;
+  window.dispatchEvent(new CustomEvent("az:agreement-screen-changed"));
+}
+export function closeAgreementScreen() {
+  agreementScreenOpen = false;
+  window.dispatchEvent(new CustomEvent("az:agreement-screen-changed"));
+}
+export function useAgreementScreenOpen(): boolean {
+  return useSyncExternalStore(subscribeAgreementScreen, () => agreementScreenOpen);
+}
+
 let simScreenId: string | null = null;
 function subscribeSimScreen(callback: () => void) {
   window.addEventListener("az:sim-screen-changed", callback);

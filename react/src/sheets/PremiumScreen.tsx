@@ -104,7 +104,7 @@ export function PremiumScreen() {
             </div>
           ) : null}
         </div>
-        <div className="footnote">开通即表示你同意我们的<button type="button" className="terms-link" onClick={openTermsScreen}>《购买者服务条款》</button>。永久买断一次付费、长期使用；月付/年付为订阅，除非提前取消否则到期自动续订，费用从你的应用商店账户中扣除，可随时在应用商店的订阅管理中取消。</div>
+        <div className="footnote">开通即表示你同意我们的<button type="button" className="terms-link" onClick={openTermsScreen}>《会员服务协议》</button>。目前应用内价格为占位展示，尚未开通真实支付渠道；正式开通后，扣款、续订与取消方式将以届时接入的支付渠道为准。</div>
       </div>
     </div>
   );

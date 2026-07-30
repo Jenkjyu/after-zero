@@ -99,6 +99,13 @@ declare global {
     __azAccountScreenBack?: () => boolean;
     __azPremiumScreenBack?: () => boolean;
     __azTermsScreenBack?: () => boolean;
+    // 同上，2026-07-31新增的三条(关于我们/隐私政策/用户服务协议)——见
+    // react/src/sheets/AboutScreen.tsx、PrivacyScreen.tsx、AgreementScreen.tsx。
+    // vanilla的__handleBackButton链里privacy/agreement/terms排在about前面("最上层先关"：
+    // 这三个是从about内部再打开的下一层)。
+    __azAboutScreenBack?: () => boolean;
+    __azPrivacyScreenBack?: () => boolean;
+    __azAgreementScreenBack?: () => boolean;
     // 同上，第八步(simScreen/notifySheet)新增的两条——见 react/src/sheets/SimScreen.tsx、
     // NotifySheet.tsx。链里按原来DOM顺序排：simScreen在backupScreen和premiumScreen之间、
     // notifySheet排在accountScreen之后(沿用原来#notifySheet在DOM里的位置)。
