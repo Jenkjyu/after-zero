@@ -21,13 +21,14 @@ export interface PlanRow {
   paidAmount?: number;
 }
 
-// 公式生成器4种计息方式共用的spec形状(genPlan(spec)的入参，calc.js里定义)——react/src/sheets/
-// GenPanel.tsx用同一份类型。字段按kind分组使用：amort用P/rate/n，equalfee用pp/pf/n，
-// interestfirst用P/rate/ni/np，custom只用n。保存债务时(EditSheet.tsx)原样存进Debt.gen，
-// 下次编辑时用来回填公式生成器的输入框(即使这条债务当初是手动录入的，也存一份"当前选中的
-// 计息方式+参数"，跟vanilla原来saveForm()的做法一致)。
+// 公式生成器5种计息方式共用的spec形状(genPlan(spec)的入参，calc.js里定义)——react/src/sheets/
+// GenPanel.tsx用同一份类型。字段按kind分组使用：amort/equalprincipal都用P/rate/n(同样的
+// 借款金额+年化+期数，只是分配方式不同)，equalfee用pp/pf/n，interestfirst用P/rate/ni/np，
+// custom只用n。保存债务时(EditSheet.tsx)原样存进Debt.gen，下次编辑时用来回填公式生成器的
+// 输入框(即使这条债务当初是手动录入的，也存一份"当前选中的计息方式+参数"，跟vanilla原来
+// saveForm()的做法一致)。
 export interface GenSpec {
-  kind: "amort" | "equalfee" | "interestfirst" | "custom";
+  kind: "amort" | "equalprincipal" | "equalfee" | "interestfirst" | "custom";
   first: string;
   P?: number;
   rate?: number;

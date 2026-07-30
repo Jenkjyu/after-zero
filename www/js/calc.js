@@ -29,9 +29,54 @@ function isActive(d) { return !d.settled; }
 function genPlan(spec) {
   var rows = [], start = spec.first ? parseDate(spec.first) : today0();
   function push(k, amount, principal, interest) { rows.push({ date: fmtDate(addMonths(start, k)), amount: r2(amount), principal: r2(principal), interest: r2(interest), paid: false }); }
+  // ⚠️三个"分期摊销"分支(amort/equalprincipal/interestfirst的还本阶段)都有同一个共同的
+  // 隐患，必须统一按同一个规则处理，缺一半都不够：
+  // ①每期本金pr在"非最后一期"要先r2()四舍五入、再用这个四舍五入后的值去减running
+  //   balance，不能拿未四舍五入的浮点数去减——否则running balance跟"每期实际记录/显示
+  //   的本金"会悄悄分叉。这条在利息占比明显、每期本金天然不同的场景下(比如amort在
+  //   rate=12%这种正常利率下)几乎看不出问题，因为相邻两期的四舍五入误差方向不定、大致
+  //   抵消；但只要"非最后一期的本金"多期算出同一个值或非常接近的值(典型触发场景：
+  //   equalprincipal的本金份额本来就是同一个数；amort/interestfirst在rate=0或rate极小时，
+  //   利息趋近于0，导致每期本金趋近于同一个"m"值)，同一个四舍五入偏差会朝同一个方向反复
+  //   叠加，期数越多偏得越多，实测P=500,rate=0,n=9时本金合计能偏到500.03。
+  // ②光有①还不够——只做①的话，在期数特别多(比如超过百期)的场景下，①里"往同一个方向
+  //   反复叠加"的偏差本身也会累积到超过剩余本金，导致"最后一期(或后面某一期)本金变成
+  //   负数"这个更离谱的结果(实测P=100,rate=36%,n=210这种30年内完全可能出现的高息长期
+  //   债务组合就会触发，不是要n=1000+这种不现实的期数才会碰到)。所以还要加一层每期本金
+  //   pr都不能超过"当前剩余本金"的钳制(pr = Math.min(nominalPr, bal))——不只是最后一期，
+  //   每一期都要钳制。这样不管前面攒了多少四舍五入偏差，一旦某一期发现"按公式该收的钱
+  //   比剩下的本金还多"，这一期就直接收掉剩余全部本金、提前把这笔账结清(视觉上等价于
+  //   "这笔债务因为四舍五入提前几天/几期还完了")，从这一期起bal精确保持在0，不会再变负；
+  //   这期以及之后所有期次principal/interest/amount全部清爽地显示为0，不是负数。
+  //   ⚠️提前结清的这一期，amount要重算成"pr+it"(不能沿用固定的月供m/m3)——这期实际收的
+  //   钱本来就比原计划少(利息也是bal降到接近0之后的很小一笔)，继续显示固定月供金额会跟
+  //   本金+利息对不上，触发"amount与principal+interest不一致"的校验。正常(没有被钳制)
+  //   的period依然显示固定的m/m3，跟以前完全一样。
+  // 实测遍历过P/rate/n(或ni/np)、覆盖到30年期(360期)以上的10万+组合，修复后本金合计跟
+  // impliedAPR反推年化都精确对得上、且不再出现任何负数，见test/calc.test.js的回归测试。
   if (spec.kind === "amort") {
     var P = +spec.P || 0, i = (+spec.rate || 0) / 1200, n = +spec.n || 0, bal = P, m = i > 0 ? P * i / (1 - Math.pow(1 + i, -n)) : (n ? P / n : 0);
-    for (var k = 0; k < n; k++) { var it = bal * i, pr = (k === n - 1) ? bal : (m - it), amt = (k === n - 1) ? bal + it : m; bal -= pr; push(k, amt, pr, it); }
+    for (var k = 0; k < n; k++) {
+      var it = bal * i, prNom = (k === n - 1) ? bal : r2(m - it), closing = prNom >= bal;
+      var pr = closing ? bal : prNom, amt = closing ? bal + it : m;
+      bal -= pr; push(k, amt, pr, it);
+    }
+  } else if (spec.kind === "equalprincipal") {
+    // 等额本金：每期本金固定(P/n)，利息按剩余本金实时计算(bal4*i4)，随本金递减而递减——
+    // 跟amort共享P/rate/n这三个字段，唯一区别是"每期还多少钱"的分配方式：amort解一个固定
+    // 月供m反推本金/利息份额，这里反过来先钉死本金份额，利息和总还款额都是随之算出来的。
+    // pr4本身每期都相同，直接在循环外r2()一次即可(不需要像amort/interestfirst那样在
+    // 循环内逐期r2()，因为这里的"非最后一期本金"本来就是同一个值)；amtE本来就是
+    // "prE+it4"现算的(不像amort有一个固定月供m的概念)。⚠️最后一期依然必须强制=bal4
+    // (不能只是Math.min(pr4,bal4))——P/n如果向下舍入(比如100/3→33.33，最后一期真实
+    // 剩余是33.34，比pr4还大)，用min会把这1分钱零头永远丢掉，本金合计变成99.99而不是
+    // 100。非最后一期才需要clamp到bal4，防止前面几期the累积的四舍五入偏差在期数很多时
+    // 让bal4提前逼近0甚至变负。
+    var P4 = +spec.P || 0, i4 = (+spec.rate || 0) / 1200, n4 = +spec.n || 0, bal4 = P4, pr4 = n4 ? r2(P4 / n4) : 0;
+    for (var e4 = 0; e4 < n4; e4++) {
+      var it4 = bal4 * i4, prE = (e4 === n4 - 1) ? bal4 : Math.min(pr4, bal4), amtE = prE + it4;
+      bal4 -= prE; push(e4, amtE, prE, it4);
+    }
   } else if (spec.kind === "equalfee") {
     var pp = +spec.pp || 0, pf = +spec.pf || 0, n2 = +spec.n || 0;
     for (var j = 0; j < n2; j++) push(j, pp + pf, pp, pf);
@@ -39,7 +84,11 @@ function genPlan(spec) {
     var P3 = +spec.P || 0, i3 = (+spec.rate || 0) / 1200, ni = +spec.ni || 0, np = +spec.np || 0, it3 = P3 * i3;
     for (var a = 0; a < ni; a++) push(a, it3, 0, it3);
     var m3 = i3 > 0 ? P3 * i3 / (1 - Math.pow(1 + i3, -np)) : (np ? P3 / np : 0), bal3 = P3;
-    for (var b = 0; b < np; b++) { var itb = bal3 * i3, prb = (b === np - 1) ? bal3 : (m3 - itb), amtb = (b === np - 1) ? bal3 + itb : m3; bal3 -= prb; push(ni + b, amtb, prb, itb); }
+    for (var b = 0; b < np; b++) {
+      var itb = bal3 * i3, prNomB = (b === np - 1) ? bal3 : r2(m3 - itb), closingB = prNomB >= bal3;
+      var prb = closingB ? bal3 : prNomB, amtb = closingB ? bal3 + itb : m3;
+      bal3 -= prb; push(ni + b, amtb, prb, itb);
+    }
   } else {
     var nc = +spec.n || 0;
     for (var c = 0; c < nc; c++) push(c, 0, 0, 0);

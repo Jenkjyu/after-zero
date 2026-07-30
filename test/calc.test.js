@@ -25,6 +25,80 @@ test("genPlan: 等额本息(amort) 本金相加=借款金额，最后一期清�
   assert.equal(plan[0].amount, plan[5].amount);
 });
 
+// 回归测试：这是一个真实存在过的bug，不是假想的边界情况——rate=0(免息)或rate极小时，
+// 每期利息趋近于0，导致每期"本金"份额趋近于同一个数，重复r2()四舍五入会往同一个方向
+// 累积偏差(原理跟equalprincipal那条回归测试是同一类)。私人借款免息/极低息是这个App
+// 完全正常的真实场景(债务类型里就有"私人借款")，不是刁钻数据。修复前P=500,rate=0,n=9
+// 时本金合计会变成500.03而不是500。
+test("genPlan: 等额本息(amort) rate=0(免息)时，本金合计依然精确=借款金额", () => {
+  const plan = calc.genPlan({ kind: "amort", P: 500, rate: 0, n: 9, first: "2026-01-01" });
+  assert.equal(plan.length, 9);
+  assert.equal(plan.reduce((s, r) => s + r.principal, 0), 500);
+  plan.forEach((r) => assert.equal(r.interest, 0)); // 免息，利息全程为0
+});
+
+// 回归测试：上面那条r2()修法只堵住了"合计对不上"，期数一多(30年内完全有可能，比如
+// P=100,rate=36%,n=210这种真实的高息长期债务组合)，同一个方向反复累积的四舍五入偏差
+// 会超过剩余本金，导致某一期(甚至最后一期)本金/金额变成负数——比"合计差几分钱"离谱得多。
+// 修法是每期本金都clamp到"不能超过当前剩余本金"(不只是最后一期)，一旦公式算出来的钱
+// 比剩下的本金还多，这一期直接收掉全部剩余、提前结清，之后每期清爽显示0，不会出现负数。
+test("genPlan: 等额本息(amort) 长期限+高利率(30年内的真实组合)不会让某一期本金/金额变成负数", () => {
+  const plan = calc.genPlan({ kind: "amort", P: 100, rate: 36, n: 210, first: "2026-01-01" });
+  assert.equal(plan.length, 210);
+  plan.forEach((r) => {
+    assert.ok(r.principal >= 0, "本金不能为负: " + JSON.stringify(r));
+    assert.ok(r.interest >= 0, "利息不能为负: " + JSON.stringify(r));
+    assert.ok(r.amount >= 0, "金额不能为负: " + JSON.stringify(r));
+  });
+  // 210项浮点加法本身会有约1e-13级别的二进制表示噪声(不是genPlan的bug，是JS浮点数的
+  // 通性，跟0.1+0.2!==0.3是同一个原因)，用r2()圆整到分再比较，跟下面的r2sum()是同一个思路。
+  assert.equal(calc.r2(plan.reduce((s, r) => s + r.principal, 0)), 100);
+});
+
+test("genPlan: 等额本金(equalprincipal) 每期本金固定，利息按剩余本金递减，本金相加=借款金额", () => {
+  const plan = calc.genPlan({ kind: "equalprincipal", P: 12000, rate: 12, n: 12, first: "2026-01-15" });
+  assert.equal(plan.length, 12);
+  assert.equal(plan.reduce((s, r) => s + r.principal, 0), 12000);
+  plan.forEach((r) => assert.equal(r.principal, 1000)); // 每期本金固定=12000/12
+  assert.ok(plan[0].interest > plan[1].interest); // 利息随剩余本金递减
+  assert.ok(plan[0].amount > plan[11].amount); // 总还款额逐期递减(跟amort的"每期相同"相反)
+});
+
+// 回归测试：P/n除不尽时(500/9=55.5555...)，早期实现每期本金各自独立r2()四舍五入成同一个
+// 值，9期全部四舍五入成55.56，最后一期没有零头可吸收，本金合计变成500.04而不是500——
+// 跟amort不同(amort每期本金天然不同、四舍五入正负大致抵消)，等额本金每期本金本来就是
+// 同一个数字，重复四舍五入只会往同一个方向偏、期数越多偏得越多。修法是pr4先r2()一次、
+// bal4按这个已四舍五入的值往下减，让最后一期精确吸收剩余零头。
+test("genPlan: 等额本金(equalprincipal) P/n除不尽时，本金合计依然精确=借款金额(不因逐期四舍五入累积偏差)", () => {
+  const plan = calc.genPlan({ kind: "equalprincipal", P: 500, rate: 6, n: 9, first: "2026-01-01" });
+  assert.equal(plan.length, 9);
+  assert.equal(plan.reduce((s, r) => s + r.principal, 0), 500);
+  // 前8期都是r2(500/9)=55.56，最后一期吸收零头(500-8*55.56=55.52)，不是55.56
+  for (let i = 0; i < 8; i++) assert.equal(plan[i].principal, 55.56);
+  assert.equal(plan[8].principal, 55.52);
+});
+
+// 回归测试：P/n向下舍入时(100/3=33.333...，r2四舍五入成33.33，比真实值小)，最后一期
+// 剩余本金反而比pr4大(100-2*33.33=33.34>33.33)——这条专门测"最后一期必须强制=剩余本金
+// 本身，不能被clamp成Math.min(pr4,剩余本金)"，否则这1分钱零头会被漏掉、合计变成99.99。
+test("genPlan: 等额本金(equalprincipal) P/n向下舍入时，最后一期吸收的零头比pr4更大也不会被漏掉", () => {
+  const plan = calc.genPlan({ kind: "equalprincipal", P: 100, rate: 6, n: 3, first: "2026-01-01" });
+  assert.deepEqual(plan.map((r) => r.principal), [33.33, 33.33, 33.34]);
+  assert.equal(plan.reduce((s, r) => s + r.principal, 0), 100);
+});
+
+// 回归测试：equalprincipal同样存在"长期限时四舍五入偏差累积超过剩余本金"的风险
+// (原理跟amort那条同名回归测试一样)，同一个clamp机制必须两个分支都生效。
+test("genPlan: 等额本金(equalprincipal) 长期限+高利率不会让某一期本金/金额变成负数", () => {
+  const plan = calc.genPlan({ kind: "equalprincipal", P: 100, rate: 36, n: 210, first: "2026-01-01" });
+  plan.forEach((r) => {
+    assert.ok(r.principal >= 0, "本金不能为负: " + JSON.stringify(r));
+    assert.ok(r.interest >= 0, "利息不能为负: " + JSON.stringify(r));
+    assert.ok(r.amount >= 0, "金额不能为负: " + JSON.stringify(r));
+  });
+  assert.equal(calc.r2(plan.reduce((s, r) => s + r.principal, 0)), 100); // 圆整掉210项浮点加法的噪声
+});
+
 test("genPlan: 信用卡等本等费(equalfee) 每期金额固定=本金+手续费", () => {
   const plan = calc.genPlan({ kind: "equalfee", pp: 1000, pf: 50, n: 6, first: "2026-02-01" });
   assert.equal(plan.length, 6);
@@ -43,6 +117,19 @@ test("genPlan: 先息后本(interestfirst) 前ni期只付利息本金为0，后n
   assert.ok(plan[0].interest > 0);
   const amortSection = plan.slice(2);
   assert.equal(amortSection.reduce((s, r) => s + r.principal, 0), 6000);
+});
+
+// 回归测试：先息后本的"还本阶段"结构上跟amort同一套摊销算法(bal3/m3)，同一个"期数一多、
+// 四舍五入偏差累积超过剩余本金"的风险也存在，同一个clamp机制必须在这个分支也生效。
+test("genPlan: 先息后本(interestfirst) 还本阶段期数很多+高利率不会让某一期本金/金额变成负数", () => {
+  const plan = calc.genPlan({ kind: "interestfirst", P: 100, rate: 36, ni: 2, np: 208, first: "2026-01-01" });
+  const amortSection = plan.slice(2);
+  amortSection.forEach((r) => {
+    assert.ok(r.principal >= 0, "本金不能为负: " + JSON.stringify(r));
+    assert.ok(r.interest >= 0, "利息不能为负: " + JSON.stringify(r));
+    assert.ok(r.amount >= 0, "金额不能为负: " + JSON.stringify(r));
+  });
+  assert.equal(calc.r2(amortSection.reduce((s, r) => s + r.principal, 0)), 100); // 圆整掉浮点加法噪声
 });
 
 test("genPlan: 自定义(custom) 生成n期全零占位", () => {
@@ -84,9 +171,10 @@ test("recompute: 空plan不抛异常，各字段归零", () => {
   assert.equal(d.nextDate, null);
 });
 
-test("recompute: 4种计息方式(amort/equalfee/interestfirst/custom)各跑一遍，都不抛异常且字段形状一致", () => {
+test("recompute: 5种计息方式(amort/equalprincipal/equalfee/interestfirst/custom)各跑一遍，都不抛异常且字段形状一致", () => {
   const specs = {
     amort: { kind: "amort", P: 5000, rate: 15, n: 6, first: "2026-01-01" },
+    equalprincipal: { kind: "equalprincipal", P: 5000, rate: 15, n: 6, first: "2026-01-01" },
     equalfee: { kind: "equalfee", pp: 800, pf: 40, n: 6, first: "2026-01-01" },
     interestfirst: { kind: "interestfirst", P: 5000, rate: 15, ni: 2, np: 4, first: "2026-01-01" },
     custom: { kind: "custom", n: 4, first: "2026-01-01" },

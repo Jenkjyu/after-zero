@@ -38,6 +38,13 @@ export function EditSheet() {
   const [oneTimeStash, setOneTimeStash] = useState<PlanRow[]>([]);
   const [planMode, setPlanMode] = useState<"manual" | "gen">("manual");
   const [gen, setGen] = useState<GenFields>(DEFAULT_GEN_FIELDS);
+  // 公式生成器"计息方式"底部抽屉(GenPanel.tsx)的开关——提升到这里(不是GenPanel自己的
+  // useState)是因为硬件返回键的优先级链(下面的window.__azEditSheetBack)要能读到它：
+  // 这个抽屉盖在#editSheet之上，必须比"关闭整个编辑表单"更早被判断到，跟jiggleMode/
+  // sortSheetOpen(react/src/debts/DebtList.tsx)是同一个道理。
+  const [kindSheetOpen, setKindSheetOpen] = useState(false);
+  const kindSheetOpenRef = useRef(kindSheetOpen);
+  useEffect(() => { kindSheetOpenRef.current = kindSheetOpen; }, [kindSheetOpen]);
   // 标题("编辑债务"/"新增债务")和"删除"按钮的显隐都要在editId===NEW_DEBT_ID这个判断上做
   // 区分，但只在*打开那一刻*判断一次并冻结——跟上面说的"表单字段不需要冻结"是同一个道理的
   // 例外：这两处直接依赖这个布尔判断本身，而editId关闭时会变成null，用它现算会在关闭动画期间
@@ -71,6 +78,9 @@ export function EditSheet() {
       P: g.P != null ? String(g.P) : "",
       rate: g.rate != null ? String(g.rate) : "",
       n: g.n != null ? String(g.n) : "",
+      epP: g.P != null ? String(g.P) : "",
+      epRate: g.rate != null ? String(g.rate) : "",
+      epN: g.n != null ? String(g.n) : "",
       pp: g.pp != null ? String(g.pp) : "",
       pf: g.pf != null ? String(g.pf) : "",
       n2: g.n != null ? String(g.n) : "",
@@ -81,6 +91,7 @@ export function EditSheet() {
       nc: "",
     });
     setPlanMode("manual");
+    setKindSheetOpen(false);
     if (sheetRef.current) sheetRef.current.scrollTop = 0;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId]);
@@ -107,6 +118,8 @@ export function EditSheet() {
   // (沿用原来#editSheet在DOM里的位置)。
   useEffect(() => {
     window.__azEditSheetBack = () => {
+      // "最上层先关"：计息方式抽屉盖在#editSheet之上，比关闭整个表单更靠上，先判它。
+      if (kindSheetOpenRef.current) { setKindSheetOpen(false); return true; }
       if (editId !== null) {
         closeEditSheet();
         return true;
@@ -198,6 +211,7 @@ export function EditSheet() {
     }
     const g: GenSpec = { kind: gen.kind, first: gen.first };
     if (gen.kind === "amort") { g.P = +gen.P; g.rate = +gen.rate; g.n = +gen.n; }
+    else if (gen.kind === "equalprincipal") { g.P = +gen.epP; g.rate = +gen.epRate; g.n = +gen.epN; }
     else if (gen.kind === "equalfee") { g.pp = +gen.pp; g.pf = +gen.pf; g.n = +gen.n2; }
     else if (gen.kind === "interestfirst") { g.P = +gen.P3; g.rate = +gen.rate3; g.ni = +gen.ni; g.np = +gen.np; }
     else { g.n = +gen.nc; }
@@ -268,7 +282,14 @@ export function EditSheet() {
               </div>
             ) : null}
             {!oneTime && planMode === "gen" ? (
-              <GenPanel fields={gen} onPatch={patchGen} onGenerate={(plan) => { setEditingPlan(plan); setPlanMode("manual"); }} />
+              <GenPanel
+                fields={gen}
+                onPatch={patchGen}
+                onGenerate={(plan) => { setEditingPlan(plan); setPlanMode("manual"); }}
+                kindSheetOpen={kindSheetOpen}
+                onKindSheetOpen={() => setKindSheetOpen(true)}
+                onKindSheetClose={() => setKindSheetOpen(false)}
+              />
             ) : null}
             {!oneTime ? <BatchBlock plan={editingPlan} onChange={setEditingPlan} /> : null}
             <PlanRows plan={editingPlan} oneTime={oneTime} planMode={planMode} onChange={setEditingPlan} />

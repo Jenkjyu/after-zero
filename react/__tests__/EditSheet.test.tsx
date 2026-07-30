@@ -294,16 +294,49 @@ describe("公式生成器(GenPanel)", () => {
     expect(screen.queryByText(/第1期/)).not.toBeInTheDocument();
   });
 
+  // "计息方式"2026-07-30从原生<select>换成了button+底部抽屉(跟排序方式SortSheet.tsx同一套
+  // shared/PickerSheet.tsx)——点开按钮再点选项文字，不再是fireEvent.change一个select。
   it("custom：按填的期数生成对应数量的空白行", () => {
     window.__azBridge = makeMockBridge();
     render(<EditSheet />);
     act(() => { openEditSheet(NEW_DEBT_ID); });
     fireEvent.click(screen.getByText("公式生成"));
-    fireEvent.change(screen.getByLabelText(/计息方式/), { target: { value: "custom" } });
+    fireEvent.click(screen.getByRole("button", { name: "计息方式" }));
+    fireEvent.click(screen.getByText("自定义（生成空白行，自己填写）"));
     fireEvent.change(screen.getByLabelText(/生成几期空白行/), { target: { value: "3" } });
     fireEvent.change(screen.getByLabelText(/首期还款日/), { target: { value: "2026-02-01" } });
     fireEvent.click(screen.getByText("生成计划"));
     expect(screen.getAllByText(/第\d+期/)).toHaveLength(3);
+  });
+
+  it("等额本金：本金相同，利息递减，写入还款计划表格", () => {
+    window.__azBridge = makeMockBridge();
+    render(<EditSheet />);
+    act(() => { openEditSheet(NEW_DEBT_ID); });
+    fireEvent.click(screen.getByText("公式生成"));
+    fireEvent.click(screen.getByRole("button", { name: "计息方式" }));
+    fireEvent.click(screen.getByText("等额本金（每期本金固定，总还款递减）"));
+    fireEvent.change(screen.getByLabelText(/借款金额/), { target: { value: "12000" } });
+    fireEvent.change(screen.getByLabelText(/年化/), { target: { value: "6" } });
+    fireEvent.change(screen.getByLabelText(/期数/), { target: { value: "12" } });
+    fireEvent.change(screen.getByLabelText(/首期还款日/), { target: { value: "2026-02-01" } });
+    fireEvent.click(screen.getByText("生成计划"));
+    expect(window.__azBridge.toast).toHaveBeenCalledWith(expect.stringContaining("已生成 12 期"));
+    expect(screen.getAllByText(/第\d+期/)).toHaveLength(12);
+  });
+
+  it("切换计息方式选项后，选中项在抽屉里带对勾(aria-current)", () => {
+    window.__azBridge = makeMockBridge();
+    render(<EditSheet />);
+    act(() => { openEditSheet(NEW_DEBT_ID); });
+    fireEvent.click(screen.getByText("公式生成"));
+    fireEvent.click(screen.getByRole("button", { name: "计息方式" }));
+    // 触发按钮自己也显示着当前选中项的文字，用screen.getByText会连触发按钮一起命中两个，
+    // 只在抽屉的选项列表里找——跟SortSheet.test.tsx同一个查法。
+    expect(document.querySelectorAll(".option-item.active").length).toBe(1);
+    const activeOpt = document.querySelector(".option-item.active")!;
+    expect(activeOpt).toHaveTextContent("等额本息（每期还款总额相同）");
+    expect(activeOpt).toHaveAttribute("aria-current", "true");
   });
 });
 

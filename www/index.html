@@ -243,8 +243,8 @@
   .view { display: none; } .view.active { display: block; }
   .section-label { font-size: var(--fs-sm); letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted);
     font-weight: 600; margin: 4px 2px 8px; display: flex; justify-content: space-between; align-items: center; }
-  /* .sort-sel从原生<select>换成了普通<button>(点击弹出自绘的.sort-sheet底部面板，
-     见react/src/debts/SortSheet.tsx)——原生select在安卓WebView里弹的是系统全屏列表，
+  /* .sort-sel从原生<select>换成了普通<button>(点击弹出自绘的底部面板，
+     见react/src/debts/SortSheet.tsx+shared/PickerSheet.tsx)——原生select在安卓WebView里弹的是系统全屏列表，
      跟这个App的视觉完全脱节。换成button之后，当年为了摁住select长按副作用打的那几条补丁
      (显式再设一次user-select、单独关掉:focus-visible的绿色描边)其实已经没有必要了，
      但保留着无害，也省得以后有人又把某个自定义控件做成看起来能长按选中的样子。 */
@@ -254,15 +254,22 @@
     box-shadow: var(--e1); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   .sort-sel svg { width: 13px; height: 13px; color: var(--text-muted); flex: none; }
   .sort-sel:focus-visible { outline: none; }
-  /* 排序面板：复用.sheet那套底部弹出外壳，只加内部列表的样式。选中项用"强调色文字+对勾"
-     而不是原生radio圆点，跟.pm-btn.active/.file-row[aria-current]那套选中态配方一致。 */
-  .sort-sheet .sort-opt-list { margin: 6px 0 2px; }
-  .sort-opt { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;
+  /* 选择器抽屉：复用.sheet那套底部弹出外壳，只加内部列表的样式——排序方式(SortSheet.tsx)和
+     公式生成器的计息方式(GenPanel.tsx)共用同一个shared/PickerSheet.tsx组件，所以这套class
+     是通用的.option-*命名，不叫.sort-*。选中项用"强调色文字+对勾"而不是原生radio圆点，
+     跟.pm-btn.active/.file-row[aria-current]那套选中态配方一致。 */
+  .option-list { margin: 6px 0 2px; }
+  .option-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;
     padding: 13px 4px; border: none; background: none; color: var(--text); font-family: inherit;
     font-size: 14.5px; text-align: left; border-bottom: 1px solid var(--hair); }
-  .sort-opt:last-child { border-bottom: none; }
-  .sort-opt.active { color: var(--accent); font-weight: 700; }
-  .sort-opt svg { width: 17px; height: 17px; flex: none; }
+  .option-item:last-child { border-bottom: none; }
+  .option-item.active { color: var(--accent); font-weight: 700; }
+  .option-item svg { width: 17px; height: 17px; flex: none; }
+  /* 公式生成器"计息方式"选择器嵌在#editSheet(.sheet，z-index:31)内部，它自己弹出的这个
+     选择抽屉必须盖过外层的#editSheet，不能用.scrim/.sheet的默认z-index(30/31)——跟
+     CLAUDE.md"第十一步"里aiHistorySheet那条"sheet挂在subpage下面必须手动提z-index"
+     是同一个坑，只是这次是sheet嵌在sheet里面。 */
+  .gen-kind-stack { z-index: 32; }
   .sort-controls { display: flex; align-items: center; gap: 6px; }
   .jiggle-done-btn { display: none; text-transform: none; letter-spacing: normal; font-size: 12px; font-weight: 600;
     padding: 5px 10px; border-radius: 7px; border: none; background: var(--accent-fill); color: var(--on-accent); }
@@ -515,6 +522,15 @@
   .field input, .field select, .field textarea { width: 100%; background: var(--surface-2); color: var(--text);
     border: 1px solid var(--border); border-radius: 9px; padding: 10px 11px; font-size: 15px; font-family: inherit; }
   .field textarea { min-height: 52px; resize: vertical; }
+  /* 公式生成器"计息方式"从原生<select>换成button+底部抽屉(GenPanel.tsx，shared/PickerSheet.tsx)
+     ——原生select在安卓WebView里弹的是系统全屏列表，是排序方式(.sort-sel)当年换掉select的
+     同一个理由。样式贴近同一个.field里其它input/select(整行宽、同样的底色/边框)，只是
+     右侧加一个chevron提示"点开有更多选项"；跟.sort-sel那种紧凑pill形态是两种场景——那个
+     夹在"保存"按钮旁边，这个是表单里独立一整行的字段。 */
+  .field-select-btn { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 9px; padding: 10px 11px; font-size: 15px; font-family: inherit; text-align: left; }
+  .field-select-btn svg { width: 15px; height: 15px; color: var(--text-muted); flex: none; }
   .field.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
   .field.two .field { margin-bottom: 0; }
   .req { color: var(--critical); font-weight: 700; }
