@@ -56,19 +56,35 @@ export function TypePie({ data }: TypePieProps) {
     const hub = hubRef.current, svg = svgRef.current;
     if (!root || !g || !leads || !hub || !svg) return;
 
-    const apply = () => {
-      const W = root.clientWidth;
-      if (!W) return;
-      const H = WRAP_H, cx = W / 2, cy = H / 2, rot = rotRef.current;
-      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-
-      g.setAttribute("transform", `rotate(${rot} ${cx} ${cy})`);
+    // ⚠️色块<path>的形状只取决于容器宽度算出的cx/cy，完全不取决于旋转角度——旋转
+    // 靠下面render()里单独给<g>设置transform属性实现。layout()只在容器尺寸变化时
+    // 才需要重新跑，不能跟每一帧拖拽绑在一起：早前这里跟rotate揉在同一个apply()里，
+    // 导致每次touchmove都要销毁重建这些<path>节点，是真机反馈"转色块部分卡、转中心孔/
+    // 容器边缘留白不卡"的根因——中心孔和标签走的是setAttribute/改style，没有这层
+    // innerHTML重建开销，色块有，所以只有摸在色块上才感觉到卡顿。
+    let W = 0, cx = 0, cy = 0, ready = false;
+    const layout = () => {
+      W = root.clientWidth;
+      if (!W) return false;
+      cx = W / 2; cy = WRAP_H / 2;
+      svg.setAttribute("viewBox", `0 0 ${W} ${WRAP_H}`);
       g.innerHTML = slices
         .map((s) => `<path class="pie-slice" d="${arcPath(cx, cy, R, s.a0, s.a1)}" fill="var(--pie-${s.i + 1})"/>`)
         .join("");
       hub.setAttribute("cx", String(cx));
       hub.setAttribute("cy", String(cy));
       hub.setAttribute("r", String(R * HUB));
+      ready = true;
+      return true;
+    };
+
+    // 每帧拖拽都要跑的部分：只改<g>的transform属性(不碰色块DOM) + 重算标签/引线
+    // 位置——这两者本来就要跟着旋转角度连续变化，没法避免每帧重算，但引线是
+    // <path>不是要销毁重建的色块，开销小得多。
+    const render = () => {
+      if (!ready) return;
+      const rot = rotRef.current;
+      g.setAttribute("transform", `rotate(${rot} ${cx} ${cy})`);
 
       // 标签：先按角度算出想待的 y，再按左右分组做避让
       const labs = Array.from(root.querySelectorAll<HTMLElement>(".pie-lab"));
@@ -82,7 +98,7 @@ export function TypePie({ data }: TypePieProps) {
       });
       (["l", "r"] as const).forEach((side) => {
         const grp = items.filter((x) => x.side === side).sort((a, b) => a.want - b.want);
-        const minY = LAB_H / 2 + 2, maxY = H - LAB_H / 2 - 2;
+        const minY = LAB_H / 2 + 2, maxY = WRAP_H - LAB_H / 2 - 2;
         let prev = -Infinity;
         grp.forEach((x) => { x.y = Math.max(minY, Math.max(x.want, prev + LAB_H)); prev = x.y; });
         for (let k = grp.length - 1; k >= 0; k--) {          // 顶到底了再从下往上回推
@@ -110,15 +126,17 @@ export function TypePie({ data }: TypePieProps) {
         .join("");
     };
 
-    apply();
+    const full = () => { if (layout()) render(); };
+
+    full();
     const detach = attachPieRotate(root, {
       getRotation: () => rotRef.current,
-      onRotate: (deg) => { rotRef.current = deg; apply(); },
+      onRotate: (deg) => { rotRef.current = deg; render(); },
     });
 
     /* ⚠️必须用 ResizeObserver，光挂 window resize 不够——四个 tab 的 React 树在启动时
        **同时挂载**，而 #view-report 初始是 display:none，此刻 .pie-wrap 的 clientWidth
-       是 0，apply() 第一句就 early-return，什么都画不出来；之后切到统计 tab 只是把
+       是 0，layout() 第一句就 early-return，什么都画不出来；之后切到统计 tab 只是把
        display 改回 block，既不触发 window resize、也不触发任何 React 重渲染，
        于是饼永远是空的（真实浏览器里实测到：扇区 0 个、引线 0 条，但 jsdom 测试因为
        clientWidth 被打了桩反而是通过的——这类"只在真浏览器里出现"的问题必须靠
@@ -126,14 +144,14 @@ export function TypePie({ data }: TypePieProps) {
        正好覆盖这个场景。 */
     let ro: ResizeObserver | null = null;
     if (typeof ResizeObserver !== "undefined") {
-      ro = new ResizeObserver(() => apply());
+      ro = new ResizeObserver(() => full());
       ro.observe(root);
     }
-    window.addEventListener("resize", apply);
+    window.addEventListener("resize", full);
     return () => {
       detach();
       if (ro) ro.disconnect();
-      window.removeEventListener("resize", apply);
+      window.removeEventListener("resize", full);
     };
     // slices 的内容只取决于 typeList，用 JSON 做依赖比较，避免每次渲染都重挂手势
   }, [JSON.stringify(list), total]);

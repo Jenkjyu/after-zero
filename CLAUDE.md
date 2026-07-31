@@ -6,6 +6,8 @@
 
 **⚠️`PROGRESS.md`只需要读最近的部分，不要整份读完**——它是按时间顺序累加的日志，早期条目的结论基本都已经沉淀进了这份CLAUDE.md，继续留着只是为了给"哪天做过什么"提供可追溯的存档，不是每次都要重新加载的上下文。**按"最近的自然日"定边界，不是按`## `标题数——同一天常常有好几个"续/再续/三续..."编号的子条目（活跃的日子一天能有七八个甚至十几个），数标题个数会跟"最近几天"对不上。** 做法：`grep -n "^## 20" PROGRESS.md | tail -20` 看最近这些标题都是哪天的，找到最近这个日期第一次出现的那一行，从那里读到文件末尾（通常就是最后1~2个自然日，含当天全部"续"条目）；如果这天内容明显偏短，往前再带一天。只有明确要追溯更早某次具体决策的完整经过时，才按关键词/日期搜更早的部分，不要因为"先看那个文件"这条规则就默认从头读到尾。
 
+**⚠️`.claude/skills/`下有几个项目专属skill，装的是"只有动到那块功能才用得上"的详细参考资料**（2026-08-01这轮从CLAUDE.md搬出去的，是为了不让这些低频细节每次session都占上下文）——`cloudbase-deploy`（云函数部署命令+三个坑）、`wechat-login-setup`（微信登录SDK接线的6个坑+自定义登录API用法）、`release-keystore`（release签名文件位置+构建命令）、`debt-model-history`（6条已修复数据模型缺口的完整前后经过）、`pay-tab-design`（还款日tab的急迫程度分档/筛选分组语义/左滑手势）、`edit-sheet-design`（新增编辑表单的oneTimeStash等状态机+genPlan四舍五入bug排查史）、`cloud-backup-design`（云备份5个云函数+配额规则）、`ai-advisor-design`（AI顾问的模型选型/用量上限/历史对话状态机）。CLAUDE.md正文里凡是写"见`xxx` skill"的地方，都是指这些——不需要手动去读那个文件，Claude Code会在做相关任务时自动判断要不要加载，正文里留的是压缩过的摘要/当前状态，不是要点开才能懂的残缺信息。
+
 ## 项目是什么
 
 **After Zero**——一个记债务的个人工具，用 [Capacitor](https://capacitorjs.com/) 把一个自包含的HTML app（`www/index.html`）包成安卓原生app。
@@ -54,79 +56,17 @@
 
 **同一轮还修了`computeReportData()`的`timeline`一个真实bug**：`timeline`第一个点固定是"今天"、随后按未还行日期升序追加，**逾期未销的期次日期在今天之前，会让第二个点的日期早于第一个点**，折线图上表现为"今天→过去→未来"的时间倒流。修法是把逾期未销（以及日期缺失/格式不对）的期次归到"今天"这个桶里——语义上也对，逾期的钱今天就该还，投影上按"立即偿还"处理，图上表现为起点处的一个陡降（此时会有两个日期同为今天的点，一个是起始余额、一个是扣掉逾期后的余额，这是刻意的，保证"起点=当前总余额""终点归零"两个不变量都不破）。**⚠️这个修复会连带改变PDF导出**——`exportReportPdf`通过`buildReportTableRows`/`buildExportChartsSVG`两处都读`timeline`（`exportReportXlsx`和`buildAiSummary`只读`totalBalance`/`avgRate`/`payoffDate`，不受影响）；这是刻意接受的：只修屏幕不修导出会造成"屏幕上对了、导出还是错的"这种更糟的不一致。
 
-## ⚠️已知的数据模型缺口（2026-07-29盘点，①②③④⑥已修，⑤部分已修）
+## ⚠️已知的数据模型缺口（2026-07-29/07-30盘点，全部已修）——完整历史见`debt-model-history` skill
 
-这一节记的是**已经确认存在**的问题，起因是"还款日"页那个"一行=一笔债务"的缺陷被真机戳破之后，顺着同一个思路把全项目扫了一遍。**共同形状是：`plan`数组一直有逐期数据，但消费者习惯性只读"第一期"或"只读active那部分"**——产品意图往前走了，读取方式没跟上。①②风险低（只改读取侧），③④是真的要改数据结构（`PlanRow`加字段），⑥是清理死字段，四者都已修完；⑤在独立git worktree（`feature/amount-consistency-check`分支，已合并回main）由另一个session并行处理，堵住了写入路径但还没做成数据模型层面的强约束（细节见下面⑤那节）。这批盘点到此全部处理完。
+`plan`数组一直有逐期数据，但曾经的消费者习惯性只读"第一期"或"只读active那部分"——产品意图往前走了、读取方式没跟上，2026-07-29盘点出6条，全部已修完。**当前数据模型**（不用看历史也该知道）：
 
-### ①（已修，2026-07-29）通知只排每笔债务的下一期
+- `PlanRow` = `{date, amount, principal, interest, paid, paidAt?, paidAmount?, settleRow?}`。`paidAt`只在真实还款事件时写（`recordPayment`/`waivePeriod`/`applySettle`结清行），手动编辑器勾选"已还"不会盖章。`paidAmount`是这期累计收到多少钱，`principal`/`interest`永远是原计划、不因部分还款改变，已还本金/利息由`recompute()`按`paidAmount`利息优先分摊算出。
+- `rowRemaining(r)` = `amount - (paidAmount||0)`，UI和`computeUpcomingPressure()`都用它。
+- `recordPayment(d, amount, todayString)`/`waivePeriod(d, amount, todayString)`（calc.js纯函数）——前者是"还多少算多少、不够继续留在未还列表"，后者是"协商减免，不管填多少都强制关闭这期"。
+- `EditSheet.tsx`保存时校验`amount === principal + interest`（容差0.015，即1.5分钱，覆盖`genPlan()`边界情况下的四舍五入噪声），只堵"手动改金额输入框"这一条路径。
+- `Debt.day`字段已删除（2026-07-30）——`#f-day`只读输入框现算自`editingPlan[0].date`，不再持久化。
 
-`syncNotifications()`（`www/index.html`）原来：
-```js
-debts.forEach(function (d) {
-  if (d.settled || !d.nextDate) return;   // ← 只看nextDate，plan里后面几期完全不管
-```
-每笔债务永远只有"下一期"有待触发的通知，靠`renderAll()`重排滚动到下一期——**而`renderAll()`只在打开App时才跑**。两个月不开App，只会收到一次提醒然后彻底安静。而"还款提醒"这个功能恰恰是给不会天天打开App的人设计的，是已承诺的功能在静默失效。
-
-**修法**：新增`calc.js`的`computeNotifySchedule(debts, notify, now, windowMonths, maxCount)`——纯计算，可单测，跟"该给哪些期次排提醒"这件事本身分开，`syncNotifications()`只留调用`LocalNotifications`插件（`getPending`/`cancel`/`schedule`）这几步impure的部分。改成一次性把"未来`NOTIFY_WINDOW_MONTHS`个月内"（默认6）全部未还期次都排上，不再依赖"重新打开App"这个动作滚动到下一期。`NOTIFY_MAX_PENDING`（默认450）兜底截断——安卓`AlarmManager`对单个UID的待触发闹钟数有一个约500个的隐性上限（AOSP源码里的常量，没写进公开文档），超出时按触发时间升序保留最近的那些（离现在越近的提醒越要紧，宁可丢远期的，反正下次`saveAll();renderAll();`它又会被重排进来）。通知文案里的金额也顺手从`d.monthly`（"最早未还期"的金额，先息后本这类计划会跟其它期不一样）改成了这一期自己的`r.amount`，跟"还款日页改成一行=一期"那次的教训一致。`test/calc.test.js`新增7个用例覆盖：关闭/无规则返回空、真排的是窗口内每一期而不只是下一期、已结清/已还的不参与、窗口边界、多规则+已过去的提醒时间跳过、按触发时间排序、超`maxCount`截断且保留最近的。
-
-### ②（已修，2026-07-29）导出的Excel/PDF不含已结清债务
-
-`exportReportXlsx()`/`exportReportPdf()`原来都是`data.active.map(...)`/`data.active.forEach(...)`（`data`=`computeReportData(debts)`，内部先`filter(!settled)`）。模型层`debts`有全部数据，是消费者只取了一部分。想拿导出做年度复盘、或者给别人看"我还掉了多少"，里面一条已结清记录都没有——跟"导出完整债务记录"这个产品意图对不上。
-
-**修法，且刻意分两半**：`computeReportData()`本身**没有改**——它的`byName`/`typeList`/`timeline`是"统计"tab图表的镜像（React `report/App.tsx`也在用），按设计就该只反映在还部分，不是这条缺口要修的对象，改了会连带影响屏幕上的图表语义。真正要改的是导出函数本身：
-- **Excel**：`exportReportXlsx()`的`debtRows`/`planRows`改成直接遍历全部`debts`（不再经过`data.active`），`debtRows`加了"状态"（在还/已结清）和"结清日期"两列，`planRows`加了"备注"列（`settleRow`标"提前结清"）。
-- **PDF**：新增`buildSettledDebtsRows(allDebts)`，只在存在已结清债务时才追加一段"已结清债务"（名称+结清日期+已还本金+已还利息），`buildTablePagesSVG()`把它`concat`进原有的表格行里分页——原来PDF里图表相关的几张表（`buildReportTableRows`）全部来自`data`，从来没有任何地方列出过已结清债务，这段是专门补的。
-
-### ③（已修，2026-07-29）没有还款流水
-
-`PlanRow`原来是`{date, amount, principal, interest, paid: boolean}`——**`date`是计划日期不是实付日期，`paid`只是个布尔**，算不出"这个月我实际还了多少钱"，也画不出真实的历史负债曲线（统计页`PayoffLine`那条footnote"本App不保存历史余额"诚实归诚实，背后就是这个缺口——这条footnote**依然成立**，这次只是加了字段，没有回填历史数据或新做一张真实走势图，那是数据攒够之后才有意义的独立工作）。
-
-**修法**：`PlanRow`加`paidAt?: string`（"YYYY-MM-DD"，只有**真实发生的还款事件**才写）。写入点只有calc.js的`recordPayment()`/`waivePeriod()`（见④）、`applySettle()`的结清行（`date`本来就是真实结清日，一并写进`paidAt`保持字段含义统一）——手动编辑器（`PlanRows.tsx`）勾选"已还"**不**自动盖章，那是编辑历史数据，不是真实发生的事件；但取消勾选时会顺手清掉`paidAt`/`paidAmount`，不留"标着实付日期但又不算已还"的自相矛盾中间态（`undoSettle()`释放最后一期已还标记时同样处理）。展示：`DetailSheet.tsx`计划表加了"实付日期"列（提前结清行的"日期"列本身已经是真实付款日，这一列显示"—"避免重复）；Excel导出`planRows`同步加了这一列。
-
-### ④（已修，2026-07-29）不支持部分还款
-
-`payInstallment`原来只能`r.paid = true`，一期要么全还要么没还。现实里少还一点、拖几天补齐、协商减免都很常见。
-
-**修法**：`PlanRow`加`paidAmount?: number`（这一期累计已经收到多少钱）。`principal`/`interest`这两个字段本身**永远不因为部分还款/减免而改变**（那是原计划，`d.original`/年化利率要用）——"已还本金/利息算多少"由`recompute()`按`paidAmount`**利息优先分摊**（先冲抵这期的利息，剩下的才冲本金，跟银行/信用卡账单的通行做法一致）。逾期滞纳金**刻意不自动计算**——跟`equalfee`手续费"没有独立字段、直接写进`interest`"是同一个先例，用户自己把这一期的金额/利息手动改高即可，不新增第三条轴、不发明一个大概率算错的公式。
-
-两个新的calc.js纯函数，都只操作"当前最早的未还期次"（沿用"销这期只能销最早那期"这条铁律）：
-- **`recordPayment(d, amount, todayString)`**——`payInstallment()`（vanilla，DebtCard/DetailSheet/PayRow三处唯一入口）背后的新逻辑：从"直接问是不是要销"变成"问这次还多少钱"（默认=`rowRemaining(r)`，没部分还过时就是整期金额，对全款用户几乎无感）。够了：跟老行为一致，标`paid=true`+盖`paidAt`（`paidAmount`封顶在`amount`，多付不结转到下一期）；不够：`paidAmount`累加，这期继续留在未还列表里，之后可以再调用同一个入口继续补——"少还一点"和"拖几天补齐"这两个需求用同一个入口解决，不新增按钮。
-- **`waivePeriod(d, amount, todayString)`**——新按钮"协商减免这一期"（只在`DetailSheet.tsx`，跟"提前结清"并排，`d.terms>0`时才显示）背后的逻辑：不管填多少都强制关闭当前最早的未还期次，差额自动通过`recompute()`的利息优先分摊算成"少收的那部分"，不追问。这个弹窗问的是"这期最终一共收了多少"（合计，不是这次新增多少）——已经部分还过时默认值=已收的钱（暗示"不再多收，就此结清"），没还过时默认值=整期金额（暗示"按原计划全额收"），跟`applySettle()`（整笔债务提前结清）问"实付多少钱"是同一个套路。
-
-`rowRemaining(r)`（calc.js纯函数）＝这一期还欠多少钱＝`amount - (paidAmount||0)`，UI（弹窗默认值、详情窗部分还款提示）和`computeUpcomingPressure()`都用它，不重新拿`principal+interest`相加——这样保留了"`amount`是独立填写的一条轴"这个既有假设，不跟"`amount`应不应该等于`principal+interest`"（下面⑤）这条另一个缺口绑在一起。
-
-**连带修的一处**：`computeUpcomingPressure()`（"未来还款压力"图，`PressureChart.tsx`在用）原来对未还期次一律按`r.amount`/`r.principal`/`r.interest`算，部分还款之后会把已经收到的钱也算进"还欠多少"，虚高。已经按同样的利息优先分摊+`rowRemaining()`改过。`computeMonthlyRepayment()`没有改——这个函数虽然还在`calc.js`/`module.exports`里，但`grep`确认现在没有任何React组件实际调用它（"统计tab视觉+交互升级"那轮`MonthlyChart.tsx`被`PressureChart.tsx`取代后就成了死代码，只是还没清理），不影响任何可见界面。
-
-**详情窗计划表新增的小字提示**（`partialNote()`，`DetailSheet.tsx`）：还没还完但已经攒了钱的行显示"已还¥X，欠¥Y"；被"协商减免"强制关闭的行（`paid`且`paidAmount`显式小于`amount`，且不是提前结清行）显示"实收¥X，减免¥Y"——这两种状态`principal`/`interest`两列本身依然显示原计划的数字（没被这次改动动过），不加这行小字的话，"本金80/利息20"和"这行钱包只收了15"两件事对不上，容易看不懂。
-
-验证：`test/calc.test.js`新增21个用例（`rowRemaining`/`recompute`的部分还款+协商减免分摊/`recordPayment`的累加与自动结清/`waivePeriod`的强制关闭/`computeUpcomingPressure`的部分还款不虚高/`undoSettle`清理`paidAt`/`paidAmount`的回归），95个全绿；`react/__tests__/DetailSheet.test.tsx`+6、`EditSheet.test.tsx`+2，285个全绿；`tsc --noEmit`零错误；`build:react`正常（`sheets.js`从收尾阶段的93.68KB涨到95.91KB）。
-
-### ⑤ `amount` 和 `principal + interest` 是两条独立填写的轴，没有一致性校验
-
-**这是最容易造成"两个页面互相矛盾"的一条**。这个App里有两套数值：
-
-| 轴 | 谁在读 |
-|---|---|
-| `amount`（这期要付多少钱） | 还款日列表、三张小卡、压力图柱高 |
-| `principal`/`interest`（这钱由什么构成） | 剩余待还、已还本金、归零进度、年化利率、`remainingInterest` |
-
-保存时**只校验了"本金和利息不能同时为0"**（`EditSheet.tsx`），**没有校验`amount === principal + interest`**。手动逐行编辑时"金额"输入框是可以单独改的，两者一旦对不上：一笔自定义债务可能在"债务"页看起来很小（剩余待还少）、在"还款日"页却很大（每期要还的钱多），而且没有任何提示。
-
-CLAUDE.md早前"统计tab口径修正"一节记过这个的一个具体后果——`amount=100`而`principal+interest=2194`，压力图柱子算出**2194%**高度冲出画布。那个具体症状当时修好了（柱高改由`total`决定、本金利息只负责按比例切分），但**根因还在**。
-
-> ⚠️**顺带纠正一条更早的说法**：曾经写过/说过"custom计划不拆本金利息、统计会静默低估"，这个说法**不准确**——`EditSheet.tsx`的保存校验挡住了"本金利息全填0"这种退化情况，存不进去。真实存在的是上面这条"两条轴可以互相矛盾"。
-
-**（部分已修，2026-07-29，独立分支`feature/amount-consistency-check`）保存时补上了`amount === principal + interest`的一致性校验**——`EditSheet.tsx`的`handleSave()`逐行校验循环里新增一条：`sum = r2(principal + interest)`，`|amount - sum| > 0.015`就toast"第N期的金额(¥X)与本金+利息(¥Y)不一致，请检查"并阻止保存（不调用`setDebt`）。**这条只堵住了"手动逐行编辑时直接改'金额'输入框"这一条路径**（`PlanRows.tsx`的`handleAmount`）——这是唯一能让两者不一致的入口：改本金/利息（`handlePrincipal`/`handleInterest`）、批量设置本金/利息（`BatchBlock.tsx`）、公式生成器（`GenPanel.tsx`）这几条路径本来就会自动联动重算`amount`，从未真正出过问题。
-
-**容差0.015（1.5分钱）不是随手挑的**：实测遍历`genPlan()`三种计息方式（amort/equalfee/interestfirst）超10万组合发现，amort分支在`n=1`（整贷整还）这种边界情况下，`principal`/`interest`/`amount`三个值各自独立`r2()`四舍五入，真实存在1分钱的量化误差（例：`P=100, rate=0.06, n=1`时`amount=100.01`而`principal+interest=100.00`）——这是算法本身固有的边界情况，不是bug。容差必须盖过这条噪声下限，否则用户完全没手动改过的、公式生成器自己吐出来的计划会被这条新校验误伤挡在保存门外，那是比"漏检真实错误"更糟的回归。真正的手填错误（比如本条一开始举的`amount=100`而`principal+interest=2194`）偏差量级是几十上百，远超这个容差，不会被误放过。
-
-**⚠️这次修的只是"检测到就拦截"，不是"自动同步"或"改数据模型"**——考虑过让`amount`输入框变成像`f-day`那样的只读派生字段（`f-day`当年就是同样的思路：一个本该派生的字段曾经能独立填写，改成只读消灭了漂移的可能），但`BatchBlock.tsx`"批量设置金额"这个功能依赖`amount`可独立编辑（批量设为一个总金额、清空本金利息为0，再逐行手动补本金/利息），做成只读会连带废掉这个已有功能，所以选了危害面更小的"保存时拦截"方案，而不是消灭`amount`的独立可编辑性。`BatchBlock.tsx`的"批量设置金额"流程完全没变——清零后的本金利息本来就会先撞上"本金和利息不能同时为0"那条更早的校验，不会因为这条新增校验多出任何新的拦截。**这条修复不涉及数据模型改动，跟同一时期另一个独立worktree/分支在做的③（还款流水`paidAt`）④（部分还款）完全无关，互不冲突。**
-
-### ⑥（已修，2026-07-30）`d.day` 是死字段
-
-`grep -rn "\.day\b"` 全项目只命中一条同名CSS类（`.pay .d .day`，`react/src/pay/PayRow.tsx`里给"还款日"卡片日期显示用的class名，跟`Debt.day`这个数据字段纯属同名巧合，`className="d"`外层配`className="day"`内层的日期文字来自`next.getDate()`不是`d.day`）——**没有任何代码读债务对象上的`d.day`**。它当年是手填的"还款日（几号）"，后来改成从计划第1期日期自动推导后就没人用了，但`EditSheet.tsx`的`handleSave()`一直还在算它、写它（`const fday = firstDateObj.getDate();`+`obj`里的`day: fday`），只是写完从没人读过。
-
-**修法**：删掉`types.ts`的`Debt.day`字段声明，删掉`EditSheet.tsx`里`fday`的计算和`obj.day`的赋值——表单上"还款日（几号）"那个只读输入框(`#f-day`/`fDay`)本身完全不受影响，那是组件渲染时现算的本地展示变量（`const fDay = firstDate ? firstDate.getDate() : ""`），跟要删的持久化字段是两个不同的变量，只是名字很像。老数据/老备份里带着这个字段不影响任何东西（JSON多一个没人读的键，纯粹被忽略），不需要写迁移脚本。`npx tsc --noEmit`/`npm run test:react`/`npm test`全部验证过没有任何地方依赖这个字段。
+**每一条当年具体怎么坏的、怎么修的、验证了多少用例，见`debt-model-history` skill**（`.claude/skills/debt-model-history/SKILL.md`）——通知调度窗口、导出含已结清债务、还款流水`paidAt`、部分还款分摊逻辑、amount一致性校验的0.015容差怎么算出来的、`d.day`死字段清理，都在里面。
 
 ## React 迁移：`react/` + "在还债务"页（绞杀者模式第一站）→ "还款日"+"统计"（第三步）→ "我的"（第四步，四个tab全部完成）→ `#detailSheet`（第五步，第一个非tab入口）→ `#editSheet`（第六步，全项目最复杂的一块UI）→ 收尾（第七~十一步，剩余全部subpage/sheet，已全部完成）——vanilla主`<script>`现在只剩数据模型+localStorage/IndexedDB读写+cloud函数/native插件调用这类impure逻辑，不再有任何JSX/DOM渲染代码
 
@@ -166,56 +106,18 @@ vanilla这边`payInstallment(i)`/`settleFull(i)`都被精简过：原来末尾`i
 
 **验证**：`EditSheet.test.tsx`(25用例，覆盖开关回填/`oneTimeStash`往返/保存校验每一条/新增与编辑两种保存路径/公式生成器4种计息方式/29-30-31号拒绝/批量设置日期与金额的确认与取消两条路径/删除+两种自动关闭场景/返回键)+`state.test.ts`补充3个用例（`useEditSheetIndex`）；`npx tsc --noEmit`零错误；`npm run test:react`全绿（125个用例）；`npm test`（calc.js套件）不受影响；`npm run build:react`确认`sheets.js`产物正常（从detailSheet单独时的8.74KB涨到35KB左右，符合预期）。Playwright headless跑了一轮完整交互（新增债务、公式生成amort、批量设置还款日弹出月份选择器并正确铺日期、保存、从详情窗点编辑、一次性还清勾选/取消往返、删除确认弹窗+自动关闭、取消按钮、硬件返回键关闭），全部通过，控制台零JS报错，light/dark主题截图确认视觉正常。
 
-### 收尾：第七~十一步，剩余全部subpage/sheet迁移到React
+### 收尾：第七~十一步，剩余全部subpage/sheet迁移到React（已全部完成）
 
-第六步做完之后，用户明确要求"先把迁移做完"——把vanilla里剩下的全部subpage/sheet也搬进React，让`www/index.html`主`<script>`只留cloud函数/native插件/IndexedDB这类impure逻辑，不再有任何JSX/DOM渲染代码。走了完整的`EnterPlanMode`流程（先手动读完`index.html`第1140-2565行剩余vanilla逻辑全貌，再写plan），确认剩下未迁移的一共8个：`#accountScreen`/`#premiumScreen`/`#termsScreen`/`#simScreen`/`#notifySheet`/`#docsScreen`/`#backupScreen`/`#aiScreen`+`#aiHistorySheet`。**明确排除在外、以后也不迁移**：`#loginGate`——它是全App唯一必须在React bundle加载*之前*就同步决定显隐的东西（FOUC防护，见"登录门"一节），架构上不可能交给一个要等JS加载完才能渲染的React组件。
+第六步做完之后，把vanilla里剩下的全部8个subpage/sheet（`#accountScreen`/`#premiumScreen`/`#termsScreen`/`#simScreen`/`#notifySheet`/`#docsScreen`/`#backupScreen`/`#aiScreen`+`#aiHistorySheet`）也搬进React——至此`www/index.html`主`<script>`不再有任何`.subpage`/`.sheet`的DOM渲染代码，只剩数据模型读写+不可移植的cloud函数/native插件/IndexedDB调用。**`#loginGate`明确排除、以后也不迁移**——它是全App唯一必须在React bundle加载*之前*就同步决定显隐的东西（FOUC防护，见"登录门"一节），架构上不可能交给要等JS加载完才能渲染的React组件。
 
-**架构决策：全部复用第五步已经建好的`react/src/sheets/`入口（`#react-sheets-root`），不新开入口**——这8个subpage/sheet都不属于任一个tab（`accountScreen`被"在还债务"Header和"我的"页两处触发、`premiumScreen`被4处触发、`simScreen`被`DetailSheet.tsx`触发、`notifySheet`被"还款日"铃铛触发、`docsScreen`/`backupScreen`被"我的"页触发），跟当年`detailSheet`/`editSheet`"被多棵独立React树共同触发、不属于任何tab"是完全相同的架构问题，直接复用已验证的模式：`shared/state.ts`给每个screen新增`openXScreen()`/`closeXScreen()`/`useXScreenOpen()`（布尔开关，不是下标——这几个screen全局只有一份，不需要"打开哪一个"这种参数，`simScreen`是例外，需要债务下标，模式同`openDetailSheet(i)`），各自独立的`az:x-screen-changed`事件（继续遵守"哪个sheet开着"和"数据变了"两类事件分开的既有原则）。**这也终结了第四步那句"'我的'tab现在是最后一处能干净套用trigger-only模式的地方了"的预判**——第七步起，trigger-only这条路直接被"screen本身搬进React"取代，不是又发明了一套新模式，而是把已经验证过的detail/editSheet模式套用到更大范围。
+**全部复用第五步已建好的`react/src/sheets/`入口，不新开入口**——这8个screen都不属于任一个tab，跟`detailSheet`/`editSheet`当年"被多棵独立React树共同触发"是同一个架构问题，直接复用已验证的模式：`shared/state.ts`给每个screen配`openXScreen()`/`closeXScreen()`/`useXScreenOpen()`（布尔开关，`simScreen`例外需要债务下标，模式同`openDetailSheet(i)`），各自独立的`az:x-screen-changed`事件。第四步"我的"tab那批trigger-only桥接函数（打开某个screen）从这一步起被彻底取代——不再有任何`openXScreen`留在`__azBridge`里，全部screen内容本身归React所有。最终的`__azBridge`形状见下面"桥接契约"一节，不在这里重复枚举每一步加了什么函数。
 
-**第七步：账户 + 订阅 + 条款（`accountScreen`/`premiumScreen`/`termsScreen`）。** 新增`react/src/sheets/AccountScreen.tsx`/`PremiumScreen.tsx`/`TermsScreen.tsx`。三张价卡的互斥选中态、兑换码输入框的展开/复位全部改成组件本地`useState`（组件常驻挂载不会因为screen关闭而卸载重建，所以"上次选中的还记得"这个效果不需要额外持久化）。`__azBridge`新增3个真正的cloud/native/共享状态调用（vanilla保留，React不重新实现）：
-- `wxLogout()`：原`wxLogoutBtn`inline handler抽出的具名函数，**没有确认弹窗**（照抄原handler行为，跟"注销账户"不同）。
-- `deleteAccount(): Promise<boolean>`：原`doDeleteAccount()`去掉"成功后`closeAccountScreen()`"那行，**改成返回布尔值**（不是`void`）让React自己决定要不要关闭screen——这是这批新增桥接函数里第一次"返回值决定UI导航"的模式，跟`setDebt`/`deleteDebt`这类"纯粹执行、不关心UI"的旧桥接函数不同。
-- `redeemCode(code): string | null`：原`REDEEM_CODES`查表+`applyRedeemTier`调用抽出来，返回命中的tier或null，React据此决定toast文案（"请输入兑换码"这个空值校验挪到了React这边，因为这是纯UI校验不需要vanilla参与）。
-
-复用既有`confirmAsync`处理"注销账户"确认弹窗和"暂未开放真实支付"提示，不新写React确认组件（跟第六步`askAsync`那条决策同一个理由——这个弹窗以后还要接着优化视觉，两份实现要同步改两处不划算）。**踩了一个因为删除`openPremiumScreen()`而暴露出来的连锁问题**：`createCloudBackup()`（`#backupScreen`要等第十步才迁移，这一步还是100%vanilla）内部有一行"万一没premium就跳订阅页"的二次防御检查(`closeBackupScreen(); openPremiumScreen("premium");`)，这行代码调用的`openPremiumScreen()`一旦被第七步删除就会直接报错——排查后确认这层检查本来就是多余的（进这个函数之前"我的"页`DataCards.tsx`已经用`hasPremium()`gate过一次，这个app也没有订阅到期/降级的实际场景），直接删掉这行（YAGNI，不是漏做，第十步原计划就要做这个简化，这次是提前触发）。同理`applyRedeemTier`/`__debugPremium`/`applyBackupData`里三处调用`renderAccountDetail()`的地方也全部删除——这些语句本来就紧邻着会派发`az:state-changed`（或者调用`renderAll()`，`renderAll()`本身会派发），`AccountScreen`的`usePremium()`/`useAccount()`能自动跟上，不需要vanilla再手动触发一次渲染。
-
-**第八步：提前还款模拟器 + 通知设置（`simScreen`/`notifySheet`），两个都是被别的sheet/tab触发的独立小工具，合并成一轮（参照当年"还款日+统计"合并的理由）。**
-- `simScreen`：新增`react/src/sheets/SimScreen.tsx`。`openSimScreen(i)`挪进`shared/state.ts`（模式同`openDetailSheet(i)`，`DetailSheet.tsx`"提前还款模拟"按钮的调用点从`window.__azBridge.openSimScreen(i)`改成直接`import`）。**`SIM_KEY`（模式+上次金额）整体移交React所有权**，直接读写localStorage——跟`debtSort`当年"没有别的地方依赖它，整体移交"是同一个先例，vanilla这边`simPrefs`/`saveSimPrefs`/`simIndex`/`simMode`/`setSimMode`/`openSimScreen`/`closeSimScreen`/`runSimulate`全部删除，`simulatePrepay()`继续是calc.js全局纯函数，React直接`window.simulatePrepay(...)`调用。**结果展示用一份"运行那一刻的快照"（含`mode`/`atPeriod`/`extra`等）而不是从当前输入框状态派生**——照抄vanilla`runSimulate()`把这几个值直接拼进结果HTML字符串的效果：用户测算后再改输入框，展示的结果文案不会跟着实时变，直到再次点"开始测算"。
-- `notifySheet`：新增`react/src/sheets/NotifySheet.tsx`，读`useNotify()`（已有hook，不用新写）。`openNotifySheet()`/`closeNotifySheet()`挪进`shared/state.ts`（`pay/App.tsx`铃铛点击的调用点改成直接`import`）。`__azBridge`新增4个**必须留vanilla**的函数（真实调用`@capacitor/local-notifications`权限检查/申请/调度，不能重写成纯React）：`setNotifyEnabled(enabled)`返回`Promise<boolean>`（最终生效状态，权限被拒时是`false`）、`addNotifyRule(offsetDays, time)`、`deleteNotifyRule(idx)`、`sendTestNotification()`。vanilla原来的`renderNotifyRules`/`openNotifySheet`/`closeNotifySheet`整个删除，"开了通知但一条规则都没加就退出、兜底成当天到期09:00"这条逻辑挪进了`NotifySheet.tsx`的`handleClose()`里（用`notify.enabled`/`notify.rules`判断+调用`addNotifyRule`）。**开关checkbox用了"乐观更新"模式**（`pendingChecked`本地state，点击立刻反映、异步权限结果出来后再交还给`notify.enabled`）而不是直接`checked={notify.enabled}`——照抄vanilla原来未受控checkbox"先勾选、被拒再回退"的效果，避免controlled input在等待系统权限弹窗这段真实耗时里显得卡顿。
-
-**第九步：档案库（`docsScreen`）——单文件最重的一步（IndexedDB blob存储+3种预览方式+原生分享），但跟当年"统计"tab同一个风险等级（零手势、纯data→JSX）。** 新增`react/src/sheets/DocsScreen.tsx`。IndexedDB（`upGetAll`/`upPut`/`upDelete`/`upClear`）、`saveToDeviceDownloads`、`tryShareFile`原生分享、`docs`数组本身的增删——全部保留vanilla（跟"云备份/AI"一贯原则一致：impure IO/native的部分不重写成TS）。`openDocsScreen()`/`closeDocsScreen()`挪进`shared/state.ts`（布尔开关，`DataCards.tsx`的调用点改成直接`import`）。
-
-`__azBridge`新增5个函数：
-- `getFiles(): FileItem[]`——原来的`fileItems()`去掉DOM构建，直接返回数据。**给每个markdown文档条目挂一个通过`WeakMap<object,string>`懒生成的稳定id**（`docKeyFor(d)`，跟`shared/state.ts`的`keyFor()`给debt生成React key是同一个技巧）——`docs`数组元素在splice/restore之外引用不变，upload条目已有IndexedDB的`id`天然稳定。**`FileItem`类型故意不含原始`Blob`**——下载/删除/分享这几个操作全部改成传`id`字符串回vanilla按id反查目标，不需要把Blob传过桥接边界（虽然技术上可以，因为是同一个JS runtime，但按id反查更简单、也避免React持有可能过期的Blob引用）。
-- `uploadArchiveFile(file): Promise<void>`（含扩展名校验，逻辑跟原来`uploadInput`的`change`handler一致）
-- `deleteArchiveFile(id): Promise<void>`（**不含确认逻辑**——原来`ask()`确认弹窗挪到了React这边用`confirmAsync`处理，标题按`item.upload`是`"删除文件"`还是`"删除文档"`区分，确认后才调这个函数，只做"真的去删"这一步）
-- `downloadArchiveFile(id): Promise<void>`、`shareArchiveFile(id): void`
-
-**新增`az:files-changed`事件**——docs/uploads任何一处变化都会派发（上传/删除/备份恢复/导入json），`shared/state.ts`新增`useFiles()`。**这个hook没有采用`useDebts()`那套"事件触发标脏"的写法，而是抄`useNotify()`那套按值(fingerprint)比较**——`getFiles()`不像`getDebts()`那样有一个可比较的底层数组引用（每次调用都用`.map()`合成全新数组，结构上更像`getNotify()`），"事件触发才标脏"这套依赖"能比较底层引用"这个前提在这里不成立，直接照抄`useNotify()`的fingerprint方案更简单可靠。**这里有一次真实踩的坑**：第一版直接照抄`useDebts()`的"dirty flag"写法（不比较内容，只在事件触发时标脏），组件测试跑第一个用例还行，但从第二个用例开始`fileList`渲染不出任何行——因为每个测试换一个全新的mock bridge、但没有dispatch`az:files-changed`，dirty flag从上一个测试起就一直是`false`，`getFilesSnapshot()`一直返回第一个测试缓存的陈旧数据。`useDebts()`那套写法之所以在它自己的场景下没事，是因为它还叠了一层"底层引用变了也强制刷新"的保险（`source !== debtsCacheSource`），而`getFiles()`每次都合成新数组，没有这样一个可比较的"源引用"，少了这层保险就直接暴露出"标脏时机不对就永久陈旧"这个问题。改成fingerprint比较后（不管有没有事件触发，每次都真的调一次bridge、按内容决定要不要换缓存），问题彻底解决，测试全绿。
-
-删除：`fileItems`/`renderFiles`/`renderDocContent`/`bindFileDownload`/`docSel`/`FILES`/`ICON_IMG`/`ICON_PDF`/`ICON_CLIP`/`ICON_DOC`全部删除（图标SVG原样复刻进`DocsScreen.tsx`的JSX常量），`#uploadInput`不再是vanilla DOM里游离的隐藏input——第九步之后它是`DocsScreen.tsx`自己渲染+持有ref的普通React元素（不需要再像`#importFileInput`那样留一个手动触发的桥接函数，因为上传的业务逻辑本身已经整体搬进React，不需要vanilla继续插手）。
-
-**第十步：云备份（`backupScreen`）——跟"我的"tab当年的云备份入口不同，这次是里面的实际内容（创建/列表/恢复/删除4个cloud函数调用）搬进React，不再只是trigger-only。** 新增`react/src/sheets/BackupScreen.tsx`，`useState`管理"加载中/列表/错误"三态（原来`renderBackupList()`直接改DOM，这次改成组件内`useEffect`在`isOpen`变`true`时触发`listBackups()`重新拉取——不是常驻订阅，备份记录列表不是"数据变了自动跟上"这种共享状态，是这个screen自己私有的、每次打开都值得重新问一遍服务端的东西）。`openBackupScreen()`/`closeBackupScreen()`挪进`shared/state.ts`（布尔开关，跟`accountScreen`/`docsScreen`同一个模式，`DataCards.tsx`"打开云备份"门禁通过后的调用点改成直接`import`）。
-
-全部cloud函数调用逻辑（`ensureCbAuthReady`/`cbApp().callFunction`这套认证会话状态）继续保留vanilla——跟`aiAdvisor`/`wxLogin`同一个"认证会话状态是vanilla独占的、不可移植"的原因。`__azBridge`新增5个函数：`createBackup(): Promise<boolean>`、`restoreBackup(id): Promise<boolean>`、`deleteBackup(id): Promise<boolean>`这3个**沿用`deleteAccount()`那个先例**——内部照旧`toast`成功/失败文案（跟原来`createCloudBackup`/`doRestoreBackup`/`confirmDeleteBackup`的文案逐字一致），返回布尔值让React决定要不要刷新列表；`listBackups(): Promise<BackupRecord[]>`是纯读取，没有布尔判断需要做，失败直接`throw`，React用`try/catch`显示错误文案（效果跟原来`renderBackupList()`的`catch`分支一致）；`getBackupMeta(): {lastBackupAt}`是同步读取（`lastBackupMeta`本来就是常驻内存的模块变量，不需要额外的loading态）。恢复/删除的二次确认弹窗（原来`ask()`包着的"此操作不可撤销，确定继续吗"）挪到了React用`confirmAsync`处理，成功后再调`restoreBackup`/`deleteBackup`——这几个vanilla函数因此**不含确认逻辑**，只做"真的去调用"这一步，跟第九步`deleteArchiveFile`同一个处理方式。
-
-删除：`createCloudBackup`/`renderBackupList`/`confirmRestoreBackup`/`doRestoreBackup`/`confirmDeleteBackup`/`renderBackupMeta`/`openBackupScreen`/`closeBackupScreen`全部删除（`applyBackupData`保留，`restoreBackup`内部继续调用它），HTML里`#backupScreen`整块。`createCloudBackup()`内部原来那行"万一没premium就跳订阅页"的二次防御检查在第七步（删除`openPremiumScreen()`时）就已经因为YAGNI被提前删掉，这一步不需要再处理这层。
-
-**真机限制（老规矩，不是新问题）**：真实的创建/列表/恢复/删除往返依赖真实微信登录会话，这个环境测不出——本地Playwright验证时用"伪造`account`跳过登录门"这个老技巧打开`backupScreen`，`listBackups()`确实按预期显示出`获取备份列表失败：Cannot read properties of null (reading 'scope')`这条错误文案，这正是"云备份（Premium）"一节"桌面浏览器测试的边界"里记录的那个已知现象（伪造`account`会让`ensureCbAuthReady()`误判"已登录"从而跳过`signInAnonymously()`兜底，连匿名会话都没有就直接撞上CloudBase SDK的null凭证读`.scope`的bug）——不是这次迁移引入的新bug，UI正确地把它当错误态展示出来而不是崩溃，符合预期。桌面Playwright验证覆盖：打开screen显示正确的"上次备份"文案+列表进入错误态、门禁两个方向（未开通跳订阅页/已开通打开backupScreen）、硬件返回键+点返回箭头都能正确关闭，light/dark主题截图确认，控制台零JS报错。
-
-**第十一步：AI债务顾问（`aiScreen`+`aiHistorySheet`）——收尾里技术上最"干净"的一步，也是最后一步。** 新增`react/src/sheets/AiScreen.tsx`（聊天界面+内嵌的历史对话sheet，两者放在同一个文件里，不是两个独立文件——历史对话sheet只从`AiScreen`自己的header按钮触发，不像其它screen那样"被多棵独立React树共同触发"，不需要在`shared/state.ts`里为它单独开一对`open/close`，`historyOpen`是纯组件本地`useState`，跟`PremiumScreen`兑换码输入框展开/收起是同一类"组件本地UI状态"）。`AI_USAGE_KEY`（每日用量软上限）/`AI_CHATLOG_KEY`（历史对话记录）这两个localStorage键整体移交React所有权（照抄`SIM_KEY`当年"没有别的地方依赖它，整体移交"的先例），vanilla的`aiConvos`/`saveAiConvos`/`aiUsage`/`aiUsageToday`/`aiUsageLeft`/`bumpAiUsage`全部删除，只有`buildAiSummary()`/`callAiAdvisor()`原样保留（因为依赖`ensureCbAuthReady`/`cbApp().callFunction`这套认证会话状态，不可移植）——`callAiAdvisor`是这一步`__azBridge`**唯一**新增的函数，`openAiScreen`则被删除（打开screen不再经过桥接，改成`shared/state.ts`的`openAiScreen()`/`closeAiScreen()`/`useAiScreenOpen()`，跟其它screen同一个布尔开关模式）。`findAiConv`/`bumpAiConvTop`继续是calc.js全局纯函数，React直接`window.findAiConv(...)`/`window.bumpAiConvTop(...)`调用，不复制逻辑到TS这边。
-
-**消息发送/持久化的状态机是vanilla逻辑的逐步骤翻译，不是重新设计**：`composeAndSend(displayQ, isReportMode)`按vanilla`aiComposeAndSend()`原来的顺序——`busy`守卫→用量检查→算出`contextHistory`（发给云函数的上下文，取自"这次提问之前"的已有消息，不含这次提问本身）→乐观追加用户气泡+"思考中"占位气泡→`setConvos`用不可变方式要么更新已有记录（继续追问）要么新增一条（新对话，`unshift`到最前）→调`callAiAdvisor`→成功后`bumpAiUsage()`+替换占位气泡为真实回复+按`AI_CHATLOG_MAX_MSGS`裁剪+用`window.bumpAiConvTop`顶到最前+按`AI_CHATLOG_MAX_CONVOS`裁剪+`saveAiConvos()`持久化→失败则显示错误气泡，**如果这条对话从没成功回复过（`messages.length<=1`）就把这条空壳记录从`convos`里撤销掉**（照抄vanilla"不留僵尸对话"的逻辑，失败分支本来就不调用持久化，这个撤销只影响内存态）。这套翻译用普通的React `useState`不可变更新（`setConvos(prev => ...)`）而不是照抄vanilla那种"直接mutate一个模块级变量+手动触发渲染"的写法——跟`gestures.ts`"手势代码原样照抄不重新设计"的原则不同，这里选择用idiomatic React重写是因为消息状态机不涉及任何真机踩过坑的DOM操作细节，用React自己的机制表达反而更不容易出错，也不违反"忠实复刻行为"这个更高优先级的原则（分支条件、发送顺序、持久化时机全部逐条对照过）。
-
-**魔法棒入场动效**（`castAiWand()`）：`castWand(el)`辅助函数原样照抄vanilla那套"remove class→强制reflow→add class→animationend后移除"技巧，只是用`useRef<SVGGElement>`拿到`<g>`节点而不是`$("aiWelcomeWand")`按id查——**`reflow`那一步在vanilla里用`el.offsetWidth`，React这边改成`el.getBoundingClientRect()`，因为TypeScript的`SVGElement`类型定义里没有`offsetWidth`这个属性**（那是`HTMLElement`专属，浏览器运行时对SVG元素其实也支持，但走类型检查这条路更省事）。触发时机保留vanilla两个入口：screen打开时（`useEffect`依赖`isOpen`）、点"新对话"按钮时，`loadConversation()`（加载历史对话）不触发，因为vanilla的`loadAiConversation()`也没调用`showAiWelcome()`。
-
-**测试环境的两个新坑，都已经修好且以后其它组件也会受益**：
-1. `Element.prototype.scrollIntoView`在jsdom里不存在——`AiScreen.tsx`每次新增消息都会调用它把最新气泡滚进视图（`useEffect`依赖`messages.length`），真实浏览器/WebView都有这个方法，但jsdom没实现，第一次跑测试直接报`el.scrollIntoView is not a function`。修法是在`react/__tests__/setup.ts`里补一个空实现（`if (typeof Element.prototype.scrollIntoView !== "function") Element.prototype.scrollIntoView = () => {}`）——这是全局setup文件的改动，不是`AiScreen.test.tsx`自己糊一个mock，以后别的组件如果也用到`scrollIntoView`不会重复踩这个坑。
-2. **`#aiHistorySheet`的`aria-labelledby="aiHistoryTitle"`让它的可访问名称(accessible name)也是"历史对话"这几个字，跟header上`aria-label="历史对话"`的按钮撞了**——Testing Library的`getByLabelText("历史对话")`会同时命中两者，报"Found multiple elements"。这不是这次迁移引入的新问题（vanilla原来的HTML结构一直是这样），只是第一次有自动化测试去查询这个文本才暴露出来；测试改用`getByRole("button", { name: "历史对话" })`精确限定成"按钮"这个role即可避开，不需要改动组件的DOM结构/aria属性。
-
-**验证**：`AiScreen.test.tsx`(17用例，覆盖欢迎态渲染/3种发送入口/用量上限拦截/发送失败丢弃僵尸对话/连续追问带正确history/成功回复持久化进`AI_CHATLOG_KEY`/历史对话加载与删除两条路径/硬件返回键"先关历史sheet再关aiScreen"的顺序/重新打开重置欢迎态)；`npx tsc --noEmit`零错误；`npm run test:react`208个用例全绿（从191涨到208）；`npm test`（calc.js套件）43个不受影响；`npm run build:react`确认`sheets.js`产物正常增长（93.68KB，从backupScreen那步的79.64KB涨上来，符合预期）。Playwright headless验证：AI banner打开aiScreen、欢迎态3个芯片正确渲染、点常见问题芯片发送后**网络受限环境下`callAiAdvisor`按预期报`Cannot read properties of null (reading 'scope')`**（真机限制，老规矩，见下方）、失败的对话确认没有出现在历史列表里（"还没有历史对话"）、硬件返回键第一次关历史sheet第二次才关aiScreen、重新打开+手输发送一条新消息全流程正常、点返回箭头关闭，全程控制台**零JS报错**，light/dark主题截图确认视觉正常。**真机限制（老规矩）**：真实AI生成/追问依赖真实微信登录会话，这个环境测不出，跟云备份/微信登录当年是同一条限制。
-
-至此**React迁移收尾第七~十一步全部完成**，`www/index.html`主`<script>`里已经不再有任何`.subpage`/`.sheet`的DOM渲染代码——`grep`过一遍确认剩下的全部函数要么是数据模型读写（`debts`/`docs`/`notify`/`premium`/`account`等及其`save*`函数），要么是不可移植的cloud函数调用（`wxLogin`相关、`createBackup`等、`callAiAdvisor`）、native插件调用（`SaveFile`/`WeChatLogin`/`LocalNotifications`）、IndexedDB操作（`upGetAll`等），符合方案里"vanilla只剩impure逻辑"这个最终目标。
+**几个不平凡的设计决定，按screen列**：
+- **accountScreen/premiumScreen/termsScreen**：`deleteAccount()`改成返回`Promise<boolean>`（不是`void`）让React自己决定要不要关闭screen——这是"返回值决定UI导航"这个模式第一次出现，之前的桥接函数都是"纯粹执行、不关心UI"。复用`confirmAsync`处理确认弹窗，不新写React确认组件（这个弹窗以后还要接着优化视觉，两份实现同步改两处不划算）。**删除`openPremiumScreen()`暴露出一处连锁死代码**：`createCloudBackup()`里"万一没premium就跳订阅页"的二次防御检查其实早就是多余的（`DataCards.tsx`已经gate过一次，没有订阅降级场景），顺势按YAGNI删掉。
+- **simScreen/notifySheet**：`SIM_KEY`整体移交React所有权直接读写localStorage（跟`debtSort`当年同一个先例），结果展示用"运行那一刻的快照"而不是从当前输入框状态派生，用户测算后改输入框不会让已显示的结果跟着实时变。通知开关checkbox用"乐观更新"（本地state立刻反映点击，异步权限结果出来后再交还真实状态）而不是直接受控，避免等系统权限弹窗这段真实耗时里显得卡顿。
+- **docsScreen**：`docKeyFor()`用`WeakMap`给文档条目生成稳定id，跟`keyFor()`给debt生成React key同一个技巧。**`useFiles()`踩过一次真实的坑**：第一版照抄`useDebts()`的"事件触发才标脏"写法，但`getFiles()`每次都用`.map()`合成全新数组、没有`useDebts()`那样"底层引用变了强制刷新"的保险，导致组件测试从第二个用例起渲染不出任何行（陈旧缓存永远还不上）——改成跟`useNotify()`一样按内容fingerprint比较后彻底解决。**以后任何新hook只要没有"可比较的底层数组引用"这个前提，直接抄fingerprint方案，别抄dirty-flag方案。**
+- **backupScreen**：备份列表用组件内`useState`三态（加载中/列表/错误），`isOpen`变`true`时才拉取——不是常驻订阅，这是screen私有的、值得每次打开都问一遍服务端的数据，跟"数据变了自动跟上"的共享状态不是一回事。
+- **aiScreen+aiHistorySheet**：消息发送状态机是vanilla逻辑的逐步骤翻译，但**故意没有照抄vanilla"直接mutate模块变量"的写法**，改用React `useState`不可变更新——跟"手势代码原样照抄不重新设计"的原则不同，这里判断消息状态机不涉及任何真机踩坑的DOM细节，idiomatic React表达反而更不容易出错。`castAiWand()`入场动效的reflow技巧从`el.offsetWidth`改成`el.getBoundingClientRect()`（TS的`SVGElement`类型没有`offsetWidth`，那是`HTMLElement`专属）。**测试环境两个新坑，都已修复且全局受益**：`Element.prototype.scrollIntoView`在jsdom不存在（已在`setup.ts`补空实现）；`#aiHistorySheet`的`aria-labelledby`让它的accessible name跟同名按钮撞了，`getByLabelText`会命中两个（测试改用`getByRole("button",{name:...})`精确限定即可，不需要改DOM）。
 
 ### 目录结构：`react/`（源码）→ `www/js/react-debts/`（构建产物，Vite多入口）
 
@@ -270,7 +172,7 @@ window.__azBridge = {
 
 **⚠️`payInstallment`/`unsettle`/`settleFull`/`deleteDebt`/`setDebt`这几个单笔债务寻址的函数，参数后来从下标`i: number`换成了id`string`**（见"债务对象加了真正的id字段"一节）——上面代码块里的写法（`payInstallment: payInstallment`这种直接引用）没有变化，变的是这些函数自身的参数类型和内部实现（改成`debts.find(x => x.id === id)`现查，不再是`debts[i]`）。
 
-**`waiveInstallment`是React迁移全部完成之后新增的一个bridge函数**（2026-07-29，修"已知的数据模型缺口④"部分还款那轮加的，不属于第一~十一步任何一步）——`DetailSheet.tsx`新增的"协商减免这一期"按钮触发，内部自己弹`askAsync`问金额，跟`settleFull`同一个套路（详见上面"已知的数据模型缺口④"一节）。这也是`__azBridge`收尾（第十一步）之后第一次再有新函数加入，说明"只在迁移步骤里加桥接函数"这条不是铁律——凡是vanilla需要暴露新的写操作给React调用，任何时候都可以照着现有几十个例子的模式加。
+**`waiveInstallment`是React迁移全部完成之后新增的一个bridge函数**（2026-07-29，修部分还款支持那轮加的，不属于第一~十一步任何一步，完整背景见`debt-model-history` skill）——`DetailSheet.tsx`新增的"协商减免这一期"按钮触发，内部自己弹`askAsync`问金额，跟`settleFull`同一个套路。这也是`__azBridge`收尾（第十一步）之后第一次再有新函数加入，说明"只在迁移步骤里加桥接函数"这条不是铁律——凡是vanilla需要暴露新的写操作给React调用，任何时候都可以照着现有几十个例子的模式加。
 
 `setDebt`/`deleteDebt`/`toast`/`confirmAsync`这4个是`#editSheet`（`react/src/sheets/EditSheet.tsx`等）专用——`setDebt(id, obj)`是`saveForm()`删除后唯一保留的narrow写入函数（`id`非空时按id查到对应下标覆盖并合并`old.id`/`old.settled`/`old.settledDate`，`id`为`null`是push新增并生成新id，内部调`recompute(obj)`但不调`saveAll`/`renderAll`，React保存时自己依次调这三个桥接函数，跟`commitReorder`那套细粒度调用惯例一致）；`deleteDebt`是原样暴露的既有vanilla函数（自带`ask()`确认+按id查下标+splice+saveAll+renderAll）；`toast`是`#flash`单例的简单passthrough；`confirmAsync`是`ask()`的Promise外壳（详见上面"第六步"）。
 
@@ -353,26 +255,11 @@ React组件挂载在同一份`index.html`文档里（不是iframe/独立页面�
 
 跟"在还债务"/"还款日"不同，"统计"tab完全没有手势代码，也没有任何tab内部状态（`payFilter`/`jiggleMode`这类）——`renderBalanceBars`/`renderTypeStack`/`renderPayoffLine`/`renderReportTables`这4个vanilla函数原本就是纯粹的"给定`data`（`computeReportData(debts)`的返回值）拼出HTML字符串"，翻译成`react/src/report/`下同名的`.tsx`组件（`BalanceBars.tsx`/`TypeStack.tsx`/`PayoffLine.tsx`/`ReportTables.tsx`）只是把字符串拼接换成JSX，数学/条件分支逻辑一行没改，是这三步迁移里风险最低、最接近"机械翻译"的一次。**JSX的文本插值天然转义，字符串拼接版本里手动调用的`esc()`在JSX版本里不需要了**（不是行为变化，是JSX本身的固有安全特性替代了手动转义这一步）。**导出按钮（`exportReportXlsx`/`exportReportPdf`）本身没有搬进React**——已确认这两个函数零DOM依赖（只读`debts`造Blob），继续100%vanilla，只是新增桥接给React的`ExportActions.tsx`调用，premium门禁判断原样复刻。
 
-### 已完成的验证 & 还没做的验证
+### 验证状态
 
-**已验证（桌面Chromium + Playwright，一次性临时`npm install playwright`验证完就`npm uninstall`了，不是这个项目的常驻依赖）**：
-- 第二步（"在还债务"）：登录门跳过、hero/KPI数字、3档严重度色晕、点卡片开详情、左滑露出+点击"销这期"触发确认弹窗、长按500ms进入抖动编辑模式("保存"按钮出现)、退出编辑模式、排序下拉框切换、"+新增一笔"打开编辑表单、`__debugPremium()`切换AI banner发光态、点头像打开账户页、tab来回切换后债务列表内容不丢。
-- 第三步（"还款日"+"统计"）：还款日hero卡+空状态、按`dueBucket`分组的4档section-label及计数、渲染的卡片数、点铃铛打开`#notifySheet`、**切通知开关后铃铛`.on`状态响应式更新（验证了`saveNotify()`新增的`az:state-changed`派发确实生效）**、筛选按钮切换后列表变化、鼠标模拟左滑露出"标记已还"按钮、点该按钮触发确认弹窗、点卡片（非滑动状态）打开`#detailSheet`；统计tab的KPI/三张图/数据明细表渲染、`hasPremium()`门禁两个方向（未开通跳订阅页/已开通直接触发导出）；跨tab一致性（"在还债务"tab切换后仍正常读同一份`debts`数据）。
-- 第四步（"我的"）：头像/昵称渲染、`__debugPremium()`切换Premium入口卡文案+`.is-member`样式、点头像/Premium入口分别打开`#accountScreen`/`#premiumScreen`、云备份按钮门禁两个方向（未开通跳订阅页/已开通打开`#backupScreen`）、档案库按钮打开`#docsScreen`（无门禁）、"下载备份文件"触发桌面`<a download>`路径实际下载出JSON、"上传备份文件"确认`#importFileInput`搬出`#view-data`后依然能被`triggerImportFilePicker()`间接点开、四个tab来回切换后各自内容不丢。
-- 第五步（`#detailSheet`）：两个tab（"在还债务"/"还款日"）点卡片都能正常打开详情窗，内容跟改之前一致；grip拖拽（下拖关闭、上拖调高、重新打开高度自动重置）；点"销这期"确认后**详情窗原地刷新**显示新进度（不关闭）；一次性债务点"一次性结清"、多期债务点"提前结清"，确认后债务变settled、**详情窗自动关闭**且移入已结清区；点"编辑"详情窗关闭+正确打开`#editSheet`；点"提前还款模拟"详情窗关闭+正确打开`#simScreen`；硬件/手势返回键（详情窗打开时只关详情窗不退出App，关闭后再按才真正退出）；四个tab来回切换互不影响。**这轮还额外挖出并修复了一个前四步遗留的真实bug**：`useDebts()`在`debts`数组被原地mutate时完全不触发重渲染（不是显示旧值，是整个组件都不重渲染），这个bug理论上从第一步就存在，这次靠"结清后详情窗该自动关闭却纹丝不动"这个明显反例才第一次被抓到、修复、补了回归测试（细节见上面"第五步"那段"⚠️真机会真实踩到"的部分）。
-- 第六步（`#editSheet`）：新增债务全流程（填字段、公式生成amort、批量设置还款日弹出月份选择器并正确铺日期、保存）；从详情窗点"编辑"正确打开、detailSheet同步关闭；一次性还清勾选/取消往返数据不丢；点"删除"弹出确认框（复用vanilla`#modalScrim`）、确认后sheet自动关闭且debts数组正确减少；点"取消"关闭；硬件返回键正确关闭。**这轮同样挖出并修复了一个真实bug**：`deleteDebt`触发的自动关闭effect第一版按下标判断，删除的不是数组最后一条时因为`splice`导致下标顺移而误判（细节见上面"第六步"），这次是靠两笔债务、删除排在前面那笔的完整Playwright交互流程真实复现的，不是理论推演，修复后补了专门覆盖这个场景的回归测试。
-- 第七步（`accountScreen`/`premiumScreen`/`termsScreen`）：点头像打开accountScreen并显示正确的头像/昵称/会员/微信绑定文案；退出登录（无确认弹窗）清空account并重新弹出登录门；三张价卡互斥选中态切换；空/无效/有效兑换码三条路径的toast文案+有效兑换码后输入框收起+Premium入口卡更新成"Premium 会员"+`.is-member`；点《购买者服务条款》打开termsScreen并显示条款正文；硬件返回键按"先关termsScreen再关premiumScreen"的顺序逐层退；点"开通Premium"弹出"暂未开放真实支付"提示。全程零JS报错。
-- 第八步（`simScreen`/`notifySheet`）：从详情窗点"提前还款模拟"正确关闭detailSheet+打开simScreen并显示对应债务名；空金额/月供不足两条toast路径；正常测算显示结果+`SIM_KEY`正确持久化；重新打开时extra按持久化值回填、atPeriod重置为1、结果清空；硬件返回键关闭。从"还款日"tab铃铛打开notifySheet；桌面浏览器无`Capacitor.Plugins.LocalNotifications`时切换开关/发送测试通知都正确toast"仅支持安卓App内使用"、checkbox正确回退未勾选（验证了乐观更新+回退这条路径）；添加/删除提醒规则正确更新列表+`NOTIF_KEY`持久化；点"完成"和硬件返回键都能正确关闭。
-- 第九步（`docsScreen`）：点"打开档案库"打开docsScreen并渲染已有的markdown文档条目；点击文档行触发`mdToHtml`预览渲染出正确的标题标签；上传一张真实图片文件，`uploads`数量正确增加+toast"已上传 ✓"，点该行触发图片预览且`<img>`的`src`是有效的`blob:` objectURL；上传不支持的扩展名（`.exe`）被正确拒绝、toast提示、文件数量不变；点删除文档行弹出标题为"删除文档"的确认框（复用vanilla`#modalScrim`），确认后行数正确减少+toast"已删除"；硬件返回键正确关闭docsScreen。全程浏览器console零JS报错。
-- 第十步（`backupScreen`）：点"打开云备份"打开backupScreen，正确显示"从未备份"+触发`listBackups()`；网络受限环境下`listBackups()`按预期落进错误态（显示"获取备份列表失败：..."，这是"云备份（Premium）"一节记录的已知SDK行为，不是这次迁移的新bug，验证了UI没有因为这个错误而崩溃或卡死）；门禁两个方向（未开通跳订阅页/已开通打开backupScreen）；硬件返回键+点返回箭头都能正确关闭。全程浏览器console零JS报错。**真实的创建/恢复/删除往返依赖真实微信登录会话，这个环境测不出，属于老规矩限制。**
-- 第十一步（`aiScreen`+`aiHistorySheet`）：点AI banner打开aiScreen显示欢迎态+3个快捷芯片；点常见问题芯片/生成分析报告芯片/手输发送三条路径都能正确触发`callAiAdvisor`；网络受限环境下发送按预期落进错误气泡（同样是`Cannot read properties of null (reading 'scope')`这个已知SDK行为，不是新bug）；失败的对话确认不出现在历史列表（"僵尸对话"被正确丢弃）；硬件返回键"先关历史sheet、再关aiScreen"的两段式顺序验证正确；点返回箭头关闭。全程浏览器console零JS报错。**真实AI生成/追问依赖真实微信登录会话，这个环境测不出，属于老规矩限制。**
-- 全程浏览器console **零JS报错**，light/dark两种主题都截图核对过。
+十一步迁移逐步都跑过桌面Chromium + Playwright验证（一次性临时装卸，不是常驻依赖）：每个screen的开关/门禁/表单校验/确认弹窗/硬件返回键链路、跨tab数据一致性，全部覆盖，全程浏览器console零JS报错，light/dark双主题截图核对。过程中挖出并修复的两个真实bug已经记在对应小节里（`useDebts()`原地mutate不触发重渲染，见"第五步"；`deleteDebt`自动关闭effect的下标失效，见"第六步"），不在此重复。
 
-**React迁移收尾（第七~十一步）至此全部完成，`www/index.html`主`<script>`不再有任何`.subpage`/`.sheet`的DOM渲染代码。**
-
-**"统计"和"我的"这两个tab都是零手势的纯data→JSX展示，不需要真机验证，桌面Playwright覆盖已经足够**（跟第二步Summary/AiBanner这类纯视觉组件判定为无需真机是同一个理由）——"我的"tab里"下载/上传备份文件"两个按钮背后的真实原生行为（`SaveFile`插件的"另存为"选择器、真机文件选择器），这次迁移完全没有改动它们的实现，只是把触发入口从vanilla按钮换成React按钮调用同一个函数，不需要为这次迁移重新验证一遍那两个功能本身。`#detailSheet`同理零手势（`initGripDrag`只是4个pointer监听器操作单个DOM节点，不是`gestures.ts`那套长按/滑动状态机），桌面Playwright覆盖已经足够。**"还款日"的左滑手势是目前唯一还留着的真机确认项**——桌面Playwright用鼠标模拟的Pointer Events路径验证了"能触发swiping分支、不报错"，但真实手指触摸的手感、多点触控边界情况、安卓WebView的触摸事件时序，历史上这个项目的教训是"必须真机验证"（见"在还债务自定义排序"一节），这次移植代码逻辑上是逐行照抄，但没有免除真机验证这一步。
-
-> **⚠️ "'统计'tab零手势"这句话从"统计tab视觉+交互升级"这轮（`react/src/report/chartScrub.ts`落地）开始已经不成立**——`PayoffLine.tsx`/`MonthlyChart.tsx`都接入了真正的Touch Events拖动/点击scrub手势，"统计"tab从此变成这个项目里第二个有真实触摸手势代码、需要真机验证的tab（"还款日"左滑是第一个）。完整细节（含桌面验证记录、真机验证待办）见下面"统计（原'高级统计报表'...）"一节"统计tab视觉+交互升级"子节。
+**零手势的纯data→JSX展示tab（当时的"统计"/"我的"）桌面Playwright覆盖已经足够，不需要真机**；`#detailSheet`的grip拖拽同理（只是4个pointer监听器，不是`gestures.ts`那套状态机）。**"还款日"左滑手势**移植时逻辑上逐行照抄，但历史教训是手势代码"必须真机验证"（见"在还债务自定义排序"一节），没有因为是移植就免掉这一步。**"统计"tab后来在"统计tab视觉+交互升级"那轮加入了`chartScrub.ts`/`pieRotate.ts`真实触摸手势**，"零手势"这条已经不再成立，从此变成第二个需要真机确认手感的tab——完整细节见下面"统计"一节。
 
 ## 原生插件：`SaveFile`
 
@@ -400,51 +287,15 @@ React组件挂载在同一份`index.html`文档里（不是iframe/独立页面�
 
 **为什么需要原生插件（不只是JS调API）**：微信登录在原生App里官方要求走"移动应用"OAuth流程——拉起手机上装的微信App本身走授权，不是网页扫码，这个交互没法用纯JS实现，必须靠微信官方Android SDK（`com.tencent.mm.opensdk`，Maven Central发布，见`android/app/build.gradle`）。
 
-**几个容易踩坑、且微信SDK硬编码写死不能改的地方**：
-- 回调Activity必须叫 `wxapi.WXEntryActivity`，包路径必须是 `<applicationId>.wxapi.WXEntryActivity`（也就是 `io.github.jenkjyu.afterzero.wxapi.WXEntryActivity`）——这是微信SDK自己去找这个类的硬编码路径，改名字/挪包会导致回调收不到，不是能自由重构的普通类。
-- `AndroidManifest.xml` 里必须有 `<queries><package android:name="com.tencent.mm" /></queries>`——本项目`targetSdkVersion 36`，安卓11+的包可见性限制下，没有这行`isWXAppInstalled()`/`sendReq()`会静默失效（不报错，就是不工作），排查起来容易摸不着头脑。
-- 微信登录**要求提交App的release签名证书SHA1指纹**去微信开放平台注册，debug签名注册不了——这是这个项目第一次真正生成release keystore的直接原因（见下面"硬性铁律"第4条的更新）。
+**SDK硬编码写死不能改的路径、CloudBase接线时按顺序会踩到的6个坑、`createTicket`/`signInWithCustomTicket`用法、release签名要求，全部见`wechat-login-setup` skill**（`.claude/skills/wechat-login-setup/SKILL.md`），不在这里重复。
 
 **JS这边怎么调用**：`www/index.html` 里点击"微信登录"按钮，跟`SaveFile`同样的模式检测 `window.Capacitor.Plugins.WeChatLogin` 是否存在，不存在（桌面浏览器测试）就提示"仅支持安卓App内使用"。存在的话调用原生插件的`login()`拉起微信，真正的授权结果是异步的，通过 `wechatAuthResult` 事件回传（因为微信App拉起和用户授权跨越了Activity生命周期，`PluginCall`没法跨这段存活，只能用事件而不是直接resolve这次调用）。拿到微信返回的`code`后，调用腾讯云开发（CloudBase）的云函数换取自定义登录票据完成登录——**AppSecret绝不出现在客户端代码里**，只存在云函数的环境变量中，客户端只带AppID（AppID本身不是秘密）。
 
 **目前的完成状态**：微信登录已经端到端跑通验证成功（真机测试，"我的"tab顶部正确显示头像+昵称）。`WeChatLoginPlugin.java`里的`APP_ID`已填真实值，云函数`WX_APPID`/`WX_APPSECRET`已配置。CloudBase环境`after-zero-d7gub5p5f09c8cc2d`，`wxLogin`云函数已部署，"自定义登录"已启用并配好私钥。
 
-**跑通这条链路过程中踩过的坑，全部是一次性的环境/配置问题，不是代码逻辑问题，但极其隐蔽，按顺序记录供以后类似场景排查参考**：
+**CDN脚本加载顺序、`signInAnonymously()`规避bug、匿名登录开关、`wxLogin`权限例外、`users`集合手建、release包WebView调试这6个坑，以及`createTicket`/`signInWithCustomTicket`API用法、"别启用内置微信开放平台登录"，全部见`wechat-login-setup` skill**（`.claude/skills/wechat-login-setup/SKILL.md`）。
 
-1. **CDN引入CloudBase JS SDK时，`cloudbase.js`只是"内核"，登录(auth)和云函数(functions)模块必须单独再引入两个`<script>`标签**（`cloudbase.auth.js`、`cloudbase.functions.js`，同版本号），漏引会导致`app.auth()`返回的对象没有`.auth`方法（`cbApp().auth is not a function`）。`www/index.html`里这三行script标签必须一起出现，别只看到一行`cloudbase.js`就以为够了。
-2. **CloudBase JS SDK（至少2.28.6这个版本）有个内部bug**：`auth._getCredentials()`内部先读`t.scope`再判断`t`是否为`null`，全新设备/App从没建立过任何登录态时`t`就是`null`，直接抛`TypeError: Cannot read properties of null (reading 'scope')`，会连带搞挂`callFunction()`（云函数调用内部也会走鉴权凭证检查）。**规避方法**：在真正走自定义票据登录流程之前，先调一次`auth.signInAnonymously()`（失败就忽略，不阻塞主流程）垫底写入一份本地凭证，绕开这个先用后判的bug。`handleWxAuthResult`函数开头那段`auth.signInAnonymously ? auth.signInAnonymously().catch(...) : null`就是干这个的，别以为是多余代码删掉。
-3. **CloudBase控制台"身份认证→登录方式"里，"匿名登录"必须单独开启**，不开的话上面第2条的`signInAnonymously()`会直接被拒（400，报错信息里会明确写"当前调用的signInAnonymously()所需的登录方式尚未在云开发控制台启用"，这条SDK自己的报错信息其实写得很清楚，不用瞎猜）。
-4. **`wxLogin`云函数默认的"安全规则"（权限控制）是`auth != null && auth.loginType != 'ANONYMOUS'`**——这条规则专门排除了匿名登录调用者，而`wxLogin`恰恰是给"还没真正登录、只靠匿名身份垫底"的客户端用来换取正式登录票据的入口函数，会被这条默认规则直接403拒绝，报`[PERMISSION_DENIED] Permission denied`。**这条规则必须手动放开**，改的位置是云开发控制台"云函数/函数管理"页面顶部工具栏的"权限控制"按钮（不是某个函数详情页里的tab，也不是每个函数各自一个按钮）。
-
-   **⚠️ 重要：这个"权限控制"弹窗改的是整个环境共用的一份配置文件，不是单个函数独立的设置**（已对照当前官方文档`docs.cloudbase.net/cloud-function/security-rules`核实）。格式是 `{ "函数名或*": { "invoke": "表达式或布尔值" } }`，匹配优先级"具体函数名 > `*`通配"。**正确做法是给`wxLogin`单独加一条具名例外，`*`通配规则保持/恢复成安全默认值，不要把`*`整条改成`{"invoke": true}`**（那样会让环境里以后新加的任何云函数都默认对所有人开放，包括不该开放的）：
-   ```json
-   {
-     "*": { "invoke": "auth.loginType != 'ANONYMOUS' && auth != null" },
-     "wxLogin": { "invoke": true }
-   }
-   ```
-   这个函数本身也靠"必须有真实微信code才能换到东西"这层业务逻辑兜底安全性，不依赖CloudBase登录态门槛——但控制台这层权限规则依然应该按"具名例外+安全通配"来配，不要图省事直接把`*`开放。
-5. **`wxLogin/index.js`里查询/写入的`users`集合，CloudBase不会自动建**：文档型数据库里没有这个集合的话，`db.collection("users").where(...).get()`会报`[ResourceNotFound] Db or Table not exist: users`。**注意：用CLI（`tcb db nosql execute`）查询一个不存在的集合不会报错，只会返回空数组`[]`**（MongoDB语义下`find`对不存在的集合本来就不报错），所以不能靠CLI查询来验证集合是否真的建好了，只能去控制台"文档型数据库"页面肉眼确认集合列表里有没有`users`。集合权限选"无权限[ADMINONLY]"就够（这个集合只被云函数用管理员身份访问，客户端永远不直接读写它）。
-6. **Capacitor默认只有debug构建才会打开WebView远程调试**（`android.webContentsDebuggingEnabled`默认跟着`isDebug`走），release包默认关闭，而微信登录又必须用release签名才能过微信那边的签名校验——导致"必须用release包测试，但release包默认没法用`chrome://inspect`/`edge://inspect`远程调试"这个死结。**排查这类release包专属问题时，临时在`capacitor.config.json`里加`"android": {"webContentsDebuggingEnabled": true}`，重新编译release包调试，调完记得改回去删掉这个临时开关**，不要把这个当成正式配置长期留着（默认关闭是有意的安全考虑）。
-
-**CloudBase自定义登录的两处API调用，已对照当前官方文档（`docs.cloudbase.net/authentication-v2/method/custom-login`）核实过，不是凭记忆写的**：
-- 云函数端：`app.auth().createTicket(openid)`——只接受一个参数（自定义用户唯一标识），不支持`refresh`/`expire`这类选项，传第二个参数会导致票据签发行为跟文档不符。
-- 客户端：不是直接`signInWithTicket(ticket)`，而是先用`auth.setCustomSignFunc(fn)`注册一个"怎么去拿ticket"的回调（这个回调内部调云函数换票据），再调用**不带参数**的`auth.signInWithCustomTicket()`，SDK内部会自己回调注册的函数取票据完成登录。方法名和调用方式如果以后又要改，务必重新核实这个链接，CloudBase的Node SDK在这块API上有过大版本调整。
-
-**`app.auth().createTicket()`必须用启用了"自定义登录"后下载的私钥初始化的app实例调用**，不能直接用云函数默认那个`cloudbase.init({ env: cloudbase.SYMBOL_CURRENT_ENV })`初始化的`app`（那个实例没有签发登录票据的权限，调用会报权限错误）。`wxLogin/index.js`里专门用`getAuthApp()`函数单独初始化了一个带`credentials`的app实例来做这件事，跟处理数据库操作的默认`app`分开。
-
-**CloudBase控制台里内置的"微信开放平台登录"这个登录方式，不是我们用的东西，别被名字搞混去启用它**——那个走的是网站应用的网页跳转授权流程（`genProviderRedirectUri`生成URL→重定向→拿code），是给网站/网页场景设计的；这个项目走的是原生App直接拉起微信App的SDK授权流程，两者不通用，官方文档自己都没写清楚原生App怎么接这个内置选项。继续用现在这套"自己的`wxLogin`云函数 + 自定义登录"就好。
-
-**部署云函数要用CloudBase CLI（没有全局装，用`npx -p @cloudbase/cli tcb ...`调用），且必须在`cloudbase/`目录下跑**（CLI靠当前目录找`cloudbaserc.json`，在repo根目录跑会读不到配置转成交互式问答卡住）：
-
-```bash
-cd cloudbase
-npx --yes -p @cloudbase/cli tcb fn deploy wxLogin --force
-```
-
-`cloudbase/cloudbaserc.json`（**已gitignore，不进git**）是这次新加的部署配置文件，性质跟`android/keystore.properties`/`android/local.properties`一样——因机器而异、装真实密钥，每次要重新部署得先确认这个文件存在且内容对（`envId`、`functions[0].envVariables`里的`TCB_CUSTOM_LOGIN_*`三个变量）。**这个文件不存在的话，云函数部署会失败或者把配置搞错，不是`npm install`能自动补出来的东西**，得重新从CloudBase控制台下载私钥JSON手动配。
-
-**踩过的坑**：私钥JSON如果直接整个塞进一个环境变量的值，`tcb fn deploy`会报`Environment.Variables.0.Value`类型应为`string`的错误（怀疑是CLI/API把"长得像JSON"的字符串值自动解析成了对象）。解决办法是拆成三个独立的纯字符串环境变量（`TCB_CUSTOM_LOGIN_PRIVATE_KEY_ID`/`TCB_CUSTOM_LOGIN_PRIVATE_KEY`/`TCB_CUSTOM_LOGIN_ENV_ID`），`wxLogin/index.js`里的`getAuthApp()`再把这三个拼回`credentials`对象——以后不管是这个云函数还是别的云函数，只要要往CloudBase环境变量里塞"一整块JSON"，先想到这个坑，别重复踩。
+**部署云函数、`cloudbaserc.json`要求、环境变量/权限控制的坑，见`cloudbase-deploy` skill**（`.claude/skills/cloudbase-deploy/SKILL.md`）——不在这里重复，那边有完整的部署命令、三个必查的坑、验证方法、当前全部云函数一览。
 
 ### 云函数：`deleteAccount`（注销账户）
 
@@ -456,12 +307,7 @@ npx --yes -p @cloudbase/cli tcb fn deploy wxLogin --force
 
 **权限控制，不需要给它单独配规则**：上面第4条已经改正过来了——"权限控制"是整个环境共用一份配置文件，不是每个函数各自独立。只要`*`通配规则保持在安全默认值（`auth.loginType != 'ANONYMOUS' && auth != null`），`deleteAccount`不用任何具名配置就自动吃到这条安全规则（只允许真实登录、非匿名的调用者调用）。**踩过的坑**：这个项目第一次配`wxLogin`权限时图省事直接把`*`整条改成了`{"invoke": true}`（对所有人开放），当时没意识到这会同时影响`deleteAccount`（和以后任何新加的函数）——后来对照文档发现`*`是共享兜底规则，才改成"给`wxLogin`单独加具名例外，`*`收紧回安全默认值"这种正确写法（见上面第4条的JSON示例）。**即使当时`*`一度是开放的，`deleteAccount`本身也没有实际风险**：它从不信任客户端参数，身份完全来自已认证会话的`customUserId`，查不到就直接拒绝、且只会操作调用者自己的数据，删不了别人的账号——控制台这层"谁能调用"的门槛和函数内部"删谁的数据"的门槛是两件独立的事，后者才是这个函数真正的安全边界。
 
-这个函数不需要任何`envVariables`（不用微信API密钥，也不用`createTicket`的私钥，只需要默认admin DB权限+`getUserInfo()`），`cloudbase/cloudbaserc.json`里的条目比`wxLogin`简单。部署方式跟`wxLogin`一样，必须在`cloudbase/`目录下跑：
-
-```bash
-cd cloudbase
-npx --yes -p @cloudbase/cli tcb fn deploy deleteAccount --force
-```
+这个函数不需要任何`envVariables`（不用微信API密钥，也不用`createTicket`的私钥，只需要默认admin DB权限+`getUserInfo()`）。部署方式见`cloudbase-deploy` skill，跟`wxLogin`一样。
 
 ## 原生插件（官方npm）：`@capacitor/local-notifications`（还款提醒通知）
 
@@ -779,95 +625,19 @@ ActionBar消失后，WebView内容直接从状态栏正后方开始铺，配合�
 **已结清列表的日期文字颜色**从`var(--good)`（蓝色）改成了`var(--text-faint)`——蓝色在这个位置显得突兀，绿色对勾图标已经足够表达"已完成"这层意思，日期不需要再抢一个强色。
 
 **后来又删掉了`#count`（header下面那行"N笔在还 · M笔已清"）**：这行文字跟它正下方`.summary`网格里的"在还笔数"/"已结清"两张`.kpi`卡片说的是同一件事，是真实的信息冗余，删掉`#count`/`.asof`这个DOM节点，`renderSummary()`里也去掉了对应的`$("count").textContent=...`赋值。**同一时间点，"计算口径说明"（`#sumNote`，那三行"在还总负债=...；已还金额=...；经常性月供=..."的公式）改成了默认折叠**：这段文字之所以能收起，是因为三条公式现在都已经在各自的KPI卡片上有了轻量提示（hero卡"只算本金"角标对应第一条、"已还金额"卡的"另付利息¥Y"子行对应第二条、"经常性月供"卡新加的"不含一次性还清"子行对应第三条），公式说明本身降级成给较真用户看的补充细则，不需要默认占屏幕。折叠靠新增的`.note-toggle`（一个纯文字+chevron的小按钮，`#sumNoteToggle`）手动切换`display`，**没有用`<details>`/`<summary>`**——这个项目在"统计"页数据明细表那次已经明确弃用过原生`<details>`（见"统计"一节），这里延续同一个偏好，不要在类似场景里重新引入。
-## 还款提醒页：hero卡片 + 左滑销这期
+## 还款提醒页：hero卡片 + 左滑销这期——设计细节见`pay-tab-design` skill
 
-> **⚠️ 这一节记录的是这个页面视觉/交互设计的历史由来（为什么是4档急迫程度、为什么筛选和分组都叫"7天内/30天内"但语义不同、为什么手势要用Touch Events等），这些设计决定依然成立、依然是当前实现的依据。但"渲染方式"本身已经翻篇：这个页面（连同`#payHero`/`#payList`/`#payFilter`等vanilla DOM结构和`renderPayHero()`/`renderPay()`等函数）已经整体由React接管，见上面"React 迁移"一节"第三步"。CSS类名（`.pay-hero`/`.pay-row`等）全部原样复用，下面提到的具体函数名/DOM id仅作历史参照，不代表当前代码里还存在。**
+"还款日"tab（`react/src/pay/`）顶部"最近还款日"hero卡+下方列表，卡片左滑露出"销这期"（同一动作在债务页/详情窗都叫这个名字，统一过一次）。
 
-"还款日"标签页顶部有一张"最近还款日"卡片（`#payHero`，`renderPayHero()`），取所有在还债务里下一期还款日最近的那一笔，底色按急迫程度换色。下面`#payList`列表里每一条债务卡片支持向左滑动，滑出一个"销这期"按钮（类似iOS/微信聊天列表左滑删除）。**这个按钮2026-07-29之前叫"标记已还"**——同一个动作在债务页左滑、详情窗按钮上都叫"销这期"，同义不同名会让人以为是两回事，统一成"销这期"。
+**⚠️列表的一行 = 一期，不是一笔债务，是本页最重要的一条当前事实**：`PayItem`按日期逐期展开（不是每笔债务只显示下一期），`amount`必须读这一期的`r.amount`（不能用`d.monthly`，先息后本这类计划每期金额不同）。
 
-**急迫程度现在是4档阈值，卡片底色和列表圆点共用同一套`urgencyTier(diff)`**（`diff`=距还款日的天数）：`diff<0`=逾期(`overdue`)、≤3天=红(`crit`)、≤14天=黄(`warn`)、其余=绿(`dim`)。**逾期是后来单独从`crit`拆出来的一档**——早期逾期和"3天内到期"共享同一个`crit`视觉，都是淡色底；逾期这一档现在故意用`--critical`实心底+白字（比其它三档的淡色底更强烈），列表圆点也加了`dotPulse`脉冲动画（`box-shadow`用`--critical-soft`做呼吸圈），因为逾期没还的实际代价（利息/信用）比"还没到但快了"更高，需要更抢眼的提示，不能被当成同一档忽略掉。`relLabel(diff)`对应也从含糊的"已到期"改成"已逾期 N 天"。**`dim`档一开始用的是`--accent`（品牌绿），浅色模式下这个绿是`#18453B`深墨绿，9px小圆点尺寸下几乎看着像黑色**——已经改成`--good`（这个项目里"已结清"/"低利率"这些正面信号一直用的蓝色），清晰可辨。以后再调这类小尺寸状态色，先拿实际渲染尺寸眼看一遍，不要只看色值本身是不是"绿色"就假设够用。
+急迫程度4档阈值、分组(`dueBucket`)跟筛选(`PayFilter`)两套"7天内/30天内"语义为什么不同（互斥分段 vs 累计口径）、左滑手势实现细节（`__justDragged`标记复位坑）、筛选条5档+日历自定义天数改版，全部见`pay-tab-design` skill（`.claude/skills/pay-tab-design/SKILL.md`）。
 
-**左滑手势沿用"在还债务"长按拖拽那条踩过的教训（见下面"在还债务自定义排序"一节），但场景更简单**：拖拽排序需要在同一个垂直轴上"平时滚动、长按后接管"，只能用Touch Events；这里左滑只需要接管**水平**轴，垂直滚动完全交给原生，所以可以额外用`touch-action:pan-y`提前告诉浏览器"水平不归你管"，减少和原生手势抢的可能，JS里对水平方向再补一层`preventDefault`兜底。触摸设备走Touch Events（`touchstart`/`touchmove`+`{passive:false}`/`touchend`），第一次移动时按dx/dy哪个更大判断"这是横滑还是竖直滚动"；桌面鼠标走独立的Pointer Events分支（`pointerType==='mouse'`才处理），纯为桌面浏览器可测。
+## 新增/编辑债务表单（`#editSheet`）——设计细节见`edit-sheet-design` skill
 
-**⚠️ 踩过一个坑：`__justDragged`这个"防止拖拽结束后紧接着的click把刚展开的滑块关掉"的标记位，必须在每次新手势开始时重置，不能只靠点击去消费它**——真正带位移的拖拽/滑动手势结束后，浏览器**不会**触发click事件（只有原地无位移的tap才会），所以如果只在click handler里"用一次就清空"，这个标记位在一次真实拖拽后会一直是`true`、永远等不到click来消费它，直到很久以后一次完全独立、毫不相关的正常点击也被这个陈旧的标记位误伤（表现是"点开着的滑块想关掉它，点了没反应"）。修法：`touchstart`/`pointerdown`一开始就先重置`front.__justDragged = false`，而不是只寄希望于click阶段清空。以后写类似"拖拽后抑制紧跟着的一次click"的逻辑，先确认这次手势结束后浏览器到底会不会补发click，别想当然。
+全项目最复杂的一块UI（公式生成器、批量设置还款日、`oneTimeStash`状态机）。`oneTimeStash`暂存机制、`planMode`切换、`#gFirstField`的DOM搬家技巧、批量设置日期确认框、29/30/31号限制、计息方式选择器+等额本金新增、`genPlan()`四舍五入/负数bug的完整排查过程，全部见`edit-sheet-design` skill（`.claude/skills/edit-sheet-design/SKILL.md`）。
 
-**同一时间只允许一条卡片保持展开**（`paySwipeOpen`模块级变量），展开新的会自动收起旧的；点开着的卡片本身会收起它；切到别的tab会强制收起（`closePaySwipe`）。滑出的"销这期"按钮直接复用`payInstallment(i)`（债务详情页"销这期"背后的同一个函数），确认弹窗、结清判断、toast提示全部保持一致，没有另写一套逻辑。
-
-**这轮跟"在还债务主页视觉改版"对齐风格时，`.pay`卡片也改成了磨砂玻璃质感，连带把左滑结构从"绝对定位叠层"换成了"flex并排"**——这是补上`.debt-front`那次已经踩过、写进CLAUDE.md的坑：`.pay-swipe-btn`原来是`position:absolute`叠在`.pay`正后方，`.pay`当时是不透明的`var(--surface)`所以不出问题；改玻璃质感后如果不动结构就会重蹈"按钮颜色透过玻璃常驻可见"的老坑。现在结构是`.pay-row`（外层，`overflow:hidden`+`box-shadow:var(--e2)`）→`.pay-swipe-row`（内层flex行，左滑的`translateX`打在它身上）→`.pay`（`flex:0 0 100%`，玻璃卡面）+`.pay-swipe-btn`（`flex:0 0 92px`，卡片右侧屏幕外），跟`.debt-row`/`.debt-front`/`.debt-swipe-btn`同一套模式。`initPaySwipe(outer, swipeRow, front, idx)`签名也跟着改了，`transform`统一打在`swipeRow`（即`.pay-swipe-row`）上，不再是`front`。
-
-**点卡片（非滑动状态）现在会打开债务详情（`openDetail(idx)`）**——早期版本卡片点击只处理"收起已展开的滑块"，没有导航效果，是一个功能缺口（跟"在还债务"卡片"点击开详情"的心智模型不一致）。`initPaySwipe`新增第4个参数`idx`就是为了接这个。
-
-**Hero下方新增`#payStats`两个小指标卡（本周待还/本月待还，金额+笔数）**，跟主页`#summary`共用`.kpi`视觉语言。**周/月是累计口径（月⊇周，`diff`0~6算周、0~29算月）且都不含逾期**——逾期是"已经错过"的，跟"即将要还"的"待还"语义不是一回事，逾期笔数只在下面列表分组里出现，不在这两个小指标里重复计。
-
-**`#payList`现在按`dueBucket(diff)`（已逾期/7天内/30天内/更晚，四档，注意阈值跟`urgencyTier`的3/14天不是同一套）分组显示，组间插入`.section-label`小节标题（"7天内 · 3笔"这种格式）**，不再是一条纯排序的flat list。**逾期分组的`.section-label`额外加`.overdue`（红字加粗），单独摘出来强调**——逾期的实际代价比"还没到但快了"更高，之前只体现在hero和圆点颜色上，列表本身没有单独强调过。
-
-**⚠️分组标签最早叫"本周内/本月内"，真机反馈后改成了"7天内/30天内"**——"本月"这种说法暗示按自然月计算（比如"到本月底"），但`dueBucket`实际是纯滚动天数窗口（`diff<=7`/`diff<=30`），标签数字和逻辑边界能对上才不会误导人，以后这类"相对时间窗口"分组，标签直接用字面天数，不要用"周/月"这种容易被读成日历语义的词。
-
-**⚠️筛选条在2026-07-29改过一轮，当前形态见下面"筛选条改版"小节**——档位从4个变成5个（中间补了"15天内"）、整条改成可横向滑动、最右侧钉了一个不跟着滚的日历图标做"自定义天数"，`PayFilter`的键名也从`week`/`month`换成了`d7`/`d15`/`d30`。下面这段描述的**语义**（累计口径 vs 互斥分组）依然100%成立，只是档位和键名要按新的读。
-
-**列表上方新增`#payFilter`筛选条（全部/已逾期/7天内/30天内四个`.pf-btn`），跟分组用的是同一个"7天内/30天内"说法但语义不同，注意别混淆**：分组（`dueBucket`）是给"全部"视图做互斥分段用的，每笔债务只属于一个组，避免同一条在列表里出现两次；筛选是"看更窄范围"，`payFilter`的`week`/`month`两档判定用的是**累计**口径（`diff 0~7`/`diff 0~30`，`month`天然包含`week`那些），不是从`dueBucket`的互斥边界复用逻辑——这是刻意的：点"30天内"筛选时用户想看的是"接下来30天要还的全部"，不是"只看第8~30天那一段"，如果照搬互斥分组的判定会让这周就要还的那几笔从"30天内"筛选结果里消失，违反直觉。`payFilter`是模块级变量（不持久化，纯会话内状态），`renderPay()`每次都重新渲染筛选条+按当前`payFilter`过滤`items`得到`visible`，hero和`#payStats`两个小指标卡不受筛选影响，永远基于全量`items`算——它们是总览widget，不是"当前筛选视图"的一部分。
-
-**Hero下方两个小指标卡的标签也从"本周待还/本月待还"改成了"7天内待还/30天内待还"**，跟分组标签统一说辞。这两个卡的口径本身没变，仍然是累计（0~7/0~30，`month`≥`week`），因为一个KPI headline("7天内待还¥X")本来就该是"接下来7天内全部要还的钱"这种累计语义，跟分组labels面对的问题（互斥分段被误读成累计）不是同一类风险，不需要跟着分组改成互斥。
-
-**卡片左边那个9px小圆点(`.dot`)已经删掉**：改磨砂玻璃质感这轮给卡片本身加了`.pay-row.crit/.warn/.dim/.overdue`驱动的`::before`色晕，已经能传达同一份严重度信息，小圆点变成纯粹的信息冗余，删掉了`.dot`相关的CSS（含`dotPulse`那个逾期呼吸动画）和HTML。
-
-**`.pay-row`/`.pay`的圆角从20px改成了18px，跟"在还债务"卡片的`.debt`/`.debt-front`对齐**——这两套左滑卡片结构是同一套模式抄出来的两份实现，圆角数值当初没有互相核对，一个20px一个18px，视觉上两个页面来回切换能看出差异。统一成18px（以`.debt`那份为准，它是更早定下来的）。
-
-**空状态（没有在还债务）从一行灰字改成了带图标的正向反馈**：`.pay-hero.empty`背景从中性灰改成`--good-soft`（跟`dim`档共用"平静的好消息"语义），配一个绿底白色对勾图标（复用"销这期"按钮同一条`M20 6 9 17l-5-5`路径，不是新画的）+"全部结清"标题+"暂无待还款项"副标题。**没有用emoji**——这个App别的地方（比如`payInstallment`成功后的toast）历史上用过🎉，但这次空状态刻意选了更克制的纯图标+文字方案。
-
-### ⚠️列表的一行 = 一期，不是一笔债务（2026-07-29改，本页最重要的一条）
-
-这个页面早期是**遍历`debts`、每笔只取`d.nextDate`（最早的未还期）生成一行**，所以一笔债务在列表里最多出现一次。窗口只有7~30天时，"一笔债务"和"一期还款"是等价的（月供债务一个月就一期），这个前提看不出问题——**是"日历自定义天数"把窗口拉到上百天之后才暴露的**：107天里一笔月供债务要还3~4期，页面上却只看得到第一期，**行数被债务数量卡死**，"接下来107天我要还哪些钱"这个问题根本答不了。
-
-现在`PayItem`展开成逐期（`d`/`next`/`diff`/`amount`/`planIdx`/`isNextUnpaid`），同一笔债务按日期占多行，React key用`d.id + ":" + planIdx`（光用`d.id`会撞key）。连带的四条：
-
-- **`amount`必须用这一期的`r.amount`，不能用`d.monthly`**——`d.monthly`是"最早未还期"的金额，同一笔债务的每一行会显示成同一个数字。等额本息看不出问题（每期一样），但**先息后本**会当场出错：前5期各100、第6期10,100，全用`d.monthly`的话6行全显示¥100，那笔大额还款在页面上彻底消失、窗口合计也会少算一个数量级。`custom`计划同理。`Hero`卡也一样改了。
-- **"下一期"是唯一一档按笔看的**（原来叫"全部"，逐期展开后这个叫法有歧义）——每笔债务只留`isNextUnpaid`那一行。它跟其余各档不在一个轴上，所以没跟它们共用"天数窗口"判定。
-- **列表只有一个表头，文案跟当前筛选一致**（"100天内 · 23期"）。原来按`dueBucket`分"已逾期/7天内/30天内/更晚"四段，窗口上百天时绝大多数行会全挤进"更晚"，分组读不出任何结构。计数单位是**期**不是笔。
-- **只有每笔债务最早的未还期能"销这期"**——`payInstallment`永远销最早的未还期，跳期销在数据模型上不成立。其余行的按钮加`.is-disabled`置灰。**⚠️故意不用`disabled`属性**：全局`button:disabled`带`pointer-events:none`，那样点了完全没反应、用户会以为是bug；保留可点，点了toast一句"请先销掉这笔债务更早的未还期次"。
-
-**三张小卡的计数口径也跟着改成按期算**（`Stats.tsx`累加`o.amount`、单位"期"）——列表逐期展开后同一个窗口里的期数会多于债务数，两处口径不一致的话会出现"卡片说13笔、列表列出15行"。
-
-**这条是"数据模型比产品意图浅"的典型案例**：`plan`数组一直有逐期数据，是**这个页面的读取方式**只取了第一期。改产品意图（窗口可自定义）时没有同步检查读取方式跟不跟得上，才留下这个缺口——以后扩展某个页面的"可视范围"时，先问一句"这一行现在代表什么、扩展之后还成立吗"。
-
-### 筛选条改版（2026-07-29）：5档 + 横向滑动 + 日历自定义天数
-
-**布局是"可滚动的一排芯片 + 固定不滚的日历按钮"两段**（`.pay-filter` > `.pf-scroll` + `.pf-cal`）。芯片加到5个（全部/已逾期/7天内/15天内/30天内）之后，390px宽的手机上一行放不下，原来那种`flex:1`等分会让每个芯片的字都换行；改成横向滚动后"30天内"要往右滑一点才露出来，**这是跟用户确认过的取舍**。**日历按钮不能放进滚动区**——它是常驻入口，滑走了就等于没有。
-
-**`PayFilter`的键名从`week`/`month`换成了`d7`/`d15`/`d30`**（加了中间档之后"week/month"这种叫法既不准确也不好扩展），另加一个`custom`。自定义的天数存在**独立的`customDays` state**里，不塞进`filter`本身——`filter`是"当前用哪种筛选"，`customDays`是"自定义那种筛选的参数"，分开存之后切走再切回来天数还在，不用重新选一次日期。
-
-**日历那条路复用了vanilla共享确认弹窗**：`ask()`/`askAsync()`新增`opts.date`（+`opts.dateMin`限制不能选过去），跟`opts.month`（批量设置还款日）、`opts.amount`（提前结清问实付金额）是同一个套路的第三个可选输入控件。**三者互斥使用**，`mOk`那个handler里取值优先级是"月份→日期→金额"，真要同时用两种输入得先改那里。选中日期后换算成"N天内"，日历按钮进入选中态并显示天数。
-
-**`.pay-stats`同步从2张卡变成3张（7/15/30天内待还）**——筛选档位和总览档位必须对得上，否则点了"15天内"筛选却在上面找不到对应的总额。三档依然是**累计**口径（30天内包含15天内、15天内又包含7天内），依然都不含逾期。
-
-~~**"全部"这个叫法保持不变**（用户问过要不要改成"最近1期"，讨论后否决）~~ **这条当天就作废了**：列表随后改成逐期展开（见上面那节），"全部"在"每笔只看下一期"和"所有期次全列出来"之间产生了真实歧义，最终改名成**「下一期」**——直说它显示什么，跟右边的窗口档位形成"按笔看 vs 按期看"的清楚对照。当时否决"最近1期"的理由（听起来像只显示1条记录）依然成立。
-
-## 新增/编辑债务表单（`#editSheet`）
-
-**"一次性还清"复选框(`f-oneTime`)勾选/取消勾选，靠`oneTimeStash`暂存被隐藏的期数，不能只是视觉隐藏**：早期`renderPlanRows()`勾上"一次性还清"时只是把第2期起从界面上`slice(0,1)`隐藏掉，底层`editingPlan`数组没有真的删——如果用户先手动加了2期再勾选，保存时那第2期还是会跟着存进去，导致"一次性¥X"（只显示第1期金额）和"借款金额"（全部期数本金相加）对不上，是个真实bug。修法：`syncOneTimeUI()`里勾选时把第2期起真正挪到`oneTimeStash`里（不是丢弃），取消勾选时原样放回`editingPlan`——这样来回勾选不会丢手动填过的数据。`oneTimeStash`每次`openEdit()`都要清空，不能跨债务残留。
-
-**"手动添加"/"公式生成"是二选一的分段切换器（`planMode`变量 + `#planModeToggle`），不是两套入口同时堆在页面上**——原来是"用公式生成▾"折叠按钮和常驻的"＋加一期"按钮并存，容易同时露出两套UI显得乱。现在点哪个就只显示哪个的内容，公式生成完之后自动切回"手动添加"（`setPlanMode("manual")`）方便直接在结果上逐行微调。
-
-**⚠️ `#gFirstField`（首期还款日）只有一份DOM，靠JS在切换计息方式时物理搬家，不是四份独立字段**：公式生成有4种计息方式（等额本息/信用卡等本等费/先息后本/自定义），"首期还款日"这个输入框是所有计息方式共用的同一个字段，但用户要求"期数"和"首期还款日"在默认的"等额本息"模式下要拼成一行——由于`data-gg`各计息方式区块之间是互斥显示（切换时`display:none/block`），没法让同一个DOM节点同时"属于"两个不同区块。解决方式是`setGenUI(k)`每次切换计息方式时，用`appendChild`把`#gFirstField`这个`.field`容器整个搬到当前生效区块里——等额本息时搬进`#amortPeriodRow`（跟"期数"拼成`.field.two`一行），其它三种搬到各自区块末尾（单独一行，位置跟以前一样）。**以后如果要再调整这个字段的布局，记住它是"移动"不是"复制"，四种计息方式任何时候都只有一份`#g-first`输入框存在于DOM里，只是挂在不同父节点下。**
-
-**"还款日（几号）"(`f-day`)不再手动填，是从还款计划第1期的实际日期里自动推出来的**（`updateFDayFromPlan()`，挂在每次计划变动的地方：加/删行、改日期、公式生成、批量设置还款日、一次性还清勾选/取消）。这个字段现在是`readonly`，不带必填星号，`saveForm()`校验时也直接读`editingPlan[0].date`而不是这个DOM字段的值。这么改是因为`d.day`这个字段过去在整个App里**完全没有别的地方读取/显示**（纯粹是用户手填、存进去就再也用不上的孤立数据），让它跟真实计划数据保持一致远比允许手填一个可能对不上的数字更有意义。（⚠️`d.day`这个持久化字段本身2026-07-30已经删除，见上面"已知的数据模型缺口⑥"——只读输入框显示的这个数字继续存在，只是不再写进`Debt`对象了。）
-
-**批量设置还款日：选"几号"之后点"应用到全部"会额外弹一个要"首期哪年哪月"的确认框**——这是给`ask()`这个原有的通用确认弹窗新加的可选第4个参数`opts.month`（会临时显示一个`<input type="month">`，`onOk`回调收到选中的月份字符串），其它调用`ask()`的地方不传这个参数就是原来纯文字确认框，不受影响。确认后按"首期年月+几号，每期顺延一个月"批量铺日期，超过当月天数会clamp到当月最后一天。
-
-**批量设置的"几号"和公式生成的"首期还款日"都不允许选29/30/31号，但还款计划表格里逐行手动填的日期不受限制**——这两个入口本质是在投射"每月同一天"的重复规律，29-31号在有些月份根本不存在，会导致还款日在不同月份之间漂移（有的月28号有的月31号），所以直接拦（`isBadRepeatDay(day)`），toast提示去表格里逐行手动填。表格里每一行的日期选择器（`#planRows`里的`data-f="date"`）代表的是"这一期具体是哪天"的真实数据，现实中贷款完全可能就是某个月的30号到期，所以这里故意不加这条限制——**两个入口的定位不同（一个是投射重复规律的快捷工具，一个是记录真实数据的详情表），限制也应该不同，别图省事统一加同一条规则。**
-
-**⚠️ 踩过一个坑：`#g-P`/`#g-rate`/`#g-n`/`#g-first`（公式生成tab专属的几个字段）不能带HTML5原生`required`属性**——它们跟"保存"提交按钮共用同一个`<form id="debtForm">`。只要用户当时停留在"公式生成"这个tab（`#genPanel`是`display:block`可见状态），哪怕根本没点"生成计划"，这几个字段只要有空的，点"保存"就会被浏览器原生表单校验拦截、`saveForm()`根本不会被调用——**而安卓WebView不会像桌面浏览器那样弹校验提示气泡，拦截后的观感就是"点保存彻底没反应"**，不关窗、不报错、不提示，非常难排查（一度真机反馈"编辑债务保存点不了"，查了很久才定位到是这几个`required`）。修法：去掉这几个字段的`required`（视觉星号`<span class="req">*</span>`保留），校验挪到`#doGen`（"生成计划"按钮，`type="button"`不是`submit`）自己的点击事件里手动toast提示。**以后如果再往`#genPanel`（或者任何跟主表单共用一个`<form>`、但靠`display:none`切换显隐的子面板）里加字段，一律不要用原生`required`，会有同样的隐形阻塞风险——校验都应该手动做、用`toast()`明确提示，不要依赖浏览器原生表单校验的可见反馈（WebView里没有）。**
-
-**计息方式选择器换成底部抽屉 + 新增"等额本金"（2026-07-30）**：公式生成器"计息方式"原来是原生`<select>`，在安卓WebView里弹的是系统全屏列表、长按还会选中文字——换成了跟排序方式（`react/src/debts/SortSheet.tsx`）同一套底部抽屉，两者共用的UI抽成了`react/src/shared/PickerSheet.tsx`（泛型组件，`SortSheet.tsx`现在只是它的一层薄封装）。**新增第5种计息方式`equalprincipal`（等额本金）**：每期本金固定（`P/n`），利息按剩余本金实时计算，`calc.js`的`genPlan()`里跟`amort`共享`P`/`rate`/`n`三个字段（`GenPanel.tsx`的`GenFields`里叫`epP`/`epRate`/`epN`，避免和amort自己tab的输入框互相覆盖）——这是跟"等额本息"并列的房贷/车贷最常见两种还款方式之一，之前只做了`amort`那一种。5个选项现在都带一句简短括号说明（"等额本息（每期还款总额相同）"这种），"等本等费"去掉了"信用卡"前缀——核实过（不是凭印象，查了多篇资料）这是标准行业术语，专指"每期本金和手续费都固定"这个模型（区别于按剩余本金实时计息的"等额本金"；跟更泛化的"等本等息"是同一个模型，只是这里的费用字段本来就叫"手续费"不叫"利息"），且不是信用卡专属，网贷分期同样常见。
-
-**⚠️同一天验证`equalprincipal`时，用穷举扫描(P/rate/n共5万+组合)顺带挖出一个`amort`本身早就存在的真实bug，不是这次新加代码引入的**：`genPlan()`里"非最后一期的本金`pr`"原来直接拿未四舍五入的浮点数去减running balance，只在`push()`时才顺手四舍五入一次显示——多数场景下每期`pr`天然不同（利息递减导致），四舍五入的正负误差大致抵消，看不出问题；但**`rate=0`或`rate`极小时，每期利息趋近于0，导致每期`pr`趋近于同一个数**，同一个四舍五入偏差会朝同一个方向反复叠加，期数越多偏得越多（实测`P=500,rate=0,n=9`时本金合计变成500.03而不是500，`n`越大偏差越大）。**这不是刁钻边界**——这个App的债务类型里就有"私人借款"，亲友间借钱免息/极低息是完全正常的真实场景。`interestfirst`的"还本阶段"（`np`那部分）结构上跟`amort`一样，同一个bug也存在。修法：三个分支（`amort`/`equalprincipal`/`interestfirst`）统一改成"非最后一期的本金先`r2()`四舍五入、再用四舍五入后的值去减running balance"——这样最后一期（永远等于"运行到这里balance还剩多少"）才能精确吸收所有零头，保证"本金相加=借款金额"在任何rate/period组合下都精确成立，不只是"通常情况下够接近"。修复后重新跑穷举扫描（amort 5.5万+组合、equalprincipal同、interestfirst 8万+组合），本金合计误差降到纯浮点噪声级别（~1e-10），`amount`与`principal+interest`的一致性、`impliedAPR()`反推年化两项交叉校验也都通过。`test/calc.test.js`补了两条回归测试（`equalprincipal`的`P=500,n=9`除不尽场景、`amort`的`rate=0`免息场景）。
-
-**⚠️上面这条修法本身还不够——用户追问"确定没问题了吧"之后再压力测试（大期数房贷级别场景），发现只做"四舍五入前先对齐"这一步，在期数特别多时，反复叠加的四舍五入偏差本身会累积到超过剩余本金，导致某一期（甚至被当成"最后一期"的那一期）本金/金额变成负数**——这比"合计差几分钱"离谱得多，且不需要n=1000+这种不现实的期数：`P=100,rate=36%,n=210`（30年内、完全合理的一笔高息长期私人借款/网贷）就会触发。用户确认"人没有这么长命，撑死了30年×12期"之后，按这个上限（n≤360，测试留了到400的余量）重新穷举验证。修法是在①的基础上再加一层钳制：**每期本金都不能超过"当前剩余本金"（不只是最后一期）**——一旦公式算出来这一期该收的钱比剩下的本金还多，这一期直接收掉全部剩余、提前结清（`amount`重算成`本金+利息`而不是继续用固定月供，否则会触发"金额与本金+利息不一致"的保存校验），之后每期清爽显示0，不会出现负数。**`equalprincipal`的"最后一期"依然必须保留"强制=剩余本金"这个特例、不能被这层钳制盖过去**——`P/n`向下舍入时（比如`100/3=33.33`，真实剩余是`33.34`，比`pr4`还大），如果最后一期也走`Math.min(pr4, 剩余本金)`，这1分钱零头会被直接丢掉，合计变成99.99而不是100（这是修这个bug时自己先犯了一遍又发现的，见下面"三条方法论教训"）。修复后n≤400范围内重新穷举（amort+equalprincipal共15万+组合、interestfirst 70万+组合），零负数、本金合计误差回到浮点噪声级别，且不影响任何正常场景（原有98+条测试全部不受影响）。`test/calc.test.js`补了4条回归测试：`amort`/`equalprincipal`/`interestfirst`各一条"长期限+高利率不出现负数"，`equalprincipal`一条"向下舍入零头不能被漏掉"。
-
-**这一整轮排查的方法论教训，值得记下来**：
-1. **穷举扫描比手算/单个例子可靠**——equalprincipal的除不尽bug和amort的免息bug，都是先写"看起来对"的实现、单个测试用例也能通过，穷举几万组合之后才暴露的。
-2. **"改小一点应该没问题"是错觉**——修复①(对齐四舍五入)时以为已经堵住了问题，但同一类偏差在期数更多时会用另一种更严重的形式（负数而不是几分钱误差）冒出来，必须重新扫一遍才能确认，不能凭"逻辑上应该行"就收工。
-3. **修一个bug的过程中自己又引入一个新bug**——给equalprincipal加钳制时，一开始把"最后一期强制=剩余本金"也顺手改成了`Math.min(pr4,剩余本金)`，结果在P/n向下舍入的场景里把零头漏掉了；这是靠"反向构造一个应该走另一条分支的例子（向下舍入 vs 向上舍入）"才抓到的，改完立刻手算+跑一遍确认。
+**⚠️唯一提前抽出来的通用规则**：跟主表单共用同一个`<form>`、靠`display:none`切换显隐的子面板里的字段，不能带原生`required`属性——哪怕字段所在tab当前不可见，只要它是空的，点提交按钮就会被浏览器原生表单校验拦截，安卓WebView不会像桌面浏览器那样弹提示气泡，表现是"点了彻底没反应"，很难排查。校验都要挪到具体按钮的点击事件里手动`toast()`。
 
 ## 订阅UI基础设施：单一 Premium（买断 + 订阅两种购买方式）
 
@@ -1031,123 +801,27 @@ sync android`+`assembleRelease`后解包核对：APK内`index.html`跟工作区`
 
 ---
 
-以下是这个页面"看板"版本时期（2026-07-28～30）的演进历史，`renderReportScreen()`/
-`renderBalanceBars()`等vanilla函数、`#reportKpis`/`#reportCharts`等DOM id、以及
-`Hero.tsx`/`PressureChart.tsx`/`PayoffLine.tsx`/`BalanceBars.tsx`/`TypeStack.tsx`/
-`SummaryCard.tsx`这几个文件都已经是历史记录，不是当前代码——保留是为了如实记录数据
-口径（逾期不混进未来月份、X轴按真实时间比例等）演进的完整过程，这些口径判断在上面的
-重写里原样继承。
+**以下压缩自这个页面"看板"版本时期（2026-07-28～30）的完整演进史**——`Hero.tsx`/`PressureChart.tsx`/`PayoffLine.tsx`/`BalanceBars.tsx`/`TypeStack.tsx`/`SummaryCard.tsx`/`MonthlyChart.tsx`/`ReportTables.tsx`等文件、`renderReportScreen()`等vanilla函数早已不是当前代码，具体的P0/P1/P2/BUG编号narrative和逐项UI改版细节见`git log -p -- CLAUDE.md`；这里只留下**跨版本依然成立的技术事实**：
 
-**这里的历史已经翻篇：早期是"我的"页里`hasPremium()`门禁的一张入口卡片、点开是整页浮层`#reportScreen`——现在是底部tabbar第3个主tab（`data-view="report"` → `#view-report`），不再是子页面，也不再有任何门禁。** 这次改动是"导航重排"那轮的一部分（详见下面"导航重排"一节），动机是图表查看本来就已经改成免费（见上面"订阅UI基础设施"一节的免费/付费边界），既然免费又是这个app除债务列表外最值得看的东西，直接提到主tab比藏在"我的"页一张卡片后面曝光率高得多。**导出PDF/Excel依然是Premium权益，没变**——门禁在`reportExportXlsxBtn`/`reportExportPdfBtn`各自的click handler上，未开通直接跳订阅页（不再需要先"关掉当前子页面"这一步，因为现在就在主tab上，没有子页面要关）。
+**导出（`exportReportXlsx`/`exportReportPdf`）100%vanilla，从看板版沿用至今，未受统计页重写影响**：
+- `jspdf@2.5.1`/`xlsx@0.20.2`本地打包在`www/js/`（`jspdf.umd.min.js`/`xlsx.full.min.js`），**不走CDN**——国内移动网络下`cdn.jsdelivr.net`/`cdn.sheetjs.com`常加载失败，真机点导出会弹"组件未就绪"、桌面浏览器却测不出来（能连通CDN）。以后引入任何第三方前端库都应下载到`www/js/`本地引入，别用国内不稳的CDN（CloudBase那三个`static.cloudbase.net`脚本是例外，腾讯自家CDN国内稳）。
+- PDF导出**不克隆屏幕上用CSS变量取色的SVG去截图**——`var(--accent)`脱离页面样式表解析不出来，会渲染成黑色/空白。改用`buildExportChartsSVG(data)`生成颜色写死成字面hex值的独立SVG，走`svgStringToPngDataURL()`转PNG贴进jsPDF。**标题/KPI/数据明细表文字也整段栅格化**（不用`doc.text()`）——jsPDF内置字体不含中文字形，中文文字用`doc.text()`画完全画不出来；代价是PDF文字不可选中。表格按约34行/页用`buildTablePagesSVG()`分页。PDF固定浅色配色，不跟随设备深色模式（打印品浅色更易读）。
+- "债务类型占比"按`d.type`（4个固定选项，超6类折叠"其他"）分组，不按自由文本的`d.funder`。
 
-内容（React迁移第三步时）：2个KPI（加权平均利率、预计全部还清日期）+ 3张图（各债务余额对比的横向条形图、债务类型占比的堆叠条形图+图例、负债预测走势折线图）+ 数据明细表（默认直接展开，不折叠），支持导出真正的`.xlsx`和`.pdf`文件。**`renderReportScreen()`函数名字没跟着改**（还叫"Screen"不叫"View"，是历史遗留，不影响功能，以后大改这块时可以顺手改名）——现在挂在`renderAll()`管线里跟`renderSummary()`/`renderDebts()`等一起调用，债务数据一变，统计tab的内容自动跟着刷新，不需要"进入tab时才渲染"这种额外逻辑（因为它不再是"打开"的东西，是常驻的tab）。**⚠️"2个KPI+3张图+数据明细表"这个结构后来变了两次，当前真实状态是**：石墨hero（在还总负债+只算本金角标+预计还清日）+ **4个常驻KPI**（累计已还本金/经常性月供/归零进度/加权平均利率）+ 笔数一行小字 + "计算口径说明"折叠 + **4个viz-block**（未来12个月还款压力 → 负债余额走势 → 各债务剩余待还 → 债务类型占比）+ 统计总结卡。**底部那4张平铺明细表已经整个删除**（完整明细由导出Excel/PDF承担）。两轮变化分别见下面"统计tab视觉+交互升级"（已被部分取代的中间态）和"统计tab口径修正"（当前状态）两个子节。
+**几条跨版本延续的工程教训**（具体UI已被2026-07-31重写取代，但这些判断依然适用）：
+- **图表交互按数据形状分两档**：连续时间序列图用真正的press+drag scrub手势（`chartScrub.ts`，Touch Events + `{passive:false}`）；离散分类图只需要普通`onClick`高亮，不需要scrub这套重手势基础设施。
+- **新增数据维度不要塞进`computeReportData()`的返回对象**——它被导出函数按字段名精确解构，改形状会同时打断两个导出功能，新维度独立成新函数。
+- **`Popover`的stacking context坑**：`position:fixed`只改定位参照，不脱离祖先stacking context——挂在`overflow:hidden`容器内即使坐标对了也点不到，需要`createPortal(panel, document.body)`真正挂到body下。以后任何"贴触发器展开的浮层"如果"位置对但点不到"，先怀疑这个坑。
+- **`--accent-soft`一类"卡片浅底"色不能当图表填充色**——对比度可能低到1.14:1、等于隐形，这类判断必须跑`dataviz` skill的`validate_palette.js`验证，不能凭肉眼。
+- **SVG图表+覆盖其上的HTML标记，两者的定位参照必须是同一个盒子**——`.chart-plot`一度带了`padding-left`刻度槽而绝对定位子元素百分比是相对"含padding整宽"算的，导致标记点和scrub手势的命中位置都systematically偏移，修法是另起一层不带padding的绘图区当唯一坐标系。
+- **"它有文档说明"不构成保留一个反直觉口径的理由**——用户不会读footnote，只会看到反直觉的数字，文档解释不了的行为就是bug。
+- **用户报的现象和真正的bug可能是两回事，但都要查到底**——为了证伪一个误报而做的像素级检查，可能顺带挖出别的真bug，不能"复现不出来就说没问题"。
 
-**这是这个项目第一批图表，配色套用了`dataviz` skill的默认8色类别色板**（`.viz-root`里的`--series-1`..`--series-8`，明暗双模式都定义了），**已经用skill自带的`validate_palette.js`对着本项目实际的浅色`#FFFFFF`/深色`#191D24`底色重新验证过**（全部PASS，只有浅色模式下3个色阶低于3:1对比度触发"relief rule"——用可见的图例文字+数据表满足，不单靠颜色）——不是直接照抄skill文档里参考色`#fcfcfb`/`#1a1a19`的验证结果，那个底色跟这个项目不是一回事，swap配色后必须重新跑一遍验证脚本，这条以后加新图表也适用。三张图全部手写（条形图用普通div+百分比宽度，堆叠条+折线图用内联SVG），没有引入任何图表库。
+## 云备份（Premium）——设计细节见`cloud-backup-design` skill
 
-**"债务类型占比"用`d.type`分组，不是`d.funder`**：`type`是表单里的固定下拉选项（银行贷/信用卡分期/网贷/私人借款，4个值），天然有界；`funder`是自由文本，可能有任意多种取值，容易在图上炸出一堆细碎分类。超过6类会折叠成"其他"，这是判断取舍，不是bug。
+"我的"页"云备份"入口打开`#backupScreen`（`react/src/sheets/BackupScreen.tsx`）：手动、每次创建一条独立备份记录（不是自动同步/覆盖），5个云函数+配额数字+集合寻址方式+客户端恢复逻辑+真机验证边界，全部见`cloud-backup-design` skill（`.claude/skills/cloud-backup-design/SKILL.md`）。
 
-**导出用两个库：`jspdf@2.5.1`（UMD，全局`window.jspdf.jsPDF`）+ SheetJS `xlsx@0.20.2`（全局`window.XLSX`）。⚠️这两个库现在是本地打包在`www/fonts`同级的`www/js/`目录下（`www/js/jspdf.umd.min.js`、`www/js/xlsx.full.min.js`），用`<script src="js/xxx">`本地引入，不走CDN——这是踩坑之后改的**：早期从`cdn.jsdelivr.net`（jspdf）/`cdn.sheetjs.com`（xlsx）引入，在国内移动网络下这两个CDN经常加载不出来（不像腾讯的`static.cloudbase.net`稳，所以微信登录/CloudBase那几个CDN脚本没事），真机上表现为点"导出Excel/PDF"弹`toast("导出组件未就绪…")`（`typeof XLSX/window.jspdf === "undefined"`），桌面浏览器却测不出来（能连通CDN）。本地引入后随APK一起装机、离线可用，`npx cap sync`会把整个`www/`（含`www/js/`）打包进去。**以后再要引第三方前端库，第一反应就是下载到`www/js/`本地引入，不要用国内网络不稳的CDN**（CloudBase那三个`static.cloudbase.net`脚本是例外，腾讯自家CDN在国内稳，且SDK有版本耦合不方便本地固化）。`www/js/`跟`www/fonts/`性质一样，是`index.html`引用的本地静态资源、该进git，别当临时产物删掉。
-
-- **Excel导出**（`exportReportXlsx()`）：`XLSX.utils.book_new()` + 3个sheet（债务明细/还款计划明细/汇总KPI），`XLSX.write(wb,{type:"array",bookType:"xlsx"})`包成`Blob`，走`saveToDeviceDownloads()`（硬性规则，见下面"原生插件：SaveFile"一节，不能用`<a download>`）。
-- **PDF导出**（`exportReportPdf()`）：**故意不去克隆屏幕上那份用CSS变量取色的主题化SVG去截图**——序列化成独立SVG文档做光栅化时，`var(--accent)`这类CSS自定义属性脱离了页面样式表的作用域根本解析不出来（渲染出空白/黑色），这是真实会踩的坑，不是猜测。改成`buildExportChartsSVG(data)`单独生成一份**颜色全部写死成字面浅色hex值**的导出专用SVG（不依赖任何CSS变量、不依赖DOM，纯数据驱动），再走`svgStringToPngDataURL()`（Blob→Image→canvas→`toDataURL`）转成PNG，`doc.addImage()`贴进jsPDF页面。**⚠️标题/KPI这几行文字也画进这份SVG里一起栅格化，不用jsPDF的`doc.text()`**——jsPDF内置字体（Helvetica等）不含中文字形，`doc.text()`画中文会整段无法显示（不是排版问题是完全画不出），除非额外内嵌中文字体到vfs（工作量大，不做）。所以整份PDF的中文全程走"SVG→canvas→PNG"这条路，代价是PDF里文字不可选中（是图片）。**PDF固定用浅色配色，不跟随设备当前深色/浅色模式**——打印品在浅色下更易读，这是刻意的取舍。
-
-**PDF现在也包含数据明细表了（不再只是图表摘要）**：早期版本PDF只有图表、明细留给Excel，后来用户要求PDF也带上明细表。因为明细是中文、同样过不了`doc.text()`，走的还是"SVG→PNG"这条路——`buildReportTableRows()`把三张表（各债务余额/类型占比/负债走势）拍平成行，`buildTablePagesSVG()`按每页约34个"行单位"（表头算2个）**分页**成多张SVG（`buildTablePageSVG()`每页一张、高度按行数动态算），`exportReportPdf()`把第1页图表 + 后续N页明细表逐张栅格化后`doc.addPage()`拼进PDF。之所以要分页而不是一张长图，是因为时间线可能几十行，单张超长图贴进A4会被页边裁掉。**屏幕上的数据明细表（`renderReportTables()`）现在也默认直接展开、不折叠了**（去掉了原来的`<details>`/`<summary>`，用户要求"直接展开不要收起"）。
-
-### 统计tab图表交互踩坑（2026-07-28那轮，多数细节已作废，仅保留仍适用的判断依据）
-
-> **⚠️ 这一节原记录"石墨hero+可折叠KPI+第4张图(月还款统计)+全部图表交互化"那轮改动，"可折叠KPI头"和"月还款统计"图都已被下一轮（"统计tab口径修正"）取代/删除**（`MonthlyChart.tsx`/`ReportTables.tsx`/`Kpis.tsx`/`ExportActions.tsx`已不存在，完整过程见git log）。仍然适用的判断依据：
-
-- **图表交互按数据形状分两档，不是所有图表一刀切成同一种手势**：连续时间序列图（如`PayoffLine`）用真正的press+drag scrub手势（`react/src/report/chartScrub.ts`，Touch Events + `{passive:false}`，`touchstart`落地立即触发一次、拖动持续更新、抬手停留不回弹）；离散分类图（`BalanceBars`/`TypeStack`）只需要普通React `onClick`高亮，不需要这套重手势基础设施。
-- **`computeMonthlyRepayment`这类新增数据维度，故意不塞进`computeReportData()`的返回对象**——那个对象被`exportReportXlsx`/`exportReportPdf`按字段名精确解构，改形状会同时打断两个导出功能。以后统计tab要加新的数据维度，照这个先例独立成新函数，不要碰被解构的对象。
-- **`react/src/shared/Popover.tsx`踩过的stacking context坑**：`position:fixed`只让元素的定位参照跳到视口，不会让它跳出祖先的stacking context——挂在`overflow:hidden`容器内的兄弟节点即使视觉坐标算对了，命中测试依然会被同级stacking context挡住，加大z-index没用。解法是`createPortal(panel, document.body)`真正把面板挂到`document.body`下，`position:fixed`+`getBoundingClientRect()`只负责算坐标，判断"点外面关闭"要同时检查触发器和面板两处引用。**以后任何"贴着触发器展开的浮层"如果"看起来定位对了但点不到"，先怀疑这个坑。**
-- **`.viz-block`需要卡片外壳**（`background`/`border`/`shadow`），不能是裸的`margin-bottom`块，否则跟其它tab的卡片质感不一致。
-
-### 统计tab口径修正 + 压力图 + 走势时间轴（2026-07-29，P0/P1/P2 已全部完成，只差真机触摸验证）
-
-上一轮"视觉+交互升级"解决的是"好不好看、能不能交互"，**这一轮解决的是"数字对不对"**——调查阶段用真实数据跑出来3个已确认的口径bug（不是代码审查推测出来的，每一个都有先于实现写好、确认过是红的回归测试）。三个bug的成因和修法见上面"纯计算函数"一节`summarizeAllTime`/`computeUpcomingPressure`那两段，这里只记UI层的决定。
-
-**Hero改版：4个常驻KPI + 笔数一行小字 + 一个"计算口径说明"折叠**，替代原来的"2常驻+4折叠(更多指标)"：
-- **hero大金额补回了标签**。原来`hero-label`是"统计"两个字，一个36px的大金额上方没有任何说明它是什么口径——用户无从得知这是"在还总负债、只算本金"。改成跟"债务"tab一致的"在还总负债"，口径角标放到金额下面的pill行（`hero-top`右侧被`ExportMenu`的"⋮"占着，塞不下"只算本金"那个pill）。
-- **新增`.hero-pills`这个flex容器**——`.hero-pill`本身没设`display`（默认block），在"债务"tab里它是`.hero-top`这个flex行的子元素所以天然收缩到内容宽度，但统计tab的pill只能放在金额下面单独一行，直接放会被拉成整行宽的圆角框。`.hero-pills`就是给它一个能收缩的flex上下文，同时支持并排放多个pill。**Playwright验证里专门加了一条"pill宽度必须明显小于行宽"的断言**盯住这个回归。
-- **4个KPI的选择依据是"金额/利息/进度/利率比笔数更值得占位置"**：累计已还本金（含利息子行）、经常性月供、归零进度、加权平均利率（带`InfoTip`）。在还/已结清笔数降级成`.hero-counts`一行小字——它们原来是2张占满位置的`.kpi`卡片，而且跟"债务"tab的KPI网格完全重复。
-- **BUG-2的修法最后落在`summarizeDebts`本身上，两个tab共用同一个累计口径**（中途曾经短暂存在过一个只给统计tab用的`summarizeAllTime`，见上面"纯计算函数"一节的完整经过）。**连带改的是`debts/Summary.tsx`的footnote**——它原来那句"两者都不含已结清的债务"现在是错的，改成了"已还金额 = 全部债务（含已结清）…"，并补上了"已完成% 怎么算"和"提前结清的剩余本金两边都不计"两条。**⚠️后一条当天晚些时候就作废了**——提前结清改成"记一次真实的还款事件"之后，剩余本金是计入已还本金的，footnote已相应重写，见"提前结清 = 记一次真实的还款事件"一节。
-- **"计算口径说明"折叠面板是新增的**（照抄"债务"tab `.note-toggle`那套）。⚠️**这两个tab的折叠按钮现在文案完全相同（都叫"计算口径说明"）**，运行时不冲突（分属两个`.view`），但**写Playwright脚本时`text=计算口径说明`会同时命中两个、报strict mode violation**——真实踩到过，脚本里所有选择器都要加`#view-report`作用域限定。同理`.hero-label`现在两个tab都是"在还总负债"。
-**P1：`MonthlyChart`→`PressureChart`（未来12个月还款压力），`ReportTables`（底部4张平铺明细表）整个删除。**
-- **为什么换掉旧图**：月还款是按月份统计的离散金额，旧图默认的折线模式语义上就是错的（折线暗示连续变量）；而且它把4类数据混在一张图里——过去已还＋过去逾期未还＋未来待还＋已结清债务的幽灵待还（那就是BUG-1），没有"今天"这条分界线，也没有任何金额/月份刻度，用户看完得不出结论。新图只回答一个问题：**接下来12个月哪个月最难过**。
-- **`.viz-mode-toggle`（柱状/折线切换器）连同`MonthlyChart.tsx`一起删除**——离散金额不该提供折线选项，"能切换"本身就是在鼓励一种错误读法。同一轮顺手删掉了`.viz-monthly-*`和早就没人引用的`.viz-table-toggle`死CSS。
-- **⚠️`--accent-soft`不能当柱子填充色，这是跑验证器跑出来的、不是眼看的结论**：它在浅色是`#E7F3F1`，对白底对比度只有**1.14:1**，等于隐形（旧图靠一条`border-top: 1px dashed`硬撑才看得见，而虚线边框本身又踩了dataviz的两条anti-pattern：虚线读作"预测/阈值"、用描边分隔marks）。新增了`--accent-mid`（浅`#4E9481`/深`#2F7B65`）作为同色相第二级，两个模式下都是对底色≥3:1、跟`--accent`的normal-vision ΔE≥21。**以后再要给图表加填充色，先跑`dataviz` skill的`scripts/validate_palette.js`，别直接抓一个现成的`*-soft`变量来用**——那批`-soft`变量是给"卡片浅底"设计的，不是给数据填充设计的。
-- **逾期刻意不做成同一条值轴上的柱子**，而是图表上方一条`--critical`提示行＋明说"未计入下方12个月"：①逾期是status不是时间桶，②逾期金额可能远大于任何单月，混进同一个scale会把12根柱子整体压扁。
-- **Y轴档位表是`[1,1.5,2,2.5,3,4,5,6,8,10]`不是常见的`[1,2,2.5,5,10]`**——后者太粗，实测最大月2,760会被抬到5,000、最高的柱子只有半格高，白白浪费一半画布；加了1.5/3/4/6/8之后落到3,000，且这些档位的一半都还是整数，中间那条刻度线不会出现1,250这种零头。
-- **删掉底部明细表的前提是"没有任何数值只能靠手势才读得到"**（dataviz的硬性anti-pattern：tooltip不能是读到值的唯一途径）。所以同一轮**给`TypeStack`的图例补上了金额**——那张表原本是唯一能看到各类型"具体多少钱"的地方。现在每个数值都有非手势的读法：`BalanceBars`每行自带金额、`TypeStack`图例带金额、`PressureChart`有Y轴刻度＋摘要行＋点击展开的当月债务组成、以及导出Excel/PDF这条完整表格路径。**⚠️`exportReportXlsx`/`exportReportPdf`是100%vanilla的独立实现，删`ReportTables.tsx`不影响它们**（这一点专门核实过）。
-- **模块顺序改成"先回答哪个问题"**：未来压力 → 是否在下降（负债预测走势）→ 结构分析（余额对比/类型占比）。
-
-**P2：走势图改真实时间轴、`BalanceBars`加排序切换、新增底部总结卡。**
-- **`PayoffLine`的X轴从"按数组下标等距"改成"按真实时间比例"**（`x = (date - t0)/(tEnd - t0) * W`）。原来的画法让折线斜率完全没有意义——同样陡的一段可能是一个月也可能是两年；密集期（多笔债务同期还款、时间线上点多）横向被拉宽，长尾期被压窄。**用户反馈过的"突然下降后长期水平"就是这么来的**：短期债务集中还完那段点很密、占了很宽的画布，剩一笔长债之后每月一个点且本金小，看起来就是一条长长的缓坡。时间比例之后斜率才真正代表"还债速度"。同时加了Y轴3档刻度、X轴3个时间刻度（今天/时间中点/还清月），标题改成"负债余额走势"+一个"预测"角标+一条footnote明说**这个App不保存历史余额、这条线不是实际走过的轨迹**（做不到"原计划vs实际"对比就诚实说明，不把预测包装成历史）。
-- **⚠️两张图共用的坐标轴外壳类名统一成`.chart-plot`/`.chart-gridline`/`.chart-xaxis`/`.chart-xtick`**（PressureChart专属的部件继续用`.pchart-`前缀），`niceCeil`也挪进了`calc.js`给两张图共用。
-- **⚠️踩了一个坐标系错配的坑，两张图都中招**：`.chart-plot`有`padding-left:34px`的刻度槽，而**绝对定位子元素的百分比是相对"含padding的整宽"算的**，不是相对内容区。所以直接把圆点挂在`.chart-plot`下面写`left:X%`，左端会偏34px、右端才恰好对上（这个"右端对得上"特别有迷惑性，容易以为没问题）。修法是加一层`.chart-area`（`position:absolute; left:34px; right:0`）当作真正的绘图区，SVG和圆点都挂在它里面。**同一个错配也让scrub手势的命中位置整体偏移**——`attachChartScrub`用`el.getBoundingClientRect()`映射手指落点到索引，绑在含刻度槽的`.chart-plot`上会让最左边那个点几乎点不到；现在PayoffLine绑`.chart-area`、PressureChart绑`.pchart-bars`，都是精确的绘图区。**以后再写"SVG图表 + 覆盖在上面的HTML标记"，先确认两者的定位参照是同一个盒子。**
-- **`BalanceBars`加了余额/利率/剩余利息三个排序维度，`.viz-bar-fill`的长度跟着当前维度换**，不是只换顺序——"标题说按利率排序、横条还是按余额画"会让读者以为最长的那条利率最高，是会直接误导人的。测试里专门构造了"余额最大的那笔利率最低"的fixture来锁这一点。数据源从`data.byName`换成`data.active`（利率在`d.rate`、剩余利息用新增的`remainingInterest(d)`现算），**故意不动`computeReportData`的返回形状**（`byName`被`exportReportPdf`按字段名解构）。
-- **新增`calc.js`的`remainingInterest(d)`（未还期次的interest之和）和`niceCeil(v)`**。⚠️`remainingInterest`对amort/equalfee/interestfirst都可靠，但"自定义"计划如果用户只填了金额、没拆本金/利息，会低估成0——UI两处（BalanceBars的"剩余利息"模式、总结卡）都带了这条口径提示，不能当精确值展示。
-- **新增`SummaryCard.tsx`**（底部统计总结），原则是**只放这一页别处看不到的结论**、不复述上面的数字：利率最高的是哪一笔、高息(≥18%，沿用`rateClass()`的既有分档)笔数与合计、剩余待付利息合计、距离还清还有几个月。**刻意不做"查看全部债务>"跳转按钮**——tabbar就在屏幕底部一步可达，为它新增一个跨React树切tab的桥接不划算（切tab目前是vanilla tabbar的职责）。
-
-- 口径说明的内容必须覆盖6条：在还总负债只算本金、累计已还本金含已结清、经常性月供不含一次性还清、归零进度只按本金算、预计还清日期是预测不是承诺、**以及"提前结清"的剩余本金既不计入总负债也不计入累计已还**（实际付了多少钱App并不知道，必须诚实说明，不能假装它被还了）。
-
-**验证**：`npm test` 64个用例（新增`computeUpcomingPressure`/`remainingInterest`/`niceCeil`及3条bug回归）、`npm run test:react` 252个用例（新增`PressureChart.test.tsx` 11条、`SummaryCard.test.tsx` 4条，`BalanceBars`/`PayoffLine`/`ReportHero`/`ReportApp`按新形态重写）、`npx tsc --noEmit`零错误、`npm run build:react`（`report.js` 23.22kB→30.83kB）。桌面Playwright每一步都跑了一轮，light/dark截图核对、零JS报错，且**用真实数据反复对照过屏幕数字与底层`debts`的一致性**（不是只看渲染成功）。
-
-**⚠️`PressureChart`的手势在2026-07-29改过，这段描述只对`PayoffLine`成立**：压力图现在是"横向滚动看更多月份 + 点柱子读数"，横滑让给了原生滚动，不再用`chartScrub`（见下面"未来还款压力：窗口不固定+横向滚动"一段）。`PayoffLine`的scrub保持不变，依然是真正的Touch Events、依然需要真机确认手感。
-
-### 未来还款压力：窗口不再固定12个月 + 横向滚动（2026-07-29）
-
-标题从"未来12个月还款压力"改成**"未来还款压力"**，窗口长度由`calc.js`的`pressureWindowMonths(debts, today)`算出来——铺到最后一笔**未还且未逾期**的期次所在月份为止，**下限12个月**（窗口太短图会退化成两三根柱子，看不出"哪个月最难过"）、**上限60个月**（再长横向滚动也没人看得完）。摘要行里那个"12个月共"跟着变成动态的"{n}个月共"。
-
-**手势上有一个必须处理的冲突**：横滑要么给原生滚动、要么给`chartScrub`（它的`touchmove`会`preventDefault`拦截滚动），两者不能共存。跟用户确认后选的方案是**滚动优先、读数改成点柱子**（离散选择，跟`BalanceBars`/`TypeStack`同一类轻交互，柱子本身改成`<button>`，再点一次取消选中）。`PayoffLine`那张连续折线图继续用`chartScrub`，不受影响——**`chartScrub.ts`现在只剩它一个消费者了**。
-
-**DOM结构上有两条不能违反的规则**（`.pchart-viewport`/`.pchart-grid`/`.pchart-scroll`/`.pchart-track`）：
-- **柱子和x轴标签必须在同一个滚动容器里**（都挂在`.pchart-track`上）——分成两个各自滚动的容器，滑动时标签和柱子必然错位。
-- **Y轴刻度线/刻度值必须留在滚动容器外**（`.pchart-grid`，绝对定位、`pointer-events:none`）——横滑时刻度是不动的参照系，跟着一起滑就失去意义了。
-
-`.pchart-track`用`width:100%` + 组件内联的`min-width: n * 26px`：月份少、容器装得下时铺满宽度（不会缩成左边一小撮），装不下才溢出滚动。
-
-**⚠️`monthLabel()`每个月都必须带年份**（`"26年9月"`）。改成动态窗口之前只有1月带年份、其余月份只写`"9月"`——窗口固定12个月时勉强能靠上下文推断，但窗口最长能到60个月之后，滑到后面看到"9月待还"根本分不清是哪一年的9月（真机第一时间就被指出来了）。用两位年份而不是`"2026年9月"`是因为这些标签挤在readout行/摘要行里，短一点不容易换行。**x轴刻度是唯一的例外**（`monthTick()`只写月份数字）——每个刻度只有约24px宽，塞不下年份，跨年靠柱子上那条竖分隔线（`.pchart-col.year-break`）区分。
-
-**这一轮的三个方法论教训（都是真实踩出来的）**：
-1. **"它有文档说明"不构成保留一个反直觉口径的理由**——BUG-2最初判断"债务tab有footnote写明了口径，所以不动它"，用户一上真机就把它当bug报了。文档解释不了的反直觉行为就是bug。
-2. **用户报的现象和真正的bug可能是两回事，但都要查到底**。"9月柱子逼近5000"最后证明是图对了、用户看的是相邻的8月（当时x轴12根柱子只标4个，认不出哪根是哪根）；但为了证伪它而做的像素级不变量检查，顺带挖出了"柱高与Y轴不同口径导致柱子能画到2194%"这个真bug。**复现不出来时不要急着说"没问题"，把量化证据摆出来，然后继续找。**
-3. **图表相关的判断要跑验证器，不要眼看**。`--accent-soft`当填充色对白底只有1.14:1（等于隐形），是跑`dataviz` skill的`validate_palette.js`发现的——这批`-soft`变量是给"卡片浅底"设计的，不是给数据填充设计的。
-
-## 云备份（Premium）
-
-> **⚠️ 渲染层已经翻篇：`#backupScreen`（第十步，React迁移收尾）已经整体由React接管（`react/src/sheets/BackupScreen.tsx`）——创建/列表/恢复/删除4个cloud函数调用的UI全部由React渲染，二次确认弹窗改用`confirmAsync`。这一节记录的产品决策（手动/独立记录而非自动同步、配额/单文件上限数字、身份来自服务端会话不信任客户端参数）依然100%成立，是理解"为什么这么设计"的背景，具体前端实现细节以"React 迁移"一节"第十步"为准。**
-
-**⚠️ 这个功能第一版做的是"自动同步、单一文档覆盖"，已经推翻重做成"完全手动、每次创建一条独立备份记录"——用户自己用下来发现自动同步让人担心手滑/多设备冲突把数据搞乱，宁可自己点一下、每条备份都能单独恢复更放心。**"云同步"这个说法也一并废弃，整个App只保留"云备份"这一种说法，别再在新代码/文案里用"同步"字眼描述这个功能。
-
-"我的"页"云备份"入口卡片（`#backupEntryBtn`，`hasPremium()`门禁）打开整页浮层`#backupScreen`：一个"上次备份"时间展示 + "创建备份"按钮（点击会打包当前的债务/文档/设置/档案库文件，作为**新的一条**记录写入云端，不覆盖已有记录）+ 备份记录列表（每条显示创建时间、笔数/文件数/大小，各自带"恢复"和"删除"按钮）。点"恢复"会先弹二次确认（"此操作不可撤销，确定继续吗"），确认后才会用那条记录的内容整体覆盖本机当前数据。**没有任何自动触发的推送/拉取**——数据变动不会自动上云，登录/冷启动也不会自动去云端拉数据，一切都要用户自己点"创建备份"/"恢复"。
-
-**架构：依然是全部走云函数代理，不做客户端直传云存储**——复用`deleteAccount`已经建立的"身份完全来自服务端已认证会话（`auth.getUserInfo().customUserId`），绝不信任客户端参数"这条安全原则，不用去研究一套这个项目从没碰过的CloudBase Storage安全规则语法（那是一个完全独立于云函数"权限控制"的配置面板）。代价：文件走base64通过函数体积会膨胀~33%、受函数超时/请求体限制——**单文件上限`BACKUP_MAX_FILE_BYTES`（8MB）**，超过的文件在打包这条备份时会被跳过（`console.error`记一条日志），不参与这次备份，仍然可以走手动的本地JSON导出导入兜底。
-
-**每用户配额（写在`backupCreate`云函数里，不是客户端校验）：最多保留20条备份记录、总大小上限300MB**——这是权衡个人记账app的真实使用量给的数字：单文件已经封顶8MB，20条记录留出足够的历史版本可选，300MB对一个人的债务JSON+几张回执单/合同照片绰绰有余，同时又给CloudBase存储成本设了一个明确的硬顶不会无限增长。每次`backupCreate`成功写入新记录后，会按创建时间正序查出这个用户名下的全部记录，只要条数或总字节数超过配额就从最老的一条开始删（连带删它在Storage里的文件），一直删到重新落在配额内。如果单次备份内容自己就超过300MB会直接拒绝写入（`{ok:false, error:...}`），不会出现"删了半天最后把自己删了"的怪异结果。**这两个数字（`MAX_BACKUPS`/`MAX_TOTAL_BYTES`）都是常量写在`backupCreate/index.js`顶部，以后要调整额度直接改这两个数、重新部署即可，不涉及数据结构变动。**
-
-**5个云函数**（`cloudbase/functions/`下，写法全部照抄`deleteAccount`"身份来自`auth.getUserInfo().customUserId`，不信任客户端传参"这一条）：
-- **`backupUploadFile`**：接收`{backupId, fileId, filename, mime, base64}`，`Buffer.from(base64,"base64")`后`app.uploadFile()`到`backups/{openid}/{backupId}/{fileId}-{filename}`，返回`{fileID, size}`。**这个函数纯粹是Storage上传代理，完全不碰数据库**——它不知道也不需要知道"这份文件属于哪条备份记录的完整清单"，客户端把所有文件逐个传完、拿到每个的`fileID`之后，自己组装成`files`数组一次性交给下面的`backupCreate`。
-- **`backupCreate`**：接收`{backupId, debts, docs, notify, premium, files}`（`files`是`backupUploadFile`已经返回的`{id,name,mime,size,fileID}`列表，不含base64），`db.collection("backups").add(...)`写入**一条新文档**（不是`update`/`set`覆盖）。负责上面说的配额清理。
-- **`backupList`**：`.where({openid}).orderBy("createdAt","desc")`查这个用户名下所有记录，`.field({...})`投影只取轻量字段（`createdAt`/`totalSizeBytes`/`debtsCount`/`filesCount`），**不带完整的`debts`/`docs`内容**，列表页够用就行，完整数据留到真正点"恢复"才取。
-- **`backupRestore`**：接收`{backupId}`，`doc(backupId).get()`取出记录后**显式核对`record.openid === customUserId`**——`backupId`本身不是私密凭证（没有额外加密/签名），必须在服务端二次确认这条记录确实属于当前调用者，不能假设"客户端传得出这个id就有权限看"。核对通过后对`files`里每个`fileID`调`app.getTempFileURL()`换临时直链返回。
-- **`backupDelete`**：接收`{backupId}`，同样先核对`record.openid`归属，再删Storage文件+删文档。
-
-**这4个新（不含`backupUploadFile`纯代理，共5个）函数都不需要碰环境共用的"权限控制"配置**——安全默认值`auth.loginType != 'ANONYMOUS' && auth != null`本来就要求真实登录，正好是这几个函数需要的门槛，不用像`wxLogin`那样加具名例外（详见上面"原生插件：WeChatLogin"一节第4条那个"权限控制是环境级共享配置"的坑）。
-
-**⚠️踩过一个隐蔽的客户端坑：云备份一直报`[PERMISSION_DENIED] Permission denied`，根因是客户端把自己的登录会话降级成了匿名。** 表现：明明微信已登录（"我的"页头像昵称都在），一进云备份点任何操作就`PERMISSION_DENIED`。链路：`ensureCbAuthReady()`早期版本**无条件**调`signInAnonymously()`垫底（本意是绕开上面"WeChatLogin第2条"那个SDK对null凭证读`.scope`的崩溃bug），但这会把微信自定义登录建立的"非匿名"会话**降级成匿名**，于是命中上面那条`*`权限规则（要求非匿名）被拒。**修法**：`ensureCbAuthReady()`改成只在本地**连`account`记录都没有**（`if (account) return;`才不return、才走匿名）时才`signInAnonymously()`——用`account`这个我们自己可靠掌握的信号判断"是否已登录"，比去猜SDK内部登录态的形状（`currentUser`/`hasLoginState()`这些在2.28.6上不一定有/不一定准）稳妥得多。同时新增`cbAuth()`统一入口，`cbApp().auth({persistence:"local"})`显式要求会话持久化到localStorage（跨App冷启动自动恢复+续期，否则重启后又只剩匿名），**所有拿auth的地方（登录/注销/退出/`ensureCbAuthReady`）都走`cbAuth()`，别再直接`cbApp().auth()`**。注意登录流程`handleWxAuthResult`开头那次`signInAnonymously()`是**故意保留**的（它在自定义登录之前、且随后就`signInWithCustomTicket()`升级上去，不构成降级），别顺手也删了。
-
-**⚠️再踩一个更隐蔽的部署坑：`PERMISSION_DENIED`修好后，云备份改报`[FUNCTIONS_EXECUTE_FAIL] Error: Cannot find module '@cloudbase/node-sdk'`——根因是这5个备份函数目录里当初漏建了`package.json`。** `wxLogin`/`deleteAccount`目录下都有`package.json`声明`"@cloudbase/node-sdk"`依赖，但这5个备份函数一开始只有`index.js`、没有`package.json`。CloudBase部署时靠函数目录里的`package.json`决定装哪些npm依赖，没有它就不装，运行时`require("@cloudbase/node-sdk")`直接`Cannot find module`。**这个报错跟权限层无关、是函数真的跑起来之后在运行时崩的**——所以看到错误码从`PERMISSION_DENIED`（调用权限层）变成`FUNCTIONS_EXECUTE_FAIL`（函数执行层），其实是"权限通了、进到函数体里了"的进展信号，别当成又坏了一处。**修法**：给5个备份函数各补一个`package.json`（`{name, main:"index.js", dependencies:{"@cloudbase/node-sdk":"^3.18.3"}}`，跟`wxLogin`一致），逐个`tcb fn deploy <name> --force`重新部署。**以后新加任何云函数，第一件事就是照着`wxLogin/package.json`建好`package.json`再写`index.js`**——`index.js`里只要`require`了任何非Node内置模块（`@cloudbase/node-sdk`是必然要用的），就必须在`package.json`里声明，否则部署上去能过、一调用就`Cannot find module`。验证部署有没有真的把依赖装上：`tcb fn invoke <name>`（会以admin身份无终端用户会话跑一次），只要**不是**`Cannot find module`、而是函数自己的业务响应（比如`{"ok":false,"error":"未登录…"}`）就说明依赖到位了（`invoke`日志里那句"缺少依赖 ws 请 npm install ws"是CLI自己streaming日志用的，跟函数无关，忽略）。
-
-**`backups`集合的寻址方式变了，从"一个用户一个文档（`doc(openid)`）"改成了"一个用户多个文档（`openid`是普通字段，配合`.where()`查）"**——因为现在一个用户可以有多条备份记录，不能再用`doc(openid)`这种一对一寻址。**集合本身还是要跟当初`users`集合一样手动去控制台建**（CLI对不存在的集合查询会静默返回`[]`，不能拿来验证是否已经建好），权限选无权限[ADMINONLY]。**Storage存储桶权限也要去控制台确认设成最严格的私有选项**——这是一个跟云函数"权限控制"完全独立的配置面板，这次开发没有实机核实过具体配置项名字，上线前要对照当前CloudBase官方文档重新确认一遍。
-
-**客户端`applyBackupData()`（点"恢复"之后真正落地数据的函数）先`upClear()`清空本机现有档案库文件，再按这条备份记录的`files`清单重新铺回来**——"恢复"语义上是"整体覆盖"，如果不先清空，备份创建之后本机新加的文件会跟恢复回来的文件混在一起，不是真正的覆盖。`debts`/`docs`/`notify`/`premium`这几个JSON字段则是直接整体替换（`localStorage.setItem`），不做字段级合并。
-
-**本地只留一个极简的`after-zero-backup-meta-v1`（`BACKUP_KEY`）存`{lastBackupAt}`**，纯粹给"上次备份"这行展示用——不再像第一版那样维护`lastPushedAt`/`lastLocalChangeAt`/`pushDirty`这类冲突检测用的字段，因为完全手动、每次都是新建记录的模型下不存在"本地和云端谁更新"这种需要比较的情况，那套字段连同它们所在的`SYNC_KEY`已经整体删除，不是改名字，是真的不需要了。
-
-**注销账户联动清理**：`cloudbase/functions/deleteAccount/index.js`现在会在删`users`文档**之前**，`.where({openid: customUserId})`查出这个用户名下**全部**备份记录（不再是当年单文档模型那样`doc(customUserId)`一次搞定），逐条删除对应的Storage文件+文档——不这样做的话，云备份上线后注销账户会真实留下别人看不见但确实存在的孤儿文件，是隐私缺口，不是可选的顺手步骤。
-
-**桌面浏览器测试的边界，容易想当然**：CLAUDE.md早先记录的"用`ACCOUNT_KEY`localStorage小技巧跳过登录门"**只是伪造本地`account`对象、隐藏`#loginGate`，从来没有真正跑通`signInWithCustomTicket()`**——这个状态下`cbAuth()`根本没有真实的CloudBase已认证会话，任何`callFunction({name:"backupCreate"/"backupList"/...})`调用在服务端都会因为鉴权失败被拒（`auth.getUserInfo().customUserId`拿不到值）。**⚠️注意：现在`ensureCbAuthReady()`用`if (account) return;`判断是否已登录（见上面那条降级坑的修法）——桌面浏览器伪造`account`会让它误以为"已登录"从而跳过`signInAnonymously()`，于是连匿名会话都没有，`callFunction`可能直接踩中SDK的null凭证崩溃或鉴权失败。这不是bug，正是"云备份必须真机验证"的另一个体现：桌面伪造`account`这条老调试手法对云备份不适用（对债务/档案库等纯本地功能仍然好用）。**真正的ticket只能来自真实微信OAuth换来的`code`，只有真机走通原生插件才能拿到。**所以模拟器、报表图表/导出、Premium/Premium+订阅页UI、兑换码这几个功能可以完整在桌面浏览器验证，但云备份的真实端到端往返（创建/列表/恢复/删除）必须是装了真实微信登录的真机**，跟当初微信登录本身的验证要求一模一样，没有捷径。
+**⚠️这条是跨功能的核心认证修复，AI债务顾问也依赖同一套，别挪进skill**：早期`ensureCbAuthReady()`无条件调`signInAnonymously()`垫底（绕开CloudBase SDK对null凭证读`.scope`的崩溃bug），但这会把微信自定义登录建立的"非匿名"会话**降级成匿名**，导致任何云函数调用命中权限规则被拒`[PERMISSION_DENIED]`。修法：`ensureCbAuthReady()`改成只在本地**连`account`记录都没有**时才`signInAnonymously()`——用`account`这个自己可靠掌握的信号判断"是否已登录"，比猜SDK内部登录态形状稳妥。新增`cbAuth()`统一入口（`cbApp().auth({persistence:"local"})`显式要求会话持久化），**所有拿auth的地方都走`cbAuth()`，别再直接`cbApp().auth()`**。桌面浏览器伪造`account`跳过登录门的老技巧对**任何调云函数的功能都不适用**——会让`ensureCbAuthReady()`误判已登录、连匿名会话都没有，这类功能的真实端到端往返必须真机验证。
 
 ## 档案库PDF预览：`<embed type="application/pdf">`在安卓WebView里天生是空白的，改用pdf.js真正渲染（2026-07-30）
 
@@ -1192,33 +866,11 @@ sync android`+`assembleRelease`后解包核对：APK内`index.html`跟工作区`
 
 **踩过一个坑**：`@capacitor/assets` 默认会给 `mipmap-anydpi-v26/ic_launcher.xml`（自适应图标配置）里的 `<background>` 和 `<foreground>` 都套一层 `16.7%` 的内缩（`<inset>`）。这对本项目不对——`icon-background.png` 设计上就是要通栏铺满到边缘的（黑白对半分），内缩之后四周会露出一圈透明，实机上大概率透出桌面壁纸/系统默认色，很难看。所以 `<background>` 这层的inset已经手动去掉了（保留 `<foreground>` 的inset，因为 `icon-foreground.png` 里的图形本身上下几乎顶到画布边缘，需要靠内缩才不会被圆形/方形等不同launcher遮罩裁掉）——**以后如果重新跑 `@capacitor/assets generate`，它会把 `<background>` 的inset加回去，记得再删一次。**
 
-## AI 债务顾问（Premium）
+## AI 债务顾问（Premium）——设计细节见`ai-advisor-design` skill
 
-> **⚠️ 渲染层已经翻篇：`#aiScreen`+`#aiHistorySheet`（第十一步，React迁移收尾）已经整体由React接管（`react/src/sheets/AiScreen.tsx`）——聊天界面/欢迎态快捷芯片/历史对话sheet全部由React渲染，`AI_USAGE_KEY`/`AI_CHATLOG_KEY`整体移交React所有权直接读写localStorage(不再经过vanilla)。这一节记录的产品设计（聊天式而非报告+问答两段拼接、成本兜底数字、云函数模型选型）依然100%成立，是理解"为什么这么设计"的背景，具体前端实现细节（含`data-q`属性/`#aiChipReport`等DOM id已不存在、`aiComposeAndSend`逻辑已翻译成React的`composeAndSend`）以"React 迁移"一节"第十一步"为准。**
+"在还债务"页AI banner是入口（`hasPremium()`门禁），聊天式界面（`react/src/sheets/AiScreen.tsx`）。欢迎态芯片、云函数模型选型（`hy3`混元，DeepSeek被套餐锁住）、每日用量软上限、历史对话可继续追问的状态机、z-index坑，全部见`ai-advisor-design` skill（`.claude/skills/ai-advisor-design/SKILL.md`）。
 
-"在还债务"页顶部的 AI banner（`#aiBannerBtn`）现在是这个功能的入口（`hasPremium()` 门禁，未开通跳订阅页）。点开进整页浮层 `#aiScreen`——**这是聊天式界面，不是"大按钮生成报告+底部迷你问答框"那种三段拼接**（那是第一版的做法，已经推翻重做）。**只做了"报告 + 智能问答"两件事，没做 OCR**（当初 Premium+ 列的三条 AI 功能之一，明确推迟）。
-
-**空状态是欢迎语+3个快捷芯片，不是常驻的"生成分析报告"按钮**：打开页面（或点"新对话"）看到的是欢迎语（"有什么想聊的？"）+ 魔法棒图标 + 3个芯片（`#aiChipReport`"生成分析报告"、另两个是常见问题"我该先还哪一笔？"/"怎样最快还清所有债务？"，`data-q`属性存问题原文）。点任意一个都走同一条统一消息流（`aiComposeAndSend(displayQ, isReportMode)`），报告和问答不再是两套UI、两套渲染逻辑——报告只是"isReportMode=true"时调云函数用`mode:"report"`（`question`传空串，服务端会忽略它），但气泡里仍然显示"生成分析报告"这句话，视觉上跟用户真提了这个问题一致。
-
-**魔法棒入场动效已经接上**：打开这个页面或点"新对话"回到欢迎态时，`#aiWelcomeWand`（跟主页AI banner同一份图标标记，见"在还债务主页视觉改版"一节）会临时加`.cast`类摇两下再定住，动画结束后`.cast`类被JS移除，`.wand`基础规则本来就一直在播的`wandGlow`呼吸光晕自动接续——这是当年在别处Artifact预览定过稿、但因为AI页面这轮才真正重做所以一直没接上的效果（`castAiWand()`函数，`prefers-reduced-motion`时直接跳过整个流程，不加`.cast`类，否则`animation:none`会让`animationend`永远不触发、`.cast`类卡住摘不掉）。
-
-**走"云函数调大模型"的正道，不是一木记账那种"导出 txt 让用户自己粘 AI"的假 AI**（这个反面教材是这次重构的直接动机）：`www/index.html` 里 `buildAiSummary()` 用 `computeReportData()` + 遍历 `debts` 拼出一份紧凑的结构化 JSON（条目少、token 便宜），`callAiAdvisor(mode, question)` 走 `ensureCbAuthReady().then(cbApp().callFunction({name:"aiAdvisor",...}))`。
-
-**云函数 `cloudbase/functions/aiAdvisor/` 用 CloudBase 自带的大模型能力**：`app.ai().createModel("cloudbase").generateText({model, messages})` 返回 `{text}`——**计费走 CloudBase 资源点，不需要第三方 API Key、不用往环境变量塞密钥**，这是它相比"云函数里直连 DeepSeek/通义 API"最省事的地方（贴合项目现有的 CloudBase 基建）。模型 id 是 `index.js` 顶部常量 `AI_MODEL`，用 `"hy3"`（混元）。**这是实机核对控制台后定的，不是随手填的**：这个环境是「体验版」套餐，控制台 AI→生文模型 里只有混元（`hy3` / `hy3-preview`）状态是「已开启」可用，**DeepSeek 全系被套餐锁住**（`deepseek-v4-*` 旁边有小皇冠图标=要升级套餐才能开、`deepseek-v3.2` 状态是「即将下线」）。`hy3` 是一方模型、最便宜、也是官方 Node SDK 文档示例用的 id。控制台 hy3 那行"免费额度剩余"显示的是"-"（不是具体数字），**别当成"免费"就默认无成本**——如果账单出现异常，先看这里而不是怀疑代码有 bug。控制台顶部曾有一条"报名小程序成长计划可获得 10 亿混元 Token"的活动横幅，是另一件事（需要单独报名），不是自动生效的额度，不能假设它已经在起作用。以后升级套餐解锁 DeepSeek 想换模型，改 `AI_MODEL` 这一行即可，但**只能填控制台里当时状态为「已开启」的 model id**，别填「即将下线/被锁」的。函数不需要 envVariables，也不需要具名"权限控制"例外（吃 `*` 安全默认值 `auth.loginType != 'ANONYMOUS' && auth != null` 即可，跟备份函数一样）。**照铁律先建了 `package.json`**（漏建=部署能过、一调用就 `Cannot find module`）。
-
-**部署状态：已完成，依赖已验证正常。** `cd cloudbase && npx --yes -p @cloudbase/cli tcb fn deploy aiAdvisor --force` 部署成功；`tcb fn invoke aiAdvisor` 返回 `{"ok":false,"error":"未登录，无法使用 AI 分析"}`——**不是 `Cannot find module`**，说明 `@cloudbase/node-sdk` 装上了、函数体正常执行到 `getUserInfo()` 这一步，invoke 本身没有终端用户会话所以拿不到 `customUserId` 属于预期。真实的"生成报告/追问"往返还没做真机验证（跟云备份一样，需要真实微信登录会话，桌面/CLI 都测不出）。
-
-**成本兜底：客户端每日用量软上限**。新增 localStorage 键 `AI_USAGE_KEY`（`after-zero-ai-usage-v1`）存 `{date, count}`，`AI_DAILY_LIMIT`（默认 20）次/天，跨天自动清零，超限 toast 拦截。**这是客户端软限、可绕过，beta 够用**；因为买断用户的 AI 是"一次付费、持续产生算力成本"，需要个上限兜底。正式上线要换服务端计数（放 `users` 文档或独立集合）才防得住。
-
-**历史对话真实持久化、可继续追问，不是只读快照**：右上角图标（`#aiHistoryBtn`）打开历史对话sheet（`#aiHistorySheet`，从`#aiScreen`这个`.subpage`内部打开，见下面z-index那条），存进新增的`AI_CHATLOG_KEY`（`after-zero-ai-chatlog-v1`，见"硬性铁律"第1条）——`aiConvos`数组，每条`{id, title, isReport, updatedAt, messages:[{role,content}]}`，最新的排最前。**任何时候只有一个"当前会话"，不区分"只读历史"和"进行中"**：点历史列表里某一条（`loadAiConversation(rec)`）= 把它整个加载回当前会话（消息+上下文都恢复），之后可以直接在输入框继续追问，新的问答会**追加**进这条记录、把它顶到列表最上面，不会产生重复记录；"新对话"按钮（`#aiNewConvBtn`/`startNewAiConversation()`）才会真正清空当前内容、开始一条全新记录。`currentAiConvId`（模块级变量，null=还没产生过消息的全新会话）是这套状态机的核心，第一次成功收到AI回复时才会真正创建并写入`aiConvos`。**这是产品决策上明确纠正过的一版**：最初设计过"点历史=只读快照，追问必须新开对话"，用户当场指出"所有chatbot都是能在旧对话里继续追问的"，改成了现在这套——以后再碰到"要不要限制用户在历史记录上做某个操作"这类设计，默认先假设标准聊天应用的心智模型，不要凭直觉发明限制。
-
-**每条对话的消息数、以及对话总条数都各自封顶**（`AI_CHATLOG_MAX_MSGS`=40、`AI_CHATLOG_MAX_CONVOS`=50，都是`www/index.html`里的常量），防止长期高频使用后localStorage无限增长——这两个数字没有跟用户对齐过具体值，纯粹是防御性上限，不是像备份配额那样讨论出来的数字，以后如果用户反馈"历史对话动不动就被吞了"，先看是不是撞了这两个数字。**失败的对话不会留下"僵尸记录"**：如果一次调用失败发生在这条对话还从没成功回复过（`rec.messages.length<=1`，即只有用户这一句、AI还没真正答过），会把这条刚创建的空壳记录从`aiConvos`里撤销掉，不会在历史列表里出现一条"只有提问、AI从没答过"的死记录。
-
-**发给云函数的`history`参数，是"这次提问之前的上下文"，不含这次提问本身**——`callAiAdvisor(mode, question, history)`签名从两参数改成三参数，`history`由调用方（`aiComposeAndSend`）显式传入：`rec.messages.slice(-12)`（在把这次的`user`消息push进`rec.messages`之前取的快照），这样服务端`aiAdvisor/index.js`里"先塞`history`、再把`question`接在最后"这套拼接逻辑才不会把同一句问题发送两次。`report`模式不需要`history`（服务端对`report`模式压根不读`history`字段），传空数组即可。
-
-**历史对话sheet的z-index是手动提高过的，不能沿用其它`.sheet`默认的31**：`.sheet`默认z-index是31、`.subpage`是35（见下面"返回键处理"一节的z-index分层表），这个历史sheet是从`#aiScreen`（一个`.subpage`）内部打开的，如果沿用默认31会被35的`#aiScreen`本身盖住、点开跟没点一样——`#aiHistorySheet, #scrimAiHistory { z-index: 36; }`这条CSS专门覆盖，这是这个项目第一次出现"从subpage内部打开sheet"的场景，以后如果再有类似场景（sheet挂在某个subpage下面），记得同样需要手动把z-index提到35以上（但别超过`.login-gate`的40）。`__handleBackButton`链里这个sheet的判断插在`aiScreen`判断**之前**（"最上层先关"），`closeAiScreen()`内部也会先调一次`closeAiHistorySheet()`，防止用户点页面自带的返回箭头（不是硬件返回键）关闭`#aiScreen`时把历史sheet晾在半空。
-
-**桌面浏览器测不了真实 AI 往返**：跟云备份完全一样——伪造 `account` 没有真实 CloudBase 已认证会话，`callFunction({name:"aiAdvisor"})` 在服务端 `getUserInfo().customUserId` 拿不到值被拒。免费/付费门禁、订阅页 UI、`__debugPremium` 切状态这些能在桌面验；**真实 AI 生成/追问必须真机（release 包 + 微信登录）**。
+真实"生成报告/追问"往返依赖真实微信登录会话，跟云备份同一条限制（见上面"云备份"一节），桌面/CLI都测不出，必须真机验证。
 
 ## 隐私政策 / 用户服务协议 / 会员服务协议 + "关于我们"入口（2026-07-31新增）
 
@@ -1238,7 +890,7 @@ App 之前**完全没有**任何地方展示《隐私政策》《用户协议》
 
 ## 云函数源码：`cloudbase/`
 
-`cloudbase/functions/wxLogin/`是腾讯云开发（CloudBase）云函数的源码，服务端代码，负责微信登录时用`code`换`openid`、签发自定义登录票据（详见上面"原生插件：`WeChatLogin`"一节）。`cloudbase/functions/deleteAccount/`是配套的注销账户云函数，负责真正删除`users`集合里的用户文档，现在也负责联动清理云备份数据（详见上面"云备份（Premium）"一节）。`cloudbase/functions/backupCreate/`、`backupList/`、`backupRestore/`、`backupDelete/`、`backupUploadFile/`是云备份功能的5个云函数，读写`backups`集合+Storage文件，详见上面"云备份（Premium）"一节。`cloudbase/functions/aiAdvisor/`是 AI 债务顾问云函数，详见上面"AI 债务顾问（Premium）"一节。**这个目录不属于Capacitor/Android那套构建流程，`npx cap sync android`不会碰它，也不会自动部署**——改完要手动同步到CloudBase控制台或用他们的CLI工具部署。AppSecret等敏感配置只存在CloudBase云函数的环境变量里，不存在这个目录任何文件里，也不能加进来。
+`cloudbase/functions/wxLogin/`是腾讯云开发（CloudBase）云函数的源码，服务端代码，负责微信登录时用`code`换`openid`、签发自定义登录票据（详见上面"原生插件：`WeChatLogin`"一节）。`cloudbase/functions/deleteAccount/`是配套的注销账户云函数，负责真正删除`users`集合里的用户文档，现在也负责联动清理云备份数据（详见上面"云备份（Premium）"一节）。`cloudbase/functions/backupCreate/`、`backupList/`、`backupRestore/`、`backupDelete/`、`backupUploadFile/`是云备份功能的5个云函数，读写`backups`集合+Storage文件，详见上面"云备份（Premium）"一节。`cloudbase/functions/aiAdvisor/`是 AI 债务顾问云函数，详见上面"AI 债务顾问（Premium）"一节。**这个目录不属于Capacitor/Android那套构建流程，`npx cap sync android`不会碰它，也不会自动部署**——改完要手动部署，部署命令/坑/验证方法见`cloudbase-deploy` skill。AppSecret等敏感配置只存在CloudBase云函数的环境变量里，不存在这个目录任何文件里，也不能加进来。
 
 ## 构建
 
@@ -1250,13 +902,7 @@ cd android && ./gradlew assembleDebug
 
 产出：`android/app/build/outputs/apk/debug/app-debug.apk`
 
-**要测微信登录必须编译release包**（debug签名过不了微信的签名校验，见上面"原生插件：`WeChatLogin`"一节）——前提是这台机器上已经有`android/app/after-zero-release.keystore`+`android/keystore.properties`（见"硬性铁律"第4条，两个都因机器而异、已gitignore，不是每台机器天生就有）：
-
-```bash
-cd android && JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew assembleRelease
-```
-
-产出：`android/app/build/outputs/apk/release/app-release.apk`
+**要测微信登录必须编译release包**（debug签名过不了微信的签名校验）——release签名文件位置、构建命令、丢失后果见`release-keystore` skill（`.claude/skills/release-keystore/SKILL.md`）。
 
 ## 本地网页测试（不用编译安卓包）
 
@@ -1287,6 +933,6 @@ localStorage.setItem("after-zero-account-v1", JSON.stringify({openid:"test",nick
    **私人数据不止藏在这三个常量里。** 之前排查发现过一次：一个叫`cliff`的调试用标记字段，虽然完全没有UI能设置它（不是SEED、不是表单字段），但代码里直接写死了具体的还款日期和金额字符串（`"2027-05 起还本，月供跳至 ¥2,182"`这类）挂在渲染逻辑里，跟SEED是否清空无关。改代码时留意：不只是搜`SEED`/`DOCS_SEED`这两个变量名，任何看着像真实日期/金额/人名的硬编码字符串都要多看一眼是不是该删。（补：曾经还有个`POSTER`"愿景海报"常量，因为没有任何UI入口能往里填内容、属于永远激活不了的死代码，已整体删除，包括`fileItems()`/`renderDocContent()`里对应的分支，别再找它。）
    **"新安装=空数据"这个假设依赖 `AndroidManifest.xml` 里 `android:allowBackup="false"`。** 安卓系统默认（`allowBackup="true"`，Capacitor脚手架生成时的默认值）会把App数据自动云备份到用户的Google账号，卸载重装或者换新手机登录同一个Google账号时可能会自动把旧数据（包括`ACCOUNT_KEY`存的登录态）恢复回来，让"重装"变得不再可靠地等于"空白状态"。这个项目已经手动改成`allowBackup="false"`彻底关掉自动备份——以后如果看到这个值被改回`true`（比如重新跑`npx cap add android`之类的脚手架命令覆盖了手改的manifest），要记得改回`false`。
 3. **包名 `io.github.jenkjyu.afterzero` 是这个app的永久身份，不要随便改。** 安卓系统靠包名判断"新装的这个APK是不是我认识的那个app的新版本"——包名一样+签名一致才会被当成"更新"（原地覆盖、保留数据）；包名一变，系统当成完全不相关的新app，跟原来的app和它的数据没有任何关系，装出来是第二个图标、全新空数据。这个项目早期开发阶段（曾用过 `com.jenkjyu.debtmanager` 这个包名做过几版debug包）就是因为这个原因废弃重来的——开发者自己手机上可能还留着那个旧包名、带真实数据的旧版本，跟现在这个 `io.github.jenkjyu.afterzero` 是两个互不相通的独立app，别搞混、别以为它们共享数据。
-4. **release签名密钥已经生成（因为微信登录要求提交release签名SHA1去微信开放平台注册），但目前还没有任何正式发布用过它。** Keystore文件在 `android/app/after-zero-release.keystore`，密码等配置在 `android/keystore.properties`——两个都已gitignore，不在git历史里。`android/app/build.gradle` 里 `signingConfigs.release` 检测到 `keystore.properties` 存在才生效（没有这个文件时`buildTypes.release`不带签名配置，仍然能正常debug构建，克隆仓库的人不受影响）。**`./gradlew assembleDebug`（README默认的构建命令）产出的还是debug包，不受这次改动影响；只有显式跑 `assembleRelease` 才会用到这个release签名。** 这个keystore一旦真正拿去发布过一个版本，丢了 = 以后再也没法用同一个身份更新这个app，需要跟`localStorage`那条铁律同等严重地对待——离线、异地备份好。
+4. **release签名密钥已经生成（因为微信登录要求提交release签名SHA1去微信开放平台注册），但目前还没有任何正式发布用过它。** 文件位置/构建命令/`signingConfigs.release`的生效条件见`release-keystore` skill。**这个keystore一旦真正拿去发布过一个版本，丢了 = 以后再也没法用同一个身份更新这个app，需要跟`localStorage`那条铁律同等严重地对待——离线、异地备份好。**
 5. **License 是 PolyForm Noncommercial 1.0.0，不是MIT/ISC这类常见的宽松协议，是刻意选的。** 开发者规划未来要在这个app上加付费功能，选这个协议是为了禁止别人白嫖代码去做商业竞品（发到应用商店卖钱、内置广告等）；别人依然可以自由fork/学习/个人非商业使用。改动licensing相关内容（`LICENSE`文件、`package.json`里的`license`字段、README里的License说明）前要确认这个前提没变。
 6. **`AndroidManifest.xml` 里的 `INTERNET` 权限当初是为未来付费功能预留的，现在已经真正用上了**——`www/index.html` 里的微信登录功能会加载CloudBase CDN脚本、调用腾讯云开发的云函数，是这个app第一次真正发出网络请求（`WeChatLogin`原生插件本身走的是Intent/AIDL跟微信App通信，不占用这条权限）。这条权限不要删。

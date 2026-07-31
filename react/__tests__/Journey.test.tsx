@@ -86,6 +86,46 @@ describe("Journey", () => {
 
       fireEvent.pointerMove(chart, { pointerType: "mouse", pointerId: 1, clientX: 0 });
       expect(document.querySelector(".jread")!.textContent).toContain("¥10,000");
+
+      // 松手：真正回到拖拽前的样子——占位文字、无游标、里程碑不再淡化
+      // (这是标准press-and-hold交互，早期版本这里从来没做过，读数会一直粘着显示)
+      fireEvent.pointerUp(chart, { pointerType: "mouse", pointerId: 1, clientX: 0 });
+      expect(document.querySelector(".jread")!.textContent).toContain("按住曲线");
+      expect(document.querySelector(".jcursor")).toBeNull();
+      expect(chart.className).not.toContain("scrubbing");
+    } finally {
+      if (orig) Object.defineProperty(Element.prototype, "getBoundingClientRect", orig);
+    }
+  });
+
+  // ⚠️真机反馈"游标显示的位置比手指实际按压的位置偏左"的回归测试：这份timeline故意
+  // 前5个点挤在20天内(模拟"早期好几笔债务扎堆还款")、最后一个点远在两年后(模拟"还完
+  // 大部分只剩一笔长期债务")——按真实时间比例渲染时，前5个点全部挤在图表最左边2.7%
+  // 的宽度内。旧算法假设点均匀分布，会把"摸中间"错配成index3(它真实位置只在2%处，
+  // 视觉上远在手指左边)；新算法按真实位置匹配，应该选中index4(真实位置离中间最近)。
+  it("时间分布不均匀时，按真实渲染位置匹配触摸点，不是按点的序号比例", () => {
+    const skewed = data({
+      timeline: [
+        { date: "2026-07-31", balance: 10000 },
+        { date: "2026-08-05", balance: 9000 },
+        { date: "2026-08-10", balance: 8000 },
+        { date: "2026-08-15", balance: 7000 },
+        { date: "2026-08-20", balance: 6000 },
+        { date: "2028-08-20", balance: 0 },
+      ],
+    });
+    const { container } = render(<Journey data={skewed} s={summary} monthsLeft={26} />);
+    const chart = container.querySelector(".jchart") as HTMLElement;
+    const orig = Object.getOwnPropertyDescriptor(Element.prototype, "getBoundingClientRect");
+    try {
+      Object.defineProperty(Element.prototype, "getBoundingClientRect", {
+        configurable: true,
+        value: () => ({ left: 0, top: 0, width: 320, height: 200, right: 320, bottom: 200, x: 0, y: 0, toJSON: () => ({}) }),
+      });
+      // 摸图表正中间(clientX=160，ratio=0.5)——真实时间比例上离中点最近的是index4(2026-08-20)
+      fireEvent.pointerDown(chart, { pointerType: "mouse", pointerId: 1, clientX: 160 });
+      expect(document.querySelector(".jread")!.textContent).toContain("2026-08-20");
+      expect(document.querySelector(".jread")!.textContent).toContain("¥6,000");
     } finally {
       if (orig) Object.defineProperty(Element.prototype, "getBoundingClientRect", orig);
     }

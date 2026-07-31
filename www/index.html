@@ -1075,7 +1075,12 @@
      ⚠️标签**贴容器左右边缘 + 折线引线**，不是沿半径方向直着往外放。后者在扇区转到
      正左/正右时水平空间只剩 60 多 px，"信用卡分期 27% ¥16,208"放不下，半径只能压到 62。
      贴边缘之后水平空间跟角度无关，半径能给到 76。 */
-  .pie-wrap { position: relative; touch-action: none; user-select: none; }
+  /* ⚠️touch-action必须是pan-y不能是none(2026-08-01改)——none会让浏览器在JS跑之前就
+     unconditionally拒绝这个区域的任何原生滚动候选手势,不管pieRotate.ts的JS怎么判断方向、
+     怎么放行preventDefault都没用，是"上下滑页面路过饼图被拦截"这条反馈的真正根因（比
+     JS里unconditional preventDefault更底层）。pan-y交给浏览器识别纵向滚动候选，横向
+     转动手势继续由pieRotate.ts的touchmove.preventDefault()接管。 */
+  .pie-wrap { position: relative; touch-action: pan-y; user-select: none; }
   .pie-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   /* ⚠️SVG 的 fill/stroke **不接受 CSS 渐变值**。这两处不能写 var(--card-grad)
      （那是个 linear-gradient(...)），浏览器解析不了会回退到默认黑色——浅色模式下

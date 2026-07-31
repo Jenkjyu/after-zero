@@ -584,7 +584,9 @@ function computeNotifySchedule(debts, notify, now, windowMonths, maxCount) {
   var n = windowMonths > 0 ? windowMonths : 6;
   var cap = maxCount > 0 ? maxCount : 450;
   var t0 = now ? new Date(now) : new Date();
-  var cutoffKey = fmtDate(addMonths(today0(), n));
+  // 窗口截止日必须从t0（这次调用认定的"现在"）派生，不能用today0()（真实系统当前日期）——
+  // 正常调用不传now时两者是同一天看不出问题，但测试传固定日期、或者今天恰好跨月运行时会漂移。
+  var cutoffKey = fmtDate(addMonths(new Date(t0.getFullYear(), t0.getMonth(), t0.getDate()), n));
   (debts || []).forEach(function (d) {
     if (d.settled) return;
     (d.plan || []).forEach(function (r) {

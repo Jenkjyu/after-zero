@@ -2,9 +2,13 @@
 //
 // ⚠️必须用原生 Touch Events + {passive:false}，不能用 JSX 的 onTouchMove——React 合成
 // 触摸事件默认 passive，preventDefault() 不会真正阻止原生滚动，这是这个项目反复踩过的坑
-// （见 CLAUDE.md"手势代码：原样移植，不重新设计"一节）。这里跟 chartScrub.ts 是同一类
-// 处理：touchstart 落在饼上就接管，touchmove 逐次 preventDefault 挡掉纵向滚动。
-// 代价是从饼正上方开始的垂直滑动不会滚页面——饼只占一小块高度，可接受。
+// （见 CLAUDE.md"手势代码：原样移植，不重新设计"一节）。
+//
+// ⚠️2026-08-01改过一轮：早期版本touchstart落在饼上就直接接管、不看方向，导致上下滑页面
+// 路过饼图时会被拦截("干涉，影响手感"，真机反馈)。现在跟chartScrub.ts同一套8px阈值方向
+// 判断——touchmove里按dx/dy谁先过阈值决定这次触摸是"转饼"还是"划页面"，纵向占主导就放行
+// 给原生滚动。代价：贴着饼的上/下边缘做近似纯纵向的拖拽会被判成划页面、转不动饼，只能横向
+// 或斜向拖拽——可接受，饼本来就靠"按住饼图可以转动"这行提示引导，不是靠边缘精确擦碰。
 //
 // 旋转角度不走 React state：拖拽期间每帧 setState 会触发整棵子树重渲染，手势会顿。
 // 改成回调里直接改 DOM（外层组件把 transform 和标签坐标的更新函数传进来）。
@@ -55,14 +59,30 @@ export function attachPieRotate(el: HTMLElement, opts: PieRotateOpts): () => voi
     spin();
   }
 
+  let axis: "x" | "y" | null = null;
+  let sx = 0, sy = 0;
   function onTouchStart(e: TouchEvent) {
     if (e.touches.length !== 1) return;
-    start(e.touches[0].clientX, e.touches[0].clientY);
+    axis = null;
+    sx = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+    // 不在这里就start()——方向还不知道，等touchmove里判定横向/纵向谁占主导。
   }
   function onTouchMove(e: TouchEvent) {
-    if (!dragging) return;
+    const t = e.touches[0];
+    if (!t) return;
+    if (axis === null) {
+      const dx = t.clientX - sx, dy = t.clientY - sy;
+      if (Math.abs(dy) > 8 && Math.abs(dy) >= Math.abs(dx)) { axis = "y"; return; } // 交给原生滚动
+      if (Math.abs(dx) > 8) { axis = "x"; start(sx, sy); } else return; // 还没过阈值，先不表态
+    }
+    if (axis !== "x") return;
     e.preventDefault();
-    move(e.touches[0].clientX, e.touches[0].clientY);
+    move(t.clientX, t.clientY);
+  }
+  function onTouchEndOrCancel() {
+    axis = null;
+    end();
   }
   function onPointerDown(e: PointerEvent) {
     if (e.pointerType !== "mouse") return;   // 触摸走上面那套，避免两边重复处理
@@ -78,8 +98,8 @@ export function attachPieRotate(el: HTMLElement, opts: PieRotateOpts): () => voi
 
   el.addEventListener("touchstart", onTouchStart as EventListener, { passive: true });
   el.addEventListener("touchmove", onTouchMove as EventListener, { passive: false });
-  el.addEventListener("touchend", end);
-  el.addEventListener("touchcancel", end);
+  el.addEventListener("touchend", onTouchEndOrCancel);
+  el.addEventListener("touchcancel", onTouchEndOrCancel);
   el.addEventListener("pointerdown", onPointerDown as EventListener);
   el.addEventListener("pointermove", onPointerMove as EventListener);
   el.addEventListener("pointerup", onPointerUp as EventListener);
@@ -89,8 +109,8 @@ export function attachPieRotate(el: HTMLElement, opts: PieRotateOpts): () => voi
     cancelAnimationFrame(raf);
     el.removeEventListener("touchstart", onTouchStart as EventListener);
     el.removeEventListener("touchmove", onTouchMove as EventListener);
-    el.removeEventListener("touchend", end);
-    el.removeEventListener("touchcancel", end);
+    el.removeEventListener("touchend", onTouchEndOrCancel);
+    el.removeEventListener("touchcancel", onTouchEndOrCancel);
     el.removeEventListener("pointerdown", onPointerDown as EventListener);
     el.removeEventListener("pointermove", onPointerMove as EventListener);
     el.removeEventListener("pointerup", onPointerUp as EventListener);
