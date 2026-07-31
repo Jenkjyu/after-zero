@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>After Zero 统计页原型 · 三套方案对比</title>
+<link rel="stylesheet" href="shared/tokens.css">
+<style>
+body { background: var(--bg); }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 22px 20px 60px; }
+.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+h1 { font-size: 21px; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+.sub { font-size: 13px; color: var(--text-muted); margin-top: 6px; line-height: 1.7; max-width: 720px; }
+.sub code { font-family: var(--font-num); font-size: 12px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+.ctrl { display: flex; gap: 8px; align-items: center; flex: none; }
+.ctrl button { border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  border-radius: 9px; padding: 8px 13px; font-size: 12.5px; font-weight: 600; }
+.ctrl button.on { background: var(--accent-fill); color: var(--on-accent); border-color: transparent; }
+
+.data-strip { display: flex; flex-wrap: wrap; gap: 0; margin: 20px 0 24px; background: var(--card-grad);
+  border: 1px solid var(--hair); border-radius: 14px; overflow: hidden; }
+.ds { flex: 1; min-width: 128px; padding: 11px 14px; border-right: 1px solid var(--hair); }
+.ds:last-child { border-right: none; }
+.ds .k { font-size: 10.5px; color: var(--text-muted); }
+.ds .v { font-size: 15px; font-weight: 700; font-family: var(--font-num); margin-top: 2px; }
+
+.grid { display: flex; gap: 18px; align-items: flex-start; overflow-x: auto; padding-bottom: 8px; }
+.card { flex: none; width: 390px; }
+.card-head { padding: 0 2px 10px; }
+.card-t { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.card-t .badge { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent); }
+.card-d { font-size: 12px; color: var(--text-muted); margin-top: 5px; line-height: 1.6; min-height: 52px; }
+.card-open { font-size: 12px; font-weight: 600; color: var(--accent); text-decoration: none;
+  display: inline-flex; align-items: center; gap: 3px; margin-top: 4px; }
+.frame { width: 390px; height: 780px; border: 1px solid var(--hair); border-radius: 16px;
+  overflow: hidden; box-shadow: var(--e2); background: var(--surface); }
+.frame iframe { width: 390px; height: 780px; border: 0; display: block; }
+
+.diff { margin-top: 34px; }
+.diff h2 { font-size: 15px; font-weight: 700; margin: 0 0 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; background: var(--card-grad);
+  border: 1px solid var(--hair); border-radius: 14px; overflow: hidden; }
+th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--hair); vertical-align: top; }
+th { font-weight: 700; background: var(--surface-2); font-size: 11.5px; }
+tr:last-child td { border-bottom: none; }
+td:first-child, th:first-child { color: var(--text-muted); width: 128px; }
+.note { font-size: 11.5px; color: var(--text-muted); line-height: 1.75; margin-top: 18px; }
+.note b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>After Zero 统计页 · 三套静态原型</h1>
+      <p class="sub">
+        三套用的是<b>同一份数据</b>——12 笔债务喂给真实的 <code>www/js/calc.js</code> 算出来的结果
+        （余额量级与类型占比跟真机截图逐项对齐），所以三栏之间的差异只来自设计本身。
+        没有改动任何业务代码，正式页面不受影响。
+      </p>
+    </div>
+    <div class="ctrl">
+      <button type="button" id="btnLight" onclick="pick('light')">浅色</button>
+      <button type="button" id="btnDark" onclick="pick('dark')">深色</button>
+    </div>
+  </div>
+
+  <div class="data-strip" id="strip"></div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-head">
+        <div class="card-t">方案 A<span class="badge">原生延续</span></div>
+        <div class="card-d">石墨 hero + 色雾、18px 圆角、--e2 阴影、2×2 KPI、5 张同构图表卡。
+          修掉审计点名的三处不一致：图例改胶囊、⋮ 换具名按钮、补回色雾层。</div>
+        <a class="card-open" href="a-native.html" target="_blank">单独打开 →</a>
+      </div>
+      <div class="frame"><iframe src="a-native.html" title="方案 A"></iframe></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="card-t">方案 B<span class="badge">债务洞察叙事</span></div>
+        <div class="card-d">没有 hero 卡，总额写进句子。分成"发现 / 风险 / 过程 / 压力 / 结构"五段，
+          图表退成结论的证据。结论规则驱动；走势图可拖动读数、压力图可切面积/柱状、占比是可旋转饼图。</div>
+        <a class="card-open" href="b-narrative.html" target="_blank">单独打开 →</a>
+      </div>
+      <div class="frame"><iframe src="b-narrative.html" title="方案 B"></iframe></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div class="card-t">方案 C<span class="badge">极简数据产品</span></div>
+        <div class="card-d">零卡片容器，只有留白和发丝线。段间距 34px，图表尺寸砍半，
+          全页只有墨色 + 琥珀两个数据色，数字比图大。</div>
+        <a class="card-open" href="c-minimal.html" target="_blank">单独打开 →</a>
+      </div>
+      <div class="frame"><iframe src="c-minimal.html" title="方案 C"></iframe></div>
+    </div>
+  </div>
+
+  <div class="diff">
+    <h2>三套的结构性差异（不是配色差异）</h2>
+    <table>
+      <tr><th></th><th>A 原生延续</th><th>B 债务洞察叙事</th><th>C 极简数据产品</th></tr>
+      <tr><td>顶部</td><td>石墨渐变 hero + 色雾动效 + 归零进度条，36px 大数字</td><td>报告头：日期 + 判断句标题，总额写在段落里</td><td>无卡片，46px 巨号数字直接压在页面底色上</td></tr>
+      <tr><td>容器</td><td>5 张同构卡片（18px / --card-grad / --e2 / 顶部内高光）</td><td>五个语义段落，只有图表处有轻容器（--e1）</td><td>零容器，只有 hairline + 34px 段间距</td></tr>
+      <tr><td>压力图</td><td>4 格摘要 + 全 27 个月柱状图 + 点击展开当月明细</td><td>面积 / 柱状两种模式可切换（默认面积），横向滑动 + 点月看明细、再点收起</td><td>柱高砍到 78px，只留 2 条刻度线，选中月的数字在图上方</td></tr>
+      <tr><td>走势图</td><td>折线 + 面积渐变 + 3 个时间刻度</td><td>三个节点的名称+时间+金额标在图上，按住拖动可读任意时间点余额，不画坐标轴</td><td>sparkline 级细线，只标首尾两个数字</td></tr>
+      <tr><td>排行</td><td>全部 12 笔 + 余额/利率/剩余利息三档切换</td><td>按累计占比 70% 截断（当前 4 笔），其余折叠</td><td>全部 12 笔，无底槽实心条，高息用琥珀色区分</td></tr>
+      <tr><td>类型占比</td><td>26px 堆叠条 + 胶囊图例（名称/百分比/金额）</td><td>可拖拽旋转的甜甜圈，标签贴边缘 + 折线引线，文字始终水平，无图例</td><td>4px 细线 + 三行文字</td></tr>
+      <tr><td>总结</td><td>6 行 key-value，卡片内</td><td>规则驱动：4 条候选按严重度排序取前 3 + "最该先动手"展开</td><td>定义列表，高息相关行用琥珀色</td></tr>
+      <tr><td>数据色</td><td>3 色角色制：蓝=量级 / 琥珀=成本 / 绿=进度</td><td>风险二档：红=年化≥18% / 蓝=其余，加本金蓝·利息琥珀</td><td>2 色：墨色 + 琥珀</td></tr>
+    </table>
+    <p class="note">
+      三套都保留了：本金/利息可区分（颜色 + 常驻图例 + 文字读数三重编码）、每个数值都有不靠手势就能读到的路径、
+      "预测不是承诺 / 本 App 不保存历史余额"的说明、走势图 X 轴按<b>真实时间比例</b>而非数组下标等距。
+      图表卡片一律不透明背景，没有用毛玻璃。<br>
+      所有配色都跑过 dataviz skill 的 <code>validate_palette.js</code>（浅深两套各验一次），
+      过程和数值记在 <code>README.md</code> 里——包括一处刻意偏离验证器的判断（方案 C 的墨色），以及
+      验证过程中发现的<b>两个正式 App 现存的配色问题</b>。
+    </p>
+  </div>
+</div>
+
+<script src="shared/data.js"></script>
+<script src="shared/util.js"></script>
+<script>
+var D = window.AZ_DATA;
+document.getElementById("strip").innerHTML = [
+  ["在还总负债", "¥" + fmt(D.report.totalBalance)],
+  ["笔数", D.summary.active + " 笔"],
+  ["已还本金", "¥" + fmt(D.summary.paidPrincipal)],
+  ["归零进度", D.summary.pct + "%"],
+  ["加权年化", D.report.avgRate.toFixed(2) + "%"],
+  ["预计还清", D.report.payoffDate],
+  ["压力窗口", D.pressure.windowMonths + " 个月"],
+  ["峰值月", monthLabel(D.pressure.peak.month) + " ¥" + fmt(D.pressure.peak.total)]
+].map(function (x) {
+  return '<div class="ds"><div class="k">' + x[0] + '</div><div class="v">' + x[1] + "</div></div>";
+}).join("");
+
+function pick(t) {
+  setTheme(t, true);
+  document.getElementById("btnLight").classList.toggle("on", t === "light");
+  document.getElementById("btnDark").classList.toggle("on", t === "dark");
+  // 同步三个 iframe——它们是独立文档，改父页面的 data-theme 不会传下去
+  Array.prototype.forEach.call(document.querySelectorAll("iframe"), function (f) {
+    try { f.contentWindow.postMessage({ azTheme: t }, "*"); } catch (e) {}
+  });
+}
+var saved = null;
+try { saved = localStorage.getItem("az-proto-theme"); } catch (e) {}
+var init = saved || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+setTheme(init, false);
+document.getElementById("btnLight").classList.toggle("on", init === "light");
+document.getElementById("btnDark").classList.toggle("on", init === "dark");
+// iframe 各自 initTheme() 时会读同一个 localStorage，所以初始就是一致的；
+// 这里再补一次 postMessage 是为了覆盖"iframe 比父页面先加载完"的时序。
+window.addEventListener("load", function () { setTimeout(function () { pick(init); }, 60); });
+</script>
+</body>
+</html>

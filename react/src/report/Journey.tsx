@@ -1,0 +1,160 @@
+// "还清这件事进行到哪了"——负债余额走势，替代原来的 PayoffLine.tsx。
+//
+// 跟被替换掉的那版比，三处实质变化：
+// ① **三个里程碑（今天/还掉一半/归零）的名称+时间+金额直接标在图上**，不再是图下面
+//    一排 flex 文字（那个排布视觉上像图例，读不出"这是曲线上的哪个点"）。
+// ② **不画坐标轴**。这是判断不是漏了：三个里程碑已经把"起点多少、中点什么时候、
+//    终点归零"三个锚点写在图上，再画 Y 轴刻度和 X 轴时间刻度等于同一份信息写两遍，
+//    而且刻度数字会跟里程碑标签抢位置。精确值由拖动读数承担（见 ③）。
+// ③ 拖动读数保留（复用 chartScrub.ts，跟原来 PayoffLine 同一套），读数显示在图**上方**
+//    一行；拖动时里程碑淡到 0.18，两套标签不会互相打架。
+//
+// ⚠️X 轴按**真实时间比例**排布，不是按数组下标等距——这条是原来 PayoffLine 修过的
+// 一个真实缺陷，必须保留：等距下标会让"两个月"和"两年"在图上一样宽，斜率完全失去意义。
+//
+// ⚠️数据是**预测**不是历史：timeline 由 computeReportData() 从"今天的总余额"出发、按现有
+// 还款计划里每一期的本金逐笔递减推算。这个 App 不保存任何历史余额快照，画不出真实走过的
+// 轨迹，footnote 必须说清楚，不能把预测包装成历史。
+import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import type { DebtSummary, ReportData } from "../types";
+import { attachChartScrub } from "./chartScrub";
+
+// 容器总高 = 上留白 + 绘图区 + 下留白。上下留白是给"今天"和"归零"两个标签用的，
+// 绘图区高度单独拿出来，是因为里程碑的 y 要按绘图区算、不能按容器总高算。
+const CH = 200, PAD_T = 52, PAD_B = 30;
+const PLOT_H = CH - PAD_T - PAD_B;
+
+export interface JourneyProps {
+  data: ReportData;
+  /** 进度百分比要用 summarizeDebts 的口径（已还本金含已结清债务），timeline 只有
+   *  "从今天往后"的部分，算不出已经还掉了多少，所以由父组件传进来 */
+  s: DebtSummary;
+  monthsLeft: number | null;
+}
+
+export function Journey({ data, s, monthsLeft }: JourneyProps) {
+  const pts = data.timeline;
+  const n = pts.length;
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const chartRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = chartRef.current;
+    if (!el || n < 2) return;
+    return attachChartScrub(el, { count: n, onIndexChange: setActiveIndex });
+  }, [n]);
+
+  if (n < 2 || data.totalBalance <= 0) {
+    return (
+      <div className="sec">
+        <div className="sec-q">还清这件事进行到哪了</div>
+        <h2 className="sec-a">暂无足够数据</h2>
+        <div className="sec-note">没有在还债务，或者还款计划里没有未还的期次。</div>
+      </div>
+    );
+  }
+
+  const W = 320, H = 100;
+  const t0 = window.parseDate(pts[0].date)!.getTime();
+  const tEnd = window.parseDate(pts[n - 1].date)!.getTime();
+  const span = tEnd - t0;
+  // span 为 0 是"所有未还期次都在今天"（全部逾期）这种极端情况——退回等距，不做除零
+  const xFor = (i: number) =>
+    span > 0 ? ((window.parseDate(pts[i].date)!.getTime() - t0) / span) * W : (i / (n - 1)) * W;
+  const top = window.niceCeil(pts[0].balance) || 1;
+  const yFor = (bal: number) => (1 - bal / top) * H;
+
+  const coords = pts.map((p, i) => [xFor(i), yFor(p.balance)] as const);
+  const line = coords.map((c, i) => (i === 0 ? "M" : "L") + c[0].toFixed(1) + "," + c[1].toFixed(1)).join(" ");
+  const area = line + ` L${coords[n - 1][0].toFixed(1)},${H} L${coords[0][0].toFixed(1)},${H} Z`;
+
+  const idx = activeIndex !== null ? Math.min(Math.max(activeIndex, 0), n - 1) : null;
+  const active = idx !== null ? pts[idx] : null;
+
+  // 容器坐标：x 用百分比（横向自适应），y 用绝对像素（纵向是固定高度）
+  const px = (i: number) => (coords[i][0] / W) * 100;
+  const py = (i: number) => PAD_T + (coords[i][1] / H) * PLOT_H;
+
+  // "还掉一半" = 余额首次跌破当前余额一半的那个点
+  let halfIdx = pts.findIndex((p) => p.balance <= pts[0].balance / 2);
+  if (halfIdx < 0) halfIdx = Math.floor(n / 2);
+
+  /* ⚠️三个标签按**纵向错开**排，不是按"哪边空放哪边"排。
+     后者试过：起点标签放点下方、中点放点上方，结果两者 top 只差 7px、横向又只隔 30%，
+     读起来像连成一行的一句话。现在起点在最上、中点在中下、终点在中上，至少差 60px。 */
+  const nodes: { i: number; t: string; cls: string; anchor: "above-left" | "below" | "above-right" }[] = [
+    { i: 0, t: "今天", cls: "now", anchor: "above-left" },
+    { i: halfIdx, t: "还掉一半", cls: "", anchor: "below" },
+    { i: n - 1, t: "归零", cls: "", anchor: "above-right" },
+  ];
+
+  return (
+    <div className="sec">
+      <div className="sec-q">还清这件事进行到哪了</div>
+      <h2 className="sec-a">
+        已经走完 <span className="n">{s.pct}</span>%
+        {monthsLeft !== null && <>，还剩 <span className="n">{monthsLeft}</span> 个月</>}
+      </h2>
+      <div className="plot-box">
+        <div className="jread">
+          {active ? (
+            <>
+              {active.date} <span className="dim">余额</span> ¥{window.fmt(active.balance)}
+            </>
+          ) : (
+            <span className="dim">按住曲线左右拖，看任意时间点的余额</span>
+          )}
+        </div>
+        <div className={"jchart" + (active ? " scrubbing" : "")} ref={chartRef} style={{ height: CH }}>
+          <svg
+            className="jsvg"
+            viewBox={`0 0 ${W} ${H}`}
+            preserveAspectRatio="none"
+            style={{ top: PAD_T, bottom: PAD_B, height: PLOT_H }}
+          >
+            <defs>
+              <linearGradient id="journeyArea" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={H}>
+                <stop offset="0%" stopColor="var(--ch-line)" stopOpacity="0.26" />
+                <stop offset="100%" stopColor="var(--ch-line)" stopOpacity="0.02" />
+              </linearGradient>
+            </defs>
+            <path d={area} fill="url(#journeyArea)" />
+            <path d={line} fill="none" stroke="var(--ch-line)" strokeWidth={2.4} vectorEffect="non-scaling-stroke" />
+          </svg>
+
+          {nodes.map((nd) => {
+            const x = px(nd.i), y = py(nd.i), p = pts[nd.i];
+            const lab: CSSProperties =
+              nd.anchor === "above-left" ? { left: 0, top: y - 50, textAlign: "left" }
+              : nd.anchor === "below" ? { left: x + "%", top: y + 16, transform: "translateX(-50%)", textAlign: "center" }
+              : { right: 0, top: y - 50, textAlign: "right" };
+            const lead: CSSProperties =
+              nd.anchor === "below" ? { left: x + "%", top: y, height: 16 } : { left: x + "%", top: y - 12, height: 12 };
+            return (
+              <span key={nd.t}>
+                <span className="jlead" style={lead} />
+                <span className={"jdot " + nd.cls} style={{ left: x + "%", top: y }} />
+                <span className={"jlab " + nd.cls} style={lab}>
+                  <span className="t">{nd.t}</span>
+                  <span className="d"> {p.date.slice(0, 7)}</span>
+                  <div className="a">¥{window.fmt(p.balance)}</div>
+                </span>
+              </span>
+            );
+          })}
+
+          {idx !== null && (
+            <>
+              <span className="jcursor" style={{ left: px(idx) + "%", top: PAD_T, bottom: PAD_B }} />
+              <span className="jcursor-dot" style={{ left: px(idx) + "%", top: py(idx) }} />
+            </>
+          )}
+        </div>
+      </div>
+      <div className="footnote" style={{ textAlign: "left", marginTop: 8, padding: 0 }}>
+        按现有还款计划推算，不含提前还款；本 App 不保存历史余额，这条线不是实际走过的轨迹。
+      </div>
+    </div>
+  );
+}

@@ -51,8 +51,9 @@ export function AboutScreen() {
       </div>
       <div className="subpage-body">
         <div className="premium-hero">
+          <img className="about-icon" src="img/app-icon.png" alt="" />
           <div className="premium-hero-title">After Zero</div>
-          <div className="premium-hero-sub">版本 {APP_VERSION} · 个人开发者出品</div>
+          <div className="premium-hero-sub">版本 {APP_VERSION}</div>
         </div>
 
         <div className="entry-group">

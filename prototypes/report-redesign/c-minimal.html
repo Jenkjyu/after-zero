@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>方案 C · 极简数据产品 — After Zero 统计页原型</title>
+<link rel="stylesheet" href="shared/tokens.css">
+<style>
+/* ============================================================================
+   方案 C：极简数据产品
+   ----------------------------------------------------------------------------
+   立场：把"卡片"这个层级整个拿掉。现在统计页是 5 张同构卡片纵向堆叠（审计里
+   点名的"看板节奏"来源之一），这一版改成**排版分区**：小标签 + 大留白 + 一条
+   发丝线，内容直接压在页面底色上。数字比图大，图缩到"够读出趋势"就停。
+
+   跟 A / B 的结构性区别：
+     · 零卡片容器（没有 border / box-shadow / 圆角矩形），只有 hairline 和留白
+     · 段间距 34px（A 是 14px 卡片间距），一屏只呈现 1–2 个信息块
+     · 图表尺寸砍到 A 的一半左右，坐标轴只保留 2 条刻度线
+     · 债务排行去掉 track 底槽，只留实心条（背景槽是"卡片时代"的产物）
+     · 类型占比压成一条 4px 高的细线 + 一行文字
+
+   配色：**墨色 + 单一琥珀强调**，全页只有 2 个数据色。
+   ⚠️如实记录一处**刻意偏离**验证器：这一对跑 validate_palette.js 时
+   "Lightness band" 和 "Chroma floor" 两项是 FAIL——因为墨色 (#242E3D, chroma 0.031)
+   按分类色板的标准"读起来像灰色"。但这正是 C 的设计前提：身份不靠色相区分，
+   靠**明度**区分。真正决定"能不能分辨"的两项（Normal-vision ΔE 40.6、
+   CVD ΔE 36.5 protan）都远超下限，是全部三套方案里分离度最高的一对。
+   这不是漏跑验证，是跑完之后有依据地判断偏离，理由记在 README 里。
+   ========================================================================== */
+.viz-root {
+  --ink: #242E3D;       /* 主数据色（本金、余额条、走势线） */
+  --amber: #C4892F;     /* 唯一强调色（利息、高息标记） */
+  --ink-dim: rgba(36,46,61,.14);
+}
+[data-theme="dark"] .viz-root {
+  --ink: #D6DCE6; --amber: #BC8B3C; --ink-dim: rgba(214,220,230,.16);
+}
+
+.app { padding: max(26px, env(safe-area-inset-top)) 22px 30px; }
+
+/* ---------- 区块：小标签 + 大留白，没有卡片 ---------- */
+.blk { padding-top: 34px; }
+.blk:first-child { padding-top: 4px; }
+.blk + .blk { border-top: 1px solid var(--hair); margin-top: 34px; padding-top: 30px; }
+.lbl { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--text-faint); margin-bottom: 14px; }
+
+/* ---------- 顶部：巨大数字直接压在底色上 ---------- */
+.head-k { font-size: 12px; color: var(--text-muted); }
+.head-v { font-size: 46px; font-weight: 700; font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em; line-height: 1.05; margin-top: 6px; }
+.head-v .cur { font-size: 24px; font-weight: 600; color: var(--text-faint); margin-right: 3px; letter-spacing: 0; }
+.head-meta { display: flex; gap: 10px; align-items: baseline; margin-top: 12px; font-size: 12px; color: var(--text-muted); }
+.head-meta .sep { color: var(--hair); }
+/* 进度：一条 2px 的线，不做成"进度条组件" */
+.thin-prog { height: 2px; background: var(--ink-dim); margin-top: 18px; position: relative; }
+.thin-prog i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink); }
+.thin-prog-row { display: flex; justify-content: space-between; margin-top: 7px; font-size: 11px; color: var(--text-muted); }
+.thin-prog-row b { color: var(--text); font-family: var(--font-num); font-weight: 700; }
+
+/* ---------- KPI：纯排版网格，只有发丝线，没有卡片 ---------- */
+.kgrid { display: grid; grid-template-columns: 1fr 1fr; }
+.kcell { padding: 14px 0 14px 0; }
+.kcell:nth-child(odd) { padding-right: 14px; border-right: 1px solid var(--hair); }
+.kcell:nth-child(even) { padding-left: 16px; }
+.kcell:nth-child(-n+2) { border-bottom: 1px solid var(--hair); }
+.kcell .v { font-size: 21px; font-weight: 700; font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em; }
+.kcell .k { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+.kcell .s { font-size: 10.5px; color: var(--text-faint); margin-top: 2px; font-family: var(--font-num); }
+
+/* ---------- 图：无容器、无底槽、两条刻度线 ---------- */
+.mini-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.mini-v { font-size: 22px; font-weight: 700; font-family: var(--font-num); letter-spacing: -.02em; }
+.mini-k { font-size: 11.5px; color: var(--text-muted); }
+
+.cwrap { position: relative; padding-left: 30px; margin-top: 16px; }
+.cgrid { position: absolute; left: 30px; right: 0; top: 0; height: 78px; pointer-events: none; }
+.gl { position: absolute; left: 0; right: 0; border-top: 1px solid var(--hair); }
+.gl span { position: absolute; right: 100%; top: -6px; padding-right: 6px; font-size: 9px;
+  color: var(--text-faint); font-family: var(--font-num); }
+.cscroll { overflow-x: auto; scrollbar-width: none; }
+.cscroll::-webkit-scrollbar { display: none; }
+.ctrack { width: 100%; }
+.bars { display: flex; align-items: flex-end; gap: 3px; height: 78px; }
+.col { flex: 1; min-width: 0; height: 100%; display: flex; align-items: flex-end;
+  background: none; border: none; padding: 0; }
+.stk { width: 100%; max-width: 16px; margin: 0 auto; height: 100%; display: flex; flex-direction: column-reverse; gap: 2px; }
+.stk .s { width: 100%; }
+.stk .s.p { background: var(--ink); }
+.stk .s.i { background: var(--amber); }
+.stk .s.i.zero { display: none; }
+/* ⚠️选中月**不靠把其余月份调暗**来表达。第一版写成 .off { opacity:.3 }，结果整张图
+   只有一根柱子是实的、其余全成浅灰，图本身没法读了——"高亮一个"不该以"藏掉其余全部"
+   为代价（dataviz 的 anti-pattern：不要为了强调而降低其它数据的可读性）。
+   现在所有柱子一律实色，选中态只体现在 x 轴刻度加粗 + 上方那行读数上。 */
+.col .stk { opacity: 1; }
+.col.on::after { content: ""; position: absolute; left: 50%; bottom: -3px; transform: translateX(-50%);
+  width: 16px; height: 2px; background: var(--ink); }
+.col { position: relative; }
+.xax { display: flex; gap: 3px; margin-top: 6px; }
+.xt { flex: 1; min-width: 0; text-align: center; font-size: 9px; color: var(--text-faint); }
+.xt.on { color: var(--text); font-weight: 700; }
+
+.spark { height: 70px; margin-top: 14px; position: relative; }
+.spark svg { width: 100%; height: 100%; display: block; }
+.spark .end { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--ink);
+  transform: translate(-50%, 50%); }
+.spark-ax { display: flex; justify-content: space-between; font-size: 9.5px; color: var(--text-faint); margin-top: 6px; }
+
+/* 排行：无底槽，只有实心条 */
+.r-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+.r-nm { width: 54px; flex: none; font-size: 12px; color: var(--text-muted); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.r-bar { flex: 1; height: 8px; position: relative; }
+.r-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink); }
+.r-bar i.hi { background: var(--amber); }
+.r-v { width: 74px; flex: none; text-align: right; font-size: 12px; font-weight: 600; font-family: var(--font-num); }
+.r-legend { font-size: 10.5px; color: var(--text-faint); margin-top: 12px; display: flex; gap: 12px; }
+.r-legend span { display: flex; align-items: center; gap: 5px; }
+.r-legend i { width: 7px; height: 7px; }
+
+/* 类型占比：一条 4px 细线 + 一行文字 */
+.mix-bar { display: flex; height: 4px; gap: 2px; margin-bottom: 12px; }
+.mix-bar i { height: 100%; }
+.mix-rows { display: flex; flex-direction: column; gap: 8px; }
+.mix-r { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; }
+.mix-r i { width: 7px; height: 7px; flex: none; align-self: center; }
+.mix-r .n { flex: 1; }
+.mix-r .p { font-family: var(--font-num); color: var(--text-muted); width: 34px; text-align: right; }
+.mix-r .a { font-family: var(--font-num); font-weight: 600; width: 70px; text-align: right; }
+
+/* 结论：定义列表式，无卡片 */
+.dl { display: flex; flex-direction: column; }
+.dl-r { display: flex; justify-content: space-between; align-items: baseline; gap: 14px;
+  padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 12.5px; }
+.dl-r:last-child { border-bottom: none; }
+.dl-r .k { color: var(--text-muted); flex: none; }
+.dl-r .v { font-weight: 600; text-align: right; font-family: var(--font-num); }
+.dl-r .v.amber { color: var(--amber); }
+
+.note { font-size: 10.5px; color: var(--text-faint); line-height: 1.7; margin-top: 26px; }
+.mini-act { background: none; border: none; padding: 0; color: var(--text-muted); }
+.mini-act svg { width: 16px; height: 16px; display: block; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="app viz-root" id="app"></div>
+  <div id="tabbar"></div>
+</div>
+<div id="themeBtn"></div>
+
+<script src="shared/data.js"></script>
+<script src="shared/util.js"></script>
+<script>
+initTheme();
+document.getElementById("themeBtn").outerHTML = THEME_BTN_HTML;
+document.getElementById("tabbar").outerHTML = TABBAR_HTML;
+
+var D = window.AZ_DATA;
+var state = { pIdx: 1 };  // 默认落在第一个有金额的月份上
+var HI = 18;
+
+function render() {
+  var s = D.summary, r = D.report, p = D.pressure, c = D.conclusions;
+  var months = p.months;
+  var typeTotal = r.typeList.reduce(function (t, x) { return t + x.value; }, 0) || 1;
+  var maxBal = D.byDebt[0].balance || 1;
+  var idx = Math.min(Math.max(state.pIdx, 0), months.length - 1);
+  var act = months[idx];
+
+  document.getElementById("app").innerHTML =
+    /* ---- 顶部 ---- */
+    '<div class="blk">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+        "<div><div class=\"head-k\">在还总负债 · 只算本金</div>" +
+        '<div class="head-v"><span class="cur">¥</span>' + fmt(r.totalBalance) + "</div></div>" +
+        '<button class="mini-act" type="button" aria-label="导出"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7.5 10.5L12 15l4.5-4.5"/><path d="M4 18.5v.5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-.5"/></svg></button>' +
+      "</div>" +
+      '<div class="head-meta"><span>' + s.active + " 笔在还</span><span class=\"sep\">·</span>" +
+        "<span>预计 " + r.payoffDate + " 还清</span></div>" +
+      '<div class="thin-prog"><i style="width:' + s.pct + '%"></i></div>' +
+      '<div class="thin-prog-row"><span>已还本金 <b>¥' + fmt(s.paidPrincipal) + "</b></span>" +
+        "<span><b>" + s.pct + "%</b></span></div>" +
+    "</div>" +
+
+    /* ---- KPI ---- */
+    '<div class="blk"><div class="kgrid">' +
+      kcell("¥" + fmt(s.paidPrincipal), "已还本金", "另付利息 ¥" + fmt(s.paidInterest)) +
+      kcell("¥" + fmt(s.monthly), "经常性月供", "不含一次性还清") +
+      kcell(r.avgRate.toFixed(2) + "%", "加权平均利率", "按余额加权") +
+      kcell("¥" + fmt(c.restInterest), "剩余待付利息", "按现有计划") +
+    "</div></div>" +
+
+    /* ---- 压力 ---- */
+    '<div class="blk">' +
+      '<div class="lbl">未来 ' + p.windowMonths + " 个月</div>" +
+      '<div class="mini-head"><div><div class="mini-v num">¥' + fmt(act.total) + "</div>" +
+        '<div class="mini-k">' + monthLabel(act.month) + "待还" +
+        (act.principal + act.interest > 0 ? " · 本金 ¥" + fmt(act.principal) + " · 利息 ¥" + fmt(act.interest) : "") +
+        "</div></div>" +
+        '<div style="text-align:right"><div class="mini-k">月均</div>' +
+        '<div class="num" style="font-size:13px;font-weight:700">¥' + fmt(p.monthlyAvg) + "</div></div></div>" +
+      barsHtml(months, idx) +
+      '<div class="r-legend"><span><i style="background:var(--ink)"></i>本金</span>' +
+        '<span><i style="background:var(--amber)"></i>利息</span>' +
+        '<span style="margin-left:auto">合计 ¥' + fmt(p.totalAhead) + "</span></div>" +
+    "</div>" +
+
+    /* ---- 走势 ---- */
+    '<div class="blk">' +
+      '<div class="lbl">负债余额走势 · 预测</div>' +
+      '<div class="mini-head"><div><div class="mini-v num">' + c.monthsLeft + ' <span style="font-size:13px;font-weight:600">个月后归零</span></div>' +
+        '<div class="mini-k">' + r.timeline[0].date + " → " + r.payoffDate + "</div></div></div>" +
+      sparkHtml(r) +
+    "</div>" +
+
+    /* ---- 排行 ---- */
+    '<div class="blk">' +
+      '<div class="lbl">各债务剩余待还</div>' +
+      D.byDebt.map(function (d) {
+        var hi = d.rate >= HI;
+        return '<div class="r-row"><div class="r-nm">' + d.name + "</div>" +
+          '<div class="r-bar"><i class="' + (hi ? "hi" : "") + '" style="width:' + (d.balance / maxBal) * 100 + '%"></i></div>' +
+          '<div class="r-v">¥' + fmt(d.balance) + "</div></div>";
+      }).join("") +
+      '<div class="r-legend"><span><i style="background:var(--amber)"></i>年化 ≥18%（' + c.highCount + " 笔 · ¥" + fmt(c.highBalance) + "）</span></div>" +
+    "</div>" +
+
+    /* ---- 类型占比：4px 细线 ---- */
+    '<div class="blk">' +
+      '<div class="lbl">债务类型</div>' +
+      '<div class="mix-bar">' + r.typeList.map(function (x, i) {
+        return '<i style="width:' + (x.value / typeTotal) * 100 + "%;background:" + mixColor(i) + '"></i>';
+      }).join("") + "</div>" +
+      '<div class="mix-rows">' + r.typeList.map(function (x, i) {
+        return '<div class="mix-r"><i style="background:' + mixColor(i) + '"></i>' +
+          '<span class="n">' + x.name + '</span><span class="p">' + Math.round((x.value / typeTotal) * 100) + '%</span>' +
+          '<span class="a">¥' + fmt(x.value) + "</span></div>";
+      }).join("") + "</div>" +
+    "</div>" +
+
+    /* ---- 结论 ---- */
+    '<div class="blk">' +
+      '<div class="lbl">结论</div>' +
+      '<div class="dl">' +
+        dl("利率最高", c.topRate.name + " · " + c.topRate.rate.toFixed(2) + "%", true) +
+        dl("高息债务（≥18%）", c.highCount + " 笔 · ¥" + fmt(c.highBalance), true) +
+        dl("剩余待付利息", "¥" + fmt(c.restInterest), false) +
+        dl("未来 " + p.windowMonths + " 个月要还", "¥" + fmt(p.totalAhead), false) +
+        dl("压力最大的月份", monthLabel(p.peak.month) + " · ¥" + fmt(p.peak.total), false) +
+        dl("预计还清", r.payoffDate, false) +
+      "</div>" +
+      '<div class="note">利率由每笔债务的还款计划反推（IRR）。走势与压力按现有还款计划推算，是预测不是承诺，不含提前还款；本 App 不保存历史余额，走势线不是实际走过的轨迹。</div>' +
+    "</div>";
+
+}
+
+/* 监听器只绑一次（理由同 A/B：#app 本身不会被 render() 替换，只有 innerHTML 会） */
+document.getElementById("app").addEventListener("click", function (e) {
+  var t = e.target.closest("[data-i]");
+  if (!t) return;
+  state.pIdx = +t.getAttribute("data-i");
+  render();
+});
+
+function kcell(v, k, s) {
+  return '<div class="kcell"><div class="v num">' + v + '</div><div class="k">' + k + '</div><div class="s">' + s + "</div></div>";
+}
+function dl(k, v, amber) {
+  return '<div class="dl-r"><span class="k">' + k + '</span><span class="v' + (amber ? " amber" : "") + '">' + v + "</span></div>";
+}
+/* 第三档不能用 --ink-dim（那是 14% 透明度的墨色，做底槽还行，当数据色在图例里几乎看不见——
+   实测浅色下对白底只有 1.1:1）。改用 --text-muted（浅 #656C7E / 深 #98A0B0），
+   两套主题下对底色都在 4:1 以上，跟墨色/琥珀也拉得开。 */
+function mixColor(i) {
+  return ["var(--ink)", "var(--amber)", "var(--text-muted)", "var(--text-faint)"][i] || "var(--text-faint)";
+}
+
+function barsHtml(months, idx) {
+  var top = niceCeil(Math.max.apply(null, months.map(function (m) { return m.total; }))) || 1;
+  var n = months.length;
+  return '<div class="cwrap"><div class="cgrid">' +
+    [0, 1].map(function (f) {
+      return '<div class="gl" style="bottom:' + f * 100 + '%"><span>' + (f === 0 ? "0" : fmtK(top)) + "</span></div>";
+    }).join("") + "</div>" +
+    '<div class="cscroll"><div class="ctrack" style="min-width:' + n * 22 + 'px"><div class="bars">' +
+      months.map(function (m, i) {
+        var bp = (m.total / top) * 100, sp = m.principal + m.interest;
+        var pH = sp <= 0 ? bp : bp * (m.principal / sp), iH = sp <= 0 ? 0 : bp * (m.interest / sp);
+        return '<button class="col ' + (i === idx ? "on" : "off") + '" type="button" data-i="' + i +
+          '" aria-label="' + monthLabel(m.month) + "待还 ¥" + fmt(m.total) + '">' +
+          '<div class="stk"><div class="s p" style="height:' + pH + '%"></div>' +
+          '<div class="s i' + (iH <= 0 ? " zero" : "") + '" style="height:' + iH + '%"></div></div></button>';
+      }).join("") + "</div>" +
+      '<div class="xax">' + months.map(function (m, i) {
+        return '<div class="xt' + (i === idx ? " on" : "") + '">' + monthTick(m.month) + "</div>";
+      }).join("") + "</div>" +
+    "</div></div></div>";
+}
+
+function sparkHtml(r) {
+  var tl = r.timeline, W = 320, H = 70;
+  var top = niceCeil(tl[0].balance) || 1;
+  var co = timelineCoords(tl, W, H, top);
+  return '<div class="spark">' +
+    '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none">' +
+      '<path d="' + linePath(co) + '" fill="none" stroke="var(--ink)" stroke-width="1.6" vector-effect="non-scaling-stroke"/>' +
+    "</svg>" +
+    '<span class="end" style="left:' + (co[co.length - 1][0] / W) * 100 + "%;bottom:" + (1 - co[co.length - 1][1] / H) * 100 + '%"></span>' +
+  "</div>" +
+  '<div class="spark-ax"><span>今天 ¥' + fmt(tl[0].balance) + "</span><span>" + r.payoffDate + " ¥0</span></div>";
+}
+
+render();
+</script>
+</body>
+</html>

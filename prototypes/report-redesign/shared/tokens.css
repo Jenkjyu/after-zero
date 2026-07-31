@@ -1,0 +1,111 @@
+/* ============================================================================
+   基础 token —— 从 www/index.html 的全局 <style> 原样抄出来的真实值，一个都没改。
+   目的：三套原型跟正式 App 站在同一套底色/文字色/阴影上，"看起来不协调"这件事
+   才能归因到设计本身，而不是"原型自己换了一套配色"。
+
+   ⚠️跟正式 App 的唯一区别：这里用 [data-theme] 手动切换，正式 App 是
+   prefers-color-scheme 媒体查询（审计里查过，正式 App 至今没有任何 JS 会设置
+   data-theme，那两块 CSS 是死代码）。原型需要能一键对比明暗，所以把它接上了。
+   ========================================================================== */
+
+:root, [data-theme="light"] {
+  --bg: #E7EAEF; --surface: #FFFFFF; --surface-2: #EFF1F6; --border: #CED2DB;
+  --text: #23272F; --text-muted: #656C7E; --text-faint: #89929C;
+  --accent: #18453B; --accent-soft: #E7F3F1; --accent-mid: #4E9481; --accent-fill: #1E715F;
+  --critical: #BE3A3A; --critical-soft: #F9E8E8; --critical-fill: #BE3A3A;
+  --warning: #A66A0A; --warning-soft: #FAF0D9;
+  --good: #2E5F8A; --good-soft: #E1EBF4;
+  --on-accent: #FFFFFF; --on-good: #FFFFFF; --on-critical: #FFFFFF;
+  --accent-rgb: 24,69,59;
+  --app-grad: linear-gradient(180deg,#E9ECF1,#E2E5EB);
+  --card-grad: linear-gradient(180deg,#FFFFFF,#FAFBFD);
+  --hair: rgba(35,42,55,.08);
+  --graphite-a: #253039; --graphite-b: #151A20;
+  --graphite-text: #FFFFFF; --graphite-dim: #9BA6B4;
+  --e1: 0 1px 2px rgba(24,32,46,.05), 0 4px 10px rgba(24,32,46,.055);
+  --e2: 0 2px 6px rgba(24,32,46,.06), 0 16px 32px rgba(24,32,46,.09);
+  --e3: 0 24px 50px rgba(16,24,38,.28);
+  --glass-hi: rgba(255,255,255,.7);
+  --fs-xs: 11px; --fs-sm: 11.5px; --fs-base: 14px; --fs-lg: 15.5px;
+  --fs-figure: 18px; --fs-xl: 19px; --fs-xxl: 23px;
+  --font-ui: 'Inter var', system-ui, -apple-system, "PingFang SC", "Segoe UI", Roboto, sans-serif;
+  --font-num: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+[data-theme="dark"] {
+  --bg: #0F1319; --surface: #24282F; --surface-2: #2E3239; --border: #3C4047;
+  --text: #E4E8EF; --text-muted: #98A0B0; --text-faint: #6E7787;
+  --accent: #6FBE9E; --accent-soft: #283633; --accent-mid: #2F7B65; --accent-fill: #6FBE9E;
+  --critical: #EE7B7B; --critical-soft: #402F31; --critical-fill: #B04040;
+  --warning: #D69A3C; --warning-soft: #3A3225;
+  --good: #6FA8D6; --good-soft: #29353E;
+  --on-accent: #0E2119; --on-good: #0D1C28; --on-critical: #FFFFFF;
+  --accent-rgb: 111,190,158;
+  --app-grad: linear-gradient(180deg,#12161C,#0C0F14);
+  --card-grad: linear-gradient(180deg,#282D35,#24282F);
+  --hair: rgba(255,255,255,.07);
+  --graphite-a: #333B45; --graphite-b: #161D25;
+  --graphite-text: #F2F5F9; --graphite-dim: #99A4B2;
+  --e1: 0 1px 2px rgba(0,0,0,.35);
+  --e2: 0 4px 18px rgba(0,0,0,.4);
+  --e3: 0 22px 46px rgba(0,0,0,.55);
+  --glass-hi: rgba(255,255,255,.08);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font-family: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+/* 手机框：桌面直接打开时把 390px 宽的内容居中，模拟真机宽度；
+   ≤430px（真机）时自动退化成全屏，不套框。 */
+.phone {
+  width: 390px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--app-grad);
+  position: relative;
+}
+@media (min-width: 431px) {
+  body { background: var(--bg); padding: 0; }
+  .phone { box-shadow: 0 0 0 1px var(--hair), 0 30px 70px rgba(0,0,0,.22); }
+}
+@media (max-width: 430px) {
+  .phone { width: 100%; }
+}
+
+/* 主题切换器：固定在右上角，三套原型共用 */
+.theme-btn {
+  position: fixed; top: 10px; right: 10px; z-index: 99;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-muted); display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--e1);
+}
+.theme-btn svg { width: 17px; height: 17px; }
+.theme-btn .ic-sun { display: none; }
+[data-theme="dark"] .theme-btn .ic-sun { display: block; }
+[data-theme="dark"] .theme-btn .ic-moon { display: none; }
+
+/* 底部 tabbar：原样复刻正式 App 的，让原型的页面比例跟真机一致
+   （统计页在真机上底部永远有 56px 左右被 tabbar 占着，不放会导致
+   "原型上留白刚好、真机上被 tabbar 压住"这种偏差） */
+.tabbar {
+  position: sticky; bottom: 0; background: var(--surface);
+  border-top: 1px solid var(--border); display: flex; z-index: 20;
+}
+.tabbar button {
+  flex: 1; background: none; border: none; color: var(--text-muted);
+  padding: 14px 2px; display: flex; align-items: center; justify-content: center;
+}
+.tabbar button svg { width: 23px; height: 23px; display: block; }
+.tabbar button.on { color: var(--accent); }

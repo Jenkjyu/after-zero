@@ -178,14 +178,6 @@
   .kpi .v { font-size: 17px; font-weight: 650; margin-top: 3px; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
   .kpi .k { font-size: 11px; color: var(--text-muted); }
   .kpi-sub { font-size: 10.5px; color: var(--text-faint); margin-top: 2px; }
-  /* 统计tab hero专用：一行可换行的pill组。"债务"tab的hero-pill是hero-top这个flex行的子元素、
-     天然收缩到内容宽度；统计tab的hero-top右侧被导出菜单占着，pill只能放到金额下面单独一行，
-     而.hero-pill本身没设display(默认block)，直接放会拉成整行宽的圆角框——这个flex容器就是
-     给它一个能收缩到内容宽度的上下文，同时支持放多个pill(口径角标+预计还清日期)。 */
-  .hero-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-  /* 统计tab：在还/已结清笔数降级成的一行小字(原来是2个占满位置的.kpi卡片，跟"债务"tab完全
-     重复；金额/利息/进度/利率的优先级更高，笔数只要能看到就够)。 */
-  .hero-counts { font-size: 11.5px; color: var(--text-muted); margin: -3px 2px 12px; }
   /* 灵动AI入口：对话气泡+魔法棒图标，胶囊描边扫光+呼吸光晕；开通前更克制、不发光。 */
   .ai-banner { position: relative; display: flex; align-items: center; gap: 11px; width: 100%; border: none;
     border-radius: 999px; padding: 12px 16px 12px 12px; background: var(--card-grad); cursor: pointer;
@@ -682,6 +674,10 @@
   @media (prefers-reduced-motion: reduce) { .premium-hero-ic { animation: none; } }
   .premium-hero-title { font-size: 18px; font-weight: 700; }
   .premium-hero-sub { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+  /* "关于我们"顶部App图标——不能直接拿一张矩形PNG贴上去，跟登录门`.gate-icon img`同一套
+     圆角处理（22px/108px的比例，这里图标更小，按比例算成14px），保持全项目图标视觉一致。 */
+  .about-icon { width: 64px; height: 64px; object-fit: cover; border-radius: 14px;
+    border: 1px solid var(--border); display: block; margin: 0 auto 12px; }
 
   .premium-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
   .premium-tab { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2);
@@ -778,7 +774,7 @@
   .ai-hist-head h2 { margin: 0; }
   .ai-hist-new-btn { background: none; border: none; color: var(--accent); font-weight: 700; font-size: 13px; padding: 4px 2px; font-family: inherit; }
 
-  .account-head { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px 0 4px; }
+  .account-head { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px 0 4px; margin-bottom: 18px; }
   .account-avatar-btn { background: none; border: none; padding: 0; border-radius: 50%;
     -webkit-tap-highlight-color: transparent; cursor: pointer; }
   .account-avatar-lg { width: 78px; height: 78px; border-radius: 50%; object-fit: cover; display: block; background: var(--surface-2); }
@@ -834,185 +830,278 @@
     /* 本金/利息：**故意不用同色系两级**。同色两级在浅色下有死结——两者都要 >=3:1 对白底，
        就只能都很深，反而更"闷"，而且对红绿色盲几乎不可分辨。改成绿(本金)/琥珀(利息)：
        色相差 120 度。四项校验全过：相邻 3.10(浅)/3.06(深)、各自对底 >=3、
-       色盲模拟距离 120(浅)/191(深)——原来同色系两级的色盲距离近乎 0。四档各有分工，别互相顶替：--ch-principal/--ch-interest 只给堆叠柱（前者为了跟琥珀
-       拉开 3:1 被压得很深）；--ch-bar 给单系列横条（不受那条堆叠约束，所以取更轻快的中绿，
-       直接拿 --ch-principal 会把横条画得又闷又重）；--ch-line 给走势图（唯一回答
-       "我在变好吗"的图，给最亮一档）。 */
-    --ch-principal: #184E3A; --ch-interest: #B88B3D; --ch-line: #278663; --ch-bar: #2F7D62;
+       色盲模拟距离 120(浅)/191(深)——原来同色系两级的色盲距离近乎 0。这一对**保留不动**，
+       它是唯一有强语义理由(必须互相区分、且已经过完整校验)绑死绿/琥珀两色的图。
+       --ch-mag/--ch-cost/--ch-line **2026-07-31 统计页重做成"债务报告"时定成"一个颜色
+       = 一个角色"的 3 色制**，不是"一张图一个颜色"：--ch-mag 量级（本金段、排行条）·
+       --ch-cost 成本（利息段）· --ch-line 进度（还清走势线）。三色跑 dataviz 的
+       validate_palette.js（--pairs all）浅深两套全部 ALL PASS。
+       ⚠️中间还有一版是 --ch-line 蓝 #2D63C8 / --ch-bar 紫 #7451B8，那一对是**只验了
+       每个颜色单独对底色、没验它俩之间**就定的；补验后 normal ΔE 只有 9.8（硬性下限 15）、
+       protan 3.4——蓝紫在正常视觉下就已经很接近，红绿色盲下基本是同一个颜色。
+       这一版 --ch-bar 整个去掉了（排行条改用 --risk/--calm 的风险二档）。
+       --risk/--calm 是排行条的风险二档（红=年化≥18% / 蓝=其余）：本来想按 App 现有的
+       .tag.rate-hi/mid/lo 做三档（红/琥珀/蓝），验出来红↔琥珀 normal ΔE 只有 12.4、
+       deutan 4.5，**三档在色相上就不成立**，改成二档 + 每行直接写利率数字，颜色不是
+       唯一编码。（这条对 .tag 那三个标签色本身同样适用——它们现在是靠标签上的文字在扛区分。）
+       --pie-1..6 是类型占比甜甜圈的分类色。 */
+    --ch-principal: #184E3A; --ch-interest: #B88B3D;
+    --ch-mag: #2B6CB8; --ch-cost: #C4892F; --ch-line: #068468;
+    --risk: #C42F2F; --calm: #2F639C;
+    --pie-1: #2B6CB8; --pie-2: #C4892F; --pie-3: #068468;
+    --pie-4: #96405D; --pie-5: #634096; --pie-6: #408596;
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) .viz-root {
       --series-1: #72C0A3; --series-2: #729CC0; --series-3: #9172C0; --series-4: #C0728C;
       --series-5: #C0A172; --series-6: #72B0C0; --series-7: #86C072; --series-8: #C072C0;
-      --ch-principal: #9ADAC3; --ch-interest: #8C6C36; --ch-line: #6CD0AC; --ch-bar: #7FCBAE;
+      --ch-principal: #9ADAC3; --ch-interest: #8C6C36;
+      --ch-mag: #5590D8; --ch-cost: #BC8B3C; --ch-line: #43A883;
+      --risk: #DC6767; --calm: #5E96D0;
+      --pie-1: #5590D8; --pie-2: #BC8B3C; --pie-3: #43A883;
+      --pie-4: #C0728C; --pie-5: #9172C0; --pie-6: #72B0C0;
     }
   }
   :root[data-theme="dark"] .viz-root {
     --series-1: #72C0A3; --series-2: #729CC0; --series-3: #9172C0; --series-4: #C0728C;
     --series-5: #C0A172; --series-6: #72B0C0; --series-7: #86C072; --series-8: #C072C0;
-    --ch-principal: #9ADAC3; --ch-interest: #8C6C36; --ch-line: #6CD0AC; --ch-bar: #7FCBAE;
+    --ch-principal: #9ADAC3; --ch-interest: #8C6C36;
+    --ch-mag: #5590D8; --ch-cost: #BC8B3C; --ch-line: #43A883;
+    --risk: #DC6767; --calm: #5E96D0;
+    --pie-1: #5590D8; --pie-2: #BC8B3C; --pie-3: #43A883;
+    --pie-4: #C0728C; --pie-5: #9172C0; --pie-6: #72B0C0;
   }
-  /* 视觉对齐的关键一步——5个viz-block（3个原有+MonthlyChart+ReportTables）套上跟"债务"/
-     "还款日"两个tab一致的卡片质感，之前一直是裸的margin-bottom，没有card外壳。 */
-  /* 图表卡的材质：跟"债务"/"还款日"两个tab的卡片对齐到同一档 elevation（--e2，跟
-     .debt/.pay-row 一致，原来是最轻的 --e1，所以统计页整体看起来比另外两个tab"平"），
-     再补一条顶部内高光——这是让卡片看起来"被打了光"的材质线索，.hero::after 用的是同一招。
-     ⚠️**故意不用磨砂玻璃**（.debt-front 那套 --glass + backdrop-filter），虽然"材质对齐"
-     字面上该抄过来。理由是数据标记需要**稳定可预测的背景**：页面底 --app-grad 是个渐变，
-     玻璃是半透明的，于是同一张图表卡在页面顶部和底部的实际底色不同（实测浅色下
-     #F7F8FA vs #F4F5F7），刚验好的图表对比度会掉到 3:1 以下、而且**随滚动位置漂移**。
-     列表卡片可以用玻璃（它们强调"漂在页面上的可操作物件"），承载数据的容器不行。 */
-  .viz-block { position: relative; margin-bottom: 22px; background: var(--card-grad);
-    border: 1px solid var(--hair); border-radius: 18px; padding: 14px 16px; box-shadow: var(--e2); }
-  .viz-block::after { content: ""; position: absolute; inset: 0; border-radius: inherit;
-    pointer-events: none; box-shadow: inset 0 1px 0 var(--glass-hi); }
-  .viz-title { font-size: 13.5px; font-weight: 700; margin-bottom: 10px; }
-  .viz-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px;
-    cursor: pointer; border-radius: 9px; padding: 2px 6px; margin-left: -6px; margin-right: -6px;
-    transition: background .15s ease; -webkit-tap-highlight-color: transparent; }
-  .viz-bar-row.active { background: var(--surface-2); }
-  .viz-bar-row.active .viz-bar-fill { filter: brightness(1.15); }
-  .viz-bar-name { width: 84px; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
-  .viz-bar-track { flex: 1; background: var(--surface-2); border-radius: 5px; height: 16px; position: relative; overflow: hidden; }
-  .viz-bar-fill { height: 100%; background: var(--ch-bar); border-radius: 5px; transition: filter .15s ease; }
-  .viz-bar-val { width: 74px; flex: none; text-align: right; font-family: var(--font-num); font-weight: 600; }
-  .viz-stack { display: flex; height: 26px; border-radius: 7px; overflow: hidden; margin-bottom: 10px; }
-  .viz-stack-seg { height: 100%; cursor: pointer; transition: opacity .15s ease; }
-  .viz-stack-seg.dim { opacity: .35; }
-  .viz-legend { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-bottom: 4px; }
-  .viz-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text);
-    cursor: pointer; border-radius: 7px; padding: 2px 6px; margin: -2px -6px; transition: background .15s ease;
-    -webkit-tap-highlight-color: transparent; }
-  .viz-legend-item.active { background: var(--surface-2); font-weight: 700; }
-  /* 图表右上角的小切换器（BalanceBars按余额/利率/剩余利息排序）。P1删MonthlyChart时
-     连同它的图标版一起删过，这里是文字版。 */
-  .viz-mode-toggle { display: flex; gap: 2px; background: var(--surface-2); border-radius: 9px; padding: 2px; }
-  .viz-mode-btn { background: none; border: none; padding: 3px 8px; border-radius: 7px;
-    color: var(--text-muted); font-size: 11px; font-weight: 600;
-    -webkit-tap-highlight-color: transparent; }
-  .viz-mode-btn.active { background: var(--card-grad); color: var(--accent); box-shadow: var(--e1); }
-  /* "预测"这类口径角标——提醒读者这条线不是历史记录 */
-  .viz-tag { font-size: 10px; font-weight: 600; color: var(--text-muted);
-    border: 1px solid var(--hair); border-radius: 999px; padding: 2px 8px; flex: none; }
-  /* 底部统计总结卡的行 */
-  .sumcard-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
-    font-size: 12.5px; padding: 7px 2px; border-bottom: 1px solid var(--hair); }
-  .sumcard-row:last-of-type { border-bottom: none; }
-  .sumcard-row .k { color: var(--text-muted); flex: none; }
-  .sumcard-row .v { color: var(--text); font-weight: 600; text-align: right; }
-  .sumcard-row .v.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
-  .sumcard-rate { margin-left: 6px; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
-  .sumcard-rate.rate-hi { color: var(--critical); }
-  .sumcard-rate.rate-mid { color: var(--warning); }
-  .sumcard-rate.rate-lo { color: var(--good); }
-  .viz-legend-amt { font-family: var(--font-num); font-variant-numeric: tabular-nums;
-    font-weight: 600; color: var(--text-muted); margin-left: 2px; }
-  .viz-legend-swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
-  .viz-line-svg { width: 100%; height: auto; display: block; }
-  /* MonthlyChart.tsx/PayoffLine.tsx共用的"精确值展示行"——chartScrub.ts拖动/点击查看曲线
-     任意一点时更新的文字条，取代了原来画在SVG里的静态<text>标签。 */
-  .viz-scrub-readout { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;
-    font-family: var(--font-num); }
-  /* MonthlyChart.tsx"月还款统计"图——柱状/折线切换按钮组+双段堆叠柱。故意不复用
-     --series-1..8(那套色板在同一.viz-root作用域内已经承担"债务对比/类型占比"两张图的身份
-     区分语义，这张图的两段颜色表达的是"同一笔钱两个阶段"，混用会违反颜色单一语义原则)，
-     改用--accent/--accent-soft这套PayoffLine已经在用、验证过对比度的现有配色。 */
-  .viz-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .viz-title-row .viz-title { margin-bottom: 0; }
-  /* ===== 未来12个月还款压力柱状图 (PressureChart.tsx) =====
-     规格逐条对照 dataviz skill：2px surface gap 分隔堆叠段/相邻柱(不画描边)、柱子≤24px粗、
-     顶端4px圆角底端方角、网格线1px实线(不用虚线)、文字一律text token不穿series色。
-     --accent-mid 是跑 validate_palette.js 验出来的第二级绿(对底色≥3:1，跟--accent的
-     normal-vision ΔE≥21)，不是随手挑的——原来的--accent-soft对白底只有1.14:1，等于隐形。 */
-  .pchart-legend { display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); }
-  .pchart-legend span { display: flex; align-items: center; gap: 5px; }
-  .pchart-legend .sw { width: 9px; height: 9px; border-radius: 2px; flex: none; }
-  .pchart-legend .sw.principal { background: var(--ch-principal); }
-  .pchart-legend .sw.interest { background: var(--ch-interest); }
-  .pchart-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-bottom: 12px; }
-  .pchart-stats .k { font-size: 11px; color: var(--text-muted); }
-  .pchart-stats .v { font-size: 14.5px; font-weight: 650; font-family: var(--font-num);
-    font-variant-numeric: tabular-nums; margin-top: 1px; }
-  .pchart-overdue { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
-    color: var(--critical); background: var(--critical-soft); border-radius: 10px;
-    padding: 7px 10px; margin-bottom: 10px; }
-  .pchart-overdue svg { width: 14px; height: 14px; flex: none; }
-  .pchart-overdue .sub { margin-left: auto; font-weight: 500; font-size: 10.5px; opacity: .8; }
-  .viz-scrub-readout .dim { color: var(--text-faint); font-weight: 500; }
-  /* 容器高度含x轴band，不用固定高度把轴标签挤掉 */
-  .pchart { margin-top: 2px; }
-  /* 两张图共用的坐标轴外壳：左侧34px刻度槽 + 相对定位的绘图区 + 下方x轴band。
-     PressureChart(柱状)和PayoffLine(折线)都套这一层，保证两张图的轴对齐、观感一致。 */
-  .chart-plot { position: relative; height: 108px; padding-left: 34px; }
-  /* 真正的绘图区：把34px刻度槽排除掉，SVG和覆盖其上的圆点共用这一个坐标系
-     （绝对定位子元素的百分比是相对含padding的整宽算的，直接挂在.chart-plot下会左偏34px） */
-  .chart-area { position: absolute; left: 34px; right: 0; top: 0; bottom: 0; }
-  .chart-area .viz-line-svg { width: 100%; height: 100%; }
-  /* 折线的端点/scrub点用HTML圆点：SVG用了preserveAspectRatio="none"做非等比拉伸，
-     里面的<circle>会被拉成椭圆，路径不受影响但圆会。 */
-  .chart-dot { position: absolute; width: 7px; height: 7px; border-radius: 50%;
-    background: var(--ch-line); transform: translate(-50%, 50%); pointer-events: none;
-    box-shadow: 0 0 0 2px var(--surface); }
-  .chart-dot.active { width: 9px; height: 9px; }
-  .chart-gridline { position: absolute; left: 34px; right: 0; height: 0;
-    border-top: 1px solid var(--hair); pointer-events: none; }
-  .chart-gridline span { position: absolute; right: 100%; top: -6px; padding-right: 6px;
-    font-size: 9.5px; color: var(--text-faint); font-family: var(--font-num);
-    font-variant-numeric: tabular-nums; white-space: nowrap; }
-  /* 压力图专属的"横向滚动"外壳(PayoffLine不用这套，它继续用.chart-plot/.chart-area)：
-     .pchart-viewport 负责34px刻度槽；.pchart-grid 是**不滚动**的刻度线层(横滑时刻度是
-     不动的参照系)；.pchart-scroll 是唯一的滚动容器，柱子和x轴标签一起放在它里面的
-     .pchart-track 上，保证滑动时两者永远对齐。 */
-  .pchart-viewport { position: relative; padding-left: 34px; }
-  .pchart-grid { position: absolute; left: 34px; right: 0; top: 0; height: 108px; pointer-events: none; }
-  .pchart-grid .chart-gridline { left: 0; right: 0; }
-  .pchart-scroll { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
-    scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-  .pchart-scroll::-webkit-scrollbar { display: none; }
-  /* width:100%+min-width：月份少、容器装得下时铺满宽度(不缩成左边一小撮)，装不下才溢出滚动。
-     min-width由组件按月份数×每根柱子的宽度内联算出。 */
-  .pchart-track { width: 100%; }
-  .pchart-track .chart-xaxis { padding-left: 0; }
-  .pchart-bars { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 108px; }
-  /* 柱子是<button>(点击读数)，要清掉按钮的默认外观 */
-  .pchart-col { position: relative; flex: 1; min-width: 0; height: 100%;
-    padding: 0; border: none; background: none; font-family: inherit;
-    display: flex; align-items: flex-end; -webkit-tap-highlight-color: transparent; }
-  .pchart-stack { width: 100%; max-width: 24px; margin: 0 auto; height: 100%;
-    display: flex; flex-direction: column-reverse; gap: 2px; }
-  .pchart-stack .seg { width: 100%; flex: none; }
-  .pchart-stack .seg.principal { background: var(--ch-principal); }
-  .pchart-stack .seg.interest { background: var(--ch-interest); border-radius: 4px 4px 0 0; }
-  /* 利息为0时圆角要落到本金那一段头上(顶端始终圆角、底端始终方角贴基线) */
-  .pchart-stack .seg.interest.zero { display: none; }
-  .pchart-stack .seg.interest.zero + .seg.principal,
-  .pchart-stack .seg.interest.zero ~ .seg.principal { border-radius: 4px 4px 0 0; }
-  .pchart-col.active .seg { filter: brightness(1.12); }
-  .pchart-col.is-current .pchart-stack { box-shadow: 0 2px 0 0 var(--accent); }
-  /* 跨年分隔：1月那根柱子左侧一条竖线（x轴标签只写月份数字，年份靠这条线区分） */
-  .pchart-col.year-break::before { content: ""; position: absolute; left: -2px; top: 0; bottom: -4px;
-    width: 1px; background: var(--hair); }
-  .pchart-peak { position: absolute; left: 50%; top: -1px; transform: translateX(-50%);
+  /* ===========================================================================
+     统计页 —— 2026-07-31 从"看板"重做成"债务报告"（react/src/report/）。
+     ---------------------------------------------------------------------------
+     旧版那套（.viz-block 卡片 / .viz-bar-* 横条 / .viz-stack 堆叠条 / .viz-legend
+     色块图例 / .viz-mode-toggle 文字切换器 / .sumcard-* 总结行 / .pchart-* 柱状图 /
+     .chart-plot 坐标轴外壳 / .report-hero-menu ⋮ 菜单）整块删除——这些类在 React 侧
+     已经零引用（改版时逐个 grep 确认过），留着就是死代码。
+     =========================================================================== */
+
+  /* ---------- 报告头 ---------- */
+  .rpt-head { padding: 6px 0 18px; }
+  .rpt-kicker { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--text-faint); }
+  .rpt-title { font-size: 25px; font-weight: 700; line-height: 1.3; margin: 8px 0 0; letter-spacing: -.01em; }
+  .rpt-title em { font-style: normal; color: var(--ch-line); }
+  .rpt-lede { font-size: 13.5px; line-height: 1.75; color: var(--text-muted); margin: 10px 0 0; }
+  .rpt-lede b { color: var(--text); font-weight: 700; font-family: var(--font-num); }
+  .rpt-foot { font-size: 11px; color: var(--text-faint); line-height: 1.6; margin-top: 16px; }
+  /* 计算口径说明展开后的正文。⚠️不复用全局 .footnote：这一页里走势图的免责说明
+     也是 .footnote，两者共用类名会让"按类名找口径说明"抓到错的那个。 */
+  .rpt-note { font-size: 11.5px; color: var(--text-muted); line-height: 1.7;
+    text-align: left; margin: -2px 2px 8px; }
+  .rpt-note b { color: var(--text); }
+
+  /* ---------- 语义段落：靠留白和一条发丝线分段，不是每段一张卡 ---------- */
+  .sec { padding: 20px 0; border-top: 1px solid var(--hair); }
+  .sec-q { font-size: 11.5px; font-weight: 600; color: var(--text-faint); letter-spacing: .04em; }
+  .sec-a { font-size: 17px; font-weight: 700; line-height: 1.45; margin: 5px 0 0; letter-spacing: -.005em; }
+  .sec-a .n { font-family: var(--font-num); }
+  .sec-note { font-size: 12.5px; line-height: 1.7; color: var(--text-muted); margin-top: 8px; }
+  .sec-note b { color: var(--text); font-family: var(--font-num); font-weight: 700; }
+
+  /* ---------- 结论列表 ---------- */
+  .finding { display: flex; gap: 11px; padding: 11px 0; border-bottom: 1px solid var(--hair); }
+  .finding:last-child { border-bottom: none; }
+  .finding-ic { width: 30px; height: 30px; border-radius: 9px; flex: none; display: flex; align-items: center; justify-content: center; }
+  .finding-ic svg { width: 16px; height: 16px; }
+  .finding-ic.risk { background: var(--critical-soft); color: var(--critical); }
+  .finding-ic.warn { background: var(--warning-soft); color: var(--warning); }
+  .finding-ic.info { background: var(--good-soft); color: var(--good); }
+  .finding-ic.good { background: var(--accent-soft); color: var(--accent); }
+  .finding-t { font-size: 13.5px; font-weight: 700; line-height: 1.4; }
+  .finding-s { font-size: 12px; color: var(--text-muted); margin-top: 3px; line-height: 1.6; }
+  .finding-s b { color: var(--text); font-family: var(--font-num); font-weight: 700; }
+
+  /* ---------- "最该先动手"展开块：底色跟着那条结论自己的 tone 走 ---------- */
+  .act-box { border-radius: 14px; padding: 14px 15px; margin-top: 12px; }
+  .act-box.risk { background: var(--critical-soft); }
+  .act-box.warn { background: var(--warning-soft); }
+  .act-box.info { background: var(--good-soft); }
+  .act-box.good { background: var(--accent-soft); }
+  .act-top { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; }
+  .act-box.risk .act-top { color: var(--critical); }
+  .act-box.warn .act-top { color: var(--warning); }
+  .act-box.info .act-top { color: var(--good); }
+  .act-box.good .act-top { color: var(--accent); }
+  .act-top svg { width: 15px; height: 15px; flex: none; }
+  .act-body { font-size: 12.5px; line-height: 1.7; color: var(--text); margin-top: 7px; opacity: .85; }
+  .act-body b { font-family: var(--font-num); font-weight: 700; }
+  .act-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .act-item { display: flex; align-items: baseline; gap: 8px; font-size: 12px; }
+  .act-item .nm { flex: none; width: 52px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .act-item .track { flex: 1; height: 6px; border-radius: 999px; background: rgba(0,0,0,.10); overflow: hidden; }
+  [data-theme="dark"] .act-item .track,
+  :root:where(:not([data-theme="light"])) .act-item .track { background: rgba(255,255,255,.12); }
+  /* ⚠️display:block 不能省。.fill 是个 <span>，默认 display:inline，而 **inline 元素会
+     静默忽略 width/height**——内联样式 width:100%/68.9%/… 全都算对了却完全不生效，
+     实测填充的 getBoundingClientRect() 宽高都是 0，界面上只剩空的灰色底槽，
+     条形长度差异和颜色一起消失。.track 有 flex:1 被 flex 容器 blockify 了所以尺寸正常，
+     .fill 在它里面没人 blockify，必须自己声明。 */
+  .act-item .fill { display: block; height: 100%; border-radius: 999px; }
+  .act-item .rt { font-family: var(--font-num); font-weight: 700; width: 62px; text-align: right; }
+  .act-box.risk .act-item .fill { background: var(--risk); }
+  .act-box.warn .act-item .fill { background: var(--warning); }
+  .act-box.info .act-item .fill { background: var(--good); }
+  .act-box.good .act-item .fill { background: var(--accent); }
+  .act-box.risk .act-item .rt { color: var(--critical); }
+  .act-box.warn .act-item .rt { color: var(--warning); }
+  .act-box.info .act-item .rt { color: var(--good); }
+  .act-box.good .act-item .rt { color: var(--accent); }
+  /* 被截断掉的那几笔的合计，右对齐到跟金额列同一条线上 */
+  .act-rest { font-size: 11px; color: var(--text); opacity: .6; text-align: right; margin-top: 8px; font-family: var(--font-num); }
+
+  /* ---------- 图容器：不透明，不用毛玻璃（数据标记需要稳定可预测的背景，
+       页面底 --app-grad 是渐变，玻璃会让对比度随滚动位置漂移） ---------- */
+  .plot-box { background: var(--card-grad); border: 1px solid var(--hair); border-radius: 14px;
+    padding: 14px 14px 12px; margin-top: 14px; box-shadow: var(--e1); }
+
+  /* ---------- 还清进度：里程碑标在图上 + 拖动读数（Journey.tsx） ---------- */
+  .jread { font-size: 12px; font-weight: 600; color: var(--text-muted); font-family: var(--font-num);
+    margin-bottom: 6px; min-height: 17px; }
+  .jread .dim { color: var(--text-faint); font-weight: 500; font-family: var(--font-ui); }
+  .jchart { position: relative; touch-action: pan-y; }
+  .jchart .jsvg { position: absolute; left: 0; right: 0; width: 100%; display: block; }
+  .jdot { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: var(--ch-line);
+    box-shadow: 0 0 0 3px var(--surface); transform: translate(-50%, -50%); z-index: 2; }
+  .jlab { position: absolute; z-index: 3; line-height: 1.35; white-space: nowrap; transition: opacity .12s; }
+  .jlab .t { font-size: 11px; font-weight: 700; }
+  .jlab .d { font-size: 9.5px; color: var(--text-faint); font-family: var(--font-num); }
+  .jlab .a { font-size: 12px; font-weight: 700; font-family: var(--font-num); margin-top: 1px; }
+  .jlab.now .t, .jlab.now .a { color: var(--ch-line); }
+  .jlead { position: absolute; width: 1px; background: var(--hair); z-index: 1; transition: opacity .12s; }
+  /* 拖动时把里程碑淡下去，只留游标——两套标签同时亮着会互相打架 */
+  .jchart.scrubbing .jlab, .jchart.scrubbing .jlead, .jchart.scrubbing .jdot { opacity: .18; }
+  .jcursor { position: absolute; width: 1px; background: var(--ch-line); opacity: .5;
+    transform: translateX(-50%); pointer-events: none; z-index: 4; }
+  .jcursor-dot { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: var(--ch-line);
+    box-shadow: 0 0 0 3px var(--surface); transform: translate(-50%, -50%); pointer-events: none; z-index: 5; }
+
+  /* ---------- 未来压力：面积 / 柱状两种模式（Pressure.tsx） ---------- */
+  .pmode { display: flex; gap: 2px; background: var(--surface-2); border-radius: 9px; padding: 2px; flex: none; }
+  .pmode button { background: none; border: none; padding: 3px 9px; border-radius: 7px;
+    color: var(--text-muted); font-size: 11px; font-weight: 600; }
+  .pmode button.on { background: var(--card-grad); color: var(--text); box-shadow: var(--e1); }
+  .psec-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .pread { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; min-height: 17px; }
+  .pread .dim { color: var(--text-faint); font-weight: 500; }
+  /* ⚠️两种模式共用的画布外壳。这 18px 上边距是给"峰值"标注留的头顶空间，**两种模式
+     必须都有**——只给一种加的话，切过去卡片会整体拉长、刻度线跟着跳。
+     ⚠️也不能直接给 .achart/.pbars 加 padding：.achart 里有绝对定位的游标竖线和圆点，
+     它们的 inset/bottom 百分比是相对 **padding box** 算的，一加 padding 整套坐标就偏。
+     ⚠️头顶空间本身不能省：外层 .ascroll 有 overflow-x:auto，而 **overflow-x 一旦不是
+     visible，overflow-y 也会被强制成非 visible**，伸到容器外的标注会被整个裁掉。 */
+  .pcanvas { padding-top: 18px; }
+  .awrap { position: relative; padding-left: 32px; margin-top: 4px; }
+  /* top 跟 .pcanvas 的 padding-top 是同一个数，改一个必须改另一个 */
+  .agrid { position: absolute; left: 32px; right: 0; top: 18px; height: 104px; pointer-events: none; z-index: 1; }
+  .gridline { position: absolute; left: 0; right: 0; border-top: 1px solid var(--hair); }
+  .gridline span { position: absolute; right: 100%; top: -6px; padding-right: 5px; font-size: 9.5px;
+    color: var(--text-faint); font-family: var(--font-num); }
+  .ascroll { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .ascroll::-webkit-scrollbar { display: none; }
+  .atrack { width: 100%; }
+  .achart { position: relative; height: 104px; }
+  .achart svg { width: 100%; height: 100%; display: block; }
+  /* 命中区：面积模式没有"这根柱子"这种可点元素，用等分的透明按钮铺满。
+     ⚠️必须跟 SVG 采样点对齐——SVG 的 viewBox 宽度取月份数、第 i 个点画在 x=i+0.5，
+     正好落在这些 flex 等分格子的中心。 */
+  .ahit { position: absolute; inset: 0; display: flex; z-index: 3; }
+  .ahit button { flex: 1; min-width: 0; background: none; border: none; padding: 0; height: 100%; }
+  .amark { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--text-faint);
+    opacity: .45; transform: translateX(-50%); pointer-events: none; z-index: 2; }
+  .adot { position: absolute; width: 7px; height: 7px; border-radius: 50%;
+    transform: translate(-50%, 50%); pointer-events: none; z-index: 2; box-shadow: 0 0 0 2px var(--surface); }
+  .adot.total { background: var(--ch-cost); }
+  .adot.prin { background: var(--ch-mag); }
+  /* 面积模式的峰值标注：柱状那个靠 .pcol.peak::after 挂在"那根柱子"上，面积图没有
+     对应的 DOM，按峰值点坐标单独定位，下面接一个朝下的小三角指回顶点。 */
+  .apeak { position: absolute; transform: translateX(-50%); margin-bottom: 6px;
+    font-size: 9px; font-weight: 700; color: var(--critical); white-space: nowrap;
+    pointer-events: none; z-index: 2; line-height: 1.2; }
+  .apeak::after { content: ""; position: absolute; left: 50%; bottom: -5px; transform: translateX(-50%);
     width: 0; height: 0; border-left: 3.5px solid transparent; border-right: 3.5px solid transparent;
-    border-top: 4px solid var(--text-faint); }
-  .chart-xaxis { display: flex; gap: 2px; padding-left: 34px; margin-top: 5px; }
-  .chart-xaxis-spread { justify-content: space-between; font-size: 9.5px; color: var(--text-faint); }
-  .chart-xtick { flex: 1; min-width: 0; text-align: center; font-size: 9.5px;
-    color: var(--text-faint); white-space: nowrap; }
-  .chart-xtick.active { color: var(--text-muted); font-weight: 700; }
-  .pchart-breakdown { margin-top: 12px; border-top: 1px solid var(--hair); padding-top: 10px; }
-  .pchart-bd-row { display: flex; justify-content: space-between; align-items: baseline;
-    font-size: 12px; color: var(--text); padding: 3px 2px; }
-  .pchart-bd-row .num { font-family: var(--font-num); font-variant-numeric: tabular-nums;
-    font-weight: 600; }
-  .report-actions { display: flex; gap: 8px; margin: 4px 0 20px; }
-  /* 统计tab hero卡右上角"⋮"导出菜单触发器(report/ExportMenu.tsx)——照抄.pay-hero-bell的
-     图标按钮定位模式，配色改用hero卡自己的石墨token(不是.pay-hero用的--accent/--text-muted，
-     那套是给彩色状态底的hero卡配的，这里的hero常年是石墨底)。 */
-  .report-hero-menu { background: none; border: none; padding: 4px; margin: -4px; border-radius: 8px;
-    color: var(--graphite-dim); display: flex; -webkit-tap-highlight-color: transparent; }
-  .report-hero-menu svg { width: 19px; height: 19px; }
-  .report-hero-menu.on { color: var(--graphite-text); background: rgba(255,255,255,.12); }
+    border-top: 4px solid var(--critical); }
+  /* 选中的正好是峰值月时，标注让位给读数竖线+圆点 */
+  .apeak.dim { opacity: .3; }
+  .pbars { display: flex; align-items: flex-end; gap: 2px; height: 104px; }
+  .pcol { flex: 1; min-width: 0; height: 100%; display: flex; align-items: flex-end;
+    background: none; border: none; padding: 0; position: relative; }
+  .pstack { width: 100%; max-width: 22px; margin: 0 auto; height: 100%; display: flex; flex-direction: column-reverse; gap: 2px; }
+  .pstack .seg { width: 100%; }
+  .pstack .seg.p { background: var(--ch-mag); }
+  .pstack .seg.i { background: var(--ch-cost); border-radius: 3px 3px 0 0; }
+  .pstack .seg.i.zero { display: none; }
+  .pstack .seg.i.zero ~ .seg.p { border-radius: 3px 3px 0 0; }
+  .pcol.peak::after { content: "峰值"; position: absolute; left: 50%; top: -14px; transform: translateX(-50%);
+    font-size: 9px; font-weight: 700; color: var(--critical); white-space: nowrap; }
+  .pcol.dimmed .pstack { opacity: .42; }
+  .pcol.active .pstack { filter: brightness(1.14); }
+  .axaxis { display: flex; margin-top: 5px; }
+  .axtick { flex: 1; min-width: 0; text-align: center; font-size: 9.5px; color: var(--text-faint); }
+  .axtick.on { color: var(--text); font-weight: 700; }
+  .legend-inline { display: flex; gap: 14px; margin-top: 10px; font-size: 11px; color: var(--text-muted); }
+  .legend-inline span { display: flex; align-items: center; gap: 5px; }
+  .legend-inline i { width: 8px; height: 8px; border-radius: 2px; }
+  .abd { margin-top: 12px; border-top: 1px solid var(--hair); padding-top: 10px; }
+  .abd-l { font-size: 11px; color: var(--text-muted); margin: 0 2px 6px; }
+  .abd-r { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; padding: 3px 2px; }
+  .abd-r .num { font-weight: 600; }
+
+  /* ---------- 排行（Rank.tsx） ---------- */
+  .rank-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--hair); }
+  .rank-row:last-child { border-bottom: none; }
+  .rank-no { width: 17px; font-size: 12px; font-weight: 700; color: var(--text-faint); font-family: var(--font-num); flex: none; }
+  .rank-main { flex: 1; min-width: 0; }
+  .rank-nm { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .rank-tag { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; }
+  .rank-tag.hi { background: var(--critical-soft); color: var(--critical); }
+  .rank-bar { height: 5px; border-radius: 999px; background: var(--surface-2); margin-top: 6px; overflow: hidden; }
+  .rank-bar i { display: block; height: 100%; border-radius: 999px; }
+  .rank-amt { text-align: right; flex: none; }
+  .rank-amt .a { font-size: 13px; font-weight: 700; font-family: var(--font-num); }
+  .rank-amt .r { font-size: 10.5px; color: var(--text-muted); font-family: var(--font-num); margin-top: 2px; }
+  /* ⚠️用 --accent 不用 --calm。--calm 在这一页是**数据色**（排行条里"非高息债务"就是它），
+     同一个颜色既当数据编码又当交互控件色，会让人以为这个按钮跟"蓝色那批债务"有关。
+     全 App 的"展开更多"只有一种视觉语言，跟 .note-toggle（"计算口径说明"）统一。 */
+  .more-btn { background: none; border: none; color: var(--accent); font-size: 12px; font-weight: 600;
+    padding: 10px 0 0; display: flex; align-items: center; gap: 4px; font-family: inherit; }
+  .more-btn svg { width: 12px; height: 12px; transition: transform .15s; }
+  .more-btn.open svg { transform: rotate(180deg); }
+
+  /* ---------- 可旋转甜甜圈（TypePie.tsx） ----------
+     ⚠️标签**贴容器左右边缘 + 折线引线**，不是沿半径方向直着往外放。后者在扇区转到
+     正左/正右时水平空间只剩 60 多 px，"信用卡分期 27% ¥16,208"放不下，半径只能压到 62。
+     贴边缘之后水平空间跟角度无关，半径能给到 76。 */
+  .pie-wrap { position: relative; touch-action: none; user-select: none; }
+  .pie-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  /* ⚠️SVG 的 fill/stroke **不接受 CSS 渐变值**。这两处不能写 var(--card-grad)
+     （那是个 linear-gradient(...)），浏览器解析不了会回退到默认黑色——浅色模式下
+     中心孔和扇区描边全黑。必须给纯色。 */
+  .pie-slice { stroke: var(--surface); stroke-width: 2; }
+  .pie-hub { fill: var(--surface); }
+  /* 引线不能用 --hair（深色下 1px 线在卡片底上等于隐形），用 --border */
+  .pie-lead { fill: none; stroke: var(--border); stroke-width: 1; }
+  .pie-lab { position: absolute; pointer-events: none; line-height: 1.32; white-space: nowrap; }
+  .pie-lab .n { font-size: 11.5px; font-weight: 700; display: flex; align-items: center; gap: 5px; }
+  .pie-lab.r .n { flex-direction: row-reverse; }
+  .pie-lab .n i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+  /* ⚠️字号和"去掉 · 分隔符"是算过宽度才定的：饼半径能做多大卡在
+     "R + gap + 标签最宽宽度 ≤ 容器宽/2"，实测标签最宽 70.5px、容器半边 163px → R=76。 */
+  .pie-lab .v { font-size: 10.5px; color: var(--text-muted); font-family: var(--font-num); margin-top: 1px; }
+  .pie-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); text-align: center; pointer-events: none; }
+  .pie-center .k { font-size: 9.5px; color: var(--text-faint); line-height: 1.2; }
+  .pie-center .v { font-size: 16px; font-weight: 700; font-family: var(--font-num); letter-spacing: -.02em; line-height: 1.3; }
+  .pie-hint { font-size: 10.5px; color: var(--text-faint); text-align: center; margin-top: 2px; }
+
+  /* ---------- 页尾结语（Outro.tsx） ---------- */
+  .outro { background: var(--surface-2); border-radius: 14px; padding: 15px 16px; margin-top: 20px; }
+  .outro-t { font-size: 13px; font-weight: 700; }
+  .outro-b { font-size: 12.5px; line-height: 1.75; color: var(--text-muted); margin-top: 6px; }
+  .outro-b b { color: var(--text); font-family: var(--font-num); font-weight: 700; }
+  .outro-act { display: flex; gap: 8px; margin-top: 13px; }
 
   /* 共享锚定浮层(react/src/shared/Popover.tsx)——"?"说明弹窗(InfoTip)和"⋮"导出菜单
      (report/ExportMenu.tsx)共用。popover-root给触发器元素做定位锚点；popover-panel用
