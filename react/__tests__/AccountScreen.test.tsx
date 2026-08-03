@@ -61,15 +61,54 @@ describe("AccountScreen", () => {
     expect(hook.result.current).toBe(false);
   });
 
-  it("注销账户：确认后调用桥接deleteAccount并关闭screen", async () => {
+  it("注销账户：确认后调用桥接deleteAccount并关闭screen，弹窗带第三个「重置本地数据」选项", async () => {
     window.__azBridge = makeMockBridge({ account });
     const hook = renderHook(() => useAccountScreenOpen());
     render(<AccountScreen />);
     act(() => { openAccountScreen(); });
     await act(async () => { fireEvent.click(screen.getByText("注销账户")); });
-    expect(window.__azBridge.confirmAsync).toHaveBeenCalledWith("注销账户", expect.stringContaining("不可撤销"));
+    expect(window.__azBridge.confirmAsync).toHaveBeenCalledWith(
+      "注销账户",
+      expect.stringContaining("不可撤销"),
+      expect.objectContaining({ thirdLabel: "重置本地数据" })
+    );
     expect(window.__azBridge.deleteAccount).toHaveBeenCalledTimes(1);
+    expect(window.__azBridge.resetLocalData).not.toHaveBeenCalled();
     expect(hook.result.current).toBe(false);
+  });
+
+  it("注销账户：选「重置本地数据」后二次确认同意，才调用resetLocalData，不调用deleteAccount、不关闭screen", async () => {
+    const bridge = makeMockBridge({ account });
+    const confirmAsync = vi.fn()
+      .mockResolvedValueOnce("third") // 第一层：选"仅重置本地数据"
+      .mockResolvedValueOnce(true);   // 第二层：二次确认同意
+    bridge.confirmAsync = confirmAsync;
+    window.__azBridge = bridge;
+    const hook = renderHook(() => useAccountScreenOpen());
+    render(<AccountScreen />);
+    act(() => { openAccountScreen(); });
+    await act(async () => { fireEvent.click(screen.getByText("注销账户")); });
+    expect(confirmAsync).toHaveBeenCalledTimes(2);
+    expect(confirmAsync.mock.calls[1][0]).toBe("确定重置本地数据？");
+    expect(window.__azBridge.resetLocalData).toHaveBeenCalledTimes(1);
+    expect(window.__azBridge.deleteAccount).not.toHaveBeenCalled();
+    // resetLocalData内部会reload页面，React这边不需要、也没有主动关闭screen
+    expect(hook.result.current).toBe(true);
+  });
+
+  it("注销账户：选「重置本地数据」但二次确认取消，不调用resetLocalData", async () => {
+    const bridge = makeMockBridge({ account });
+    bridge.confirmAsync = vi.fn()
+      .mockResolvedValueOnce("third")
+      .mockResolvedValueOnce(false); // 第二层：二次确认取消
+    window.__azBridge = bridge;
+    const hook = renderHook(() => useAccountScreenOpen());
+    render(<AccountScreen />);
+    act(() => { openAccountScreen(); });
+    await act(async () => { fireEvent.click(screen.getByText("注销账户")); });
+    expect(window.__azBridge.resetLocalData).not.toHaveBeenCalled();
+    expect(window.__azBridge.deleteAccount).not.toHaveBeenCalled();
+    expect(hook.result.current).toBe(true);
   });
 
   it("注销账户：取消确认后不调用deleteAccount、不关闭screen", async () => {

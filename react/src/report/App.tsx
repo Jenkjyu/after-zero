@@ -67,10 +67,13 @@ export function App() {
           <p className="rpt-lede">
             {s.settled > 0
               ? <>已经结清 <b>{s.settled}</b> 笔，累计还掉本金 <b>¥{window.fmt(s.paidPrincipal)}</b>、另付利息 <b>¥{window.fmt(s.paidInterest)}</b>。</>
-              : <>还没有记录任何债务。到"债务"页新增一笔之后，这里会生成一份完整的分析报告。</>}
+              : <>还没有记录任何债务。到"首页"新增一笔之后，这里会生成一份完整的分析报告。</>}
           </p>
         </div>
-        <Outro lead={null} premium={premium} />
+        {/* 从没记过债务时整个结语块（"如果只做一件事"+导出+口径说明）都不成立——
+            没有数据可导出，也没有"保持节奏"这回事，直接不渲染。已结清历史（s.settled>0）
+            则保留结语块，只去掉不成立的那一句判断文案，导出/口径说明依然有意义。 */}
+        {s.settled > 0 && <Outro lead={null} premium={premium} showLead={false} />}
       </div>
     );
   }

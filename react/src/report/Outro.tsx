@@ -16,18 +16,26 @@ import { ExportMenu } from "./ExportMenu";
 export interface OutroProps {
   lead: Finding | null;
   premium: Premium;
+  // 没有在还债务、只有历史结清记录时（App.tsx 的 `s.settled > 0` 分支），"如果只做
+  // 一件事"这句判断性文案不成立——没有"现在的节奏"可保持。这种情况下导出按钮/计算
+  // 口径说明依然有意义（导出的是已结清历史），只隐藏这一句，不隐藏整个 Outro。
+  showLead?: boolean;
 }
 
-export function Outro({ lead, premium }: OutroProps) {
+export function Outro({ lead, premium, showLead = true }: OutroProps) {
   const [noteOpen, setNoteOpen] = useState(false);
 
   return (
     <>
       <div className="outro">
-        <div className="outro-t">如果只做一件事</div>
-        <div className="outro-b">
-          {lead && lead.actionTitle ? <>{lead.actionTitle}。</> : "保持现在的还款节奏。"}
-        </div>
+        {showLead && (
+          <>
+            <div className="outro-t">如果只做一件事</div>
+            <div className="outro-b">
+              {lead && lead.actionTitle ? <>{lead.actionTitle}。</> : "保持现在的还款节奏。"}
+            </div>
+          </>
+        )}
         <div className="outro-act">
           <ExportMenu premium={premium} />
         </div>

@@ -115,7 +115,7 @@ describe("report App（债务报告版）", () => {
     expect(note.textContent).toContain("是预测不是承诺");
   });
 
-  it("没有在还债务时整页降级成完成态，不是堆一排「暂无数据」", () => {
+  it("有已结清历史时整页降级成完成态，不是堆一排「暂无数据」", () => {
     window.__azBridge = makeMockBridge({
       debts: [makeDebt({ name: "已结清", settled: true, balance: 0, paidPrincipal: 5000, paidInterest: 300 })],
       premium: { premium: null },
@@ -123,9 +123,25 @@ describe("report App（债务报告版）", () => {
     render(<App />);
     expect(document.querySelector(".rpt-title")?.textContent).toContain("没有在还的债务");
     expect(document.querySelectorAll(".sec-q").length).toBe(0);
-    // 结语和口径说明依然在（导出功能不能因为没有在还债务就消失）
+    // 结语和口径说明依然在（导出的是已结清历史，不能因为没有在还债务就消失）
     expect(screen.getByLabelText("导出报表")).toBeInTheDocument();
     expect(screen.getByText("计算口径说明")).toBeInTheDocument();
+    // 但"如果只做一件事"这句判断文案不成立——没有"现在的节奏"可保持，不应该出现
+    expect(screen.queryByText("如果只做一件事")).not.toBeInTheDocument();
+    expect(screen.queryByText(/保持现在的还款节奏/)).not.toBeInTheDocument();
+  });
+
+  it("从没记过任何债务时，连结语块（导出/口径说明）都不渲染，落地页指向「首页」不是「债务」页", () => {
+    window.__azBridge = makeMockBridge({ debts: [], premium: { premium: null } });
+    render(<App />);
+    expect(document.querySelector(".rpt-title")?.textContent).toContain("没有在还的债务");
+    const lede = document.querySelector(".rpt-lede")!.textContent!;
+    expect(lede).toContain("还没有记录任何债务");
+    expect(lede).toContain("首页");
+    expect(lede).not.toContain("债务”页");
+    expect(screen.queryByLabelText("导出报表")).not.toBeInTheDocument();
+    expect(screen.queryByText("计算口径说明")).not.toBeInTheDocument();
+    expect(screen.queryByText("如果只做一件事")).not.toBeInTheDocument();
   });
 
   it("已结清债务不计入在还总额，但计入已还本金（累计口径）", () => {

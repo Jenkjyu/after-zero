@@ -616,6 +616,10 @@
   .modal-scrim.open { display: flex; }
   .modal { background: var(--surface); border-radius: 22px; max-width: 380px; width: 100%; padding: 20px; box-shadow: 0 8px 40px rgba(0,0,0,.3); }
   .modal .mtitle { font-size: 16px; font-weight: 700; margin-bottom: 8px; overflow-wrap: break-word; word-break: break-word; }
+  /* opts.thirdLabel的按钮挪到了标题行右上角(见下面#mThird规则)，标题行本身要改成横向
+     布局才能容纳；.mtitle-row内的.mtitle不再需要自己的margin-bottom，间距交给行本身。 */
+  .modal .mtitle-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  .modal .mtitle-row .mtitle { margin-bottom: 0; }
   .modal .mbody { font-size: 13.5px; color: var(--text); white-space: pre-line; margin-bottom: 18px; line-height: 1.55; overflow-wrap: break-word; word-break: break-word; }
   #mMonthInput, #mAmountInput, #mDateInput { width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
     border-radius: 9px; padding: 10px 11px; font-size: 15px; font-family: inherit; margin: -8px 0 18px; }
@@ -624,6 +628,15 @@
   #mAmountInput { margin-bottom: 6px; }
   .modal .mhint { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin: 0 2px 16px; }
   .modal-actions { display: flex; gap: 10px; }
+  /* 第三个按钮(opts.thirdLabel)是"取消/确认"之外的另一条路径——真机验证过一版"独立一行、
+     跟取消同款灰底"的做法，问题是视觉权重跟"取消"一样重，容易让人低估它的破坏性(这个
+     操作实际上跟"确认"一样不可逆)。改成标题行右上角的纯文字小链接：足够弱化、不会被
+     误当成跟确认/取消同等地位的选项，具体后果留给点击后的二次确认弹窗说清楚，这里
+     的文案可以很短。 */
+  #mThird { flex: 0 0 auto; background: none; border: none; padding: 2px 0; margin: 0;
+    font-size: 12.5px; font-weight: 600; color: var(--text-muted); text-decoration: underline;
+    text-underline-offset: 2px; white-space: nowrap; cursor: pointer; }
+  #mThird:active { opacity: .6; }
 
   /* 登录门默认(纯CSS，不依赖任何JS执行时机)就是display:flex可见的——这是刻意的"fail-closed"设计。
      以前默认display:none、靠JS抢在CDN脚本网络等待之前把它设成可见，真机上仍然偶发"一闪而过"，
@@ -693,15 +706,22 @@
   .pf-desc { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
   .price-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 18px; }
-  .price-grid.two { grid-template-columns: 1fr 1fr; }
   .price-card { border: 2px solid var(--border); border-radius: 16px; padding: 14px; background: var(--surface);
     text-align: left; font-family: inherit; }
-  .price-card.selected { border-color: var(--accent); background: var(--accent-soft); }
   .price-card .pc-badge { display: inline-block; font-size: 10.5px; font-weight: 700; color: var(--on-accent); background: var(--accent-fill);
     border-radius: 999px; padding: 2px 8px; margin-bottom: 6px; }
   .price-card .pc-amt { font-size: 19px; font-weight: 700; }
   .price-card .pc-period { font-size: 12px; color: var(--text-muted); }
   .price-card .pc-note { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  /* 2026-08-04：单一买断价卡的"原价划线+现价+限时优惠"，只留买断后新增。pc-price-row用
+     flex让划线原价/现价/角标在同一行按基线对齐；pc-strike单独控制划线样式。"限时优惠"
+     故意不用pc-badge(绿色实心胶囊)——那样跟"永久解锁"标签、卡片外框、下面的"开通Premium"
+     按钮撞成一片绿，四处同一个强调色挤在一小块区域反而互相抢戏。改成纯文字弱化处理，
+     卡片外框也去掉了.selected常驻高亮(只剩一张卡，"选中态"这个语义已经不存在了，
+     描边只是在重复"这里很重要"，没必要再跟按钮抢颜色)。 */
+  .price-card .pc-price-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .price-card .pc-strike { font-size: 13px; color: var(--text-muted); text-decoration: line-through; }
+  .price-card .pc-limited { font-size: 11.5px; font-weight: 600; color: var(--text-muted); }
 
   /* ===== AI 债务顾问：聊天式界面（欢迎态+快捷芯片、统一消息流、吸底输入框） =====
      #aiScreen需要真正的flex-column三段布局(header固定/中间可滚动/输入框天然贴在真实屏幕底边)，
@@ -1291,7 +1311,10 @@
 
 <div class="modal-scrim" id="modalScrim">
   <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="mTitle">
-    <div class="mtitle" id="mTitle">确认</div>
+    <div class="mtitle-row">
+      <div class="mtitle" id="mTitle">确认</div>
+      <button type="button" id="mThird" style="display:none"></button>
+    </div>
     <div class="mbody" id="mBody"></div>
     <input type="month" id="mMonthInput" style="display:none">
     <input type="date" id="mDateInput" style="display:none">
@@ -1362,10 +1385,12 @@
   // computeNotifySchedule()），NOTIFY_MAX_PENDING是安卓AlarmManager单UID待触发闹钟数隐性
   // 上限(~500)的兜底截断值，两者都在"已知的数据模型缺口①"那节有完整背景。
   var NOTIFY_WINDOW_MONTHS = 6, NOTIFY_MAX_PENDING = 450;
-  // 订阅状态：单一 Premium 会员（同时提供 ¥98 永久买断 与 ¥5.9/月·¥50/年 订阅，用户自选）。
-  // 早期曾是 Premium/Premium+ 两级分级，已合并成一个 tier——原 Premium+ 的功能（AI）全并入
-  // Premium。存 { premium: {method:"onetime"|"monthly"|"yearly"|"redeemed", at:ISO} | null }，
-  // 只剩单字段；hasPremium(premium) 判 premium.premium 是否为空。独立于上面几个键。
+  // 订阅状态：单一 Premium 会员，只有买断（一次性）一种购买方式——2026-08-04 去掉了月付/
+  // 年付两个入口：面向负债人群的产品判断是"再背一笔月费"对这批用户心理阻力太大，一次性
+  // 买断更符合这个场景；以后真正开始付费时靠订阅做增量，不是唯一收入来源。早期曾是
+  // Premium/Premium+ 两级分级，已合并成一个 tier——原 Premium+ 的功能（AI）全并入 Premium。
+  // 存 { premium: {method:"onetime"|"redeemed", at:ISO} | null }，只剩单字段；
+  // hasPremium(premium) 判 premium.premium 是否为空，不读method的具体取值。独立于上面几个键。
   var PREMIUM_KEY = "after-zero-premium-v1";
   // AI_USAGE_KEY(每日用量软上限)/AI_CHATLOG_KEY(历史对话记录)这两个键第十一步(React迁移
   // 收尾)后整体移交react/src/sheets/AiScreen.tsx所有——跟下面SIM_KEY那条同一个先例，
@@ -1403,9 +1428,12 @@
   function saveNotify() { try { localStorage.setItem(NOTIF_KEY, JSON.stringify(notify)); } catch (e) {} window.dispatchEvent(new CustomEvent("az:state-changed")); }
   // 新装必须是空数据：默认 premium 为 null，即"普通用户"。
   // 单一 Premium tier；兼容迁移：旧调试数据里若残留 premiumPlus 字段，搬进 premium。
+  // billing曾经是"monthly"|"yearly"|"redeemed"，现在method只剩"onetime"|"redeemed"两个
+  // 取值——月付/年付入口已经删除，不会再有新数据带这两个值，这条老迁移路径统一归成
+  // "redeemed"（反正它本来记录的就是"当年靠某种付费方式解锁的"，不影响hasPremium()判断）。
   var premium = loadJSON(PREMIUM_KEY, { premium: null });
   if (premium && premium.premiumPlus && !premium.premium) {
-    premium.premium = { method: premium.premiumPlus.billing || "redeemed", at: premium.premiumPlus.startedAt || new Date().toISOString() };
+    premium.premium = { method: "redeemed", at: premium.premiumPlus.startedAt || new Date().toISOString() };
   }
   if (premium) delete premium.premiumPlus;
   function savePremium() { try { localStorage.setItem(PREMIUM_KEY, JSON.stringify(premium)); } catch (e) {} }
@@ -1457,12 +1485,17 @@
   function unlockScroll() { if (scrollLockCount > 0 && --scrollLockCount === 0) document.body.style.overflow = ""; }
 
   // custom confirm
-  var _onOk = null, _onCancel = null, _confirmed = false;
+  var _onOk = null, _onCancel = null, _onThird = null, _confirmed = false;
   // ask()第4个可选参数{month:"YYYY-MM"}：需要额外收集"哪年哪月"时用(比如批量设置还款日
   // 要知道首期年月)，不传就是普通的纯文字确认框。onOk回调收到的参数是选中的年月字符串
   // (没用到month input时是undefined，其它调用方原本就是零参函数，多传一个不影响)。
   function ask(title, body, onOk, opts) {
     $("mTitle").textContent = title; $("mBody").textContent = body; _onOk = onOk; _onCancel = null; _confirmed = false;
+    // opts.thirdLabel：取消/确认之外的第三条路径(目前只有"注销账户"弹窗的"仅重置本地数据"
+    // 用到)，opts.onThird是它的回调。不传就隐藏#mThird，不影响现有十几个两按钮调用点。
+    var mt = $("mThird");
+    if (opts && opts.thirdLabel) { mt.style.display = ""; mt.textContent = opts.thirdLabel; _onThird = opts.onThird || null; }
+    else { mt.style.display = "none"; mt.textContent = ""; _onThird = null; }
     var mi = $("mMonthInput");
     if (opts && opts.month !== undefined) { mi.style.display = ""; mi.value = opts.month || ""; } else { mi.style.display = "none"; mi.value = ""; }
     // opts.date：日期输入框(还款日页"自定义天数"筛选，点日历图标弹出)。
@@ -1488,23 +1521,25 @@
   // 确认返回true，取消返回false。
   function askAsync(title, body, opts) {
     // 带输入控件时(month或amount)：确认返回输入框的值、取消返回null；不带输入控件时：
-    // 确认true、取消false。加amount这一路没有改变month那一路的任何行为。
+    // 确认true、取消false。加amount这一路没有改变month那一路的任何行为。第三个按钮
+    // (opts.thirdLabel)点击时resolve字符串"third"，跟true/false/月份字符串都区分得开。
     var wantsValue = !!(opts && (opts.month !== undefined || opts.date !== undefined || opts.amount !== undefined));
     return new Promise(function (resolve) {
       _onCancel = function () { resolve(wantsValue ? null : false); };
       ask(title, body, function (inputVal) {
         resolve(wantsValue ? inputVal : true);
-      }, opts);
+      }, Object.assign({}, opts, opts && opts.thirdLabel ? { onThird: function () { resolve("third"); } } : null));
     });
   }
   function closeModal() {
     if (!$("modalScrim").classList.contains("open")) return;
     $("modalScrim").classList.remove("open");
     if (!_confirmed && _onCancel) { var c = _onCancel; _onCancel = null; c(); }
-    _onOk = null; _onCancel = null;
+    _onOk = null; _onCancel = null; _onThird = null;
     $("mMonthInput").style.display = "none";
     $("mDateInput").style.display = "none";
     $("mAmountInput").style.display = "none"; $("mAmountHint").style.display = "none";
+    $("mThird").style.display = "none"; $("mThird").textContent = "";
     unlockScroll();
   }
   $("mOk").addEventListener("click", function () {
@@ -1515,6 +1550,9 @@
     _confirmed = true; closeModal(); if (f) f(inputVal);
   });
   $("mCancel").addEventListener("click", closeModal);
+  $("mThird").addEventListener("click", function () {
+    var f = _onThird; _confirmed = true; closeModal(); if (f) f();
+  });
   $("modalScrim").addEventListener("click", function (e) { if (e.target === $("modalScrim")) closeModal(); });
 
   var flashTimer;
@@ -1874,6 +1912,17 @@
       toast("注销失败：" + ((err && err.message) || "网络错误"));
       return false;
     });
+  }
+  // "仅重置本地数据"——注销账户弹窗里的第三条路径，只清本机storage、不碰服务器账户，
+  // 不需要cloud函数调用。localStorage.clear()而不是逐个key移除，效果等同卸载重装，
+  // 不会漏清以后新增的localStorage key；UP_DB(见上面"uploaded PDF storage"注释)是
+  // IndexedDB另存的上传文件库，localStorage.clear()够不到它，要单独删。reload()让
+  // 页面从头走一遍冷启动逻辑(回到#loginGate)，比手动清理内存里的account/debts等
+  // 模块变量简单可靠。
+  function resetLocalData() {
+    localStorage.clear();
+    try { indexedDB.deleteDatabase(UP_DB); } catch (e) {}
+    location.reload();
   }
 
   // renderAIBanner()已经搬进React(react/src/debts/AiBanner.tsx)，判断逻辑没变
@@ -2655,6 +2704,8 @@
     wxLogout: wxLogout,
     deleteAccount: deleteAccount,
     redeemCode: redeemCode,
+    // "注销账户"确认弹窗的第三条路径新增：只清本机storage、不删服务器账户(见定义处的注释)。
+    resetLocalData: resetLocalData,
     // 第八步(notifySheet)新增：这4个都要调用@capacitor/local-notifications原生插件
     // (权限检查/申请/调度)，留在vanilla私有作用域里，React只调用不重新实现。
     setNotifyEnabled: setNotifyEnabled,

@@ -72,7 +72,10 @@ export interface Debt {
 }
 
 export interface Premium {
-  premium: { method: "onetime" | "monthly" | "yearly" | "redeemed"; at: string } | null;
+  // "monthly"/"yearly"已删除(2026-08-04)——订阅页只保留买断一种购买方式，不再有月付/年付
+  // 入口，这两个取值不会再被任何代码写入。旧设备上如果还有历史数据带着这两个值，
+  // hasPremium()只看premium是不是非null就判定已解锁，不读method的具体取值，不受影响。
+  premium: { method: "onetime" | "redeemed"; at: string } | null;
 }
 
 export interface Account {
@@ -241,7 +244,10 @@ export interface AzBridge {
   setDebt(id: string | null, obj: Omit<Debt, "id">): void;
   deleteDebt(id: string): void;
   toast(msg: string): void;
-  confirmAsync(title: string, body: string, opts?: { month?: string; date?: string; dateMin?: string; amount?: number; amountHint?: string }): Promise<string | boolean | null>;
+  // opts.thirdLabel：取消/确认之外的第三条路径(目前只有"注销账户"弹窗的"仅重置本地数据"
+  // 用到)——传了就多显示一个按钮，点击时Promise resolve成字符串字面量"third"，跟月份/日期/
+  // 金额输入值以及true/false都区分得开。不传的话行为跟以前完全一样。
+  confirmAsync(title: string, body: string, opts?: { month?: string; date?: string; dateMin?: string; amount?: number; amountHint?: string; thirdLabel?: string }): Promise<string | boolean | null>;
   // 第七步(accountScreen/premiumScreen)新增：这三个都是真实的cloud/native调用或者共享状态
   // 变更，不能重写成纯React——wxLogout()清本地账号态+CloudBase signOut；deleteAccount()调
   // deleteAccount云函数(不信任客户端参数，身份来自已认证会话)；redeemCode(code)查
@@ -251,6 +257,9 @@ export interface AzBridge {
   // 一致的用户反馈)，React只需要这个布尔值来决定要不要顺带关闭accountScreen。
   deleteAccount(): Promise<boolean>;
   redeemCode(code: string): string | null;
+  // "注销账户"弹窗第三条路径新增：只清本机localStorage+IndexedDB上传文件库、不删服务器
+  // 账户，清完立刻reload()回到#loginGate——没有返回值，页面已经在这个函数内部被刷新掉了。
+  resetLocalData(): void;
   // 第八步(notifySheet)新增：这几个都要调用@capacitor/local-notifications原生插件
   // (权限检查/申请/调度)，不能重写成纯React。setNotifyEnabled返回最终生效的状态(权限被拒时
   // 会是false，React据此把checkbox退回未勾选)；addNotifyRule/deleteNotifyRule/

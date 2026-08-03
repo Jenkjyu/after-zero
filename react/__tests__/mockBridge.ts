@@ -46,6 +46,7 @@ export function makeMockBridge(overrides?: {
     wxLogout: vi.fn(),
     deleteAccount: vi.fn(() => Promise.resolve(true)),
     redeemCode: vi.fn(() => null),
+    resetLocalData: vi.fn(),
     setNotifyEnabled: vi.fn((enabled: boolean) => Promise.resolve(enabled)),
     addNotifyRule: vi.fn(),
     deleteNotifyRule: vi.fn(),

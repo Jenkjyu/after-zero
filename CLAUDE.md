@@ -157,6 +157,7 @@ window.__azBridge = {
   toast: toast,
   confirmAsync: askAsync,
   wxLogout: wxLogout, deleteAccount: deleteAccount, redeemCode: redeemCode,
+  resetLocalData: resetLocalData,
   setNotifyEnabled: setNotifyEnabled, addNotifyRule: addNotifyRule,
   deleteNotifyRule: deleteNotifyRule, sendTestNotification: sendTestNotification,
   getFiles: getFiles, uploadArchiveFile: uploadArchiveFile,
@@ -172,7 +173,9 @@ window.__azBridge = {
 
 **⚠️`payInstallment`/`unsettle`/`settleFull`/`deleteDebt`/`setDebt`这几个单笔债务寻址的函数，参数后来从下标`i: number`换成了id`string`**（见"债务对象加了真正的id字段"一节）——上面代码块里的写法（`payInstallment: payInstallment`这种直接引用）没有变化，变的是这些函数自身的参数类型和内部实现（改成`debts.find(x => x.id === id)`现查，不再是`debts[i]`）。
 
-**`waiveInstallment`是React迁移全部完成之后新增的一个bridge函数**（2026-07-29，修部分还款支持那轮加的，不属于第一~十一步任何一步，完整背景见`debt-model-history` skill）——`DetailSheet.tsx`新增的"协商减免这一期"按钮触发，内部自己弹`askAsync`问金额，跟`settleFull`同一个套路。这也是`__azBridge`收尾（第十一步）之后第一次再有新函数加入，说明"只在迁移步骤里加桥接函数"这条不是铁律——凡是vanilla需要暴露新的写操作给React调用，任何时候都可以照着现有几十个例子的模式加。
+**`waiveInstallment`是React迁移全部完成之后新增的一个bridge函数**（2026-07-29，修部分还款支持那轮加的，不属于第一~十一步任何一步，完整背景见`debt-model-history` skill）——`DetailSheet.tsx`新增的"协商减免这一期"按钮触发，内部自己弹`askAsync`问金额，跟`settleFull`同一个套路。这也是`__azBridge`收尾（第十一步）之后第一次再有新函数加入，说明"只在迁移步骤里加桥接函数"这条不是铁律——凡是vanilla需要暴露新的写操作给React调用，任何时候都可以照着现有几十个例子的模式加。**`resetLocalData`是又一个例子**（2026-08-04，"注销账户"确认框新增"重置本地数据"选项那轮加的）——`localStorage.clear()`+`indexedDB.deleteDatabase(UP_DB)`+`location.reload()`，效果等同卸载重装但不用离开App、不影响服务器账户，`AccountScreen.tsx`选了这条路径后还要再过一层独立的二次确认（同样是`confirmAsync`）才真正调用，不能因为已经点过一次弹窗按钮就跳过再问一遍。
+
+**共享确认弹窗`#modalScrim`/`ask()`/`askAsync()`2026-08-04新增了第三个按钮的支持（`opts.thirdLabel`，全App第一次出现三按钮弹窗）**——用在"注销账户"确认框里给出"重置本地数据"这条旁路。`askAsync()`点击第三个按钮时resolve字符串字面量`"third"`，跟已有的`true`/`false`/月份字符串区分得开；不传`opts.thirdLabel`就隐藏，不影响现有十几个两按钮调用点的行为。**这个按钮渲染在标题行右上角、纯文字下划线小链接样式，不是跟"取消/确认"同款的灰底大按钮**——第一版做成了跟"取消"同样的`.btn.ghost`大按钮、独立一行铺满宽度，真机验证后用户指出这样视觉权重跟一个零风险操作(取消)一样重，容易让人低估它的破坏性（这个操作实际上和"确认"一样不可逆），改成弱化的角落文字链接才对。**踩过一个真实的显隐bug**：第一版隐藏`#mThird`用的是外部CSS规则`display:none`，但JS显示它时用的是清空内联`style`（`mt.style.display=""`）——这两种手法不匹配，清空内联样式后外部CSS的`display:none`依然生效，按钮永远显示不出来；`#mMonthInput`/`#mDateInput`/`#mAmountInput`/`#mAmountHint`这几个先例全部是用**内联**`style="display:none"`藏起来的，改`#mThird`时没有照抄这个既有约定、自己另起了一套外部CSS，才踩到这个坑。**这类bug测试套件测不出来**——React这边的单测全程mock了`window.__azBridge.confirmAsync`，从没真正跑过vanilla`ask()`/`askAsync()`操作`#mThird`这段DOM逻辑本身，这个项目目前没有针对vanilla index.html的DOM测试基础设施（只有calc.js的node:test和React组件的vitest两套），这类"vanilla DOM显隐逻辑对不对"的bug只能靠真机/浏览器验证兜底。
 
 `setDebt`/`deleteDebt`/`toast`/`confirmAsync`这4个是`#editSheet`（`react/src/sheets/EditSheet.tsx`等）专用——`setDebt(id, obj)`是`saveForm()`删除后唯一保留的narrow写入函数（`id`非空时按id查到对应下标覆盖并合并`old.id`/`old.settled`/`old.settledDate`，`id`为`null`是push新增并生成新id，内部调`recompute(obj)`但不调`saveAll`/`renderAll`，React保存时自己依次调这三个桥接函数，跟`commitReorder`那套细粒度调用惯例一致）；`deleteDebt`是原样暴露的既有vanilla函数（自带`ask()`确认+按id查下标+splice+saveAll+renderAll）；`toast`是`#flash`单例的简单passthrough；`confirmAsync`是`ask()`的Promise外壳（详见上面"第六步"）。
 
@@ -639,13 +642,15 @@ ActionBar消失后，WebView内容直接从状态栏正后方开始铺，配合�
 
 **⚠️唯一提前抽出来的通用规则**：跟主表单共用同一个`<form>`、靠`display:none`切换显隐的子面板里的字段，不能带原生`required`属性——哪怕字段所在tab当前不可见，只要它是空的，点提交按钮就会被浏览器原生表单校验拦截，安卓WebView不会像桌面浏览器那样弹提示气泡，表现是"点了彻底没反应"，很难排查。校验都要挪到具体按钮的点击事件里手动`toast()`。
 
-## 订阅UI基础设施：单一 Premium（买断 + 订阅两种购买方式）
+## 订阅UI基础设施：单一 Premium，只有买断（一次性）一种购买方式
 
-> **⚠️ 这一节的历史已翻篇：早期是 Premium / Premium+ 两级分级（正交产品线 → 后来改成分级），现在已经合并成"单一 Premium 一个 tier"。** 原 Premium+ 独有的 AI 功能全部并入 Premium。同时免费/付费边界也重划过一轮（见下）。下面正文里凡是还提到"Premium+ / 分级 / hasPremiumPlus / 两个tab"的描述都是**已作废的旧状态**，保留是为了让你读懂演进；当前真实状态以本框内和"AI 债务顾问"一节为准：
-> - **只有一个 Premium**：数据模型 `PREMIUM_KEY`（`after-zero-premium-v1`）存 `{ premium: {method:"onetime"|"monthly"|"yearly"|"redeemed", at:ISO} | null }`，单字段。`hasPremium()` = `!!premium.premium`。**`hasPremiumPlus()` 已删除**，全项目引用改成 `hasPremium()`。加载时有一次性兼容迁移（旧 `premiumPlus` 字段搬进 `premium`）。
-> - **两种购买方式并存**：¥98 永久买断 / ¥5.9 月 / ¥50 年，三张价卡共享一份互斥选中态（`premiumPlanSel` 是单个字符串 `"onetime"|"monthly"|"yearly"`）。订阅页 `#premiumScreen` 不再有 tab，一份功能列表 + 一个价格区（买断整行高亮 + 月/年两列）。价格仍是占位（用户已确认），接真实支付时再定。
-> - **免费/付费边界（重划后）**：图表查看、提前还款模拟器 → **免费**（零成本、桌面级、口碑引擎，删了门禁）；高级统计报表**导出 PDF/Excel**、云备份、AI → **付费**（导出在 `reportExportXlsxBtn`/`reportExportPdfBtn` 的 click handler 里判 `hasPremium()`，查看图表无门禁）。判断标准：有真实成本（服务器/算力）才收费，纯客户端零成本的不设障碍。
+> **⚠️ 这一节的历史已翻篇两次：早期是 Premium / Premium+ 两级分级 → 合并成"单一 Premium 一个 tier" → 2026-08-04 又去掉了月付/年付，只留买断。** 下面正文里凡是还提到"Premium+ / 分级 / hasPremiumPlus / 两个tab / 月付 / 年付"的描述都是**已作废的旧状态**，保留是为了让你读懂演进；当前真实状态以本框内和"AI 债务顾问"一节为准：
+> - **产品决策（2026-08-04）**：去掉月付/年付两个入口，只留买断——面向负债人群的判断是"再背一笔按月/按年扣费"对这批用户心理阻力远大于一般记账App用户，一次性买断更符合"帮你摆脱债务"这个定位；长期变现路径改成买断打底、以后靠订阅做**增量**（不是唯一收入来源）。AI/云备份这两个有真实持续成本的功能靠既有的每日用量软上限兜住风险，不因为改成买断制就需要额外处理。
+> - **只有一个 Premium**：数据模型 `PREMIUM_KEY`（`after-zero-premium-v1`）存 `{ premium: {method:"onetime"|"redeemed", at:ISO} | null }`，单字段——`method` 曾经还有 `"monthly"|"yearly"` 两个值，去掉入口后类型跟着收窄（`react/src/types.ts`），没有入口就不该留着这两个死值。`hasPremium()` = `!!premium.premium`，不读 `method` 的具体取值。加载时有一次性兼容迁移（旧 `premiumPlus` 字段搬进 `premium`，`billing` 不管原来是什么值现在统一归成 `"redeemed"`）。
+> - **只有一张价卡**：`react/src/sheets/PremiumScreen.tsx` 的 `#premiumPrice` 只剩一张静态 `<div className="price-card">`（不再是可点击切换选中态的 `<button>`，`premiumPlanSel`/`Plan` 类型/`useState` 一并删除——只有一个选项，没有"选"这个动作），价格现价 ¥24、原价 ¥40 划线、"限时优惠"角标——**这个角标故意不用`.pc-badge`绿色实心胶囊**（跟"永久解锁"标签、卡片外框、下面"开通Premium"按钮撞成一片绿，四处同一个强调色挤在一小块区域会互相抢戏），改成纯文字弱化处理（`.pc-limited`）；卡片外框也去掉了常驻的 `.selected` 高亮（只剩一张卡时"选中态"这个语义已经不存在）。**具体数字（¥24/¥40/限时优惠）是产品决策，不是技术细节，改的时候别自己套别的框架（比如按百分比"省X%"去算）**——真机验证时用户明确纠正过这一点，"限时优惠"是紧迫感框架，不是"省了多少钱"的计算框架，两者逻辑不同。
+> - **免费/付费边界**：图表查看、提前还款模拟器 → **免费**（零成本、桌面级、口碑引擎，删了门禁）；高级统计报表**导出 PDF/Excel**、云备份、AI → **付费**（导出在 `reportExportXlsxBtn`/`reportExportPdfBtn` 的 click handler 里判 `hasPremium()`，查看图表无门禁）。判断标准：有真实成本（服务器/算力）才收费，纯客户端零成本的不设障碍。
 > - **兑换码**：`REDEEM_CODES = {"0000":"premium"}`；`applyRedeemTier` 写 `premium.premium={method:"redeemed",at}`。`__debugPremium` 状态只剩 `"premium"`/`"none"`。
+> - **法律文案联动**：`docs/legal/会员服务协议.md` + `react/src/sheets/TermsScreen.tsx`"当前状态说明"那条原来写"买断、包月、包年三种购买方式的入口"，跟着改成"只提供买断（一次性）这一种购买方式"——**以后任何一次改变购买方式的产品决策，都要检查这两处法律文案是不是也要同步改**，它们描述的是同一件事的两份拷贝（`.md`是源文件，`TermsScreen.tsx`是渲染进App的硬编码版本），改一处忘另一处会导致法律文案和实际功能对不上。
 
 ## （旧版分级设计，已作废，仅存档）Premium(买断) + Premium+(月付/年付，分级)
 

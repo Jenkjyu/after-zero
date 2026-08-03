@@ -25,7 +25,7 @@ describe("DataCards", () => {
 
   it("已开通premium时点云备份直接打开备份页(纯React状态)", () => {
     window.__azBridge = makeMockBridge();
-    const premium: Premium = { premium: { method: "yearly", at: "2026-01-01" } };
+    const premium: Premium = { premium: { method: "onetime", at: "2026-01-01" } };
     render(<DataCards premium={premium} />);
     const backupHook = renderHook(() => useBackupScreenOpen());
     fireEvent.click(screen.getByText("云备份"));

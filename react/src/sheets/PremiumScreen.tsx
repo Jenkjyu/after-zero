@@ -1,16 +1,14 @@
-// 订阅页——第七步(React迁移收尾)从vanilla的#premiumScreen原样复刻。三张价卡的互斥选中态
-// (premiumPlanSel)改成组件本地useState(不需要跨open持久化，vanilla原来也是每次打开都可能
-// 停留在上次选中的那张，这里效果一致，因为组件是常驻挂载不会卸载重建)。兑换码输入框每次
-// 打开都强制复位收起(跟vanilla openPremiumScreen()里的行为一致，避免上次展开残留)。
+// 订阅页——第七步(React迁移收尾)从vanilla的#premiumScreen原样复刻。2026-08-04去掉了月付/
+// 年付两张价卡，只保留买断——面向负债人群的产品判断，一次性买断比按月订阅心理阻力小得多
+// (完整理由见PROGRESS.md 2026-08-04那条)。价卡不再有互斥选中态(只有一个选项，没有"选"这个
+// 动作)，原来的premiumPlanSel/plan useState一并删除。兑换码输入框每次打开都强制复位收起
+// (跟vanilla openPremiumScreen()里的行为一致，避免上次展开残留)。
 import { useEffect, useState } from "react";
 import { closePremiumScreen, openTermsScreen, usePremium, usePremiumScreenOpen } from "../shared/state";
-
-type Plan = "onetime" | "monthly" | "yearly";
 
 export function PremiumScreen() {
   const isOpen = usePremiumScreenOpen();
   const premium = usePremium();
-  const [plan, setPlan] = useState<Plan>("onetime");
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [redeemCode, setRedeemCodeInput] = useState("");
 
@@ -71,24 +69,15 @@ export function PremiumScreen() {
 
         <div id="premiumPrice">
           <div className="price-grid">
-            <button type="button" className={"price-card" + (plan === "onetime" ? " selected" : "")} onClick={() => setPlan("onetime")}>
+            <div className="price-card">
               <span className="pc-badge">永久解锁</span>
-              <div className="pc-amt num">¥98</div>
+              <div className="pc-price-row">
+                <span className="pc-strike">¥40</span>
+                <span className="pc-amt num">¥24</span>
+                <span className="pc-limited">限时优惠</span>
+              </div>
               <div className="pc-period">一次性付费，永久使用</div>
-            </button>
-          </div>
-          <div className="price-grid two">
-            <button type="button" className={"price-card" + (plan === "monthly" ? " selected" : "")} onClick={() => setPlan("monthly")}>
-              <div className="pc-amt num">¥5.9</div>
-              <div className="pc-period">/ 月</div>
-              <div className="pc-note">按月订阅，随时可取消</div>
-            </button>
-            <button type="button" className={"price-card" + (plan === "yearly" ? " selected" : "")} onClick={() => setPlan("yearly")}>
-              <span className="pc-badge">省 29%</span>
-              <div className="pc-amt num">¥50</div>
-              <div className="pc-period">/ 年</div>
-              <div className="pc-note">折合 ¥4.2/月</div>
-            </button>
+            </div>
           </div>
         </div>
 
