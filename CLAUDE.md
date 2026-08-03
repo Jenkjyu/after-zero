@@ -425,7 +425,7 @@ ActionBar消失后，WebView内容直接从状态栏正后方开始铺，配合�
 
 **根因**：`.sheet`原来同时具备**圆角 + `overflow-y:auto` + `transform`**这三样，Chromium会把它当成一个**不透明的合成滚动层**（`contents_opaque`），圆角外那几个像素直接留了图层的默认白底。**浅色模式下`--surface`本来就是白的，所以这个白边跟卡片本身混在一起完全看不出来，只有深色才露馅**——这解释了"为什么只有深色模式有这个问题"，也是定位这个bug的关键线索。用户提供的两张对比截图（一张拖高了露白、一张没拖高正常）直接给出了"要滚动才触发"这个触发条件。
 
-**修法**：把滚动挪到内层`.sheet-scroll`（`flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain`），`.sheet`自己改成`display:flex; flex-direction:column; overflow:hidden`——只剩圆角+`overflow:hidden`+`transform`，不再是合成滚动容器，那个组合就不成立了。**四个sheet（`DetailSheet`/`EditSheet`/`NotifySheet`/`SortSheet`）都要有这层包裹**，`SortSheet.test.tsx`里有一条结构断言盯着这件事。
+**修法**：把滚动挪到内层`.sheet-scroll`（`flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain`），`.sheet`自己改成`display:flex; flex-direction:column; overflow:hidden`——只剩圆角+`overflow:hidden`+`transform`，不再是合成滚动容器，那个组合就不成立了。**四个sheet（`DetailSheet`/`EditSheet`/`NotifySheet`/`SortSheet`）都要有这层包裹**，`SortSheet.test.tsx`里有一条结构断言盯着这件事。**⚠️`#aiHistorySheet`（`AiScreen.tsx`，第十一步React迁移收尾时新写的）当时漏掉了这层包裹，2026-08-04才补上**——它是在这条规则定下来之后另一轮新加的sheet，没有照抄这个既有约定，说明"新增sheet要不要包`.sheet-scroll`"这条不会被linter/类型检查自动提醒，得靠人工核对。以后再新增任何`.sheet`，先确认这层包裹加了没有。
 
 **顺带的好处**：`grip`留在滚动区**外面**（是`.sheet`的直接子元素），拖动条永远在顶部、不会被内容滚走。`gripDrag.ts`里`sheet.style.height`的写法不受影响——外层是flex容器，设了高度之后内层`flex:1`自动填满。
 

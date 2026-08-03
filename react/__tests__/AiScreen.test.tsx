@@ -7,9 +7,23 @@ import { makeMockBridge } from "./mockBridge";
 const AI_USAGE_KEY = "after-zero-ai-usage-v1";
 const AI_CHATLOG_KEY = "after-zero-ai-chatlog-v1";
 
+// 默认让"假流式"打字动画(startReveal)以prefers-reduced-motion的方式直接跳过——回复到达
+// 后立刻整段显示，绝大多数测试断言"回复内容"时不用等一段打字动画播完。jsdom本来就没有
+// window.matchMedia这个东西，这里补一份，同时也顺带覆盖了castWand()同样查的这条媒体
+// 查询(两者都用同一种"reduce=跳过动画"判断，互不冲突)。需要真正验证打字动画本身的
+// 测试会在各自用例里临时换成matches:false并配合fake timers。
+function stubMatchMedia(matches: boolean) {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches, media: query, onchange: null,
+    addListener: vi.fn(), removeListener: vi.fn(),
+    addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+  }));
+}
+
 beforeEach(() => {
   localStorage.removeItem(AI_USAGE_KEY);
   localStorage.removeItem(AI_CHATLOG_KEY);
+  stubMatchMedia(true);
 });
 afterEach(() => {
   closeAiScreen(); // aiScreenOpen是模块级状态，重置避免测试间互相污染
@@ -246,6 +260,172 @@ describe("AiScreen", () => {
     act(() => { openAiScreen(); });
     fireEvent.click(screen.getByLabelText("返回"));
     expect(hook.result.current).toBe(false);
+  });
+
+  it("回复失败后点「重试」：用相同参数重新调用，不重复追加用户气泡，成功后错误气泡原地替换", async () => {
+    const bridge = makeMockBridge();
+    bridge.callAiAdvisor = vi.fn()
+      .mockRejectedValueOnce(new Error("网络错误"))
+      .mockResolvedValueOnce("重试后的回复");
+    window.__azBridge = bridge;
+    const { container } = render(<AiScreen />);
+    act(() => { openAiScreen(); });
+    await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
+    expect(screen.getByText("网络错误")).toBeInTheDocument();
+    expect(container.querySelectorAll(".ai-msg")).toHaveLength(2); // 用户+错误气泡，没有多出来
+
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "重试" })); });
+    expect(bridge.callAiAdvisor).toHaveBeenLastCalledWith("chat", "我该先还哪一笔？", []);
+    expect(container.querySelectorAll(".ai-msg")).toHaveLength(2); // 原地替换，不是追加新的一轮
+    expect(screen.getByText("重试后的回复")).toBeInTheDocument();
+    expect(screen.queryByText("网络错误")).not.toBeInTheDocument();
+  });
+
+  it("今日用量已用完时点「重试」：toast提示且不再调用callAiAdvisor", async () => {
+    const bridge = makeMockBridge();
+    bridge.callAiAdvisor = vi.fn(() => Promise.reject(new Error("网络错误")));
+    window.__azBridge = bridge;
+    render(<AiScreen />);
+    act(() => { openAiScreen(); });
+    await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
+    localStorage.setItem(AI_USAGE_KEY, JSON.stringify({ date: window.fmtDate(window.today0()), count: 20 }));
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+    expect(window.__azBridge.toast).toHaveBeenCalledWith("今日 AI 分析次数已用完，明天再来");
+    expect(bridge.callAiAdvisor).toHaveBeenCalledTimes(1); // 只有最初那次失败的调用，重试没有真正发出
+  });
+
+  it("回复末尾带###SUGGESTIONS###：正文里不显示marker，解析成可点的追问建议芯片", async () => {
+    const bridge = makeMockBridge();
+    bridge.callAiAdvisor = vi.fn()
+      .mockResolvedValueOnce("先还利率最高的那笔。\n###SUGGESTIONS###\n- 如果每月多还500呢？\n- 还有更快的方法吗？")
+      .mockResolvedValueOnce("多还500能提前3个月还清");
+    window.__azBridge = bridge;
+    render(<AiScreen />);
+    act(() => { openAiScreen(); });
+    await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
+
+    expect(screen.getByText("先还利率最高的那笔。")).toBeInTheDocument();
+    expect(screen.queryByText(/SUGGESTIONS/)).not.toBeInTheDocument();
+    const chip = screen.getByText("如果每月多还500呢？");
+    expect(screen.getByText("还有更快的方法吗？")).toBeInTheDocument();
+
+    await act(async () => { fireEvent.click(chip); });
+    expect(bridge.callAiAdvisor).toHaveBeenLastCalledWith("chat", "如果每月多还500呢？", [
+      { role: "user", content: "我该先还哪一笔？" },
+      { role: "assistant", content: "先还利率最高的那笔。" },
+    ]);
+    expect(screen.getByText("多还500能提前3个月还清")).toBeInTheDocument();
+  });
+
+  it("持久化进历史记录的正文已经剥离了###SUGGESTIONS###这段", async () => {
+    const bridge = makeMockBridge();
+    bridge.callAiAdvisor = vi.fn(() => Promise.resolve("答案\n###SUGGESTIONS###\n- 追问A"));
+    window.__azBridge = bridge;
+    render(<AiScreen />);
+    act(() => { openAiScreen(); });
+    await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
+    const saved = JSON.parse(localStorage.getItem(AI_CHATLOG_KEY) || "[]");
+    expect(saved[0].messages[1].content).toBe("答案");
+  });
+
+  it("追问建议芯片只挂在最后一条回复下面：发出新问题后旧的建议消失", async () => {
+    const bridge = makeMockBridge();
+    bridge.callAiAdvisor = vi.fn()
+      .mockResolvedValueOnce("第一次回复\n###SUGGESTIONS###\n- 追问A")
+      .mockResolvedValueOnce("第二次回复");
+    window.__azBridge = bridge;
+    render(<AiScreen />);
+    act(() => { openAiScreen(); });
+    await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
+    expect(screen.getByText("追问A")).toBeInTheDocument();
+
+    const textarea = screen.getByPlaceholderText("发消息给 AI 债务顾问…");
+    fireEvent.change(textarea, { target: { value: "那第二笔呢" } });
+    await act(async () => { fireEvent.click(screen.getByLabelText("发送")); });
+    expect(screen.queryByText("追问A")).not.toBeInTheDocument();
+  });
+
+  it("回复里markdown风格的列表(- 开头)渲染成真正的<ul><li>，不是原样文字堆着", async () => {
+    const bridge = makeMockBridge();
+    bridge.callAiAdvisor = vi.fn(() => Promise.resolve("建议如下：\n- 先还网贷\n- 再还信用卡"));
+    window.__azBridge = bridge;
+    const { container } = render(<AiScreen />);
+    act(() => { openAiScreen(); });
+    await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
+    const list = container.querySelector(".ai-msg-list");
+    expect(list?.tagName).toBe("UL");
+    const items = list ? within(list as HTMLElement).getAllByRole("listitem") : [];
+    expect(items.map((li) => li.textContent)).toEqual(["先还网贷", "再还信用卡"]);
+  });
+
+  it("思考中气泡会显示已过去的秒数", async () => {
+    vi.useFakeTimers();
+    try {
+      const bridge = makeMockBridge();
+      let resolveReply: (v: string) => void = () => {};
+      bridge.callAiAdvisor = vi.fn(() => new Promise<string>((res) => { resolveReply = res; }));
+      window.__azBridge = bridge;
+      const { container } = render(<AiScreen />);
+      act(() => { openAiScreen(); });
+      await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
+
+      act(() => { vi.advanceTimersByTime(3000); });
+      const pending = container.querySelector(".ai-msg.pending");
+      expect(pending?.textContent).toContain("思考中 3s");
+
+      await act(async () => { resolveReply("答案"); });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("回复到达后不是一次性整段出现，而是逐渐揭示，动画结束后显示完整内容", async () => {
+    stubMatchMedia(false); // 这条测试要真的验证动画本身，关掉"跳过动画"这个默认桩
+    vi.useFakeTimers();
+    try {
+      const bridge = makeMockBridge();
+      bridge.callAiAdvisor = vi.fn(() => Promise.resolve("先还利率最高的那笔"));
+      window.__azBridge = bridge;
+      const { container } = render(<AiScreen />);
+      act(() => { openAiScreen(); });
+      await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
+
+      // 回复刚到达、动画刚起步的这一刻：气泡存在，但还没显示完整文字
+      const botMsg = container.querySelectorAll(".ai-msg.bot")[0];
+      expect(botMsg.textContent).not.toBe("先还利率最高的那笔");
+
+      act(() => { vi.advanceTimersByTime(500); }); // 足够让这么短的文字揭示完
+      expect(botMsg.textContent).toBe("先还利率最高的那笔");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("打字动画进行中切换到新对话：不会有残留的interval把新对话的回复截断", async () => {
+    stubMatchMedia(false);
+    vi.useFakeTimers();
+    try {
+      const bridge = makeMockBridge();
+      bridge.callAiAdvisor = vi.fn()
+        .mockResolvedValueOnce("第一段很长很长很长很长很长的回复内容用来确保动画还没播完")
+        .mockResolvedValueOnce("短");
+      window.__azBridge = bridge;
+      const { container } = render(<AiScreen />);
+      act(() => { openAiScreen(); });
+      await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
+      act(() => { vi.advanceTimersByTime(16); }); // 动画刚开始跑几步，远没播完
+
+      // 这时候切到新对话——旧对话那个还在跑的interval理应自行失效，不能污染接下来的新对话
+      act(() => { fireEvent.click(screen.getByRole("button", { name: "历史对话" })); });
+      act(() => { fireEvent.click(screen.getByText("新对话")); });
+      await act(async () => { fireEvent.click(screen.getByText("生成分析报告")); });
+
+      act(() => { vi.advanceTimersByTime(500); }); // 让新对话这次的动画播完
+      const botMsg = container.querySelectorAll(".ai-msg.bot")[0];
+      expect(botMsg.textContent).toBe("短");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("重新打开screen会重置成欢迎态(即使上次退出时还在某个对话里)", async () => {
