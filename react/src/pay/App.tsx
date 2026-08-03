@@ -80,6 +80,20 @@ export function App() {
     return out.sort((a, b) => a.diff - b.diff);
   }, [debts]);
 
+  // Hero只显示items[0]单独一笔时，同一天到期的别的债务会被吞掉(2026-08-04真机截图报的
+  // bug：test3~test8同一天到期，卡片却只显示test3一个名字、一个金额)。按"跟items[0]同一天"
+  // 分组，笔数按debt id去重(避免同一笔债务手动改出两条同日期的行被数成两笔)，金额原样加总
+  // 这些期次(不去重)——不然"等N笔"和右边的钱对不上，等于没修。
+  const heroSoonest = useMemo(() => {
+    if (items.length === 0) return null;
+    const first = items[0];
+    const sameDay = items.filter((o) => o.next.getTime() === first.next.getTime());
+    const debtCount = new Set(sameDay.map((o) => o.d.id)).size;
+    const amount = sameDay.reduce((sum, o) => sum + o.amount, 0);
+    const name = debtCount > 1 ? `${first.d.name} 等${debtCount}笔` : first.d.name;
+    return { next: first.next, diff: first.diff, amount, name };
+  }, [items]);
+
   // "下一期"是唯一一档**按笔**看的(每笔债务只留最早的未还期)，其余各档都是**按期**看
   // (窗口内的每一期各占一行)。这两种视角本来就不在一个轴上，所以这一档没跟其它档共用
   // "天数窗口"那套判定。窗口档位是**累计**口径(30天内天然包含7/15天内那些)。
@@ -122,7 +136,7 @@ export function App() {
 
   return (
     <>
-      <Hero soonest={items[0] ?? null} notifyEnabled={notify.enabled} onBellClick={openNotifySheet} />
+      <Hero soonest={heroSoonest} notifyEnabled={notify.enabled} onBellClick={openNotifySheet} />
       <div className="pay-stats"><Stats items={items} /></div>
       <div className="pay-filter">
         <FilterBar

@@ -13,12 +13,32 @@ import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { closeAiScreen, useAiScreenOpen } from "../shared/state";
 import type { AiChatMessage, AiConversation } from "../types";
+import { AiLimitModal } from "./AiLimitModal";
 
 const AI_USAGE_KEY = "after-zero-ai-usage-v1";
 const AI_DAILY_LIMIT = 20;
 const AI_CHATLOG_KEY = "after-zero-ai-chatlog-v1";
 const AI_CHATLOG_MAX_CONVOS = 50;
 const AI_CHATLOG_MAX_MSGS = 40;
+// 首次进入AI页面提前展示一次"每日额度+复制提示词退路"说明弹窗用的标记，跟AI_USAGE_KEY/
+// AI_CHATLOG_KEY一样是新增的独立键，不复用两者(硬性铁律第1条：各自独立的键，不要合并)。
+const AI_LIMIT_NOTICE_KEY = "after-zero-ai-limit-notice-v1";
+// 弹窗延迟到魔法棒.wand.cast那0.75s的"施法"动效播完再出现(见www/index.html里.wand.cast
+// 的animation-duration)，不然弹窗会正好盖住这个动效最抢眼的那一下。
+const LIMIT_NOTICE_DELAY_MS = 900;
+
+// 复制到剪贴板给外部AI助手用的完整提示词——跟服务端aiAdvisor云函数的SYSTEM_PROMPT是
+// 同一套"雪球法/雪崩法"分析框架，但去掉了"追问建议marker"这类只有我们自己前端才认识的
+// 输出格式要求(粘贴给豆包等外部聊天机器人没有意义)，改成第二人称"帮我分析"的措辞。
+function buildCopyPrompt(): string {
+  const summary = window.__azBridge.buildAiSummary();
+  return "你是一位务实、简洁的中文债务优化顾问。以下是我的债务概况（JSON，金额单位为元，"
+    + "每笔债务的\"还款计划\"是逐期的日期/金额/本金/利息/是否已还）：\n\n"
+    + JSON.stringify(summary, null, 2)
+    + "\n\n请基于雪球法（先还余额最小的）和雪崩法（先还利率最高的）两种策略帮我分析，"
+    + "明确指出优先该还哪一笔最省钱、大致能省多少利息，并给出可执行的还款顺序建议。"
+    + "语言口语化、直接、给数字，不要写大段免责声明。";
+}
 
 interface AiUsage { date: string; count: number }
 
@@ -174,6 +194,7 @@ export function AiScreen() {
   const [revealState, setRevealState] = useState<{ msgIndex: number; shown: number } | null>(null);
   const [input, setInput] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [limitModalOpen, setLimitModalOpen] = useState(false);
   const wandRef = useRef<SVGGElement | null>(null);
   const logRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -193,6 +214,18 @@ export function AiScreen() {
       revealTokenRef.current++;
       setRevealState(null);
       castWand(wandRef.current);
+      // 首次进入AI页面提前弹一次"每日额度+复制提示词退路"说明——之后真撞到20次/天上限时
+      // (composeAndSend/onRetry)还会再弹一次，就算这次没复制、以后额度用完了也还有机会。
+      // 延迟到魔法棒0.75s的施法动效播完，不然弹窗会正好盖住这个动效最抢眼的那一下。
+      let seen = false;
+      try { seen = localStorage.getItem(AI_LIMIT_NOTICE_KEY) === "1"; } catch { /* ignore */ }
+      if (!seen) {
+        const timer = window.setTimeout(() => {
+          setLimitModalOpen(true);
+          try { localStorage.setItem(AI_LIMIT_NOTICE_KEY, "1"); } catch { /* ignore */ }
+        }, LIMIT_NOTICE_DELAY_MS);
+        return () => window.clearTimeout(timer);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
@@ -343,7 +376,9 @@ export function AiScreen() {
   // question不生效，但气泡里仍然显示"生成分析报告"这句话，跟用户真的问了这句话视觉上一致)。
   async function composeAndSend(displayQ: string, isReportMode: boolean) {
     if (busy) return;
-    if (aiUsageLeft() <= 0) { window.__azBridge.toast("今日 AI 分析次数已用完，明天再来"); return; }
+    // 真撞到20次/天上限：弹说明弹窗(带"复制提示词"退路)取代原来单纯的toast——
+    // toast只说"用完了"，弹窗能顺带给一条能继续用的路，这正是撞上限那一刻用户需要的。
+    if (aiUsageLeft() <= 0) { setLimitModalOpen(true); return; }
 
     const existingRec = currentConvId ? window.findAiConv(convos, currentConvId) : null;
     const contextHistory: AiChatMessage[] = existingRec
@@ -368,9 +403,22 @@ export function AiScreen() {
   // 追加一条用户提问(避免同一个问题在气泡列表和历史记录里出现两遍)。
   function onRetry(ctx: RetryCtx) {
     if (busy) return;
-    if (aiUsageLeft() <= 0) { window.__azBridge.toast("今日 AI 分析次数已用完，明天再来"); return; }
+    // 真撞到20次/天上限：弹说明弹窗(带"复制提示词"退路)取代原来单纯的toast——
+    // toast只说"用完了"，弹窗能顺带给一条能继续用的路，这正是撞上限那一刻用户需要的。
+    if (aiUsageLeft() <= 0) { setLimitModalOpen(true); return; }
     setMessages((prev) => prev.map((m, i) => (i === ctx.msgIndex ? { role: "assistant", content: "", pending: true } : m)));
     runAdvisor(ctx.msgIndex, ctx.recId, ctx.displayQ, ctx.isReportMode, ctx.contextHistory);
+  }
+
+  // 弹窗里"复制完整分析提示词"——复制成功后弹窗故意不自动关闭(万一想再读一遍说明或
+  // 重新复制一次)，靠用户自己点"知道了"关掉，跟"确认后自动收起"这种一次性操作不是一回事。
+  async function onCopyPrompt() {
+    try {
+      await navigator.clipboard.writeText(buildCopyPrompt());
+      window.__azBridge.toast("已复制，可以粘贴给其他AI助手了");
+    } catch {
+      window.__azBridge.toast("复制失败，请重试");
+    }
   }
 
   function onSendFromInput() {
@@ -513,6 +561,7 @@ export function AiScreen() {
           </div>
         </div>
       </div>
+      <AiLimitModal open={limitModalOpen} onClose={() => setLimitModalOpen(false)} onCopy={onCopyPrompt} />
     </div>
   );
 }

@@ -62,6 +62,9 @@ export function makeMockBridge(overrides?: {
     deleteBackup: vi.fn(() => Promise.resolve(true)),
     getBackupMeta: vi.fn(() => ({ lastBackupAt })),
     callAiAdvisor: vi.fn(() => Promise.resolve("测试回复")),
+    buildAiSummary: vi.fn(() => ({
+      在还总负债: 0, 加权平均年化利率百分比: 0, 预计全部还清日期: "未知", 债务清单: [],
+    })),
   };
 }
 

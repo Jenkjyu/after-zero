@@ -295,6 +295,19 @@ export interface AzBridge {
   // React所有权(跟SIM_KEY当年同一个先例)，不经过bridge。history是"这次提问之前的上下文"，
   // 不含这次提问本身(服务端会把question接在最后)；report模式不需要history，传空数组。
   callAiAdvisor(mode: "report" | "chat", question: string, history: AiChatMessage[]): Promise<string>;
+  // 2026-08-04新增：额度用完弹窗"复制完整提示词"按钮用来现读一份跟真正调云函数时
+  // 一模一样的债务JSON(逐期还款计划全含)，零DOM依赖、不调云函数，直接原样暴露。
+  buildAiSummary(): AiSummary;
+}
+
+export interface AiSummaryPlanRow { 日期: string; 金额: number; 本金: number; 利息: number; 已还: boolean }
+export interface AiSummaryDebt {
+  名称: string; 类型: string; 债主: string; 开始日期: string; 备注: string; 计息方式: string;
+  剩余本金: number; 年化利率百分比: number; 月供: number; 剩余期数: number; 总期数: number;
+  一次性还清: boolean; 累计已还本金: number; 累计已还利息: number; 还款计划: AiSummaryPlanRow[];
+}
+export interface AiSummary {
+  在还总负债: number; 加权平均年化利率百分比: number; 预计全部还清日期: string; 债务清单: AiSummaryDebt[];
 }
 
 // 排序方式(含"custom")的类型，跟 www/index.html 原来的 DEBT_SORTS 键名保持一致，

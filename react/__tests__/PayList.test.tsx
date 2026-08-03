@@ -39,7 +39,7 @@ describe("PayList", () => {
     ];
     const { container } = render(<PayList visible={items} label="100天内" ctx={makeCtx()} />);
     const labels = Array.from(container.querySelectorAll(".section-label")).map((el) => el.textContent);
-    expect(labels).toEqual(["100天内 · 3 期"]);
+    expect(labels).toEqual(["100天内 · 3 期 · ¥300"]);
     expect(container.querySelectorAll(".pay-row").length).toBe(3);
   });
 
@@ -48,7 +48,7 @@ describe("PayList", () => {
     const { container } = render(
       <PayList visible={[item({ diff: -2 })]} label="已逾期" ctx={makeCtx()} />
     );
-    expect(container.querySelector(".section-label.overdue")?.textContent).toBe("已逾期 · 1 期");
+    expect(container.querySelector(".section-label.overdue")?.textContent).toBe("已逾期 · 1 期 · ¥100");
   });
 
   it("同一笔债务的多期各占一行，key不撞车", () => {

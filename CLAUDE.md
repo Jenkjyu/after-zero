@@ -636,6 +636,8 @@ ActionBar消失后，WebView内容直接从状态栏正后方开始铺，配合�
 
 急迫程度4档阈值、分组(`dueBucket`)跟筛选(`PayFilter`)两套"7天内/30天内"语义为什么不同（互斥分段 vs 累计口径）、左滑手势实现细节（`__justDragged`标记复位坑）、筛选条5档+日历自定义天数改版，全部见`pay-tab-design` skill（`.claude/skills/pay-tab-design/SKILL.md`）。
 
+**⚠️2026-08-04修的一个真机截图报的bug**：Hero卡原来只显示`items[0]`单独一笔（`react/src/pay/App.tsx`），同一天到期的其它债务会被吞掉——用户报的现象是"3天后有不止一笔要还，卡片却只显示一笔"。改成按"跟`items[0]`同一天"分组，笔数按`debt.id`去重、金额原样加总这些期次，名称显示成"test3 等6笔"这种形式，金额也是当天全部到期笔的合计，不再是单笔的数字。同一轮顺手在`PayList.tsx`的`section-label`（"下一期 · 12 期"这行）后面加了总金额（"· ¥XXX"），一眼看出这个筛选窗口内一共要还多少钱。
+
 ## 新增/编辑债务表单（`#editSheet`）——设计细节见`edit-sheet-design` skill
 
 全项目最复杂的一块UI（公式生成器、批量设置还款日、`oneTimeStash`状态机）。`oneTimeStash`暂存机制、`planMode`切换、`#gFirstField`的DOM搬家技巧、批量设置日期确认框、29/30/31号限制、计息方式选择器+等额本金新增、`genPlan()`四舍五入/负数bug的完整排查过程，全部见`edit-sheet-design` skill（`.claude/skills/edit-sheet-design/SKILL.md`）。
@@ -877,6 +879,8 @@ sync android`+`assembleRelease`后解包核对：APK内`index.html`跟工作区`
 
 真实"生成报告/追问"往返依赖真实微信登录会话，跟云备份同一条限制（见上面"云备份"一节），桌面/CLI都测不出，必须真机验证。
 
+**2026-08-04又改了两处**：①`buildAiSummary()`（`www/index.html`）原来只传"月供"这一个笼统数字，先息后本/等本等费这类每期金额不同的贷款AI看不到后面某期本金会跳涨、答出跟真实计划表矛盾的结论（真机报的bug），改成每笔债务连完整逐期还款计划表（日期/金额/本金/利息/是否已还）+计息方式都传过去。②新增`AiLimitModal.tsx`——首次进AI页面（等魔法棒0.75s施法动效播完再弹）和真撞到20次/天上限时，弹一个说明"App免费、AI有真实成本、所以限量"的弹窗，带"复制完整分析提示词"按钮（内容=同一份`buildAiSummary()`JSON+雪球/雪崩法说明），可以粘贴给豆包等外部AI助手继续问，等于零成本给了一条"无限量"的退路。弹窗进场动画是手写CSS弹性缓动曲线，没有引入动画库——这个项目所有动效一直是这个路子。
+
 ## 隐私政策 / 用户服务协议 / 会员服务协议 + "关于我们"入口（2026-07-31新增）
 
 App 之前**完全没有**任何地方展示《隐私政策》《用户协议》——微信登录+处理个人信息的 App 理论上该有，且`react/src/sheets/TermsScreen.tsx`原来显示的是一份假设"应用商店计费"的占位条款（用户自己确认"当时是乱写的"）。这一轮把三份真正的法律文档接了进去，源文本在`docs/legal/`（`隐私政策.md`/`用户服务协议.md`/`会员服务协议.md`），基于一木记账同类文档的结构参考+App当前真实功能整理，不是照抄，也不虚构不存在的数据收集行为（比如没有一木那些微博/QQ/友盟/百度语音/支付宝SDK，就没往里塞）。
@@ -933,7 +937,7 @@ localStorage.setItem("after-zero-account-v1", JSON.stringify({openid:"test",nick
 
 ## 硬性铁律，改代码前必看
 
-1. **`localStorage` 的 KEY（在`www/index.html`里搜 `debt-manager-v5`）永远不能改。** 这是用户设备上保存真实数据的键名，改了等于让已经装过的app找不到自己原来存的数据，直接清零。同理，`DKEY`（`debt-manager-docs-v5`）、账号登录状态用的`ACCOUNT_KEY`（`after-zero-account-v1`）、在还债务排序方式用的`SORT_KEY`（`debt-manager-sort-v1`）、还款提醒通知设置用的`NOTIF_KEY`（`after-zero-notify-v1`）、订阅状态用的`PREMIUM_KEY`（`after-zero-premium-v1`）、提前还款模拟器用的`SIM_KEY`（`after-zero-simulate-v1`）、云备份"上次备份时间"用的`BACKUP_KEY`（`after-zero-backup-meta-v1`）、AI 债务顾问每日用量计数用的`AI_USAGE_KEY`（`after-zero-ai-usage-v1`）、AI 债务顾问历史对话记录用的`AI_CHATLOG_KEY`（`after-zero-ai-chatlog-v1`）以后也不能改——十者是各自独立的键，不要以为加新功能可以复用或合并。
+1. **`localStorage` 的 KEY（在`www/index.html`里搜 `debt-manager-v5`）永远不能改。** 这是用户设备上保存真实数据的键名，改了等于让已经装过的app找不到自己原来存的数据，直接清零。同理，`DKEY`（`debt-manager-docs-v5`）、账号登录状态用的`ACCOUNT_KEY`（`after-zero-account-v1`）、在还债务排序方式用的`SORT_KEY`（`debt-manager-sort-v1`）、还款提醒通知设置用的`NOTIF_KEY`（`after-zero-notify-v1`）、订阅状态用的`PREMIUM_KEY`（`after-zero-premium-v1`）、提前还款模拟器用的`SIM_KEY`（`after-zero-simulate-v1`）、云备份"上次备份时间"用的`BACKUP_KEY`（`after-zero-backup-meta-v1`）、AI 债务顾问每日用量计数用的`AI_USAGE_KEY`（`after-zero-ai-usage-v1`）、AI 债务顾问历史对话记录用的`AI_CHATLOG_KEY`（`after-zero-ai-chatlog-v1`）、AI 债务顾问"是否已看过首次额度说明弹窗"用的`AI_LIMIT_NOTICE_KEY`（`after-zero-ai-limit-notice-v1`）以后也不能改——十一者是各自独立的键，不要以为加新功能可以复用或合并。
 2. **新安装必须是空数据。** `www/index.html` 里 `SEED`（债务种子数据）、`DOCS_SEED`（文档种子数据）这两个常量现在都是空值——这是故意的，因为这个app的定位是要发给别人用，任何人第一次打开都不能预装开发者自己的私人财务数据。**改代码时如果要放测试数据，改完记得清空再提交，别把私人内容（真实债务数字、个人反思文档、任何带真实姓名/金额的东西）带回默认值里。**
    **私人数据不止藏在这三个常量里。** 之前排查发现过一次：一个叫`cliff`的调试用标记字段，虽然完全没有UI能设置它（不是SEED、不是表单字段），但代码里直接写死了具体的还款日期和金额字符串（`"2027-05 起还本，月供跳至 ¥2,182"`这类）挂在渲染逻辑里，跟SEED是否清空无关。改代码时留意：不只是搜`SEED`/`DOCS_SEED`这两个变量名，任何看着像真实日期/金额/人名的硬编码字符串都要多看一眼是不是该删。（补：曾经还有个`POSTER`"愿景海报"常量，因为没有任何UI入口能往里填内容、属于永远激活不了的死代码，已整体删除，包括`fileItems()`/`renderDocContent()`里对应的分支，别再找它。）
    **"新安装=空数据"这个假设依赖 `AndroidManifest.xml` 里 `android:allowBackup="false"`。** 安卓系统默认（`allowBackup="true"`，Capacitor脚手架生成时的默认值）会把App数据自动云备份到用户的Google账号，卸载重装或者换新手机登录同一个Google账号时可能会自动把旧数据（包括`ACCOUNT_KEY`存的登录态）恢复回来，让"重装"变得不再可靠地等于"空白状态"。这个项目已经手动改成`allowBackup="false"`彻底关掉自动备份——以后如果看到这个值被改回`true`（比如重新跑`npx cap add android`之类的脚手架命令覆盖了手改的manifest），要记得改回`false`。

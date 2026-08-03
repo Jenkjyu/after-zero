@@ -6,6 +6,7 @@ import { makeMockBridge } from "./mockBridge";
 
 const AI_USAGE_KEY = "after-zero-ai-usage-v1";
 const AI_CHATLOG_KEY = "after-zero-ai-chatlog-v1";
+const AI_LIMIT_NOTICE_KEY = "after-zero-ai-limit-notice-v1";
 
 // 默认让"假流式"打字动画(startReveal)以prefers-reduced-motion的方式直接跳过——回复到达
 // 后立刻整段显示，绝大多数测试断言"回复内容"时不用等一段打字动画播完。jsdom本来就没有
@@ -23,6 +24,10 @@ function stubMatchMedia(matches: boolean) {
 beforeEach(() => {
   localStorage.removeItem(AI_USAGE_KEY);
   localStorage.removeItem(AI_CHATLOG_KEY);
+  // 默认标成"已经看过"首次进入的额度说明弹窗，避免它在不相关的用例里意外弹出、
+  // 干扰断言(那个900ms延迟本来就不会在同步测试里触发，但用fake timers的用例会触发)。
+  // 专门测这个弹窗的用例自己remove这个键。
+  localStorage.setItem(AI_LIMIT_NOTICE_KEY, "1");
   stubMatchMedia(true);
 });
 afterEach(() => {
@@ -138,13 +143,13 @@ describe("AiScreen", () => {
     expect(bridge.callAiAdvisor).toHaveBeenCalledWith("chat", "问题A", []);
   });
 
-  it("今日用量已用完：toast提示且不调用callAiAdvisor", () => {
+  it("今日用量已用完：弹出额度说明弹窗(带复制提示词按钮)且不调用callAiAdvisor", () => {
     localStorage.setItem(AI_USAGE_KEY, JSON.stringify({ date: window.fmtDate(window.today0()), count: 20 }));
     window.__azBridge = makeMockBridge();
     render(<AiScreen />);
     act(() => { openAiScreen(); });
     fireEvent.click(screen.getByText("生成分析报告"));
-    expect(window.__azBridge.toast).toHaveBeenCalledWith("今日 AI 分析次数已用完，明天再来");
+    expect(screen.getByText("复制完整分析提示词")).toBeInTheDocument();
     expect(window.__azBridge.callAiAdvisor).not.toHaveBeenCalled();
   });
 
@@ -281,7 +286,7 @@ describe("AiScreen", () => {
     expect(screen.queryByText("网络错误")).not.toBeInTheDocument();
   });
 
-  it("今日用量已用完时点「重试」：toast提示且不再调用callAiAdvisor", async () => {
+  it("今日用量已用完时点「重试」：弹出额度说明弹窗且不再调用callAiAdvisor", async () => {
     const bridge = makeMockBridge();
     bridge.callAiAdvisor = vi.fn(() => Promise.reject(new Error("网络错误")));
     window.__azBridge = bridge;
@@ -290,7 +295,7 @@ describe("AiScreen", () => {
     await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
     localStorage.setItem(AI_USAGE_KEY, JSON.stringify({ date: window.fmtDate(window.today0()), count: 20 }));
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
-    expect(window.__azBridge.toast).toHaveBeenCalledWith("今日 AI 分析次数已用完，明天再来");
+    expect(screen.getByText("复制完整分析提示词")).toBeInTheDocument();
     expect(bridge.callAiAdvisor).toHaveBeenCalledTimes(1); // 只有最初那次失败的调用，重试没有真正发出
   });
 
@@ -438,5 +443,79 @@ describe("AiScreen", () => {
     act(() => { closeAiScreen(); });
     act(() => { openAiScreen(); });
     expect(screen.getByText("有什么想聊的？")).toBeInTheDocument();
+  });
+
+  describe("额度说明弹窗", () => {
+    it("首次进入：延迟后弹出说明弹窗并标记'已看过'，退出再进不会重复弹", () => {
+      localStorage.removeItem(AI_LIMIT_NOTICE_KEY);
+      vi.useFakeTimers();
+      try {
+        window.__azBridge = makeMockBridge();
+        render(<AiScreen />);
+        act(() => { openAiScreen(); });
+        // 魔法棒的施法动效还没播完，弹窗不该立刻出现
+        expect(screen.queryByText("复制完整分析提示词")).not.toBeInTheDocument();
+        act(() => { vi.advanceTimersByTime(900); });
+        expect(screen.getByText("复制完整分析提示词")).toBeInTheDocument();
+        expect(localStorage.getItem(AI_LIMIT_NOTICE_KEY)).toBe("1");
+
+        fireEvent.click(screen.getByText("知道了"));
+        expect(screen.queryByText("复制完整分析提示词")).not.toBeInTheDocument();
+
+        act(() => { closeAiScreen(); });
+        act(() => { openAiScreen(); });
+        act(() => { vi.advanceTimersByTime(900); });
+        expect(screen.queryByText("复制完整分析提示词")).not.toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("点击背后遮罩也能关闭弹窗", () => {
+      localStorage.removeItem(AI_LIMIT_NOTICE_KEY);
+      vi.useFakeTimers();
+      try {
+        window.__azBridge = makeMockBridge();
+        const { container } = render(<AiScreen />);
+        act(() => { openAiScreen(); });
+        act(() => { vi.advanceTimersByTime(900); });
+        expect(screen.getByText("复制完整分析提示词")).toBeInTheDocument();
+        fireEvent.click(container.querySelector(".ai-limit-scrim")!);
+        expect(screen.queryByText("复制完整分析提示词")).not.toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("点「复制完整分析提示词」：写入剪贴板(含完整债务JSON)并toast成功", async () => {
+      localStorage.setItem(AI_LIMIT_NOTICE_KEY, "1");
+      localStorage.setItem(AI_USAGE_KEY, JSON.stringify({ date: window.fmtDate(window.today0()), count: 20 }));
+      const writeText = vi.fn((_text: string) => Promise.resolve());
+      Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+      const bridge = makeMockBridge();
+      window.__azBridge = bridge;
+      render(<AiScreen />);
+      act(() => { openAiScreen(); });
+      fireEvent.click(screen.getByText("生成分析报告")); // 已用完额度，撞限弹出说明弹窗
+      await act(async () => { fireEvent.click(screen.getByText("复制完整分析提示词")); });
+      expect(writeText).toHaveBeenCalledTimes(1);
+      expect(writeText.mock.calls[0][0]).toContain("在还总负债");
+      expect(bridge.toast).toHaveBeenCalledWith("已复制，可以粘贴给其他AI助手了");
+    });
+
+    it("复制失败：toast失败提示而不是抛出未捕获异常", async () => {
+      localStorage.setItem(AI_LIMIT_NOTICE_KEY, "1");
+      localStorage.setItem(AI_USAGE_KEY, JSON.stringify({ date: window.fmtDate(window.today0()), count: 20 }));
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: vi.fn(() => Promise.reject(new Error("拒绝"))) }, configurable: true,
+      });
+      const bridge = makeMockBridge();
+      window.__azBridge = bridge;
+      render(<AiScreen />);
+      act(() => { openAiScreen(); });
+      fireEvent.click(screen.getByText("生成分析报告"));
+      await act(async () => { fireEvent.click(screen.getByText("复制完整分析提示词")); });
+      expect(bridge.toast).toHaveBeenCalledWith("复制失败，请重试");
+    });
   });
 });

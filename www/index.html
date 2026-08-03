@@ -813,6 +813,28 @@
   .ai-hist-head h2 { margin: 0; }
   .ai-hist-new-btn { background: none; border: none; color: var(--accent); font-weight: 700; font-size: 13px; padding: 4px 2px; font-family: inherit; }
 
+  /* 每日额度用完/首次进入AI页面的说明弹窗——刻意不跟#modalScrim的askAsync()共用，那套
+     是给"确定/取消"事务性确认设计的朴素样式；这里想要更"精致灵动"(类似Telegram)的
+     进场观感，靠CSS弹性缓动曲线做，没有引入任何动画库——这个项目所有动效(.wand.cast等)
+     一直是手写keyframes，没用过库，一个弹窗没必要破例。z-index跟.modal-scrim同一档(50)：
+     概念上是同一类"盖在一切之上的模态框"，比它所在的#aiScreen(35)/#aiHistorySheet(36)
+     都高，toast(60)依然能盖在它上面。 */
+  .ai-limit-scrim { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.45);
+    backdrop-filter: blur(2px); animation: aiLimitScrimIn .2s ease both; }
+  @keyframes aiLimitScrimIn { from { opacity: 0; } to { opacity: 1; } }
+  .ai-limit-modal { position: fixed; z-index: 50; left: 50%; top: 50%; width: min(320px, calc(100vw - 48px));
+    background: var(--card-grad); border-radius: 20px; box-shadow: var(--e3); padding: 26px 20px 18px;
+    text-align: center; display: flex; flex-direction: column; align-items: center;
+    animation: aiLimitModalIn .42s cubic-bezier(.34,1.56,.64,1) both; }
+  @keyframes aiLimitModalIn { from { opacity: 0; transform: translate(-50%,-50%) scale(.82); }
+    to { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
+  .ai-limit-emoji { font-size: 34px; line-height: 1; margin-bottom: 10px; }
+  .ai-limit-text { font-size: 13.5px; color: var(--text); line-height: 1.6; margin: 0 0 10px; }
+  .ai-limit-copy { width: 100%; margin-top: 6px; }
+  .ai-limit-dismiss { background: none; border: none; color: var(--text-muted); font-size: 12.5px;
+    font-family: inherit; padding: 10px 6px 2px; }
+  @media (prefers-reduced-motion: reduce) { .ai-limit-scrim, .ai-limit-modal { animation: none; } }
+
   .account-head { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px 0 4px; margin-bottom: 18px; }
   .account-avatar-btn { background: none; border: none; padding: 0; border-radius: 50%;
     -webkit-tap-highlight-color: transparent; cursor: pointer; }
@@ -1978,12 +2000,27 @@
   // 调用，不复制逻辑。
   // buildAiSummary()/callAiAdvisor()原样保留——它们依赖ensureCbAuthReady/
   // cbApp().callFunction这套认证会话状态，不可移植，是这一步__azBridge唯一新增的桥接函数。
+  // 2026-08-04修：原来只传"月供"这一个笼统数字，先息后本/等本等费这类每期金额不同的贷款，
+  // AI看不到后面某期本金会跳涨，会把"当前这一期"误当成"每一期都一样"，答出跟真实计划表
+  // 矛盾的结论(真机报的bug：test11明明27年5月才开始还本金，AI坚持说没有这笔债务)。
+  // 改成把每笔债务的完整还款计划表(逐期日期/金额/本金/利息/是否已还)+计息方式都传过去，
+  // 这个AI是随问随答的，情报不全比传多一点更容易出错。
+  function methodLabel(kind) {
+    return { amort: "等额本息", equalprincipal: "等额本金", equalfee: "等本等费",
+      interestfirst: "先息后本", custom: "自定义" }[kind] || "未知";
+  }
   function buildAiSummary() {
     var data = computeReportData(debts);
     var list = debts.filter(function (d) { return (+d.balance || 0) > 0.005; }).map(function (d) {
-      return { 名称: d.name || "未命名", 类型: d.type || "其他", 债主: d.funder || "", 剩余本金: r2(d.balance),
-        年化利率百分比: r2(d.rate), 月供: r2(d.monthly), 剩余期数: d.terms || 0, 总期数: d.totalTerms || 0,
-        一次性还清: !!d.oneTime };
+      return { 名称: d.name || "未命名", 类型: d.type || "其他", 债主: d.funder || "",
+        开始日期: d.opened || "", 备注: d.notes || "",
+        计息方式: d.gen && d.gen.kind ? methodLabel(d.gen.kind) : "未知",
+        剩余本金: r2(d.balance), 年化利率百分比: r2(d.rate), 月供: r2(d.monthly),
+        剩余期数: d.terms || 0, 总期数: d.totalTerms || 0, 一次性还清: !!d.oneTime,
+        累计已还本金: r2(d.paidPrincipal), 累计已还利息: r2(d.paidInterest),
+        还款计划: (d.plan || []).map(function (r) {
+          return { 日期: r.date, 金额: r2(r.amount), 本金: r2(r.principal), 利息: r2(r.interest), 已还: !!r.paid };
+        }) };
     });
     return { 在还总负债: data.totalBalance, 加权平均年化利率百分比: r2(data.avgRate),
       预计全部还清日期: data.payoffDate || "未知", 债务清单: list };
@@ -2748,7 +2785,10 @@
     getBackupMeta: getBackupMeta,
     // 第十一步(aiScreen)新增，且是这一步唯一的新增：callAiAdvisor原样保留(依赖
     // ensureCbAuthReady/cbApp().callFunction这套认证会话状态，不可移植)。
-    callAiAdvisor: callAiAdvisor
+    callAiAdvisor: callAiAdvisor,
+    // 2026-08-04新增："每日额度用完了怎么办"弹窗的"复制完整提示词"按钮要用——buildAiSummary()
+    // 本身零DOM依赖、不调用云函数，直接原样暴露，不用像callAiAdvisor那样包一层。
+    buildAiSummary: buildAiSummary
   };
 
   renderAll(); loadUploads(); renderAccountUI();

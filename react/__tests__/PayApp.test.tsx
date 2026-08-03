@@ -54,7 +54,7 @@ describe("pay App", () => {
     // 默认筛选是"下一期"(每笔债务只显示最早的未还期)，表头只有一个、计数按期算。
     // 已结清那笔被isActive过滤掉，不出现。
     const labels = Array.from(document.querySelectorAll(".section-label")).map((el) => el.textContent);
-    expect(labels).toEqual(["下一期 · 2 期"]);
+    expect(labels).toEqual(["下一期 · 2 期 · ¥200"]);
     expect(screen.queryByText("已结清债务")).not.toBeInTheDocument();
   });
 
@@ -125,12 +125,12 @@ describe("pay App", () => {
     // 默认"下一期"：两笔债务各一行
     const list = document.getElementById("payList")!;
     expect(list.querySelectorAll(".pay-row").length).toBe(2);
-    expect(document.querySelector(".section-label")!.textContent).toBe("下一期 · 2 期");
+    expect(document.querySelector(".section-label")!.textContent).toBe("下一期 · 2 期 · ¥2,104");
 
     // 切到100天窗口：信用卡分期4期 + 一次性1期 = 5行
     await act(async () => { fireEvent.click(screen.getByLabelText("按日期筛选")); });
     expect(list.querySelectorAll(".pay-row").length).toBe(5);
-    expect(document.querySelector(".section-label")!.textContent).toBe("100天内 · 5 期");
+    expect(document.querySelector(".section-label")!.textContent).toBe("100天内 · 5 期 · ¥2,416");
 
     // 只有每笔债务最早的那一期能销，其余置灰
     const btns = [...list.querySelectorAll(".pay-swipe-btn")];

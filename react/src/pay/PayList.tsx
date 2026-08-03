@@ -25,7 +25,7 @@ export function PayList({ visible, label, ctx }: PayListProps) {
   return (
     <>
       <div className={"section-label" + (label === "已逾期" ? " overdue" : "")}>
-        {label} · {visible.length} 期
+        {label} · {visible.length} 期 · ¥{window.fmt(visible.reduce((sum, o) => sum + o.amount, 0))}
       </div>
       {visible.map((o) => (
         <PayRow

@@ -1,10 +1,17 @@
 // "最近还款日"hero卡+通知铃铛——直译自vanilla bellHtml()+renderPayHero()（www/index.html）。
 // 铃铛不再需要id+事件委托+updateBellUI()那套incremental toggle，React靠notifyEnabled
 // prop声明式驱动.on类，桥接getNotify()经过useNotify()（见shared/state.ts）保证响应式更新。
-import type { PayItem } from "./App";
+/** App.tsx算好的"最近这一天"合并信息——同一天可能有好几笔债务到期，name已经拼成
+ *  "test3 等6笔"这种形式，amount是这些期次的加总，不再是单笔债务的PayItem。 */
+export interface HeroSoonest {
+  next: Date;
+  diff: number;
+  amount: number;
+  name: string;
+}
 
 export interface HeroProps {
-  soonest: PayItem | null;
+  soonest: HeroSoonest | null;
   notifyEnabled: boolean;
   onBellClick(): void;
 }
@@ -44,7 +51,7 @@ export function Hero({ soonest, notifyEnabled, onBellClick }: HeroProps) {
       </div>
     );
   }
-  const { d, next, diff, amount } = soonest;
+  const { next, diff, amount, name } = soonest;
   return (
     <div className={"pay-hero " + window.urgencyTier(diff)}>
       <div className="pay-hero-top">
@@ -58,7 +65,7 @@ export function Hero({ soonest, notifyEnabled, onBellClick }: HeroProps) {
         </div>
         <div className="pay-hero-amt num">¥{window.fmt(amount)}</div>
       </div>
-      <div className="pay-hero-name">{d.name}</div>
+      <div className="pay-hero-name">{name}</div>
     </div>
   );
 }
