@@ -259,6 +259,90 @@ test("simulatePrepay: 月供覆盖不了利息时返回null", () => {
   assert.equal(calc.simulatePrepay(d, "single", 1, 10), null);
 });
 
+test("snowballOrder: 按余额升序排id", () => {
+  const debts = [{ id: "a", balance: 500 }, { id: "b", balance: 100 }, { id: "c", balance: 300 }];
+  assert.deepEqual(calc.snowballOrder(debts), ["b", "c", "a"]);
+});
+
+test("avalancheOrder: 按年化利率降序排id", () => {
+  const debts = [{ id: "a", rate: 8 }, { id: "b", rate: 24 }, { id: "c", rate: 15 }];
+  assert.deepEqual(calc.avalancheOrder(debts), ["b", "c", "a"]);
+});
+
+test("simulateRepaymentOrder: 单笔债务退化成跟amortForward一致的结果", () => {
+  const debts = [{ id: "a", balance: 1000, rate: 12, monthly: 100 }];
+  const res = calc.simulateRepaymentOrder(debts, ["a"], 0);
+  const base = calc.amortForward(1000, 12 / 1200, 100, null);
+  assert.equal(res.months, base.months);
+  assert.equal(res.totalInterest, base.totalInterest);
+  assert.equal(res.monthly.length, res.months);
+  assert.equal(res.monthly[res.months - 1].balance, 0);
+  assert.deepEqual(res.payoffMonth, { a: res.months });
+});
+
+test("simulateRepaymentOrder: 一笔还清后，它的月供滚入队列里下一笔（雪球效应）——两笔均衡余额但顺序不同，总利息应该不同", () => {
+  // 两笔条件对称(同余额同利率同月供)，只是谁排第一——先还完的那笔的月供滚给另一笔，
+  // 让另一笔提前还清；顺序颠倒时省下利息的应该是"被排在后面、但因为滚入而提前还完"的那笔。
+  // 用不对称利率验证"雪崩法排序应该比雪球法排序总利息更低或相等"这个数学性质。
+  const debts = [
+    { id: "hi", balance: 2000, rate: 24, monthly: 100 },
+    { id: "lo", balance: 500, rate: 6, monthly: 100 },
+  ];
+  const snowball = calc.simulateRepaymentOrder(debts, calc.snowballOrder(debts), 0); // 先还lo(余额小)
+  const avalanche = calc.simulateRepaymentOrder(debts, calc.avalancheOrder(debts), 0); // 先还hi(利率高)
+  assert.deepEqual(calc.snowballOrder(debts), ["lo", "hi"]);
+  assert.deepEqual(calc.avalancheOrder(debts), ["hi", "lo"]);
+  // 雪崩法优先集中火力在高息债务上，数学上总利息不会比雪球法更多
+  assert.ok(avalanche.totalInterest <= snowball.totalInterest);
+});
+
+test("simulateRepaymentOrder: 额外月供能让两种顺序都提前还清、总利息都下降", () => {
+  const debts = [
+    { id: "a", balance: 2000, rate: 18, monthly: 100 },
+    { id: "b", balance: 1000, rate: 10, monthly: 80 },
+  ];
+  const order = calc.snowballOrder(debts);
+  const noExtra = calc.simulateRepaymentOrder(debts, order, 0);
+  const withExtra = calc.simulateRepaymentOrder(debts, order, 300);
+  assert.ok(withExtra.months < noExtra.months);
+  assert.ok(withExtra.totalInterest < noExtra.totalInterest);
+});
+
+test("simulateRepaymentOrder: 月供覆盖不了利息时返回null", () => {
+  const debts = [{ id: "a", balance: 1000, rate: 600, monthly: 1 }]; // 月利率50%，月供1远不够
+  assert.equal(calc.simulateRepaymentOrder(debts, ["a"], 0), null);
+});
+
+test("simulateRepaymentOrder: orderIds没覆盖到的债务被忽略，不参与模拟", () => {
+  const debts = [
+    { id: "a", balance: 500, rate: 10, monthly: 100 },
+    { id: "b", balance: 99999, rate: 999, monthly: 0 }, // 若被算进去会返回null(月供0覆盖不了利息)
+  ];
+  const res = calc.simulateRepaymentOrder(debts, ["a"], 0);
+  assert.ok(res); // 没被null掉，说明"b"确实被忽略了
+  assert.deepEqual(Object.keys(res.payoffMonth), ["a"]);
+});
+
+test("simulateRepaymentOrder: 全部债务余额已为0时返回0个月、空历史", () => {
+  const debts = [{ id: "a", balance: 0, rate: 10, monthly: 100 }];
+  const res = calc.simulateRepaymentOrder(debts, ["a"], 0);
+  assert.equal(res.months, 0);
+  assert.equal(res.totalInterest, 0);
+  assert.deepEqual(res.monthly, []);
+});
+
+test("simulateRepaymentOrder: monthly数组的balance应该单调不增、最后一条为0", () => {
+  const debts = [
+    { id: "a", balance: 3000, rate: 20, monthly: 150 },
+    { id: "b", balance: 1500, rate: 8, monthly: 90 },
+  ];
+  const res = calc.simulateRepaymentOrder(debts, calc.avalancheOrder(debts), 50);
+  for (let k = 1; k < res.monthly.length; k++) {
+    assert.ok(res.monthly[k].balance <= res.monthly[k - 1].balance + 0.005);
+  }
+  assert.equal(res.monthly[res.monthly.length - 1].balance, 0);
+});
+
 test("detectMatchingSort: 顺序匹配某个预设排序时返回该排序名", () => {
   const sorts = { "a-asc": (x) => x.v, "a-desc": (x) => -x.v };
   const arr = [{ v: 1 }, { v: 2 }, { v: 3 }];
@@ -1005,6 +1089,80 @@ test("waivePeriod: 已经没有未还期次时返回null", () => {
 });
 
 // ===== pressureWindowMonths（"未来还款压力"图的窗口长度，2026-07-29）=====
+test("buildHistoryEvents: 没有真实还款事件时返回空数组", () => {
+  const debts = [{ id: "a", name: "A", settled: false, plan: [
+    { date: "2026-08-01", amount: 100, principal: 90, interest: 10, paid: false },
+  ] }];
+  assert.deepEqual(calc.buildHistoryEvents(debts), []);
+});
+
+test("buildHistoryEvents: 手动编辑器勾选的已还(paid=true但没有paidAt)不算真实事件", () => {
+  const debts = [{ id: "a", name: "A", settled: false, plan: [
+    { date: "2026-08-01", amount: 20000, principal: 20000, interest: 0, paid: true }, // 没有paidAt
+  ] }];
+  assert.deepEqual(calc.buildHistoryEvents(debts), []);
+});
+
+test("buildHistoryEvents: 结清事件——提前结清(settleRow)取该行date，销最后一期自动结清取最后一期paidAt", () => {
+  const debts = [
+    { id: "a", name: "提前结清的", settled: true, settledDate: "8/1", plan: [
+      { date: "2026-07-01", amount: 100, principal: 90, interest: 10, paid: true, paidAt: "2026-07-01" },
+      { date: "2026-08-01", amount: 500, principal: 480, interest: 20, paid: true, settleRow: true },
+    ] },
+    { id: "b", name: "销最后一期结清的", settled: true, settledDate: "9/5", plan: [
+      { date: "2026-09-05", amount: 200, principal: 200, interest: 0, paid: true, paidAt: "2026-09-05" },
+    ] },
+  ];
+  const events = calc.buildHistoryEvents(debts);
+  const settledEvents = events.filter((e) => e.type === "settled");
+  assert.deepEqual(settledEvents, [
+    { type: "settled", date: "2026-08-01", name: "提前结清的" },
+    { type: "settled", date: "2026-09-05", name: "销最后一期结清的" },
+  ]);
+});
+
+test("buildHistoryEvents: 累计还款跨过里程碑阈值时各记一条，按真实日期排序", () => {
+  const debts = [{ id: "a", name: "A", settled: false, plan: [
+    { date: "2026-01-01", amount: 6000, principal: 6000, interest: 0, paid: true, paidAt: "2026-01-01" }, // 累计6000，未跨线
+    { date: "2026-02-01", amount: 5000, principal: 5000, interest: 0, paid: true, paidAt: "2026-02-01" }, // 累计11000，跨过10000
+    { date: "2026-03-01", amount: 20000, principal: 20000, interest: 0, paid: true, paidAt: "2026-03-01" }, // 累计31000，跨过30000
+  ] }];
+  const events = calc.buildHistoryEvents(debts);
+  assert.deepEqual(events, [
+    { type: "milestone", date: "2026-02-01", amount: 10000 },
+    { type: "milestone", date: "2026-03-01", amount: 30000 },
+  ]);
+});
+
+test("buildHistoryEvents: 一次还款同时跨过多个阈值，各记一条、都用同一天的日期", () => {
+  const debts = [{ id: "a", name: "A", settled: false, plan: [
+    { date: "2026-05-01", amount: 120000, principal: 120000, interest: 0, paid: true, paidAt: "2026-05-01" },
+  ] }];
+  const events = calc.buildHistoryEvents(debts);
+  assert.deepEqual(events, [
+    { type: "milestone", date: "2026-05-01", amount: 10000 },
+    { type: "milestone", date: "2026-05-01", amount: 30000 },
+    { type: "milestone", date: "2026-05-01", amount: 50000 },
+    { type: "milestone", date: "2026-05-01", amount: 100000 },
+  ]);
+});
+
+test("buildHistoryEvents: 结清事件跟里程碑事件按真实日期混排，不是settled全排在milestone前面", () => {
+  const debts = [
+    { id: "a", name: "早还清的", settled: true, settledDate: "1/10", plan: [
+      { date: "2026-01-10", amount: 5000, principal: 5000, interest: 0, paid: true, settleRow: true },
+    ] },
+    { id: "b", name: "B", settled: false, plan: [
+      { date: "2026-03-01", amount: 20000, principal: 20000, interest: 0, paid: true, paidAt: "2026-03-01" }, // 跨过10000
+    ] },
+  ];
+  const events = calc.buildHistoryEvents(debts);
+  assert.deepEqual(events, [
+    { type: "settled", date: "2026-01-10", name: "早还清的" },
+    { type: "milestone", date: "2026-03-01", amount: 10000 },
+  ]);
+});
+
 test("pressureWindowMonths: 铺到最后一笔未还期次所在的月份，下限12上限60", () => {
   const today = new Date(2026, 6, 15); // 2026-07-15
   const mk = (dates, extra) => Object.assign({

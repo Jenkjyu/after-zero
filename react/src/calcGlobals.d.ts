@@ -5,13 +5,17 @@
 //
 // 只声明已迁移的React页面实际会调用的几个，不是calc.js全部39个——够用即可，见CLAUDE.md
 // "React 迁移"一节。
-import type { AiConversation, Debt, DebtSummary, GenSpec, MonthlyRepayment, PlanRow, Premium, ReportData, SortKey, UpcomingPressure } from "./types";
+import type { AiConversation, Debt, DebtSummary, GenSpec, HistoryEvent, MonthlyRepayment, PlanRow, Premium, ReportData, SortKey, UpcomingPressure } from "./types";
 
 declare global {
   interface Window {
     __azBridge: import("./types").AzBridge;
     recompute(d: Debt): void;
     summarizeDebts(debts: Debt[]): DebtSummary;
+    // historyScreen(react/src/sheets/HistoryScreen.tsx)用：把散落在各笔债务plan里的真实
+    // 还款事件(settled结清/milestone累计金额跨过整数关口)串成一条按时间升序排列的时间线，
+    // 不是逐期流水账——见calc.js注释。
+    buildHistoryEvents(debts: Debt[]): HistoryEvent[];
     hasPremium(premium: Premium): boolean;
     premiumLabel(premium: Premium): string | null;
     // sorts是{排序名: 取值函数}的映射——calc.js的detectMatchingSort()对键名不关心具体是哪个
@@ -70,6 +74,26 @@ declare global {
       extra: number
     ): { monthsSaved: number; interestSaved: number; newMonths: number; baseMonths: number } | null;
     isBadRepeatDay(day: number): boolean;
+    // strategyCompareScreen(react/src/sheets/StrategyCompareScreen.tsx)用：多策略对比规划
+    // 的核心模拟——给定一个还款优先级顺序(债务id数组)+可选的每月额外投入，按"雪球/雪崩"
+    // 那套经典策略模拟(预算集中砸向队首未还清的债务，一笔还完后它的月供份额滚入下一笔)。
+    // 返回null的两种情况：①某笔债务月供覆盖不了自己的利息(永远还不完)；②超过600个月
+    // (50年)还没还完。debts只需要{id,balance,rate,monthly}这4个字段，不要求完整Debt对象。
+    simulateRepaymentOrder(
+      debts: { id: string; balance: number; rate: number; monthly: number }[],
+      orderIds: string[],
+      extraMonthly: number
+    ): {
+      months: number;
+      totalInterest: number;
+      totalPrincipal: number;
+      monthly: { month: number; interest: number; principal: number; balance: number }[];
+      payoffMonth: Record<string, number>;
+    } | null;
+    // 雪球法：按余额升序排债务id；雪崩法：按年化利率降序排债务id。都是给
+    // simulateRepaymentOrder的orderIds参数用的现成排序，不改变传入数组本身。
+    snowballOrder(debts: { id: string; balance: number }[]): string[];
+    avalancheOrder(debts: { id: string; rate: number }[]): string[];
     r2(x: number): number;
     clone<T>(x: T): T;
     addMonths(d: Date, m: number): Date;
@@ -124,6 +148,13 @@ declare global {
     // 排在backupScreen之前、termsScreen之后。
     __azAiScreenBack?: () => boolean;
     __azAiHistorySheetBack?: () => boolean;
+    // 同上，多策略对比规划(2026-08-04新增)——见 react/src/sheets/StrategyCompareScreen.tsx。
+    // 不从别的sheets屏幕内部打开、也不从自己内部打开别的sheets屏幕，链里位置不受排序
+    // 约束，放在链尾。
+    __azStrategyScreenBack?: () => boolean;
+    // 同上，还债历程(2026-08-04新增)——见 react/src/sheets/HistoryScreen.tsx。同样不受
+    // 排序约束的独立screen，放在链尾。
+    __azHistoryScreenBack?: () => boolean;
     // 档案库PDF预览(react/src/sheets/DocsScreen.tsx)用：pdf.js的legacy构建，通过
     // www/index.html里一段行内type="module"脚本挂到window上(不是npm依赖，不参与
     // Vite打包，见index.html里那段注释)——这里只声明DocsScreen.tsx实际用到的

@@ -16,18 +16,20 @@ describe("PremiumScreen", () => {
     expect(container.querySelector("#premiumScreen")).not.toHaveClass("open");
   });
 
-  it("只有一张买断价卡：原价划线¥40、现价¥24、限时优惠为纯文字(不是绿色胶囊)，没有月付/年付选项", () => {
+  it("只有一张买断价卡：朴素现价¥49，没有划线原价/限时优惠这类促销话术，没有月付/年付选项", () => {
     window.__azBridge = makeMockBridge();
     const { container } = render(<PremiumScreen />);
     act(() => { openPremiumScreen(); });
-    expect(screen.getByText("¥24")).toBeInTheDocument();
-    expect(screen.getByText("¥40")).toHaveClass("pc-strike");
-    expect(screen.getByText("限时优惠")).toHaveClass("pc-limited");
+    expect(screen.getByText("¥49")).toBeInTheDocument();
     expect(container.querySelectorAll(".price-card")).toHaveLength(1);
     // 只有一张卡时没有"选中"这个语义，卡片不再常驻高亮描边
     expect(container.querySelector(".price-card")).not.toHaveClass("selected");
+    expect(screen.queryByText("¥40")).not.toBeInTheDocument();
+    expect(screen.queryByText("限时优惠")).not.toBeInTheDocument();
     expect(screen.queryByText("¥5.9")).not.toBeInTheDocument();
     expect(screen.queryByText(/按月订阅/)).not.toBeInTheDocument();
+    // 朴素陈述为什么收这个钱，不是营销话术
+    expect(screen.getByText(/真实的服务器成本/)).toBeInTheDocument();
   });
 
   it("点开通Premium调用confirmAsync弹出暂未开放支付提示", () => {

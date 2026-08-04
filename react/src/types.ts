@@ -162,7 +162,7 @@ export interface UpcomingPressure {
   peak: { month: string; total: number } | null;
 }
 
-// AI 债务顾问历史对话记录（react/src/sheets/AiScreen.tsx用）——第十一步(React迁移收尾)后
+// AI 债务助手历史对话记录（react/src/sheets/AiScreen.tsx用）——第十一步(React迁移收尾)后
 // AI_CHATLOG_KEY整体移交React所有权，直接读写localStorage(不经过bridge，跟SIM_KEY当年
 // 的先例一致)。messages里的role只有"user"/"assistant"两种(跟发给aiAdvisor云函数的history
 // 参数、以及calc.js的findAiConv/bumpAiConvTop操作的形状完全一致)，UI渲染时按
@@ -294,11 +294,32 @@ export interface AzBridge {
   // cbApp().callFunction这套认证会话状态，不可移植。AI_USAGE_KEY/AI_CHATLOG_KEY整体移交
   // React所有权(跟SIM_KEY当年同一个先例)，不经过bridge。history是"这次提问之前的上下文"，
   // 不含这次提问本身(服务端会把question接在最后)；report模式不需要history，传空数组。
-  callAiAdvisor(mode: "report" | "chat", question: string, history: AiChatMessage[]): Promise<string>;
-  // 2026-08-04新增：额度用完弹窗"复制完整提示词"按钮用来现读一份跟真正调云函数时
-  // 一模一样的债务JSON(逐期还款计划全含)，零DOM依赖、不调云函数，直接原样暴露。
-  buildAiSummary(): AiSummary;
+  // 2026-08-04：返回值从 Promise<string> 改成 {text, quota}——额度改成服务端权威计数
+  // (aiAdvisor云函数的AI_MONTHLY_LIMIT/aiUsage集合)之后，每次调用都要把本月最新用量带
+  // 回来给React刷新本地缓存(AI_USAGE_KEY)。超额时这个Promise会reject，Error上挂着
+  // code:"QUOTA_EXCEEDED"和quota，React据此弹额度说明弹窗而不是当普通报错。
+  callAiAdvisor(mode: "report" | "chat", question: string, history: AiChatMessage[]):
+    Promise<{ text: string; quota: AiQuota | null }>;
+  // 2026-08-04新增：额度用完弹窗"复制完整提示词"按钮用来现读一份债务JSON。
+  // ⚠️不传参=**全量**(逐期还款计划全含)，这正是复制路径要的——用户粘去豆包/文心，
+  // token是对方付、我们零成本，压缩只会白白降低对方回答质量。
+  // vanilla内部的callAiAdvisor()走的是buildAiSummary(true)压缩版(已还期次压成汇总)，
+  // 因为那条路径的token我们自己付、且每次提问都重发一遍。两条路径成本结构相反，
+  // 所以刻意不共用同一份数据，详见www/index.html里buildAiSummary的注释。
+  buildAiSummary(compact?: boolean): AiSummary;
+  // "还债历程"(react/src/sheets/HistoryScreen.tsx)"生成分享卡片"按钮用——Premium专属。
+  // SVG拼图+转PNG+存到设备这条链路涉及Blob/Canvas/原生插件调用，不可移植，包一层。
+  generateHistoryShareCard(): Promise<void>;
 }
+
+/** buildHistoryEvents(debts)(www/js/calc.js)的返回元素——见calc.js注释，只挑两类事件：
+ *  settled(某笔债务被还清)/milestone(累计已还跨过整数关口)，不是逐期流水账。 */
+export type HistoryEvent =
+  | { type: "settled"; date: string; name: string }
+  | { type: "milestone"; date: string; amount: number };
+
+/** aiAdvisor云函数返回的本月用量（服务端权威值）。month按北京时间算，形如"2026-08"。 */
+export interface AiQuota { month: string; used: number; limit: number }
 
 export interface AiSummaryPlanRow { 日期: string; 金额: number; 本金: number; 利息: number; 已还: boolean }
 export interface AiSummaryDebt {

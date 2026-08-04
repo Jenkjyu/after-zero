@@ -17,10 +17,10 @@ export function AiLimitModal({ open, onClose, onCopy }: AiLimitModalProps) {
       <div className="ai-limit-modal" role="dialog" aria-modal="true" aria-labelledby="aiLimitText1">
         <div className="ai-limit-emoji" aria-hidden="true">😭😭</div>
         <p className="ai-limit-text" id="aiLimitText1">
-          After Zero 现在是完全免费的 app，AI 分析对开发者来说是有真实成本的——为了不让这个功能被无限次调用拖垮，每天最多能问 20 次。
+          After Zero 现在是完全免费的 app，AI 分析对开发者来说是有真实成本的——为了不让这个功能被无限次调用拖垮，每月最多能问 50 次，每月 1 号恢复。
         </p>
         <p className="ai-limit-text">
-          如果这 20 次不够用，可以把包含你全部债务信息的完整提示词复制下来，粘贴给豆包、文心一言等其他 AI 助手，同样能得到精准分析。
+          如果不够用，可以把包含你全部债务信息的完整提示词复制下来，粘贴给豆包、文心一言等其他 AI 助手，同样能得到精准分析。
         </p>
         <button type="button" className="btn primary ai-limit-copy" onClick={onCopy}>复制完整分析提示词</button>
         <button type="button" className="ai-limit-dismiss" onClick={onClose}>知道了</button>

@@ -23,6 +23,8 @@ import { useMemo } from "react";
 import { useDebts, usePremium } from "../shared/state";
 import { ReportHead } from "./ReportHead";
 import { FindingList, ActionBox } from "./Conclusions";
+import { StrategyCta } from "./StrategyCta";
+import { HistoryTeaser } from "./HistoryTeaser";
 import { Journey } from "./Journey";
 import { Pressure } from "./Pressure";
 import { Rank } from "./Rank";
@@ -73,6 +75,7 @@ export function App() {
         {/* 从没记过债务时整个结语块（"如果只做一件事"+导出+口径说明）都不成立——
             没有数据可导出，也没有"保持节奏"这回事，直接不渲染。已结清历史（s.settled>0）
             则保留结语块，只去掉不成立的那一句判断文案，导出/口径说明依然有意义。 */}
+        {s.settled > 0 && <HistoryTeaser s={s} />}
         {s.settled > 0 && <Outro lead={null} premium={premium} showLead={false} />}
       </div>
     );
@@ -83,10 +86,13 @@ export function App() {
       <ReportHead data={data} s={s} monthsLeft={monthsLeft} />
       <FindingList items={top3} />
       {lead && <ActionBox lead={lead} />}
+      {/* 至少要有2笔在还债务才有"顺序"可比——1笔或0笔时这个入口没有意义，不展示 */}
+      {data.active.length >= 2 && <StrategyCta premium={premium} />}
       <Journey data={data} s={s} monthsLeft={monthsLeft} />
       <Pressure data={pressure} />
       <Rank rows={rows} totalBalance={data.totalBalance} />
       <TypePie data={data} />
+      <HistoryTeaser s={s} />
       <Outro lead={lead} premium={premium} />
     </div>
   );

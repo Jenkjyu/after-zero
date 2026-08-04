@@ -315,6 +315,76 @@ function simulatePrepay(d, mode, atPeriod, extra) {
   return { monthsSaved: baseline.months - scenario.months, interestSaved: r2(baseline.totalInterest - scenario.totalInterest), newMonths: scenario.months, baseMonths: baseline.months };
 }
 
+// 多策略对比规划（统计tab"最该先动手的地方"下面的入口）：给定一个还款优先级顺序，
+// 模拟"雪球法/雪崩法/自定义顺序"这类经典债务偿还策略——每月固定预算(=全部债务当前
+// 月供之和+可选的额外投入)，按顺序把预算集中砸向队列里第一笔没还完的债务，其余债务
+// 只还各自的月供；一笔还完后，它的月供份额自动滚入下一笔(这就是"雪球"名字的由来)。
+// 跟amortForward同样的简化取舍：不追4种计划生成器各自的逐行数学，统一用recompute()
+// 算出的balance/rate/monthly做标准等额本息模拟——见amortForward注释，这里不重复。
+//
+// debts: 一批 {id, balance, rate, monthly}（不要求是完整Debt对象，测试/UI都只传这4个
+// 字段就够）。orderIds: 优先级顺序(债务id数组)，必须覆盖debts里的每一个id(顺序不含的
+// id会被忽略——调用方传子集是自己的选择，比如已经手动排除掉一次性结清的债务)。
+// extraMonthly: 每月额外投入(不分给哪笔债务，整体滚入当前队首)，默认0。
+//
+// 返回 null 的两种情况：①任意一笔债务的月供覆盖不了自己的利息(那笔永远还不完，见
+// amortForward同样的判断)；②超过600个月(50年)还没还完，数据大概率有问题，不返回
+// 一个看似合理实则荒谬的假结果。
+function simulateRepaymentOrder(debts, orderIds, extraMonthly) {
+  var extra = +extraMonthly || 0;
+  var byId = {};
+  debts.forEach(function (d) { byId[d.id] = d; });
+  var state = orderIds.filter(function (id) { return byId[id]; }).map(function (id) {
+    var d = byId[id];
+    return { id: id, balance: +d.balance || 0, i: (+d.rate || 0) / 1200, min: +d.monthly || 0 };
+  });
+  for (var k = 0; k < state.length; k++) {
+    var s0 = state[k];
+    if (s0.balance > 0.005 && s0.min < s0.balance * s0.i - 0.005) return null;
+  }
+  var month = 0, totalInterest = 0, totalPrincipal = 0;
+  var monthly = [];
+  var payoffMonth = {};
+  var MAX_MONTHS = 600;
+  while (state.some(function (s) { return s.balance > 0.005; }) && month < MAX_MONTHS) {
+    month++;
+    // 已经还完的债务，它们的月供份额本月起自动滚入队首那笔还没还完的
+    var rollover = extra;
+    for (var a = 0; a < state.length; a++) {
+      if (state[a].balance <= 0.005) rollover += state[a].min;
+    }
+    var targetTaken = false;
+    var monthInterest = 0, monthPrincipal = 0;
+    for (var b = 0; b < state.length; b++) {
+      var s = state[b];
+      if (s.balance <= 0.005) continue;
+      var interest = s.balance * s.i;
+      var payment = s.min;
+      if (!targetTaken) { payment += rollover; targetTaken = true; } // 队列里第一笔未还清的独占全部滚入预算
+      if (payment > s.balance + interest) payment = s.balance + interest;
+      var principal = payment - interest;
+      s.balance = Math.max(0, s.balance - principal);
+      if (s.balance <= 0.005 && !payoffMonth[s.id]) payoffMonth[s.id] = month;
+      monthInterest += interest;
+      monthPrincipal += principal;
+    }
+    totalInterest += monthInterest;
+    totalPrincipal += monthPrincipal;
+    var remaining = state.reduce(function (sum, s) { return sum + s.balance; }, 0);
+    monthly.push({ month: month, interest: r2(monthInterest), principal: r2(monthPrincipal), balance: r2(remaining) });
+  }
+  if (month >= MAX_MONTHS) return null;
+  return { months: month, totalInterest: r2(totalInterest), totalPrincipal: r2(totalPrincipal), monthly: monthly, payoffMonth: payoffMonth };
+}
+// 雪球法：优先还余额最小的——每还清一笔都是一次心理上的小胜利，最容易坚持下去。
+function snowballOrder(debts) {
+  return debts.slice().sort(function (a, b) { return (+a.balance || 0) - (+b.balance || 0); }).map(function (d) { return d.id; });
+}
+// 雪崩法：优先还年化利率最高的——数学上总利息最省，但见效慢，容易半途而废。
+function avalancheOrder(debts) {
+  return debts.slice().sort(function (a, b) { return (+b.rate || 0) - (+a.rate || 0); }).map(function (d) { return d.id; });
+}
+
 // Array.sort自ES2019起规范保证稳定；万一某个古早WebView不稳定，最坏结果只是多显示"自定义"，不会误配错的预设名。
 // sorts 是 {sortKey: function(d){return 排序用的数字}} 的映射——index.html 里是 DEBT_SORTS，
 // 作为参数传入而不是从闭包读取，这样这个函数不依赖任何模块级状态，可以直接单测。
@@ -445,6 +515,54 @@ function summarizeDebts(debts) {
   });
   var zeroBase = paidPrincipal + total, pct = zeroBase > 0 ? Math.round(paidPrincipal / zeroBase * 100) : 0;
   return { total: r2(total), monthly: r2(monthly), active: active, settled: settled, paidPrincipal: r2(paidPrincipal), paidInterest: r2(paidInterest), pct: pct };
+}
+
+// "还债历程"(HistoryScreen)用：把散落在各笔债务plan里的真实还款事件，串成一条按时间
+// 排序的叙事时间线。故意不是"每一期还款都列一条"——一个12笔债务、每笔24期的用户会有
+// 几百条记录，那是流水账不是"历程"，看不出重点。只挑两类真正值得回顾的事件：
+// ①settled：这笔债务被还清的那一刻(纯庆祝性质，天然稀疏)
+// ②milestone：累计已还金额跨过整数关口(1万/3万/5万/10万...)的那一刻——用固定阈值表，
+//   不是"取整到最近"(niceCeil是给图表坐标轴用的，语义不一样，这里故意不复用)。
+// 只用真实发生过的事件(r.paidAt，或settleRow这种"没单独盖paidAt但date本身就是真实结清
+// 那天"的行)——手动编辑器勾选的"已还"没有真实日期，不算数(已知的数据模型缺口③定的
+// 同一条规矩：paidAt只在recordPayment/waivePeriod/applySettle这几个真实还款事件里写)。
+var HISTORY_MILESTONE_STEPS = [10000, 30000, 50000, 100000, 200000, 500000, 1000000, 2000000, 5000000];
+function buildHistoryEvents(debts) {
+  var payments = [], settled = [];
+  debts.forEach(function (d) {
+    var plan = d.plan || [];
+    plan.forEach(function (r) {
+      if (!r.paid) return;
+      var date = r.paidAt || (r.settleRow ? r.date : null);
+      if (!date) return;
+      payments.push({ date: date, amount: r.paidAmount != null ? +r.paidAmount : (+r.amount || 0) });
+    });
+    if (!d.settled) return;
+    // d.settledDate是"M/D"短格式(没有年份)，展示用的历史遗留格式，不能直接排序——
+    // 真实完整日期(YYYY-MM-DD)要么从settleRow那一行的date拿(提前结清路径)，要么从
+    // 最后一期的paidAt拿(销掉最后一期自动结清路径，见recordPayment/payInstallment)，
+    // 两条路径见calc.js"提前结清"一节，两者都能推出同一天，不需要再单独存一个字段。
+    var settleRow = null, lastPaid = null;
+    for (var i = 0; i < plan.length; i++) {
+      if (plan[i].settleRow) settleRow = plan[i];
+      if (plan[i].paid && plan[i].paidAt) lastPaid = plan[i];
+    }
+    var realDate = settleRow ? settleRow.date : (lastPaid ? lastPaid.paidAt : null);
+    if (realDate) settled.push({ date: realDate, name: d.name || "未命名" });
+  });
+  payments.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+
+  var events = settled.map(function (s) { return { type: "settled", date: s.date, name: s.name }; });
+  var cum = 0, stepIdx = 0;
+  payments.forEach(function (p) {
+    cum += p.amount;
+    while (stepIdx < HISTORY_MILESTONE_STEPS.length && cum >= HISTORY_MILESTONE_STEPS[stepIdx]) {
+      events.push({ type: "milestone", date: p.date, amount: HISTORY_MILESTONE_STEPS[stepIdx] });
+      stepIdx++;
+    }
+  });
+  events.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+  return events;
 }
 
 // 统计tab"月还款统计"图用的月度聚合：按 plan 里每一期的 date 所在月份分组，拆已还(actual)/
@@ -658,9 +776,12 @@ if (typeof module !== "undefined" && module.exports) {
     recompute: recompute, markPaidThrough: markPaidThrough, normalize: normalize, genDebtId: genDebtId,
     applySettle: applySettle, undoSettle: undoSettle, shortDateFromISO: shortDateFromISO,
     rowRemaining: rowRemaining, recordPayment: recordPayment, waivePeriod: waivePeriod,
-    amortForward: amortForward, simulatePrepay: simulatePrepay, detectMatchingSort: detectMatchingSort,
+    amortForward: amortForward, simulatePrepay: simulatePrepay,
+    simulateRepaymentOrder: simulateRepaymentOrder, snowballOrder: snowballOrder, avalancheOrder: avalancheOrder,
+    detectMatchingSort: detectMatchingSort,
     urgencyTier: urgencyTier, relLabel: relLabel, dueBucket: dueBucket,
     isBadRepeatDay: isBadRepeatDay, offsetLabel: offsetLabel, computeReportData: computeReportData, summarizeDebts: summarizeDebts,
+    buildHistoryEvents: buildHistoryEvents,
     computeMonthlyRepayment: computeMonthlyRepayment, computeUpcomingPressure: computeUpcomingPressure,
     remainingInterest: remainingInterest, niceCeil: niceCeil, pressureWindowMonths: pressureWindowMonths,
     computeNotifySchedule: computeNotifySchedule,

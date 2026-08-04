@@ -166,9 +166,13 @@ window.__azBridge = {
   createBackup: createBackup, listBackups: listBackups,
   restoreBackup: restoreBackup, deleteBackup: deleteBackup,
   getBackupMeta: getBackupMeta,
-  callAiAdvisor: callAiAdvisor
+  callAiAdvisor: callAiAdvisor,
+  // 第十一步之后陆续新增，不再逐步编号——见下面"为什么是函数"之后的说明。
+  buildAiSummary: buildAiSummary,
+  generateHistoryShareCard: generateHistoryShareCard
 };
 ```
+**这个代码块之后不再逐步枚举新增函数**——`resetLocalData`（注销账户新增"仅重置本地数据"那轮）、`buildAiSummary`（AI额度弹窗"复制提示词"按钮那轮）、`generateHistoryShareCard`（还债历程分享卡片那轮，2026-08-04）都是这类例子，凡是vanilla需要暴露新的写操作给React调用，任何时候都可以照着现有几十个例子的模式加，不需要等"下一个迁移步骤"。这个代码块本身会滞后于实际代码，`grep "window.__azBridge = {" -A 40 www/index.html`看当前真实状态比信这里的快照可靠。
 `downloadBackupFile`/`triggerImportFilePicker`是"我的"tab（`react/src/mine/DataCards.tsx`）专用的trigger-only函数——`downloadBackupFile`是把原来`dlBackupBtn`的inline click handler抽成的具名函数；`triggerImportFilePicker`是新写的一行`$("importFileInput").click()`，用来间接点开依然留在vanilla DOM里的`#importFileInput`（这个input和它的`change`监听器完整保留在vanilla，只是从`#view-data`内部搬到了折叠后的挂载点外面）。
 
 **⚠️`payInstallment`/`unsettle`/`settleFull`/`deleteDebt`/`setDebt`这几个单笔债务寻址的函数，参数后来从下标`i: number`换成了id`string`**（见"债务对象加了真正的id字段"一节）——上面代码块里的写法（`payInstallment: payInstallment`这种直接引用）没有变化，变的是这些函数自身的参数类型和内部实现（改成`debts.find(x => x.id === id)`现查，不再是`debts[i]`）。
@@ -179,7 +183,7 @@ window.__azBridge = {
 
 `setDebt`/`deleteDebt`/`toast`/`confirmAsync`这4个是`#editSheet`（`react/src/sheets/EditSheet.tsx`等）专用——`setDebt(id, obj)`是`saveForm()`删除后唯一保留的narrow写入函数（`id`非空时按id查到对应下标覆盖并合并`old.id`/`old.settled`/`old.settledDate`，`id`为`null`是push新增并生成新id，内部调`recompute(obj)`但不调`saveAll`/`renderAll`，React保存时自己依次调这三个桥接函数，跟`commitReorder`那套细粒度调用惯例一致）；`deleteDebt`是原样暴露的既有vanilla函数（自带`ask()`确认+按id查下标+splice+saveAll+renderAll）；`toast`是`#flash`单例的简单passthrough；`confirmAsync`是`ask()`的Promise外壳（详见上面"第六步"）。
 
-其余（`ask()`确认弹窗本身等）继续保持private。**详情窗`#detailSheet`、新增/编辑表单`#editSheet`、账户详情`#accountScreen`、订阅页`#premiumScreen`、条款页`#termsScreen`、提前还款模拟器`#simScreen`、通知设置面板`#notifySheet`、档案库`#docsScreen`、云备份`#backupScreen`、AI债务顾问`#aiScreen`+`#aiHistorySheet`这十个subpage/sheet的实际内容全部已经搬进React（分别是第五~十一步）**——至此`window.__azBridge`里再也没有任何`openXScreen`这类trigger-only函数，剩下的全部是①真正的debts数据读写、②不可移植的cloud/native/IO调用两类。
+其余（`ask()`确认弹窗本身等）继续保持private。**详情窗`#detailSheet`、新增/编辑表单`#editSheet`、账户详情`#accountScreen`、订阅页`#premiumScreen`、条款页`#termsScreen`、提前还款模拟器`#simScreen`、通知设置面板`#notifySheet`、档案库`#docsScreen`、云备份`#backupScreen`、AI债务助手`#aiScreen`+`#aiHistorySheet`这十个subpage/sheet的实际内容全部已经搬进React（分别是第五~十一步）**——至此`window.__azBridge`里再也没有任何`openXScreen`这类trigger-only函数，剩下的全部是①真正的debts数据读写、②不可移植的cloud/native/IO调用两类。
 
 **`exportReportXlsx`/`exportReportPdf`两个函数虽然桥接给了React调用，但函数本身继续100%vanilla、原封不动**——它们已经确认是零DOM依赖的纯函数（只读`debts`、拼Excel/PDF的Blob、调用`window.XLSX`/`window.jspdf`/`saveToDeviceDownloads()`），React这边`ExportActions.tsx`只是原样复刻了vanilla原来两个按钮click handler里的`hasPremium(premium)`门禁判断，然后调用桥接函数触发真正的导出，不是把导出逻辑本身搬进React。**⚠️`ExportActions.tsx`在"统计tab视觉+交互升级"这轮已经删除，门禁逻辑原样吸收进新的`react/src/report/ExportMenu.tsx`（收进右上角"⋮"菜单，不再是两个独立按钮），桥接函数本身没变，详见下面"统计"一节"统计tab视觉+交互升级"子节。**
 
@@ -615,7 +619,7 @@ ActionBar消失后，WebView内容直接从状态栏正后方开始铺，配合�
 
 **KPI区改成"一个石墨hero + 4个降权小指标"**：`renderSummary()`现在会分别写两个容器——`#heroCard`（固定的`.hero`外壳+JS每次重灌内部HTML，同`#summary`这种"外层壳子在HTML里、内容每次innerHTML替换"的既有模式）放"在还总负债"这一个数字，配一条"距归零 N%"进度条（`N = 已还本金/(已还本金+在还总负债)`，`zeroBase`为0时兜底显示0%不做除法）；`#summary`降级成2×2的`已还金额/经常性月供/在还笔数/已结清`小卡片网格。hero卡内有三团用`radial-gradient`+`blur`+`mix-blend-mode:screen`做的`.hero-puff`色雾，`heroDrift1/2/3`三条不同周期(8s/10s/12.5s)的`@keyframes`错开漂移，色调不变、纯做材质层次，`prefers-reduced-motion`会关掉。
 
-**AI banner改成"灵动胶囊"**：`.ai-banner`从方角卡片改成全圆角胶囊，`::before`一圈用`background-size:220% 100%`+位移动画做的极淡描边扫光，`::after`一层`radial-gradient`呼吸光晕，图标从原来的"星芒"改成"对话气泡+魔法棒"组合（气泡是`stroke`路径，魔法棒是`.wand`一个`<g>`：一条`stroke`手柄+一个4角闪光菱形+两个小圆点"魔法尘"，`filter:drop-shadow`常驻微光+`wandGlow`呼吸透明度）。**没开通Premium时**（`.ai-banner:not(.is-ai)`）扫光/呼吸/魔法棒发光全部关掉，图标降级成中性灰色纯静态——发光本身被设计成一种"已解锁"的身份感，不是无条件的装饰。`.wand`的入场动效（"进入AI页面时摇两下再定住转成呼吸闪烁"，`.wand.cast`+`@keyframes wandCast`）已经在`#aiScreen`聊天式改版里接上，详见下面"AI 债务顾问"一节——这里的`.wand`只是静态图标，跟`#aiWelcomeWand`共用同一份CSS规则（同一个class名），两处图标路径数据也保持一致，改了一处要记得另一处同步。
+**AI banner改成"灵动胶囊"**：`.ai-banner`从方角卡片改成全圆角胶囊，`::before`一圈用`background-size:220% 100%`+位移动画做的极淡描边扫光，`::after`一层`radial-gradient`呼吸光晕，图标从原来的"星芒"改成"对话气泡+魔法棒"组合（气泡是`stroke`路径，魔法棒是`.wand`一个`<g>`：一条`stroke`手柄+一个4角闪光菱形+两个小圆点"魔法尘"，`filter:drop-shadow`常驻微光+`wandGlow`呼吸透明度）。**没开通Premium时**（`.ai-banner:not(.is-ai)`）扫光/呼吸/魔法棒发光全部关掉，图标降级成中性灰色纯静态——发光本身被设计成一种"已解锁"的身份感，不是无条件的装饰。`.wand`的入场动效（"进入AI页面时摇两下再定住转成呼吸闪烁"，`.wand.cast`+`@keyframes wandCast`）已经在`#aiScreen`聊天式改版里接上，详见下面"AI 债务助手"一节——这里的`.wand`只是静态图标，跟`#aiWelcomeWand`共用同一份CSS规则（同一个class名），两处图标路径数据也保持一致，改了一处要记得另一处同步。
 
 **债务卡改成磨砂玻璃 + 左滑露出"销这期"，去掉原来"查看详情/销这期"两个并排按钮**：
 
@@ -646,11 +650,11 @@ ActionBar消失后，WebView内容直接从状态栏正后方开始铺，配合�
 
 ## 订阅UI基础设施：单一 Premium，只有买断（一次性）一种购买方式
 
-> **⚠️ 这一节的历史已翻篇两次：早期是 Premium / Premium+ 两级分级 → 合并成"单一 Premium 一个 tier" → 2026-08-04 又去掉了月付/年付，只留买断。** 下面正文里凡是还提到"Premium+ / 分级 / hasPremiumPlus / 两个tab / 月付 / 年付"的描述都是**已作废的旧状态**，保留是为了让你读懂演进；当前真实状态以本框内和"AI 债务顾问"一节为准：
+> **⚠️ 这一节的历史已翻篇两次：早期是 Premium / Premium+ 两级分级 → 合并成"单一 Premium 一个 tier" → 2026-08-04 又去掉了月付/年付，只留买断。** 下面正文里凡是还提到"Premium+ / 分级 / hasPremiumPlus / 两个tab / 月付 / 年付"的描述都是**已作废的旧状态**，保留是为了让你读懂演进；当前真实状态以本框内和"AI 债务助手"一节为准：
 > - **产品决策（2026-08-04）**：去掉月付/年付两个入口，只留买断——面向负债人群的判断是"再背一笔按月/按年扣费"对这批用户心理阻力远大于一般记账App用户，一次性买断更符合"帮你摆脱债务"这个定位；长期变现路径改成买断打底、以后靠订阅做**增量**（不是唯一收入来源）。AI/云备份这两个有真实持续成本的功能靠既有的每日用量软上限兜住风险，不因为改成买断制就需要额外处理。
 > - **只有一个 Premium**：数据模型 `PREMIUM_KEY`（`after-zero-premium-v1`）存 `{ premium: {method:"onetime"|"redeemed", at:ISO} | null }`，单字段——`method` 曾经还有 `"monthly"|"yearly"` 两个值，去掉入口后类型跟着收窄（`react/src/types.ts`），没有入口就不该留着这两个死值。`hasPremium()` = `!!premium.premium`，不读 `method` 的具体取值。加载时有一次性兼容迁移（旧 `premiumPlus` 字段搬进 `premium`，`billing` 不管原来是什么值现在统一归成 `"redeemed"`）。
-> - **只有一张价卡**：`react/src/sheets/PremiumScreen.tsx` 的 `#premiumPrice` 只剩一张静态 `<div className="price-card">`（不再是可点击切换选中态的 `<button>`，`premiumPlanSel`/`Plan` 类型/`useState` 一并删除——只有一个选项，没有"选"这个动作），价格现价 ¥24、原价 ¥40 划线、"限时优惠"角标——**这个角标故意不用`.pc-badge`绿色实心胶囊**（跟"永久解锁"标签、卡片外框、下面"开通Premium"按钮撞成一片绿，四处同一个强调色挤在一小块区域会互相抢戏），改成纯文字弱化处理（`.pc-limited`）；卡片外框也去掉了常驻的 `.selected` 高亮（只剩一张卡时"选中态"这个语义已经不存在）。**具体数字（¥24/¥40/限时优惠）是产品决策，不是技术细节，改的时候别自己套别的框架（比如按百分比"省X%"去算）**——真机验证时用户明确纠正过这一点，"限时优惠"是紧迫感框架，不是"省了多少钱"的计算框架，两者逻辑不同。
-> - **免费/付费边界**：图表查看、提前还款模拟器 → **免费**（零成本、桌面级、口碑引擎，删了门禁）；高级统计报表**导出 PDF/Excel**、云备份、AI → **付费**（导出在 `reportExportXlsxBtn`/`reportExportPdfBtn` 的 click handler 里判 `hasPremium()`，查看图表无门禁）。判断标准：有真实成本（服务器/算力）才收费，纯客户端零成本的不设障碍。
+> - **只有一张价卡，¥49，没有促销话术**：`react/src/sheets/PremiumScreen.tsx` 的 `#premiumPrice` 只剩一张静态 `<div className="price-card">`（不再是可点击切换选中态的 `<button>`，`premiumPlanSel`/`Plan` 类型/`useState` 一并删除——只有一个选项，没有"选"这个动作）。**2026-08-04又改过一次价格**：¥24原价¥40划线+"限时优惠"角标（`.pc-strike`/`.pc-limited`，已删）→ 朴素**¥49**，没有划线原价、没有限时角标。理由：①国内独立App买断正常区间68-98元，¥24显著偏低不是"对负债人群体贴"而是削弱价值感知；②"限时优惠"永不过期＝假锚点，跟AI额度弹窗"坦诚说成本"的口吻矛盾——负债人群对营销话术的信任度是负的。价格旁边新增一句朴素说明（不是营销文案）："云备份和AI分析对我们来说有真实的服务器成本，其余功能是我们花时间做出来的——一次性¥49，全部解锁，用多久都不用再付"——**故意不笼统说"这些都很贵"**：云备份/AI是真烧钱的，多策略对比/历程这类纯客户端计算是零成本、只是花时间做的，两类话术分开说，不能为了显得"值这个价"就模糊掉这条边界。卡片外框去掉了常驻的 `.selected` 高亮（只剩一张卡时"选中态"这个语义已经不存在）。**具体数字是产品决策，不是技术细节，改的时候别自己套别的框架**（比如按百分比"省X%"去算——真机验证时用户明确纠正过这一点）。
+> - **免费/付费边界**：图表查看、提前还款模拟器、**多策略对比规划的免费部分（对比结果）、还债历程的基础时间线** → **免费**（零成本、口碑引擎，删了门禁）；高级统计报表**导出 PDF/Excel**、云备份、AI、**历程的"生成分享卡片"** → **付费**（导出在 `reportExportXlsxBtn`/`reportExportPdfBtn` 的 click handler 里判 `hasPremium()`，查看图表无门禁）。判断标准始终是：有真实成本（服务器/算力）才收费，纯客户端零成本的不设障碍——见下面"多策略对比规划"/"还债历程"两节，这条边界2026-08-04分析付费策略那轮被重新审视过一次、结论是维持不变（不能为了转化率就打破这条已经对用户诚实过一次的原则）。
 > - **兑换码**：`REDEEM_CODES = {"0000":"premium"}`；`applyRedeemTier` 写 `premium.premium={method:"redeemed",at}`。`__debugPremium` 状态只剩 `"premium"`/`"none"`。
 > - **法律文案联动**：`docs/legal/会员服务协议.md` + `react/src/sheets/TermsScreen.tsx`"当前状态说明"那条原来写"买断、包月、包年三种购买方式的入口"，跟着改成"只提供买断（一次性）这一种购买方式"——**以后任何一次改变购买方式的产品决策，都要检查这两处法律文案是不是也要同步改**，它们描述的是同一件事的两份拷贝（`.md`是源文件，`TermsScreen.tsx`是渲染进App的硬编码版本），改一处忘另一处会导致法律文案和实际功能对不上。
 
@@ -669,6 +673,40 @@ ActionBar消失后，WebView内容直接从状态栏正后方开始铺，配合�
 `M <= interest`（月供还不够付利息，本金永远还不完）时`amortForward`返回`null`，UI层toast"月供不足以覆盖利息，无法测算"——这不该在正常数据下触发，但custom计划允许全0金额，属于防御性兜底。
 
 **只持久化`{mode, extra}`（上次用的模式+金额），不记是哪笔债务/哪一期**：新增localStorage键`after-zero-simulate-v1`（`SIM_KEY`）。**这条决定当初的理由是"债务没有稳定id，记'哪笔债务'在删除/拖拽重排后会失效或指错对象"——这条理由现在已经是历史了**（债务后来加了真正的id字段，见"债务对象加了真正的id字段"一节，技术上完全可以记）。`SIM_KEY`的形状**刻意维持不变**：只记用户的数值习惯（模式+金额）而不记"上次模拟的是哪笔债务"，是产品层面的选择——这个模拟器本来就是"临时算一下、看个大概"的工具，没有"记住上次在哪笔债务上算过"的实际需求。`SimScreen.tsx`倒是借这次机会顺手补了一个之前没有的auto-close effect（这笔债务在模拟器开着的时候被删除/消失会自动关闭），这是识别度更高的正确性修复，跟`SIM_KEY`存不存debt id是两件事。
+
+## 多策略对比规划（Premium，2026-08-04新增）
+
+统计tab"最该先动手的地方"下面的入口（`react/src/report/StrategyCta.tsx`），门禁逻辑照抄`ExportMenu.tsx`（没开通跳订阅页）。点开是新screen `react/src/sheets/StrategyCompareScreen.tsx`：对比雪球法（先还余额最小的）、雪崩法（先还利率最高的）、自定义顺序三种还款优先级，给出总利息/还清月份的对比+一条压力曲线叠加图。
+
+**核心算法`simulateRepaymentOrder(debts, orderIds, extraMonthly)`（`www/js/calc.js`）实现的是经典"雪球效应"**：每月固定预算（=全部债务当前月供之和+可选的额外投入）集中砸向队列里第一笔还没还完的债务，其余债务只还各自的月供；一笔还完后，它的月供份额自动滚入队列里下一笔。跟`amortForward`同样的简化取舍——不追4种计划生成器各自的逐行数学，统一用`recompute()`算出的`balance`/`rate`/`monthly`做标准等额本息模拟。`snowballOrder`/`avalancheOrder`是给这个函数生成`orderIds`参数用的现成排序。
+
+**两处主动做的实现取舍，不是随口决定，写代码前就想清楚了权衡**：
+- **"自定义顺序"用上下移动按钮，不是真拖拽**——这批债务列表通常<15项，按钮在触摸设备上更可靠，也不用把"在还债务"tab那套为jiggle模式+swipe写的复杂手势状态机（`debts/gestures.ts`）硬套过来，那套代码假设的交互（长按进编辑模式+同时处理左滑）跟这里"纯排序、没有swipe"的需求不匹配。
+- **对比曲线图（`StrategyChart.tsx`）是静态SVG，不做scrub手势**——3条不同长度的线做逐帧命中判定成本明显更高，且核心数字（总利息/还清日期）已经在结果卡片里，图表纯粹是视觉印证，不需要精确到"某个月余额是多少"这个粒度。不画坐标轴（跟`Journey.tsx`同一个判断），图例满足dataviz skill"≥2个系列必须有图例"的要求。
+
+**⚠️踩过并自己发现修复的一个CSS作用域坑**：新增的`--strat-1/2/3`分类色（数值跟统计tab`--pie-1/2/3`相同，蓝/琥珀/青，已用dataviz skill的`validate_palette.js`对`--card-grad`底色验证过）最初套用了`--pie-*`的写法，定义在`.viz-root`选择器下——但`StrategyCompareScreen`是`sheets`入口挂载的完全独立DOM子树，不在`.viz-root`里，取不到这几个变量（`var()`解析不出会退化成初始值，颜色直接消失）。修法是挪到跟`--accent-fill`同级的全局`:root`/`[data-theme]`4个主题块，不复用`--pie-*`本身（那几个的角色是"债务类型占比"分类色，跟"策略身份"不是同一件事，"一个颜色=一个角色"是这份配色体系的既有原则）。
+
+## 还债历程（Premium，2026-08-04新增）
+
+统计tab末尾（`Outro`结语块附近）的入口卡片`react/src/report/HistoryTeaser.tsx`，露一两个高光数字（已结清笔数+累计已还本金），点"查看完整历程"进`react/src/sheets/HistoryScreen.tsx`看完整时间线。
+
+**⚠️免费/付费边界在这个功能里被刻意分层，别看到"Premium"就以为整个功能都要收费**：基础时间线**完全免费**（任何人点进来都能看全部），只有里面的"生成分享卡片"这一个按钮是Premium专属。这不是随口决定——2026-08-04分析付费策略那轮讨论明确指出，这个功能全是纯客户端计算、零服务器成本，如果整个收费会打破"零成本=免费"这条已经在AI额度弹窗里对用户强化过一次的诚实原则；付费的不是"看到自己的历程"，是"生成一张能分享出去的精致呈现"这个增量价值，跟"报表导出"（数据免费，导出成PDF/Excel收费）是同一类边界划法。
+
+**数据层`buildHistoryEvents(debts)`（`www/js/calc.js`）故意不是逐期流水账**——一个12笔债务、每笔24期的用户会有几百条还款记录，那是账本不是"历程"，看不出重点。只挑两类真正值得回顾的事件：①`settled`——一笔债务被还清的那一刻（纯庆祝性质，天然稀疏）；②`milestone`——累计已还金额跨过整数关口（1万/3万/5万/10万/20万/50万/100万...固定阈值表，不是"取整到最近"，`niceCeil`是给图表坐标轴用的不同语义，故意不复用）。只认真实发生过的事件（`r.paidAt`，或`settleRow`这种"没单独盖`paidAt`但`date`本身就是真实结清那天"的行）——手动编辑器勾选的"已还"没有真实日期，不算数（跟已知的数据模型缺口③是同一条规矩）。`d.settledDate`是"M/D"短格式没有年份不能直接排序，真实完整日期要么从`settleRow`那行的`date`拿（提前结清路径），要么从最后一期的`paidAt`拿（销掉最后一期自动结清路径），两条路径见"提前结清 = 记一次真实的还款事件"一节。
+
+**分享卡片生成（`generateHistoryShareCard`，`www/index.html`）复用了"高级统计报表PDF导出"那条现成的SVG→PNG→存设备链路（`svgStringToPngDataURL`/`dataURLToBlob`/`saveToDeviceDownloads`），零新依赖**。石墨深色配色（呼应"在还债务"页hero卡的石墨主题，不跟随设备明暗模式——这是一张要分享给别人看的"成就卡"，效果要在任何人的屏幕上看起来一样，跟PDF导出"固定浅色更易读"是同一类判断）。**不用emoji**，用简单几何图形（勾/星）画事件类型的小标记——延续"空状态克制的纯图标+文字"这条既有原则，不是每处庆祝性UI都要塞emoji（对比AI额度弹窗那次是用户明确要求"两个流泪emoji"，这里没有类似要求，默认回落到项目一贯的克制风格）。
+
+**⚠️又一次踩到并自己绕开的架构坑，跟"多策略对比规划"那次不是同一类但是同一个教训（写代码前先想清楚，别硬着头皮做）**：`HistoryScreen`是`.subpage`，"生成分享卡片"没开通Premium时要跳订阅页——但`PremiumScreen`同样是`.subpage`（同一z-index=35）。两个`.subpage`同时开着需要额外的JSX挂载顺序+返回键链顺序才能正确叠放（"关于我们→账户详情"那条先例，见"React 迁移"一节`sheets/App.tsx`头部注释）。判断这层复杂度不值得为一个次要按钮引入，改成`closeHistoryScreen(); openPremiumScreen();`——先关掉自己再跳订阅页，不是叠在上面，完全规避了排序问题。**这是一个可以复用的判断模式**：不是所有"从已打开的subpage内部跳另一个subpage"的场景都要走完整的层叠架构，只有真的需要"回得去"（比如账户详情要能返回"关于我们"）才值得付出排序复杂度，纯粹的"跳转+不需要保留来源上下文"场景直接切换更简单也更不容易出返回键顺序的错。
+
+## 付费触发时机：`useSettleCelebration`（2026-08-04新增）
+
+在此之前，Premium的全部入口都是"用户主动点"（"我的"页、AI banner、多策略对比/历程里的按钮）——没有一个是App在"价值已经被证明的那一刻"主动提起的。2026-08-04分析付费策略那轮讨论认为，**刚还清一笔债务是全App最强的"价值已证明"时刻**：用户刚亲眼看着这个App帮自己把一笔债务追到了零，这时候提一句"要不要支持一下"，是紧跟着一次真实成就的邀请，不是"你还没买"这种缺失感框架。
+
+`react/src/sheets/useSettleCelebration.ts`（一个自定义hook，挂在常驻的`sheets/App.tsx`里，不属于任何具体screen——债务可能从"债务"tab左滑、`DetailSheet`的"结清"/"提前结清"任意一条路径变成已结清，这个hook只关心`debts`数组本身的变化，不关心是谁触发的）：用`useRef<Set<string>>`记录已经见过的已结清债务id，**只对"刚刚发生的"结清触发**——挂载时已经结清的债务（打开App之前就结清的历史）不会触发（当成基准快照，不庆祝）；只对非会员触发；撤销结清后再重新结清同一笔债务会被当成新的一次庆祝（`Set`会先移出再加回，符合直觉，不需要额外处理）。
+
+**复用`confirmAsync`而不是新建"精美灵动"的专属UI**——AI额度弹窗那次花心思做视觉是因为用户明确要求"类似Telegram"的观感；这里是一个低频（每笔债务一生只会真正结清一次）、低强度的邀请，用现成基础设施更合适，不是每个提示都要建一套新组件。文案："🎉 还清一笔了！「XX」已经还清，你又往'归零'走近了一步。如果 After Zero 帮到了你，可以看看 Premium——解锁云备份、AI 分析和更多功能。"确认跳订阅页，取消什么都不做。
+
+**⚠️写测试时又踩了一次`useDebts()`的经典陷阱**（"React 迁移"一节`useDebts()`那条注释早就记过）：mock里`window.__azBridge.getDebts = vi.fn(() => [{...}])`——箭头函数体里直接写数组字面量，每次调用都返回全新引用，`useSyncExternalStore`的一致性检查判定"引用一直在变"，陷入`Maximum update depth exceeded`无限重渲染。修法是先把新数组赋值给一个变量、再让`vi.fn`返回同一个引用（`const settledDebts=[...]; vi.fn(()=>settledDebts)`），跟`DetailSheet.test.tsx`"这笔债务变成settled后自动关闭sheet(数组整体重新赋值场景)"那条测试的写法一致。**这是这个陷阱第二次在测试代码里被踩到，以后写任何"改debts后重新dispatch az:state-changed"的测试，数组字面量必须先落进一个变量，不能直接写在`vi.fn`箭头函数体里。**
 
 ## 导航重排：tabbar从"债务/还款日/档案库/我的"改成"债务/还款日/统计/我的"
 
@@ -828,7 +866,7 @@ sync android`+`assembleRelease`后解包核对：APK内`index.html`跟工作区`
 
 "我的"页"云备份"入口打开`#backupScreen`（`react/src/sheets/BackupScreen.tsx`）：手动、每次创建一条独立备份记录（不是自动同步/覆盖），5个云函数+配额数字+集合寻址方式+客户端恢复逻辑+真机验证边界，全部见`cloud-backup-design` skill（`.claude/skills/cloud-backup-design/SKILL.md`）。
 
-**⚠️这条是跨功能的核心认证修复，AI债务顾问也依赖同一套，别挪进skill**：早期`ensureCbAuthReady()`无条件调`signInAnonymously()`垫底（绕开CloudBase SDK对null凭证读`.scope`的崩溃bug），但这会把微信自定义登录建立的"非匿名"会话**降级成匿名**，导致任何云函数调用命中权限规则被拒`[PERMISSION_DENIED]`。修法：`ensureCbAuthReady()`改成只在本地**连`account`记录都没有**时才`signInAnonymously()`——用`account`这个自己可靠掌握的信号判断"是否已登录"，比猜SDK内部登录态形状稳妥。新增`cbAuth()`统一入口（`cbApp().auth({persistence:"local"})`显式要求会话持久化），**所有拿auth的地方都走`cbAuth()`，别再直接`cbApp().auth()`**。桌面浏览器伪造`account`跳过登录门的老技巧对**任何调云函数的功能都不适用**——会让`ensureCbAuthReady()`误判已登录、连匿名会话都没有，这类功能的真实端到端往返必须真机验证。
+**⚠️这条是跨功能的核心认证修复，AI债务助手也依赖同一套，别挪进skill**：早期`ensureCbAuthReady()`无条件调`signInAnonymously()`垫底（绕开CloudBase SDK对null凭证读`.scope`的崩溃bug），但这会把微信自定义登录建立的"非匿名"会话**降级成匿名**，导致任何云函数调用命中权限规则被拒`[PERMISSION_DENIED]`。修法：`ensureCbAuthReady()`改成只在本地**连`account`记录都没有**时才`signInAnonymously()`——用`account`这个自己可靠掌握的信号判断"是否已登录"，比猜SDK内部登录态形状稳妥。新增`cbAuth()`统一入口（`cbApp().auth({persistence:"local"})`显式要求会话持久化），**所有拿auth的地方都走`cbAuth()`，别再直接`cbApp().auth()`**。桌面浏览器伪造`account`跳过登录门的老技巧对**任何调云函数的功能都不适用**——会让`ensureCbAuthReady()`误判已登录、连匿名会话都没有，这类功能的真实端到端往返必须真机验证。
 
 ## 档案库PDF预览：`<embed type="application/pdf">`在安卓WebView里天生是空白的，改用pdf.js真正渲染（2026-07-30）
 
@@ -873,13 +911,23 @@ sync android`+`assembleRelease`后解包核对：APK内`index.html`跟工作区`
 
 **踩过一个坑**：`@capacitor/assets` 默认会给 `mipmap-anydpi-v26/ic_launcher.xml`（自适应图标配置）里的 `<background>` 和 `<foreground>` 都套一层 `16.7%` 的内缩（`<inset>`）。这对本项目不对——`icon-background.png` 设计上就是要通栏铺满到边缘的（黑白对半分），内缩之后四周会露出一圈透明，实机上大概率透出桌面壁纸/系统默认色，很难看。所以 `<background>` 这层的inset已经手动去掉了（保留 `<foreground>` 的inset，因为 `icon-foreground.png` 里的图形本身上下几乎顶到画布边缘，需要靠内缩才不会被圆形/方形等不同launcher遮罩裁掉）——**以后如果重新跑 `@capacitor/assets generate`，它会把 `<background>` 的inset加回去，记得再删一次。**
 
-## AI 债务顾问（Premium）——设计细节见`ai-advisor-design` skill
+## AI 债务助手（Premium）——设计细节见`ai-advisor-design` skill
 
 "在还债务"页AI banner是入口（`hasPremium()`门禁），聊天式界面（`react/src/sheets/AiScreen.tsx`）。欢迎态芯片、云函数模型选型（`hy3`混元，DeepSeek被套餐锁住）、每日用量软上限、历史对话可继续追问的状态机、z-index坑，全部见`ai-advisor-design` skill（`.claude/skills/ai-advisor-design/SKILL.md`）。
 
 真实"生成报告/追问"往返依赖真实微信登录会话，跟云备份同一条限制（见上面"云备份"一节），桌面/CLI都测不出，必须真机验证。
 
-**2026-08-04又改了两处**：①`buildAiSummary()`（`www/index.html`）原来只传"月供"这一个笼统数字，先息后本/等本等费这类每期金额不同的贷款AI看不到后面某期本金会跳涨、答出跟真实计划表矛盾的结论（真机报的bug），改成每笔债务连完整逐期还款计划表（日期/金额/本金/利息/是否已还）+计息方式都传过去。②新增`AiLimitModal.tsx`——首次进AI页面（等魔法棒0.75s施法动效播完再弹）和真撞到20次/天上限时，弹一个说明"App免费、AI有真实成本、所以限量"的弹窗，带"复制完整分析提示词"按钮（内容=同一份`buildAiSummary()`JSON+雪球/雪崩法说明），可以粘贴给豆包等外部AI助手继续问，等于零成本给了一条"无限量"的退路。弹窗进场动画是手写CSS弹性缓动曲线，没有引入动画库——这个项目所有动效一直是这个路子。
+**2026-08-04又改了两处**：①`buildAiSummary()`（`www/index.html`）原来只传"月供"这一个笼统数字，先息后本/等本等费这类每期金额不同的贷款AI看不到后面某期本金会跳涨、答出跟真实计划表矛盾的结论（真机报的bug），改成每笔债务连完整逐期还款计划表（日期/金额/本金/利息/是否已还）+计息方式都传过去。②新增`AiLimitModal.tsx`——首次进AI页面（等魔法棒0.75s施法动效播完再弹）和真撞到限额时，弹一个说明"App免费、AI有真实成本、所以限量"的弹窗，带"复制完整分析提示词"按钮（内容=同一份`buildAiSummary()`JSON+雪球/雪崩法说明），可以粘贴给豆包等外部AI助手继续问，等于零成本给了一条"无限量"的退路。弹窗进场动画是手写CSS弹性缓动曲线，没有引入动画库——这个项目所有动效一直是这个路子。
+
+**同一天晚些时候又改了两轮，都是2026-08-04分析付费策略那次讨论的直接产物**：
+
+①**改名**："AI 债务顾问"→"AI 债务助手"、"AI 债务优化报告"→"AI 债务分析报告"（30+处，含2份法律文档）——起因是查证到金融监管总局2026-02风险提示逐字点名"债务优化"属于不实宣传话术清单，"顾问"虽不在名单上但是全App最像"提供金融咨询服务"的词，一并改掉降低上架审核被误判成金融类App的风险。云函数`SYSTEM_PROMPT`里AI自称的身份文案也同步改了。
+
+②**用量上限从"每天20次(客户端计数)"改成"每月50次(服务端计数)"**——买断制下AI是持续成本，纯客户端`localStorage`计数清一下数据就绕过，敞口必须堵在服务端。`aiAdvisor`云函数新建`aiUsage`集合（`{openid, month, count}`，`openid+month`寻址，仿`backups`集合"一个用户多条记录用普通字段+`.where()`查"的先例，不是`doc(openid)`一对一）：`AI_MONTHLY_LIMIT=50`，月份按**北京时间**算（`Date.now()+8h`取ISO前7位，云函数跑在UTC不校正会在月初几小时跟用户手机看到的月份对不上）；额度检查在拼prompt/调模型**之前**；计数只在模型**真的返回内容之后**才加（失败/超时不扣）；读取失败**fail-open**（放行+`console.error`，宁可漏计也不误伤付费用户）。返回结构从`Promise<string>`改成`Promise<{text,quota}>`，`quota:{month,used,limit}`是服务端权威值，客户端拿它刷新本地缓存。
+
+**`AI_USAGE_KEY`键名沿用不变（硬性铁律第1条），但角色变了**：从"权威计数器"变成"服务端返回值的本地缓存"，存储形状从`{date,count}`换成`{month,used,limit}`——只用来做①欢迎态显示"本月还剩N次"②发请求前的快路径拦截（省一次必然被拒的往返，只在**确知**超额时才拦，不确定就放行让服务端裁决）。老数据的`month`字段是`undefined`跟当前月份对不上，会被当成"没有缓存"直接放行，不需要一次性迁移脚本，是优雅降级。
+
+**`buildAiSummary(compact)`一函数两种模式，两条路径成本结构相反**：云函数(`callAiAdvisor`)那条走`compact=true`压缩版——token我们自己付费、且每次提问都重发一遍，已还期次压成`{已还期次汇总:{期数,最后一期日期}}`，未还期次仍逐期全发（test11那种"先还利息、某月起本金跳涨"的结构必须让AI看见，这是压缩的下限）；"复制完整提示词"给外部AI那条（`buildCopyPrompt`）走全量版——用户自己粘给豆包等，token是对方付、我们零成本，压缩只会白白降低对方回答质量。**这个区分是用户在讨论时明确要求的**，不是自己猜的优化。
 
 ## 隐私政策 / 用户服务协议 / 会员服务协议 + "关于我们"入口（2026-07-31新增）
 
@@ -899,7 +947,7 @@ App 之前**完全没有**任何地方展示《隐私政策》《用户协议》
 
 ## 云函数源码：`cloudbase/`
 
-`cloudbase/functions/wxLogin/`是腾讯云开发（CloudBase）云函数的源码，服务端代码，负责微信登录时用`code`换`openid`、签发自定义登录票据（详见上面"原生插件：`WeChatLogin`"一节）。`cloudbase/functions/deleteAccount/`是配套的注销账户云函数，负责真正删除`users`集合里的用户文档，现在也负责联动清理云备份数据（详见上面"云备份（Premium）"一节）。`cloudbase/functions/backupCreate/`、`backupList/`、`backupRestore/`、`backupDelete/`、`backupUploadFile/`是云备份功能的5个云函数，读写`backups`集合+Storage文件，详见上面"云备份（Premium）"一节。`cloudbase/functions/aiAdvisor/`是 AI 债务顾问云函数，详见上面"AI 债务顾问（Premium）"一节。**这个目录不属于Capacitor/Android那套构建流程，`npx cap sync android`不会碰它，也不会自动部署**——改完要手动部署，部署命令/坑/验证方法见`cloudbase-deploy` skill。AppSecret等敏感配置只存在CloudBase云函数的环境变量里，不存在这个目录任何文件里，也不能加进来。
+`cloudbase/functions/wxLogin/`是腾讯云开发（CloudBase）云函数的源码，服务端代码，负责微信登录时用`code`换`openid`、签发自定义登录票据（详见上面"原生插件：`WeChatLogin`"一节）。`cloudbase/functions/deleteAccount/`是配套的注销账户云函数，负责真正删除`users`集合里的用户文档，现在也负责联动清理云备份数据（详见上面"云备份（Premium）"一节）。`cloudbase/functions/backupCreate/`、`backupList/`、`backupRestore/`、`backupDelete/`、`backupUploadFile/`是云备份功能的5个云函数，读写`backups`集合+Storage文件，详见上面"云备份（Premium）"一节。`cloudbase/functions/aiAdvisor/`是 AI 债务助手云函数，详见上面"AI 债务助手（Premium）"一节。**这个目录不属于Capacitor/Android那套构建流程，`npx cap sync android`不会碰它，也不会自动部署**——改完要手动部署，部署命令/坑/验证方法见`cloudbase-deploy` skill。AppSecret等敏感配置只存在CloudBase云函数的环境变量里，不存在这个目录任何文件里，也不能加进来。
 
 ## 构建
 
@@ -937,7 +985,7 @@ localStorage.setItem("after-zero-account-v1", JSON.stringify({openid:"test",nick
 
 ## 硬性铁律，改代码前必看
 
-1. **`localStorage` 的 KEY（在`www/index.html`里搜 `debt-manager-v5`）永远不能改。** 这是用户设备上保存真实数据的键名，改了等于让已经装过的app找不到自己原来存的数据，直接清零。同理，`DKEY`（`debt-manager-docs-v5`）、账号登录状态用的`ACCOUNT_KEY`（`after-zero-account-v1`）、在还债务排序方式用的`SORT_KEY`（`debt-manager-sort-v1`）、还款提醒通知设置用的`NOTIF_KEY`（`after-zero-notify-v1`）、订阅状态用的`PREMIUM_KEY`（`after-zero-premium-v1`）、提前还款模拟器用的`SIM_KEY`（`after-zero-simulate-v1`）、云备份"上次备份时间"用的`BACKUP_KEY`（`after-zero-backup-meta-v1`）、AI 债务顾问每日用量计数用的`AI_USAGE_KEY`（`after-zero-ai-usage-v1`）、AI 债务顾问历史对话记录用的`AI_CHATLOG_KEY`（`after-zero-ai-chatlog-v1`）、AI 债务顾问"是否已看过首次额度说明弹窗"用的`AI_LIMIT_NOTICE_KEY`（`after-zero-ai-limit-notice-v1`）以后也不能改——十一者是各自独立的键，不要以为加新功能可以复用或合并。
+1. **`localStorage` 的 KEY（在`www/index.html`里搜 `debt-manager-v5`）永远不能改。** 这是用户设备上保存真实数据的键名，改了等于让已经装过的app找不到自己原来存的数据，直接清零。同理，`DKEY`（`debt-manager-docs-v5`）、账号登录状态用的`ACCOUNT_KEY`（`after-zero-account-v1`）、在还债务排序方式用的`SORT_KEY`（`debt-manager-sort-v1`）、还款提醒通知设置用的`NOTIF_KEY`（`after-zero-notify-v1`）、订阅状态用的`PREMIUM_KEY`（`after-zero-premium-v1`）、提前还款模拟器用的`SIM_KEY`（`after-zero-simulate-v1`）、云备份"上次备份时间"用的`BACKUP_KEY`（`after-zero-backup-meta-v1`）、AI 债务助手用量计数（本地缓存，服务端权威值见下文）用的`AI_USAGE_KEY`（`after-zero-ai-usage-v1`）、AI 债务助手历史对话记录用的`AI_CHATLOG_KEY`（`after-zero-ai-chatlog-v1`）、AI 债务助手"是否已看过首次额度说明弹窗"用的`AI_LIMIT_NOTICE_KEY`（`after-zero-ai-limit-notice-v1`）以后也不能改——十一者是各自独立的键，不要以为加新功能可以复用或合并。
 2. **新安装必须是空数据。** `www/index.html` 里 `SEED`（债务种子数据）、`DOCS_SEED`（文档种子数据）这两个常量现在都是空值——这是故意的，因为这个app的定位是要发给别人用，任何人第一次打开都不能预装开发者自己的私人财务数据。**改代码时如果要放测试数据，改完记得清空再提交，别把私人内容（真实债务数字、个人反思文档、任何带真实姓名/金额的东西）带回默认值里。**
    **私人数据不止藏在这三个常量里。** 之前排查发现过一次：一个叫`cliff`的调试用标记字段，虽然完全没有UI能设置它（不是SEED、不是表单字段），但代码里直接写死了具体的还款日期和金额字符串（`"2027-05 起还本，月供跳至 ¥2,182"`这类）挂在渲染逻辑里，跟SEED是否清空无关。改代码时留意：不只是搜`SEED`/`DOCS_SEED`这两个变量名，任何看着像真实日期/金额/人名的硬编码字符串都要多看一眼是不是该删。（补：曾经还有个`POSTER`"愿景海报"常量，因为没有任何UI入口能往里填内容、属于永远激活不了的死代码，已整体删除，包括`fileItems()`/`renderDocContent()`里对应的分支，别再找它。）
    **"新安装=空数据"这个假设依赖 `AndroidManifest.xml` 里 `android:allowBackup="false"`。** 安卓系统默认（`allowBackup="true"`，Capacitor脚手架生成时的默认值）会把App数据自动云备份到用户的Google账号，卸载重装或者换新手机登录同一个Google账号时可能会自动把旧数据（包括`ACCOUNT_KEY`存的登录态）恢复回来，让"重装"变得不再可靠地等于"空白状态"。这个项目已经手动改成`allowBackup="false"`彻底关掉自动备份——以后如果看到这个值被改回`true`（比如重新跑`npx cap add android`之类的脚手架命令覆盖了手改的manifest），要记得改回`false`。

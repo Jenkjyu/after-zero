@@ -1,4 +1,4 @@
-// AI 债务顾问——第十一步(React迁移收尾)从vanilla的#aiScreen+#aiHistorySheet原样复刻，
+// AI 债务助手——第十一步(React迁移收尾)从vanilla的#aiScreen+#aiHistorySheet原样复刻，
 // 是这批subpage/sheet里技术上最"干净"的一步：AI_USAGE_KEY(每日用量)/AI_CHATLOG_KEY(历史
 // 对话)这两个localStorage键整体移交React所有权(照抄SIM_KEY当年"没有别的地方依赖它，
 // 整体移交"的先例)，vanilla唯一保留的是callAiAdvisor()——因为它依赖ensureCbAuthReady/
@@ -12,11 +12,19 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { closeAiScreen, useAiScreenOpen } from "../shared/state";
-import type { AiChatMessage, AiConversation } from "../types";
+import type { AiChatMessage, AiConversation, AiQuota } from "../types";
 import { AiLimitModal } from "./AiLimitModal";
 
+// 2026-08-04：从"客户端20次/天软限"改成"服务端50次/月硬限"。**额度的真正把关在
+// aiAdvisor云函数**（见那边的AI_MONTHLY_LIMIT/aiUsage集合）——买断制下AI是持续成本，
+// 原来纯客户端计数清一下本地数据就绕过了，敞口必须堵在服务端。
+// 这个键的角色也随之变了：不再是权威计数器，而是**服务端返回值的本地缓存**，只用来
+// ①欢迎态显示"本月还剩N次" ②发请求前的快路径拦截（省一次必然被拒的往返）。
+// 被清掉/篡改最多让客户端多打一次请求，服务端照样拒。
+// ⚠️键名沿用不变（硬性铁律第1条），但存的形状从 {date,count} 换成 {month,used,limit}：
+// 老数据的 month 是 undefined，跟当前月份对不上，会被当成"没有缓存"直接放行让服务端说话，
+// 属于优雅降级，不需要一次性迁移脚本。
 const AI_USAGE_KEY = "after-zero-ai-usage-v1";
-const AI_DAILY_LIMIT = 20;
 const AI_CHATLOG_KEY = "after-zero-ai-chatlog-v1";
 const AI_CHATLOG_MAX_CONVOS = 50;
 const AI_CHATLOG_MAX_MSGS = 40;
@@ -32,7 +40,7 @@ const LIMIT_NOTICE_DELAY_MS = 900;
 // 输出格式要求(粘贴给豆包等外部聊天机器人没有意义)，改成第二人称"帮我分析"的措辞。
 function buildCopyPrompt(): string {
   const summary = window.__azBridge.buildAiSummary();
-  return "你是一位务实、简洁的中文债务优化顾问。以下是我的债务概况（JSON，金额单位为元，"
+  return "你是一位务实、简洁的中文债务分析助手。以下是我的债务概况（JSON，金额单位为元，"
     + "每笔债务的\"还款计划\"是逐期的日期/金额/本金/利息/是否已还）：\n\n"
     + JSON.stringify(summary, null, 2)
     + "\n\n请基于雪球法（先还余额最小的）和雪崩法（先还利率最高的）两种策略帮我分析，"
@@ -40,30 +48,28 @@ function buildCopyPrompt(): string {
     + "语言口语化、直接、给数字，不要写大段免责声明。";
 }
 
-interface AiUsage { date: string; count: number }
+/** 当前月份串，跟云函数的currentMonth()一样按北京时间算，两边必须一致否则跨月那天会打架 */
+function currentMonth(): string {
+  return new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 7);
+}
 
-function loadAiUsage(): AiUsage {
+/** 读本地缓存；月份对不上（跨月了 / 老格式数据）一律当成"不知道"返回null，让服务端说话 */
+function loadAiQuota(): AiQuota | null {
   try {
     const raw = localStorage.getItem(AI_USAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return { date: "", count: 0 };
+    if (!raw) return null;
+    const q = JSON.parse(raw) as Partial<AiQuota>;
+    if (!q || q.month !== currentMonth() || typeof q.used !== "number" || typeof q.limit !== "number") return null;
+    return { month: q.month, used: q.used, limit: q.limit };
+  } catch { return null; }
 }
-function saveAiUsage(u: AiUsage) {
-  try { localStorage.setItem(AI_USAGE_KEY, JSON.stringify(u)); } catch { /* ignore */ }
+function saveAiQuota(q: AiQuota) {
+  try { localStorage.setItem(AI_USAGE_KEY, JSON.stringify(q)); } catch { /* ignore */ }
 }
-function aiUsageToday(): AiUsage {
-  const t = window.fmtDate(window.today0());
-  const u = loadAiUsage();
-  return u.date === t ? u : { date: t, count: 0 };
-}
-function aiUsageLeft(): number {
-  return Math.max(0, AI_DAILY_LIMIT - aiUsageToday().count);
-}
-function bumpAiUsage() {
-  const u = aiUsageToday();
-  u.count++;
-  saveAiUsage(u);
+/** 快路径：只有在**确知**已超额时才拦截；不知道就放行，由服务端裁决 */
+function quotaExhaustedLocally(): boolean {
+  const q = loadAiQuota();
+  return !!q && q.used >= q.limit;
 }
 
 function loadAiConvos(): AiConversation[] {
@@ -195,6 +201,10 @@ export function AiScreen() {
   const [input, setInput] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [limitModalOpen, setLimitModalOpen] = useState(false);
+  // 本月额度（服务端权威值的镜像）。初始从localStorage缓存读，每次云函数返回后刷新。
+  // null表示"还不知道"——第一次装App、跨月、或缓存被清掉时都是这个状态，此时不显示
+  // 剩余次数（不猜一个可能是错的数字），等第一次真实调用回来自然就有了。
+  const [quota, setQuota] = useState<AiQuota | null>(() => loadAiQuota());
   const wandRef = useRef<SVGGElement | null>(null);
   const logRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -327,8 +337,10 @@ export function AiScreen() {
     const timer = window.setInterval(() => setThinkingSeconds(Math.floor((Date.now() - startedAt) / 1000)), 1000);
 
     try {
-      const text = await window.__azBridge.callAiAdvisor(isReportMode ? "report" : "chat", isReportMode ? "" : displayQ, contextHistory);
-      bumpAiUsage();
+      const res = await window.__azBridge.callAiAdvisor(isReportMode ? "report" : "chat", isReportMode ? "" : displayQ, contextHistory);
+      const text = res.text;
+      // 用服务端返回的权威额度刷新本地缓存（不再本地自增——服务端才是唯一真相）
+      if (res.quota) { setQuota(res.quota); saveAiQuota(res.quota); }
       // 追问建议只在展示层保留(DisplayMsg.suggestions)，持久化进convos的是剥离掉
       // marker之后的干净正文——历史对话reload回来后不会残留字面的"###SUGGESTIONS###"文字，
       // 代价是重新打开一条历史对话不会恢复它当时的追问建议(这是刻意的，见下面显示建议
@@ -351,6 +363,11 @@ export function AiScreen() {
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "AI 分析失败";
+      // 服务端判定超额（本地快路径没拦住：缓存被清过/跨月了/多设备用的同一个账号）——
+      // 除了照常显示错误气泡，还要把额度说明弹窗弹出来，那里有"复制提示词"这条退路。
+      const e = err as { code?: string; quota?: AiQuota };
+      if (e && e.quota) { setQuota(e.quota); saveAiQuota(e.quota); }
+      if (e && e.code === "QUOTA_EXCEEDED") setLimitModalOpen(true);
       setMessages((prev) => prev.map((m, i) => (i === msgIndex
         ? { role: "assistant", content: msg, error: true, retryCtx: { msgIndex, recId, displayQ, isReportMode, contextHistory } }
         : m)));
@@ -376,9 +393,10 @@ export function AiScreen() {
   // question不生效，但气泡里仍然显示"生成分析报告"这句话，跟用户真的问了这句话视觉上一致)。
   async function composeAndSend(displayQ: string, isReportMode: boolean) {
     if (busy) return;
-    // 真撞到20次/天上限：弹说明弹窗(带"复制提示词"退路)取代原来单纯的toast——
-    // toast只说"用完了"，弹窗能顺带给一条能继续用的路，这正是撞上限那一刻用户需要的。
-    if (aiUsageLeft() <= 0) { setLimitModalOpen(true); return; }
+    // 快路径：本地缓存**确知**本月额度已满就直接弹说明弹窗(带"复制提示词"退路)，
+    // 省掉一次必然被服务端拒的往返。缓存不确定(跨月/被清过/老格式)时放行，由服务端裁决，
+    // 那条路径在runAdvisor的catch里同样会弹这个弹窗。
+    if (quotaExhaustedLocally()) { setLimitModalOpen(true); return; }
 
     const existingRec = currentConvId ? window.findAiConv(convos, currentConvId) : null;
     const contextHistory: AiChatMessage[] = existingRec
@@ -403,9 +421,10 @@ export function AiScreen() {
   // 追加一条用户提问(避免同一个问题在气泡列表和历史记录里出现两遍)。
   function onRetry(ctx: RetryCtx) {
     if (busy) return;
-    // 真撞到20次/天上限：弹说明弹窗(带"复制提示词"退路)取代原来单纯的toast——
-    // toast只说"用完了"，弹窗能顺带给一条能继续用的路，这正是撞上限那一刻用户需要的。
-    if (aiUsageLeft() <= 0) { setLimitModalOpen(true); return; }
+    // 快路径：本地缓存**确知**本月额度已满就直接弹说明弹窗(带"复制提示词"退路)，
+    // 省掉一次必然被服务端拒的往返。缓存不确定(跨月/被清过/老格式)时放行，由服务端裁决，
+    // 那条路径在runAdvisor的catch里同样会弹这个弹窗。
+    if (quotaExhaustedLocally()) { setLimitModalOpen(true); return; }
     setMessages((prev) => prev.map((m, i) => (i === ctx.msgIndex ? { role: "assistant", content: "", pending: true } : m)));
     runAdvisor(ctx.msgIndex, ctx.recId, ctx.displayQ, ctx.isReportMode, ctx.contextHistory);
   }
@@ -453,7 +472,7 @@ export function AiScreen() {
         <button type="button" className="subpage-back" aria-label="返回" onClick={() => { setHistoryOpen(false); closeAiScreen(); }}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
-        <div className="subpage-title">AI 债务顾问</div>
+        <div className="subpage-title">AI 债务助手</div>
         <button type="button" className="subpage-back" aria-label="历史对话" onClick={() => setHistoryOpen(true)}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /><path d="M12 8v4l3 2" /></svg>
         </button>
@@ -473,6 +492,12 @@ export function AiScreen() {
             </div>
             <h2>有什么想聊的？</h2>
             <p>我能看到你当前的在还债务，可以帮你排优先级、测算利息，或者直接问我一个具体问题。</p>
+            {/* quota为null(还不知道)时整行不渲染——不猜一个可能是错的数字给用户看 */}
+            {quota && (
+              <div className="ai-quota-note">
+                本月还剩 <strong>{Math.max(0, quota.limit - quota.used)}</strong> / {quota.limit} 次
+              </div>
+            )}
             <div className="ai-chips">
               <button type="button" className="ai-chip primary" onClick={() => composeAndSend("生成分析报告", true)}>
                 <span className="ai-chip-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 19V10M12 19V5M20 19v-7" /></svg></span>
@@ -521,7 +546,7 @@ export function AiScreen() {
         <textarea
           ref={inputRef}
           rows={1}
-          placeholder="发消息给 AI 债务顾问…"
+          placeholder="发消息给 AI 债务助手…"
           value={input}
           onChange={onInputChange}
           onKeyDown={onInputKeyDown}

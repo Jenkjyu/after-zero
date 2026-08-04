@@ -16,7 +16,7 @@ describe("PremiumEntryCard", () => {
     const premium: Premium = { premium: null };
     const { container } = render(<PremiumEntryCard premium={premium} />);
     expect(screen.getByText("升级 Premium")).toBeInTheDocument();
-    expect(screen.getByText("云备份 · 报表导出 · AI 债务顾问")).toBeInTheDocument();
+    expect(screen.getByText("云备份 · 报表导出 · AI 债务助手")).toBeInTheDocument();
     expect(container.querySelector(".premium-entry-card")).not.toHaveClass("is-member");
   });
 

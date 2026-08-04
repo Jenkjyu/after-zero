@@ -22,13 +22,21 @@ import { BackupScreen } from "./BackupScreen";
 import { DetailSheet } from "./DetailSheet";
 import { DocsScreen } from "./DocsScreen";
 import { EditSheet } from "./EditSheet";
+import { HistoryScreen } from "./HistoryScreen";
 import { NotifySheet } from "./NotifySheet";
 import { PremiumScreen } from "./PremiumScreen";
 import { PrivacyScreen } from "./PrivacyScreen";
 import { SimScreen } from "./SimScreen";
+import { StrategyCompareScreen } from "./StrategyCompareScreen";
 import { TermsScreen } from "./TermsScreen";
+import { useSettleCelebration } from "./useSettleCelebration";
 
 export function App() {
+  // 付费触发时机——刚还清一笔债务时(全App"价值已证明"最强的一刻)邀请非会员看看
+  // Premium，见useSettleCelebration.ts注释。这里只是接入点，不属于任何具体screen，
+  // 跟这个文件"常驻挂载、服务全部tab"的定位一致。
+  useSettleCelebration();
+
   return (
     <>
       <DetailSheet />
@@ -44,6 +52,8 @@ export function App() {
       <DocsScreen />
       <BackupScreen />
       <AiScreen />
+      <StrategyCompareScreen />
+      <HistoryScreen />
     </>
   );
 }

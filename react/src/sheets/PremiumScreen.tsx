@@ -53,18 +53,18 @@ export function PremiumScreen() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l2.9 6.3L21.5 9l-4.8 4.5 1.3 6.7L12 17l-6 3.2 1.3-6.7L2.5 9l6.6-.7L12 2z" /></svg>
           </div>
           <div className="premium-hero-title">升级你的 After Zero</div>
-          <div className="premium-hero-sub">解锁云备份、报表导出与 AI 债务顾问</div>
+          <div className="premium-hero-sub">解锁云备份、AI 债务助手与更多功能</div>
         </div>
 
         <div className="pf-list">
           <div className="pf-row"><div className="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.5-8.98A5.5 5.5 0 0 1 17 8.06 4 4 0 0 1 17 18H7z" /></svg></div>
             <div className="pf-text"><div className="pf-title">云备份</div><div className="pf-desc">手动创建云端备份，每条记录都能单独恢复，换手机也能找回数据</div></div></div>
           <div className="pf-row"><div className="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .8 1.6v.5h5.4v-.5c0-.6.3-1.2.8-1.6A6 6 0 0 0 12 3z" /></svg></div>
-            <div className="pf-text"><div className="pf-title">AI 债务优化报告</div><div className="pf-desc">雪球法 / 雪崩法分析，告诉你优先还哪笔最省钱</div></div></div>
+            <div className="pf-text"><div className="pf-title">AI 债务分析报告</div><div className="pf-desc">雪球法 / 雪崩法分析，告诉你优先还哪笔最省钱</div></div></div>
           <div className="pf-row"><div className="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v11H8l-4 4z" /></svg></div>
             <div className="pf-text"><div className="pf-title">AI 智能问答</div><div className="pf-desc">针对你自己的债务数据直接提问，随问随答</div></div></div>
-          <div className="pf-row"><div className="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M4 20V10M11 20V4M18 20v-7" /></svg></div>
-            <div className="pf-text"><div className="pf-title">高级统计报表导出</div><div className="pf-desc">把报表导出成 PDF / Excel，方便存档与分享（图表查看免费）</div></div></div>
+          <div className="pf-row"><div className="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M4 19l6-6 4 4 6-8" /><path d="M14 6h6v6" /></svg></div>
+            <div className="pf-text"><div className="pf-title">多策略对比规划</div><div className="pf-desc">雪球法/雪崩法/自定义顺序并排对比，哪种最省利息一眼看出</div></div></div>
         </div>
 
         <div id="premiumPrice">
@@ -72,14 +72,20 @@ export function PremiumScreen() {
             <div className="price-card">
               <span className="pc-badge">永久解锁</span>
               <div className="pc-price-row">
-                <span className="pc-strike">¥40</span>
-                <span className="pc-amt num">¥24</span>
-                <span className="pc-limited">限时优惠</span>
+                <span className="pc-amt num">¥49</span>
               </div>
-              <div className="pc-period">一次性付费，永久使用</div>
+              <div className="pc-period">一次性付费，永久使用，不再另外收费</div>
             </div>
           </div>
         </div>
+        {/* 朴素陈述"为什么收这个钱"，不做营销话术——这个App的AI额度弹窗已经在用同一套
+            "坦诚说清楚成本"的口吻跟用户说话，订阅页不该是App里唯一还在打折促销的地方。
+            云备份/AI是真实服务器成本，其余(多策略对比/历程等)是纯客户端计算、零服务器
+            成本，诚实起见不笼统说"这些功能都很贵"，只说云备份/AI是真花钱的、其余是花
+            时间做的——跟"限时优惠"这种永不过期的假锚点相比，这句话经得起用户反复回来看。 */}
+        <p className="footnote" style={{ textAlign: "left" }}>
+          云备份和 AI 分析对我们来说有真实的服务器成本，其余功能是我们花时间做出来的——一次性 ¥49，全部解锁，用多久都不用再付。
+        </p>
 
         <div className="data-actions" style={{ marginTop: 4 }}>
           <button type="button" className="btn primary" onClick={onSubscribe}>开通 Premium</button>

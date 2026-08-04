@@ -3,7 +3,7 @@ name: ai-advisor-design
 description: This skill should be used when working on the AI debt advisor feature (`react/src/sheets/AiScreen.tsx`, `cloudbase/functions/aiAdvisor`), or debugging AI usage limits, chat history persistence, or model selection.
 ---
 
-# AI 债务顾问（Premium）设计细节
+# AI 债务助手（Premium）设计细节
 
 **聊天式界面，不是"大按钮生成报告+底部迷你问答框"**（第一版做法已推翻）。只做"报告+智能问答"，没做OCR（明确推迟）。
 
@@ -35,7 +35,7 @@ description: This skill should be used when working on the AI debt advisor featu
 
 ## 2026-08：追问建议芯片 + 失败重试 + 富文本渲染 + "思考中N秒" + 假流式打字动画
 
-这五项是同一轮("完善AI债务顾问")加的，`react/src/sheets/AiScreen.tsx`（都在这个文件里，没有新增文件）+ `cloudbase/functions/aiAdvisor/index.js`（只有追问建议这一项touch了云函数）。
+这五项是同一轮("完善AI债务助手")加的，`react/src/sheets/AiScreen.tsx`（都在这个文件里，没有新增文件）+ `cloudbase/functions/aiAdvisor/index.js`（只有追问建议这一项touch了云函数）。
 
 **追问建议芯片**：system prompt里要求模型在正文之后另起一段，按固定格式追加2~3条追问（`###SUGGESTIONS###`这个marker+`- `列表）。客户端`splitSuggestions(text)`按这个marker把回复切成`{body, suggestions}`两部分——**持久化进`aiConvos`/`AI_CHATLOG_KEY`的是剥离掉marker之后的干净`body`**，不是原始text，这样历史对话reload回来不会残留字面的"###SUGGESTIONS###"文字；代价是重新打开一条历史对话不会恢复它当时的追问建议（芯片是纯展示层状态，只挂在`DisplayMsg.suggestions`上，不落盘）。`hy3`不保证100%遵循这个格式，找不到marker就整段当正文、建议列表为空——这是优雅降级，不是错误。芯片只挂在"最后一条、已完成、没出错、没在打字动画中"的回复下面，问新问题/开始新一轮打字动画时自然消失，不需要额外状态去手动隐藏。点芯片直接调用`composeAndSend(建议文字, false)`，跟手输问题走同一条路径。
 

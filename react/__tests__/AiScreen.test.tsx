@@ -8,6 +8,17 @@ const AI_USAGE_KEY = "after-zero-ai-usage-v1";
 const AI_CHATLOG_KEY = "after-zero-ai-chatlog-v1";
 const AI_LIMIT_NOTICE_KEY = "after-zero-ai-limit-notice-v1";
 
+// 跟 AiScreen.tsx / aiAdvisor云函数 的 currentMonth() 保持一致（北京时间）——
+// 三处必须同一个算法，否则跨月那天测试和实现会对不上。
+function currentMonth(): string {
+  return new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 7);
+}
+// 把本地额度缓存写成"本月已用满"，触发发请求前的快路径拦截。
+// ⚠️形状是 {month,used,limit}（服务端返回值的镜像），不是老的 {date,count}。
+function stubQuotaExhausted(limit = 50) {
+  localStorage.setItem(AI_USAGE_KEY, JSON.stringify({ month: currentMonth(), used: limit, limit }));
+}
+
 // 默认让"假流式"打字动画(startReveal)以prefers-reduced-motion的方式直接跳过——回复到达
 // 后立刻整段显示，绝大多数测试断言"回复内容"时不用等一段打字动画播完。jsdom本来就没有
 // window.matchMedia这个东西，这里补一份，同时也顺带覆盖了castWand()同样查的这条媒体
@@ -53,7 +64,7 @@ describe("AiScreen", () => {
 
   it("点「生成分析报告」芯片：以report模式发送，气泡显示这句话+最终回复", async () => {
     const bridge = makeMockBridge();
-    bridge.callAiAdvisor = vi.fn(() => Promise.resolve("这是分析报告"));
+    bridge.callAiAdvisor = vi.fn(() => Promise.resolve({ text: "这是分析报告", quota: null }));
     window.__azBridge = bridge;
     render(<AiScreen />);
     act(() => { openAiScreen(); });
@@ -71,8 +82,8 @@ describe("AiScreen", () => {
   // (不是等回复回来才补上)。真正的视觉验证只能靠Playwright/真机截图。
   it("消息发出的那一刻，用户气泡和思考中气泡就已经带上正确的左右类名", async () => {
     const bridge = makeMockBridge();
-    let resolveReply: (v: string) => void = () => {};
-    bridge.callAiAdvisor = vi.fn(() => new Promise<string>((res) => { resolveReply = res; }));
+    let resolveReply: (v: { text: string; quota: null }) => void = () => {};
+    bridge.callAiAdvisor = vi.fn(() => new Promise<{ text: string; quota: null }>((res) => { resolveReply = res; }));
     window.__azBridge = bridge;
     const { container } = render(<AiScreen />);
     act(() => { openAiScreen(); });
@@ -87,7 +98,7 @@ describe("AiScreen", () => {
     expect(pendingMsgs[1].textContent).toContain("思考中");
 
     // 回复到达后，占位气泡原地换成真实回复，类名不变(依然靠左)
-    await act(async () => { resolveReply("先还利率最高的那笔"); });
+    await act(async () => { resolveReply({ text: "先还利率最高的那笔", quota: null }); });
     const doneMsgs = container.querySelectorAll(".ai-msg");
     expect(doneMsgs.length).toBe(2);
     expect(doneMsgs[0]).toHaveClass("user");
@@ -98,7 +109,7 @@ describe("AiScreen", () => {
 
   it("点常见问题芯片：以chat模式发送对应问题", async () => {
     const bridge = makeMockBridge();
-    bridge.callAiAdvisor = vi.fn(() => Promise.resolve("先还利率最高的那笔"));
+    bridge.callAiAdvisor = vi.fn(() => Promise.resolve({ text: "先还利率最高的那笔", quota: null }));
     window.__azBridge = bridge;
     render(<AiScreen />);
     act(() => { openAiScreen(); });
@@ -118,11 +129,11 @@ describe("AiScreen", () => {
 
   it("手输：有内容清空输入框并发送", async () => {
     const bridge = makeMockBridge();
-    bridge.callAiAdvisor = vi.fn(() => Promise.resolve("回复"));
+    bridge.callAiAdvisor = vi.fn(() => Promise.resolve({ text: "回复", quota: null }));
     window.__azBridge = bridge;
     render(<AiScreen />);
     act(() => { openAiScreen(); });
-    const textarea = screen.getByPlaceholderText("发消息给 AI 债务顾问…") as HTMLTextAreaElement;
+    const textarea = screen.getByPlaceholderText("发消息给 AI 债务助手…") as HTMLTextAreaElement;
     fireEvent.change(textarea, { target: { value: "我该怎么办" } });
     await act(async () => { fireEvent.click(screen.getByLabelText("发送")); });
     expect(bridge.callAiAdvisor).toHaveBeenCalledWith("chat", "我该怎么办", []);
@@ -131,11 +142,11 @@ describe("AiScreen", () => {
 
   it("Enter键(不按shift)发送，Shift+Enter不发送", async () => {
     const bridge = makeMockBridge();
-    bridge.callAiAdvisor = vi.fn(() => Promise.resolve("回复"));
+    bridge.callAiAdvisor = vi.fn(() => Promise.resolve({ text: "回复", quota: null }));
     window.__azBridge = bridge;
     render(<AiScreen />);
     act(() => { openAiScreen(); });
-    const textarea = screen.getByPlaceholderText("发消息给 AI 债务顾问…");
+    const textarea = screen.getByPlaceholderText("发消息给 AI 债务助手…");
     fireEvent.change(textarea, { target: { value: "问题A" } });
     fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
     expect(bridge.callAiAdvisor).not.toHaveBeenCalled();
@@ -143,8 +154,8 @@ describe("AiScreen", () => {
     expect(bridge.callAiAdvisor).toHaveBeenCalledWith("chat", "问题A", []);
   });
 
-  it("今日用量已用完：弹出额度说明弹窗(带复制提示词按钮)且不调用callAiAdvisor", () => {
-    localStorage.setItem(AI_USAGE_KEY, JSON.stringify({ date: window.fmtDate(window.today0()), count: 20 }));
+  it("本月额度已用完：弹出额度说明弹窗(带复制提示词按钮)且不调用callAiAdvisor", () => {
+    stubQuotaExhausted();
     window.__azBridge = makeMockBridge();
     render(<AiScreen />);
     act(() => { openAiScreen(); });
@@ -168,13 +179,13 @@ describe("AiScreen", () => {
   it("连续追问：第二次发送带上第一轮的history", async () => {
     const bridge = makeMockBridge();
     bridge.callAiAdvisor = vi.fn()
-      .mockResolvedValueOnce("第一次回复")
-      .mockResolvedValueOnce("第二次回复");
+      .mockResolvedValueOnce({ text: "第一次回复", quota: null })
+      .mockResolvedValueOnce({ text: "第二次回复", quota: null });
     window.__azBridge = bridge;
     render(<AiScreen />);
     act(() => { openAiScreen(); });
     await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
-    const textarea = screen.getByPlaceholderText("发消息给 AI 债务顾问…");
+    const textarea = screen.getByPlaceholderText("发消息给 AI 债务助手…");
     fireEvent.change(textarea, { target: { value: "那第二笔呢" } });
     await act(async () => { fireEvent.click(screen.getByLabelText("发送")); });
     expect(bridge.callAiAdvisor).toHaveBeenLastCalledWith("chat", "那第二笔呢", [
@@ -185,7 +196,7 @@ describe("AiScreen", () => {
 
   it("成功回复后持久化进AI_CHATLOG_KEY，历史列表能看到", async () => {
     const bridge = makeMockBridge();
-    bridge.callAiAdvisor = vi.fn(() => Promise.resolve("回复内容"));
+    bridge.callAiAdvisor = vi.fn(() => Promise.resolve({ text: "回复内容", quota: null }));
     window.__azBridge = bridge;
     render(<AiScreen />);
     act(() => { openAiScreen(); });
@@ -204,7 +215,7 @@ describe("AiScreen", () => {
 
   it("点历史行加载对话并关闭历史sheet", async () => {
     const bridge = makeMockBridge();
-    bridge.callAiAdvisor = vi.fn(() => Promise.resolve("回复内容"));
+    bridge.callAiAdvisor = vi.fn(() => Promise.resolve({ text: "回复内容", quota: null }));
     window.__azBridge = bridge;
     render(<AiScreen />);
     act(() => { openAiScreen(); });
@@ -222,7 +233,7 @@ describe("AiScreen", () => {
 
   it("删除历史对话：确认后删除，若是当前对话重置为欢迎态", async () => {
     const bridge = makeMockBridge();
-    bridge.callAiAdvisor = vi.fn(() => Promise.resolve("回复内容"));
+    bridge.callAiAdvisor = vi.fn(() => Promise.resolve({ text: "回复内容", quota: null }));
     window.__azBridge = bridge;
     render(<AiScreen />);
     act(() => { openAiScreen(); });
@@ -237,7 +248,7 @@ describe("AiScreen", () => {
 
   it("删除历史对话：取消不删除", async () => {
     const bridge = makeMockBridge();
-    bridge.callAiAdvisor = vi.fn(() => Promise.resolve("回复内容"));
+    bridge.callAiAdvisor = vi.fn(() => Promise.resolve({ text: "回复内容", quota: null }));
     bridge.confirmAsync = vi.fn(() => Promise.resolve(false));
     window.__azBridge = bridge;
     render(<AiScreen />);
@@ -271,7 +282,7 @@ describe("AiScreen", () => {
     const bridge = makeMockBridge();
     bridge.callAiAdvisor = vi.fn()
       .mockRejectedValueOnce(new Error("网络错误"))
-      .mockResolvedValueOnce("重试后的回复");
+      .mockResolvedValueOnce({ text: "重试后的回复", quota: null });
     window.__azBridge = bridge;
     const { container } = render(<AiScreen />);
     act(() => { openAiScreen(); });
@@ -286,14 +297,14 @@ describe("AiScreen", () => {
     expect(screen.queryByText("网络错误")).not.toBeInTheDocument();
   });
 
-  it("今日用量已用完时点「重试」：弹出额度说明弹窗且不再调用callAiAdvisor", async () => {
+  it("本月额度已用完时点「重试」：弹出额度说明弹窗且不再调用callAiAdvisor", async () => {
     const bridge = makeMockBridge();
     bridge.callAiAdvisor = vi.fn(() => Promise.reject(new Error("网络错误")));
     window.__azBridge = bridge;
     render(<AiScreen />);
     act(() => { openAiScreen(); });
     await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
-    localStorage.setItem(AI_USAGE_KEY, JSON.stringify({ date: window.fmtDate(window.today0()), count: 20 }));
+    stubQuotaExhausted();
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
     expect(screen.getByText("复制完整分析提示词")).toBeInTheDocument();
     expect(bridge.callAiAdvisor).toHaveBeenCalledTimes(1); // 只有最初那次失败的调用，重试没有真正发出
@@ -302,8 +313,8 @@ describe("AiScreen", () => {
   it("回复末尾带###SUGGESTIONS###：正文里不显示marker，解析成可点的追问建议芯片", async () => {
     const bridge = makeMockBridge();
     bridge.callAiAdvisor = vi.fn()
-      .mockResolvedValueOnce("先还利率最高的那笔。\n###SUGGESTIONS###\n- 如果每月多还500呢？\n- 还有更快的方法吗？")
-      .mockResolvedValueOnce("多还500能提前3个月还清");
+      .mockResolvedValueOnce({ text: "先还利率最高的那笔。\n###SUGGESTIONS###\n- 如果每月多还500呢？\n- 还有更快的方法吗？", quota: null })
+      .mockResolvedValueOnce({ text: "多还500能提前3个月还清", quota: null });
     window.__azBridge = bridge;
     render(<AiScreen />);
     act(() => { openAiScreen(); });
@@ -324,7 +335,7 @@ describe("AiScreen", () => {
 
   it("持久化进历史记录的正文已经剥离了###SUGGESTIONS###这段", async () => {
     const bridge = makeMockBridge();
-    bridge.callAiAdvisor = vi.fn(() => Promise.resolve("答案\n###SUGGESTIONS###\n- 追问A"));
+    bridge.callAiAdvisor = vi.fn(() => Promise.resolve({ text: "答案\n###SUGGESTIONS###\n- 追问A", quota: null }));
     window.__azBridge = bridge;
     render(<AiScreen />);
     act(() => { openAiScreen(); });
@@ -336,15 +347,15 @@ describe("AiScreen", () => {
   it("追问建议芯片只挂在最后一条回复下面：发出新问题后旧的建议消失", async () => {
     const bridge = makeMockBridge();
     bridge.callAiAdvisor = vi.fn()
-      .mockResolvedValueOnce("第一次回复\n###SUGGESTIONS###\n- 追问A")
-      .mockResolvedValueOnce("第二次回复");
+      .mockResolvedValueOnce({ text: "第一次回复\n###SUGGESTIONS###\n- 追问A", quota: null })
+      .mockResolvedValueOnce({ text: "第二次回复", quota: null });
     window.__azBridge = bridge;
     render(<AiScreen />);
     act(() => { openAiScreen(); });
     await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
     expect(screen.getByText("追问A")).toBeInTheDocument();
 
-    const textarea = screen.getByPlaceholderText("发消息给 AI 债务顾问…");
+    const textarea = screen.getByPlaceholderText("发消息给 AI 债务助手…");
     fireEvent.change(textarea, { target: { value: "那第二笔呢" } });
     await act(async () => { fireEvent.click(screen.getByLabelText("发送")); });
     expect(screen.queryByText("追问A")).not.toBeInTheDocument();
@@ -352,7 +363,7 @@ describe("AiScreen", () => {
 
   it("回复里markdown风格的列表(- 开头)渲染成真正的<ul><li>，不是原样文字堆着", async () => {
     const bridge = makeMockBridge();
-    bridge.callAiAdvisor = vi.fn(() => Promise.resolve("建议如下：\n- 先还网贷\n- 再还信用卡"));
+    bridge.callAiAdvisor = vi.fn(() => Promise.resolve({ text: "建议如下：\n- 先还网贷\n- 再还信用卡", quota: null }));
     window.__azBridge = bridge;
     const { container } = render(<AiScreen />);
     act(() => { openAiScreen(); });
@@ -367,8 +378,8 @@ describe("AiScreen", () => {
     vi.useFakeTimers();
     try {
       const bridge = makeMockBridge();
-      let resolveReply: (v: string) => void = () => {};
-      bridge.callAiAdvisor = vi.fn(() => new Promise<string>((res) => { resolveReply = res; }));
+      let resolveReply: (v: { text: string; quota: null }) => void = () => {};
+      bridge.callAiAdvisor = vi.fn(() => new Promise<{ text: string; quota: null }>((res) => { resolveReply = res; }));
       window.__azBridge = bridge;
       const { container } = render(<AiScreen />);
       act(() => { openAiScreen(); });
@@ -378,7 +389,7 @@ describe("AiScreen", () => {
       const pending = container.querySelector(".ai-msg.pending");
       expect(pending?.textContent).toContain("思考中 3s");
 
-      await act(async () => { resolveReply("答案"); });
+      await act(async () => { resolveReply({ text: "答案", quota: null }); });
     } finally {
       vi.useRealTimers();
     }
@@ -389,7 +400,7 @@ describe("AiScreen", () => {
     vi.useFakeTimers();
     try {
       const bridge = makeMockBridge();
-      bridge.callAiAdvisor = vi.fn(() => Promise.resolve("先还利率最高的那笔"));
+      bridge.callAiAdvisor = vi.fn(() => Promise.resolve({ text: "先还利率最高的那笔", quota: null }));
       window.__azBridge = bridge;
       const { container } = render(<AiScreen />);
       act(() => { openAiScreen(); });
@@ -412,8 +423,8 @@ describe("AiScreen", () => {
     try {
       const bridge = makeMockBridge();
       bridge.callAiAdvisor = vi.fn()
-        .mockResolvedValueOnce("第一段很长很长很长很长很长的回复内容用来确保动画还没播完")
-        .mockResolvedValueOnce("短");
+        .mockResolvedValueOnce({ text: "第一段很长很长很长很长很长的回复内容用来确保动画还没播完", quota: null })
+        .mockResolvedValueOnce({ text: "短", quota: null });
       window.__azBridge = bridge;
       const { container } = render(<AiScreen />);
       act(() => { openAiScreen(); });
@@ -435,7 +446,7 @@ describe("AiScreen", () => {
 
   it("重新打开screen会重置成欢迎态(即使上次退出时还在某个对话里)", async () => {
     const bridge = makeMockBridge();
-    bridge.callAiAdvisor = vi.fn(() => Promise.resolve("回复内容"));
+    bridge.callAiAdvisor = vi.fn(() => Promise.resolve({ text: "回复内容", quota: null }));
     window.__azBridge = bridge;
     render(<AiScreen />);
     act(() => { openAiScreen(); });
@@ -443,6 +454,84 @@ describe("AiScreen", () => {
     act(() => { closeAiScreen(); });
     act(() => { openAiScreen(); });
     expect(screen.getByText("有什么想聊的？")).toBeInTheDocument();
+  });
+
+  // ===== 服务端权威额度（2026-08-04：从客户端20次/天软限改成服务端50次/月硬限）=====
+  describe("服务端额度", () => {
+    it("成功返回的quota会写进本地缓存，并在欢迎态显示本月剩余次数", async () => {
+      const bridge = makeMockBridge();
+      bridge.callAiAdvisor = vi.fn(() => Promise.resolve({
+        text: "回复", quota: { month: currentMonth(), used: 7, limit: 50 },
+      }));
+      window.__azBridge = bridge;
+      render(<AiScreen />);
+      act(() => { openAiScreen(); });
+      await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
+
+      // 缓存被服务端的权威值刷新（不是客户端自己+1算出来的）
+      expect(JSON.parse(localStorage.getItem(AI_USAGE_KEY)!)).toEqual({
+        month: currentMonth(), used: 7, limit: 50,
+      });
+      // 回到欢迎态就能看到剩余次数
+      act(() => { fireEvent.click(screen.getByRole("button", { name: "历史对话" })); });
+      act(() => { fireEvent.click(screen.getByText("新对话")); });
+      expect(screen.getByText("43")).toBeInTheDocument(); // 50-7
+    });
+
+    it("本地缓存没拦住时(缓存被清/跨月)，服务端返回QUOTA_EXCEEDED同样弹额度弹窗", async () => {
+      const bridge = makeMockBridge();
+      const err = Object.assign(new Error("本月 AI 分析次数已用完（50 次/月），下个月 1 号恢复"), {
+        code: "QUOTA_EXCEEDED",
+        quota: { month: currentMonth(), used: 50, limit: 50 },
+      });
+      bridge.callAiAdvisor = vi.fn(() => Promise.reject(err));
+      window.__azBridge = bridge;
+      render(<AiScreen />);
+      act(() => { openAiScreen(); });
+      // 本地没有缓存 → 快路径放行 → 真的发出了请求
+      await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
+      expect(bridge.callAiAdvisor).toHaveBeenCalled();
+      // 服务端拒绝后：错误气泡 + 额度说明弹窗都要出现
+      expect(screen.getByText("复制完整分析提示词")).toBeInTheDocument();
+      expect(screen.getByText("本月 AI 分析次数已用完（50 次/月），下个月 1 号恢复")).toBeInTheDocument();
+      // 并且把服务端的额度写进缓存，下次就能走快路径直接拦
+      expect(JSON.parse(localStorage.getItem(AI_USAGE_KEY)!).used).toBe(50);
+    });
+
+    it("普通报错(非额度问题)不弹额度弹窗", async () => {
+      const bridge = makeMockBridge();
+      bridge.callAiAdvisor = vi.fn(() => Promise.reject(new Error("网络错误")));
+      window.__azBridge = bridge;
+      render(<AiScreen />);
+      act(() => { openAiScreen(); });
+      await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
+      expect(screen.getByText("网络错误")).toBeInTheDocument();
+      expect(screen.queryByText("复制完整分析提示词")).not.toBeInTheDocument();
+    });
+
+    it("老格式缓存({date,count})不会被误读成额度，直接放行让服务端裁决", async () => {
+      // 升级前装过App的用户，localStorage里躺着老形状的数据
+      localStorage.setItem(AI_USAGE_KEY, JSON.stringify({ date: "2026-08-04", count: 20 }));
+      const bridge = makeMockBridge();
+      bridge.callAiAdvisor = vi.fn(() => Promise.resolve({ text: "回复", quota: null }));
+      window.__azBridge = bridge;
+      render(<AiScreen />);
+      act(() => { openAiScreen(); });
+      await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
+      expect(bridge.callAiAdvisor).toHaveBeenCalled(); // 没有被老数据误拦
+      expect(screen.queryByText("复制完整分析提示词")).not.toBeInTheDocument();
+    });
+
+    it("上个月的缓存不会被当成本月额度", async () => {
+      localStorage.setItem(AI_USAGE_KEY, JSON.stringify({ month: "2020-01", used: 50, limit: 50 }));
+      const bridge = makeMockBridge();
+      bridge.callAiAdvisor = vi.fn(() => Promise.resolve({ text: "回复", quota: null }));
+      window.__azBridge = bridge;
+      render(<AiScreen />);
+      act(() => { openAiScreen(); });
+      await act(async () => { fireEvent.click(screen.getByText("我该先还哪一笔？")); });
+      expect(bridge.callAiAdvisor).toHaveBeenCalled(); // 跨月了，旧月份的"已用满"不该拦
+    });
   });
 
   describe("额度说明弹窗", () => {
@@ -489,7 +578,7 @@ describe("AiScreen", () => {
 
     it("点「复制完整分析提示词」：写入剪贴板(含完整债务JSON)并toast成功", async () => {
       localStorage.setItem(AI_LIMIT_NOTICE_KEY, "1");
-      localStorage.setItem(AI_USAGE_KEY, JSON.stringify({ date: window.fmtDate(window.today0()), count: 20 }));
+      stubQuotaExhausted();
       const writeText = vi.fn((_text: string) => Promise.resolve());
       Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
       const bridge = makeMockBridge();
@@ -505,7 +594,7 @@ describe("AiScreen", () => {
 
     it("复制失败：toast失败提示而不是抛出未捕获异常", async () => {
       localStorage.setItem(AI_LIMIT_NOTICE_KEY, "1");
-      localStorage.setItem(AI_USAGE_KEY, JSON.stringify({ date: window.fmtDate(window.today0()), count: 20 }));
+      stubQuotaExhausted();
       Object.defineProperty(navigator, "clipboard", {
         value: { writeText: vi.fn(() => Promise.reject(new Error("拒绝"))) }, configurable: true,
       });

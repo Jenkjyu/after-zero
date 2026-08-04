@@ -304,7 +304,7 @@ export function useBackupScreenOpen(): boolean {
   return useSyncExternalStore(subscribeBackupScreen, () => backupScreenOpen);
 }
 
-// AI 债务顾问——第十一步(React迁移收尾)新增，布尔开关，跟accountScreen/premiumScreen/
+// AI 债务助手——第十一步(React迁移收尾)新增，布尔开关，跟accountScreen/premiumScreen/
 // termsScreen/notifySheet/docsScreen/backupScreen同一个模式。"哪个历史对话开着"这份状态
 // (原来的aiHistorySheet)完全是AiScreen自己的组件内部状态，不需要在这里再加一对
 // open/close——跟其它几个screen不同的是，历史对话sheet只会从AiScreen自己的header按钮
@@ -371,5 +371,46 @@ function getFilesSnapshot(): FileItem[] {
 }
 export function useFiles(): FileItem[] {
   return useSyncExternalStore(subscribeFiles, getFilesSnapshot);
+}
+
+// 多策略对比规划——2026-08-04新增，布尔开关，跟accountScreen/premiumScreen/termsScreen
+// 同一个模式(全局只有一份，不需要"打开哪一个"这种参数——这个工具操作对象是全部在还
+// 债务的组合，不是单笔债务，所以不像simScreen那样用id)。从"统计"tab的Conclusions.tsx
+// (完全独立的另一棵React树，report入口)触发，跟其它从"我的"tab/AI banner触发进sheets
+// 挂载点的screen是同一种"跨树触发"关系。
+let strategyScreenOpen = false;
+function subscribeStrategyScreen(callback: () => void) {
+  window.addEventListener("az:strategy-screen-changed", callback);
+  return () => window.removeEventListener("az:strategy-screen-changed", callback);
+}
+export function openStrategyScreen() {
+  strategyScreenOpen = true;
+  window.dispatchEvent(new CustomEvent("az:strategy-screen-changed"));
+}
+export function closeStrategyScreen() {
+  strategyScreenOpen = false;
+  window.dispatchEvent(new CustomEvent("az:strategy-screen-changed"));
+}
+export function useStrategyScreenOpen(): boolean {
+  return useSyncExternalStore(subscribeStrategyScreen, () => strategyScreenOpen);
+}
+
+// 还债历程——2026-08-04新增，跟strategyScreen同一个模式(全局布尔开关，不需要id参数)。
+// 从"统计"tab的HistoryTeaser.tsx(另一棵独立React树)触发。
+let historyScreenOpen = false;
+function subscribeHistoryScreen(callback: () => void) {
+  window.addEventListener("az:history-screen-changed", callback);
+  return () => window.removeEventListener("az:history-screen-changed", callback);
+}
+export function openHistoryScreen() {
+  historyScreenOpen = true;
+  window.dispatchEvent(new CustomEvent("az:history-screen-changed"));
+}
+export function closeHistoryScreen() {
+  historyScreenOpen = false;
+  window.dispatchEvent(new CustomEvent("az:history-screen-changed"));
+}
+export function useHistoryScreenOpen(): boolean {
+  return useSyncExternalStore(subscribeHistoryScreen, () => historyScreenOpen);
 }
 

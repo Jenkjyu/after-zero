@@ -27,6 +27,13 @@
     --e2: 0 2px 6px rgba(24,32,46,.06), 0 16px 32px rgba(24,32,46,.09);
     --e3: 0 24px 50px rgba(16,24,38,.28);
     --glass: rgba(255,255,255,.62); --glass-border: rgba(255,255,255,.8); --glass-hi: rgba(255,255,255,.7);
+    /* 多策略对比规划(StrategyCompareScreen)的3色分类色——雪球法/雪崩法/自定义顺序固定
+       这个顺序，不循环使用。数值跟统计tab的--pie-1/2/3相同(蓝/琥珀/青，已用dataviz skill
+       的validate_palette.js对--card-grad底色验证过全部通过)，但故意不直接复用--pie-*
+       这几个token——那几个的角色是"债务类型占比甜甜圈"分类色、且作用域限定在.viz-root下
+       (统计tab专属)，这个新screen不在.viz-root范围内，且"策略身份"跟"债务类型"不是同一件
+       事，"一个颜色=一个角色"是这份配色体系的既有原则，故另起3个跟主题块同级的全局token。 */
+    --strat-1: #2B6CB8; --strat-2: #C4892F; --strat-3: #068468;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #0F1319; --surface: #24282F; --surface-2: #2E3239; --border: #3C4047;
@@ -39,7 +46,8 @@
       --graphite-a: #333B45; --graphite-b: #161D25; --graphite-text: #F2F5F9; --graphite-dim: #99A4B2;
       --graphite-sheen: rgba(111,190,158,.22);
       --e1: 0 1px 2px rgba(0,0,0,.35); --e2: 0 4px 18px rgba(0,0,0,.4); --e3: 0 22px 46px rgba(0,0,0,.55);
-      --glass: rgba(54,58,66,.55); --glass-border: rgba(255,255,255,.10); --glass-hi: rgba(255,255,255,.08); }
+      --glass: rgba(54,58,66,.55); --glass-border: rgba(255,255,255,.10); --glass-hi: rgba(255,255,255,.08);
+      --strat-1: #5590D8; --strat-2: #BC8B3C; --strat-3: #43A883; }
   }
   :root[data-theme="light"] { --bg: #E7EAEF; --surface: #FFFFFF; --surface-2: #EFF1F6; --border: #CED2DB;
     --text: #23272F; --text-muted: #656C7E; --accent: #18453B; --accent-soft: #E7F3F1; --accent-mid: #4E9481;
@@ -53,7 +61,8 @@
     --e1: 0 1px 2px rgba(24,32,46,.05), 0 4px 10px rgba(24,32,46,.055);
     --e2: 0 2px 6px rgba(24,32,46,.06), 0 16px 32px rgba(24,32,46,.09);
     --e3: 0 24px 50px rgba(16,24,38,.28);
-    --glass: rgba(255,255,255,.62); --glass-border: rgba(255,255,255,.8); --glass-hi: rgba(255,255,255,.7); }
+    --glass: rgba(255,255,255,.62); --glass-border: rgba(255,255,255,.8); --glass-hi: rgba(255,255,255,.7);
+    --strat-1: #2B6CB8; --strat-2: #C4892F; --strat-3: #068468; }
   /* 图标徽章色家族——**故意只定义一次、不跟着明暗模式换**，跟上面那4个主题块的规矩不同。
      理由：这些颜色只出现在38px的小圆角方块里（约屏幕面积2%），小面积高饱和在明暗两种底色
      下都成立，保持恒定反而让App有一个跨主题稳定的色彩signature（Google账号设置页就是这么做的，
@@ -77,7 +86,8 @@
     --graphite-a: #333B45; --graphite-b: #161D25; --graphite-text: #F2F5F9; --graphite-dim: #99A4B2;
     --graphite-sheen: rgba(111,190,158,.22);
     --e1: 0 1px 2px rgba(0,0,0,.35); --e2: 0 4px 18px rgba(0,0,0,.4); --e3: 0 22px 46px rgba(0,0,0,.55);
-    --glass: rgba(54,58,66,.55); --glass-border: rgba(255,255,255,.10); --glass-hi: rgba(255,255,255,.08); }
+    --glass: rgba(54,58,66,.55); --glass-border: rgba(255,255,255,.10); --glass-hi: rgba(255,255,255,.08);
+    --strat-1: #5590D8; --strat-2: #BC8B3C; --strat-3: #43A883; }
 
   * { box-sizing: border-box; }
   /* 全局禁掉长按选中/复制文字，只在真正的文字输入框(input/textarea)里保留——
@@ -697,6 +707,67 @@
     color: var(--text-muted); font-size: 14px; font-weight: 700; font-family: inherit; }
   .premium-tab.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
 
+  /* 多策略对比规划(StrategyCompareScreen)——统计tab"最该先动手的地方"下面的入口。
+     外层用现成的.sec(跟FindingList/ActionBox同一套section节奏)，这里只补按钮自己的样式。 */
+  .strategy-cta .btn { width: 100%; margin-top: 10px; }
+  /* 自定义顺序：上下移动按钮，不做真正的拖拽——见CLAUDE.md"多策略对比规划"一节，
+     这个决定是权衡过的：这批列表通常<15项，按钮比touch drag更可靠、也不需要重新
+     实现一套手势状态机(那套代码本来就是为"在还债务"tab的jiggle模式+swipe写的，
+     跟这里"纯排序、没有swipe"的需求不匹配，硬套反而更容易出错)。 */
+  .strat-order-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    border-radius: 12px; background: var(--surface-2); margin-bottom: 6px; }
+  .strat-order-row:last-child { margin-bottom: 0; }
+  .strat-order-idx { font-size: 12px; color: var(--text-faint); font-family: var(--font-num); width: 16px; flex: none; }
+  .strat-order-name { flex: 1; font-size: 13.5px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .strat-order-bal { font-size: 12px; color: var(--text-muted); font-family: var(--font-num); flex: none; }
+  .strat-order-moves { display: flex; gap: 4px; flex: none; }
+  .strat-order-btn { width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
+  .strat-order-btn:disabled { opacity: .35; }
+  .strat-order-btn svg { width: 13px; height: 13px; }
+
+  /* 结果：3行，每行=一种策略(颜色点+名字+总利息+还清时间)，最省的那行加高亮标记 */
+  .strat-result-row { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px;
+    background: var(--card-grad); border: 1px solid var(--hair); margin-bottom: 8px; }
+  .strat-result-row.best { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .strat-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .strat-dot.s1 { background: var(--strat-1); }
+  .strat-dot.s2 { background: var(--strat-2); }
+  .strat-dot.s3 { background: var(--strat-3); }
+  .strat-result-name { flex: 1; font-size: 13.5px; font-weight: 700; min-width: 0; }
+  .strat-result-name .best-badge { display: inline-block; margin-left: 6px; font-size: 10.5px; font-weight: 700;
+    color: var(--on-accent); background: var(--accent-fill); border-radius: 999px; padding: 1px 7px; vertical-align: 1px; }
+  .strat-result-nums { text-align: right; flex: none; }
+  .strat-result-nums .v { font-size: 14px; font-weight: 700; font-family: var(--font-num); }
+  .strat-result-nums .k { font-size: 10.5px; color: var(--text-muted); }
+
+  /* 压力曲线对比图：静态SVG，不做scrub手势(3条不同长度的线做逐帧命中判定成本明显更高，
+     且这张图的核心信息——"哪个策略更快归零"——已经靠3行结果卡片里的日期数字说清楚了，
+     图表纯粹是视觉印证，不需要再精确到"某个月的余额是多少"这个粒度)。 */
+  .strat-chart-wrap { position: relative; background: var(--card-grad); border: 1px solid var(--hair);
+    border-radius: 16px; padding: 14px 14px 10px; margin: 14px 0; }
+  .strat-chart-wrap svg { display: block; width: 100%; height: auto; }
+  .strat-legend { display: flex; gap: 14px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
+  .strat-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--text-muted); }
+
+  /* 还债历程(HistoryScreen)——统计tab里的入口卡片(.history-teaser)+ 时间线页面本身 */
+  .history-teaser { padding: 16px; }
+  .history-teaser-nums { display: flex; gap: 18px; margin: 8px 0 14px; }
+  .history-teaser-num .v { font-size: 19px; font-weight: 700; font-family: var(--font-num); }
+  .history-teaser-num .k { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .history-teaser .btn { width: 100%; }
+
+  .history-event-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 2px; border-bottom: 1px solid var(--hair); }
+  .history-event-row:last-child { border-bottom: none; }
+  .history-event-ic { width: 30px; height: 30px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; }
+  .history-event-ic.settled { background: var(--accent-soft); color: var(--accent); }
+  .history-event-ic.milestone { background: var(--warning-soft); color: var(--warning); }
+  .history-event-ic svg { width: 15px; height: 15px; }
+  .history-event-text { flex: 1; min-width: 0; }
+  .history-event-title { font-size: 13.5px; font-weight: 600; }
+  .history-event-date { font-size: 11.5px; color: var(--text-faint); margin-top: 2px; }
+  .history-empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 13px; }
+
   .pf-list { margin: 4px 0 20px; }
   .pf-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .pf-row:last-child { border-bottom: none; }
@@ -713,17 +784,13 @@
   .price-card .pc-amt { font-size: 19px; font-weight: 700; }
   .price-card .pc-period { font-size: 12px; color: var(--text-muted); }
   .price-card .pc-note { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
-  /* 2026-08-04：单一买断价卡的"原价划线+现价+限时优惠"，只留买断后新增。pc-price-row用
-     flex让划线原价/现价/角标在同一行按基线对齐；pc-strike单独控制划线样式。"限时优惠"
-     故意不用pc-badge(绿色实心胶囊)——那样跟"永久解锁"标签、卡片外框、下面的"开通Premium"
-     按钮撞成一片绿，四处同一个强调色挤在一小块区域反而互相抢戏。改成纯文字弱化处理，
-     卡片外框也去掉了.selected常驻高亮(只剩一张卡，"选中态"这个语义已经不存在了，
-     描边只是在重复"这里很重要"，没必要再跟按钮抢颜色)。 */
+  /* 2026-08-04：去掉了"原价划线+限时优惠"这套电商促销话术(pc-strike/pc-limited已删)——
+     跟AI额度弹窗"坦诚说清楚成本"的口吻矛盾，且"限时"永不过期就是个假锚点，负债人群对
+     这类营销话术的信任度是负的。现在只剩朴素的现价，卡片外框也去掉了.selected常驻
+     高亮(只剩一张卡，"选中态"这个语义已经不存在了)。 */
   .price-card .pc-price-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-  .price-card .pc-strike { font-size: 13px; color: var(--text-muted); text-decoration: line-through; }
-  .price-card .pc-limited { font-size: 11.5px; font-weight: 600; color: var(--text-muted); }
 
-  /* ===== AI 债务顾问：聊天式界面（欢迎态+快捷芯片、统一消息流、吸底输入框） =====
+  /* ===== AI 债务助手：聊天式界面（欢迎态+快捷芯片、统一消息流、吸底输入框） =====
      #aiScreen需要真正的flex-column三段布局(header固定/中间可滚动/输入框天然贴在真实屏幕底边)，
      不能像其它.subpage那样靠overflow-y:auto整页滚动+sticky模拟"吸底"——sticky只在"内容比
      视口高、需要滚动"时才会把元素顶到视口底边，内容不够高时(比如欢迎态消息很少)它就停在
@@ -750,6 +817,9 @@
   .ai-welcome-ic svg { width: 28px; height: 28px; overflow: visible; }
   .ai-welcome h2 { font-size: 17px; font-weight: 700; margin: 0; }
   .ai-welcome p { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin: 0; max-width: 30ch; }
+  /* 本月剩余次数——比正文再弱一档，是参考信息不是主角，不该跟欢迎语抢注意力 */
+  .ai-quota-note { font-size: 12px; color: var(--text-faint); margin: -6px 0 0; }
+  .ai-quota-note strong { color: var(--text-muted); font-weight: 700; }
   .ai-chips { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 6px; }
   .ai-chip { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 12px 14px;
     border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
@@ -1986,7 +2056,7 @@
     return tier;
   }
 
-  // ===== AI 债务顾问（Premium）=====
+  // ===== AI 债务助手（Premium）=====
   // 报告=一次性生成、问答=多轮对话，都走 aiAdvisor 云函数（服务端调 CloudBase 大模型）。
   // 结构化数据在客户端算好再上传（条目少、token 便宜），云函数不碰债务原始数组。
   //
@@ -2009,33 +2079,64 @@
     return { amort: "等额本息", equalprincipal: "等额本金", equalfee: "等本等费",
       interestfirst: "先息后本", custom: "自定义" }[kind] || "未知";
   }
-  function buildAiSummary() {
+  // compact=true 时把**已还**期次压成一行汇总、只逐期列出未还的那些（2026-08-04加）。
+  // 为什么要分两种模式：这份JSON有两个消费者，成本结构完全相反——
+  //   ①云函数(callAiAdvisor)：token我们自己付费，且**每次提问都重发一遍**整份数据，
+  //     一个12笔债务×24期的用户光计划表就约1.7万字符。已还期次对"接下来该怎么还"
+  //     没有推理价值(累计已还本金/利息两个字段已经把结果表达完了)，压掉省的是真金白银。
+  //   ②一键复制给外部AI(buildCopyPrompt)：用户自己粘去豆包/文心，**我们零成本**，
+  //     压缩只会白白降低对方的回答质量，所以那条路径走全量。
+  // 未还期次永远逐期全发——test11那种"先还利息、某月起本金跳涨"的结构必须让AI看见，
+  // 这正是当初加完整计划表要解决的问题，不能压。
+  function buildAiSummary(compact) {
     var data = computeReportData(debts);
     var list = debts.filter(function (d) { return (+d.balance || 0) > 0.005; }).map(function (d) {
-      return { 名称: d.name || "未命名", 类型: d.type || "其他", 债主: d.funder || "",
+      var plan = d.plan || [];
+      var rows = compact ? plan.filter(function (r) { return !r.paid; }) : plan;
+      var o = { 名称: d.name || "未命名", 类型: d.type || "其他", 债主: d.funder || "",
         开始日期: d.opened || "", 备注: d.notes || "",
         计息方式: d.gen && d.gen.kind ? methodLabel(d.gen.kind) : "未知",
         剩余本金: r2(d.balance), 年化利率百分比: r2(d.rate), 月供: r2(d.monthly),
         剩余期数: d.terms || 0, 总期数: d.totalTerms || 0, 一次性还清: !!d.oneTime,
-        累计已还本金: r2(d.paidPrincipal), 累计已还利息: r2(d.paidInterest),
-        还款计划: (d.plan || []).map(function (r) {
-          return { 日期: r.date, 金额: r2(r.amount), 本金: r2(r.principal), 利息: r2(r.interest), 已还: !!r.paid };
-        }) };
+        累计已还本金: r2(d.paidPrincipal), 累计已还利息: r2(d.paidInterest) };
+      if (compact) {
+        var paid = plan.filter(function (r) { return r.paid; });
+        o.已还期次汇总 = { 期数: paid.length,
+          最后一期日期: paid.length ? paid[paid.length - 1].date : "" };
+        o.还款计划说明 = "下面只列未还期次；已还的见上面「已还期次汇总」和累计已还本金/利息";
+      }
+      o.还款计划 = rows.map(function (r) {
+        return { 日期: r.date, 金额: r2(r.amount), 本金: r2(r.principal), 利息: r2(r.interest), 已还: !!r.paid };
+      });
+      return o;
     });
     return { 在还总负债: data.totalBalance, 加权平均年化利率百分比: r2(data.avgRate),
       预计全部还清日期: data.payoffDate || "未知", 债务清单: list };
   }
   // 调云函数：mode=report 无 question、不需要 history；mode=chat 带 question + history
   // （history 是这次提问之前的上下文，不含这次提问本身，服务端会把 question 接在最后）。
+  // summary走**压缩版**(buildAiSummary(true))——这条路径的token我们自己付费、且每次提问
+  // 都重发一遍，见上面buildAiSummary的注释。一键复制那条路径不走这里，用的是全量版。
+  //
+  // 返回 {text, quota}：quota是服务端权威的本月用量({month,used,limit})，React拿它更新
+  // 本地缓存(AI_USAGE_KEY)供"还剩N次"显示和下次调用前的快速拦截。**额度真正的把关在
+  // 服务端**，本地缓存只是快路径+展示，被清掉/篡改最多让客户端多打一次必然被拒的请求。
+  // 超额时服务端返回 code:"QUOTA_EXCEEDED"，这里把它挂到Error上，React据此弹额度说明
+  // 弹窗而不是当成普通报错。
   function callAiAdvisor(mode, question, history) {
-    var summary = buildAiSummary();
+    var summary = buildAiSummary(true);
     if (!summary.债务清单.length) return Promise.reject(new Error("没有在还债务，先添加一笔再来分析"));
     return ensureCbAuthReady().then(function () {
       return cbApp().callFunction({ name: "aiAdvisor", data: { mode: mode, summary: summary, question: question || "", history: history || [] } });
     }).then(function (res) {
       var r = res && res.result;
-      if (!r || !r.ok) throw new Error((r && r.error) || "AI 分析失败，请稍后再试");
-      return r.text || "";
+      if (!r || !r.ok) {
+        var err = new Error((r && r.error) || "AI 分析失败，请稍后再试");
+        if (r && r.code) err.code = r.code;
+        if (r && r.quota) err.quota = r.quota;
+        throw err;
+      }
+      return { text: r.text || "", quota: r.quota || null };
     });
   }
 
@@ -2131,6 +2232,57 @@
       img.src = url;
     });
   }
+  // "还债历程"(HistoryScreen)分享卡片——Premium专属(react/src/sheets/HistoryScreen.tsx按钮
+  // 触发，门禁判断在React那边，跟其它导出按钮同一个套路)。SVG→PNG→存到设备沿用
+  // buildExportChartsSVG/svgStringToPngDataURL/dataURLToBlob/saveToDeviceDownloads这条现成
+  // 链路，没有引入任何新依赖。颜色固定用石墨主题的字面hex值(不跟随设备深色模式)——这是
+  // 一张要分享出去给别人看的"成就卡"，不是数据文档，效果要在任何人的屏幕上看起来一样，
+  // 跟PDF导出"固定浅色更易读"是同一类判断，只是这里选石墨深色因为更像"成就/纪念"的调性
+  // (呼应"在还债务"页hero卡的石墨配色)。不用emoji——这个项目一直是"克制的纯图标+文字"
+  // 方案(空状态那条既有原则)，这里延续，用简单的几何图形(勾/星)画事件类型的小标记。
+  function buildHistoryShareSvg(events, s) {
+    var W = 640, H = 800;
+    var G = { bgA: "#253039", bgB: "#151A20", text: "#FFFFFF", dim: "#9BA6B4", accent: "#6FBE9E" };
+    var p = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" font-family="sans-serif">'];
+    p.push('<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0" stop-color="' + G.bgA + '"/><stop offset="1" stop-color="' + G.bgB + '"/></linearGradient></defs>');
+    p.push('<rect width="' + W + '" height="' + H + '" fill="url(#bg)"/>');
+    var y = 64;
+    p.push('<text x="40" y="' + y + '" font-size="15" font-weight="700" letter-spacing="1" fill="' + G.dim + '">AFTER ZERO</text>'); y += 40;
+    p.push('<text x="40" y="' + y + '" font-size="26" font-weight="700" fill="' + G.text + '">我的还债历程</text>'); y += 56;
+    p.push('<text x="40" y="' + y + '" font-size="13" fill="' + G.dim + '">累计已还本金</text>'); y += 46;
+    p.push('<text x="40" y="' + y + '" font-size="44" font-weight="700" fill="' + G.text + '">¥' + fmt(s.paidPrincipal) + '</text>'); y += 36;
+    p.push('<text x="40" y="' + y + '" font-size="14" fill="' + G.dim + '">另付利息 ¥' + fmt(s.paidInterest) + ' · 已结清 ' + s.settled + ' 笔</text>'); y += 50;
+    p.push('<line x1="40" y1="' + y + '" x2="' + (W - 40) + '" y2="' + y + '" stroke="' + G.dim + '" stroke-opacity=".25"/>'); y += 42;
+    // 最近的事件排在最上面(倒序)，跟HistoryScreen列表顺序一致；最多画8条，卡片高度有限
+    var recent = events.slice(-8).reverse();
+    if (!recent.length) {
+      p.push('<text x="40" y="' + y + '" font-size="13" fill="' + G.dim + '">还没有可回顾的还款记录</text>');
+    }
+    recent.forEach(function (ev) {
+      if (ev.type === "settled") {
+        p.push('<circle cx="48" cy="' + (y - 5) + '" r="9" fill="none" stroke="' + G.accent + '" stroke-width="1.6"/>');
+        p.push('<path d="M44 ' + (y - 5) + 'l3 3 6-6" fill="none" stroke="' + G.accent + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>');
+        p.push('<text x="68" y="' + y + '" font-size="13.5" fill="' + G.text + '">' + escSvg(ev.name) + ' 已还清</text>');
+      } else {
+        p.push('<path d="M48 ' + (y - 13) + 'l2.6 6.6 6.6.4-5.2 4.4 1.8 6.6-6-3.8-6 3.8 1.8-6.6-5.2-4.4 6.6-.4Z" fill="' + G.accent + '"/>');
+        p.push('<text x="68" y="' + y + '" font-size="13.5" fill="' + G.text + '">累计已还突破 ¥' + fmt(ev.amount) + '</text>');
+      }
+      p.push('<text x="' + (W - 40) + '" y="' + y + '" font-size="11.5" fill="' + G.dim + '" text-anchor="end">' + escSvg(ev.date) + '</text>');
+      y += 34;
+    });
+    p.push('<text x="40" y="' + (H - 32) + '" font-size="11" fill="' + G.dim + '">生成于 ' + escSvg(new Date().toLocaleDateString()) + '</text>');
+    p.push('</svg>');
+    return p.join("");
+  }
+  function generateHistoryShareCard() {
+    var events = buildHistoryEvents(debts), s = summarizeDebts(debts);
+    var svg = buildHistoryShareSvg(events, s);
+    return svgStringToPngDataURL(svg, 640, 800, 2).then(dataURLToBlob).then(function (blob) {
+      return saveToDeviceDownloads(blob, "after-zero-历程-" + fmtDate(today0()) + ".png", "image/png");
+    });
+  }
+
   function exportReportXlsx() {
     if (typeof XLSX === "undefined") { toast("导出组件未就绪，请重启 App 后重试"); return; }
     var data = computeReportData(debts);
@@ -2650,6 +2802,13 @@
     // 是同一个模式。editSheet排在detailSheet之前(位置沿用原来#editSheet在DOM里的顺序)。
     if (window.__azEditSheetBack && window.__azEditSheetBack()) return true;
     if (window.__azDetailSheetBack && window.__azDetailSheetBack()) return true;
+    // 多策略对比规划(react/src/sheets/StrategyCompareScreen.tsx，2026-08-04新增)——不从
+    // 任何别的sheets屏幕内部打开(触发点在"统计"tab完全独立的另一棵React树)，也不从自己
+    // 内部打开别的sheets屏幕，链里的位置不受"谁盖在谁上面"那条排序约束，放在链尾即可。
+    if (window.__azStrategyScreenBack && window.__azStrategyScreenBack()) return true;
+    // 还债历程(react/src/sheets/HistoryScreen.tsx，2026-08-04新增)——同strategyScreen，
+    // 不受"谁盖在谁上面"排序约束，放在链尾。
+    if (window.__azHistoryScreenBack && window.__azHistoryScreenBack()) return true;
     return false;
   };
   // #topAvatarBtn(在还债务页头像)/"我的"页accountAvatarBtn/premiumEntryBtn的点击现在由
@@ -2788,7 +2947,10 @@
     callAiAdvisor: callAiAdvisor,
     // 2026-08-04新增："每日额度用完了怎么办"弹窗的"复制完整提示词"按钮要用——buildAiSummary()
     // 本身零DOM依赖、不调用云函数，直接原样暴露，不用像callAiAdvisor那样包一层。
-    buildAiSummary: buildAiSummary
+    buildAiSummary: buildAiSummary,
+    // "还债历程"(HistoryScreen)分享卡片——生成PNG+存到设备这条链路涉及Blob/Canvas/原生
+    // 插件调用，不可移植，包一层跟callAiAdvisor/downloadBackupFile同一个理由。
+    generateHistoryShareCard: generateHistoryShareCard
   };
 
   renderAll(); loadUploads(); renderAccountUI();

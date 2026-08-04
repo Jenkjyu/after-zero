@@ -45,6 +45,6 @@ npx --yes -p @cloudbase/cli tcb fn deploy <函数名> --force
 | `wxLogin` | 微信登录换票据 | `TCB_CUSTOM_LOGIN_*` 三个 |
 | `deleteAccount` | 注销账户，联动清理云备份 | 无 |
 | `backupCreate`/`backupList`/`backupRestore`/`backupDelete`/`backupUploadFile` | 云备份 | 无 |
-| `aiAdvisor` | AI债务顾问，调CloudBase内置大模型 | 无 |
+| `aiAdvisor` | AI债务助手，调CloudBase内置大模型 | 无 |
 
 不信任客户端传参是这些函数共同的安全原则——身份一律来自`app.auth().getUserInfo()`读到的已认证会话`customUserId`，不接受客户端自己传的openid/用户id。
