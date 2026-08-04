@@ -238,6 +238,25 @@ test("amortForward: 月供不够付利息时返回null(不会死循环)", () => 
   assert.equal(calc.amortForward(1000, 0.5, 10, null), null);
 });
 
+test("amortForward: 先息后本债务月供恰好=利息(只差舍入噪声)不该被误判成月供不够", () => {
+  // 复现真实踩到的bug：genPlan生成的先息后本债务，d.rate是impliedAPR反推的隐含年化，
+  // r2()舍入之后跟生成时的原始rate有细微出入(这里5.81被反推成5.82)，拿这个舍入过的
+  // 利率去算"这期利息应该是多少"，会跟真实的下一期还款金额(interest-only阶段月供
+  // 本来就=利息)产生一个纯粹是舍入噪声、跟"这笔债务是不是真的还不完"毫无关系的差值。
+  const gen = { kind: "interestfirst", P: 500, rate: 5.81, ni: 8, np: 11, first: "2025-01-01" };
+  const plan = calc.genPlan(gen);
+  const d = { gen, plan };
+  calc.markPaidThrough(d.plan, 1);
+  calc.recompute(d);
+  assert.notEqual(calc.amortForward(d.balance, d.rate / 1200, d.monthly, null), null);
+});
+
+test("interestCoverTolerance: 真正入不敷出的月供(远低于利息)依然要被拦住，不是把检查整个关掉", () => {
+  const tol = calc.interestCoverTolerance(1000);
+  assert.ok(tol < 50); // 容差本身该是个小数目，不是随便设一个大到能盖住任何情况的数
+  assert.equal(calc.amortForward(1000, 0.5, 10, null), null); // 月利率50%，月供1远不够，容差覆盖不了这个差距
+});
+
 test("simulatePrepay: 单次多还一笔比不还提前还清、少付利息", () => {
   const d = { rate: 12, monthly: 100, balance: 1000 };
   const sim = calc.simulatePrepay(d, "single", 3, 300);
@@ -284,6 +303,12 @@ test("simulateRepaymentOrder: 一笔还清后，它的月供滚入队列里下�
   // 两笔条件对称(同余额同利率同月供)，只是谁排第一——先还完的那笔的月供滚给另一笔，
   // 让另一笔提前还清；顺序颠倒时省下利息的应该是"被排在后面、但因为滚入而提前还完"的那笔。
   // 用不对称利率验证"雪崩法排序应该比雪球法排序总利息更低或相等"这个数学性质。
+  // ⚠️2026-08-05这条断言曾经被"资金池只沿队列单趟流过去"那版修法打破过——雪崩法队列
+  // 是[hi,lo]，某个月lo(排第二)恰好靠自己的月供就能提前结清、省下一截零头，但那版修法
+  // 只处理"月初就已知道花不完的钱"，这笔"执行到一半才发现能省下来的钱"没法倒流给已经
+  // 处理过的hi，导致雪崩法总利息一度反而比雪球法更高。是这条测试本身把回归测出来的，
+  // 不是真机反馈——最终修法(拆成"先结算各自月供"+"资金池按优先级追加本金"两轮)见
+  // calc.js里simulateRepaymentOrder的注释。
   const debts = [
     { id: "hi", balance: 2000, rate: 24, monthly: 100 },
     { id: "lo", balance: 500, rate: 6, monthly: 100 },
@@ -308,9 +333,64 @@ test("simulateRepaymentOrder: 额外月供能让两种顺序都提前还清、�
   assert.ok(withExtra.totalInterest < noExtra.totalInterest);
 });
 
+test("simulateRepaymentOrder: 队首是笔小额债务时，额外投入不能被这笔债务一次性吞掉不往下流", () => {
+  // 用户真实反馈的bug：总负债6万多，每月额外投入5000，结果显示要十几个月——逐月拆解
+  // 模拟结果才发现，队首那笔债务余额只有100，把整份5000额外投入都"分配"给了它，但它
+  // 自己100就够还清，剩下4900块凭空消失，没有流给排第二的债务。这里用最小可复现的
+  // 两笔债务验证：排第一的debt余额远小于额外投入，第二笔debt应该照样吃到没花完的部分。
+  const debts = [
+    { id: "tiny", balance: 100, rate: 0, monthly: 100 }, // 一步到位就能还清，min本身已经够
+    { id: "big", balance: 10000, rate: 12, monthly: 200 },
+  ];
+  const withoutFix = calc.simulateRepaymentOrder(debts, ["tiny", "big"], 5000);
+  // 如果5000真的完全流向了big(而不是被tiny吞掉浪费掉)，第1个月big的本金应该收到
+  // 5000-(tiny用剩的部分，这里tiny刚好=100不用额外投入)，即整份5000都该到big身上，
+  // 加上big自己的月供，第1个月还清的本金应该接近5000+200-利息，余额应该大幅下降，
+  // 不会停留在接近10000。
+  assert.ok(withoutFix.monthly[0].balance < 6000, "第1个月过后余额应该已经因为5000额外投入大幅下降，不该几乎纹丝不动");
+});
+
 test("simulateRepaymentOrder: 月供覆盖不了利息时返回null", () => {
   const debts = [{ id: "a", balance: 1000, rate: 600, monthly: 1 }]; // 月利率50%，月供1远不够
   assert.equal(calc.simulateRepaymentOrder(debts, ["a"], 0), null);
+});
+
+test("simulateRepaymentOrder: 混入一笔先息后本债务(月供≈利息，只差舍入噪声)不该让整体对比失败", () => {
+  // 用户真实反馈的bug：多策略对比规划里只要有一笔先息后本债务，不管其它债务是什么样，
+  // 三种策略全部返回null——根因跟上面amortForward那条回归测试同源，这里额外验证"混进
+  // 一批正常债务里"也不受影响，因为simulateRepaymentOrder是逐笔预检查，一笔触发就整体
+  // 返回null，必须确认这笔先息后本债务本身不再触发这条误判。
+  const gen = { kind: "interestfirst", P: 500, rate: 5.81, ni: 8, np: 11, first: "2025-01-01" };
+  const plan = calc.genPlan(gen);
+  const interestFirstDebt = { id: "x", gen, plan };
+  calc.markPaidThrough(interestFirstDebt.plan, 1);
+  calc.recompute(interestFirstDebt);
+  const debts = [
+    { id: "a", balance: 2000, rate: 18, monthly: 200 },
+    { id: "x", balance: interestFirstDebt.balance, rate: interestFirstDebt.rate, monthly: interestFirstDebt.monthly },
+  ];
+  const res = calc.simulateRepaymentOrder(debts, calc.snowballOrder(debts), 0);
+  assert.notEqual(res, null);
+});
+
+test("simulateRepaymentOrder: 先息后本债务首期利息因放款日不是整月而偏高(真实数据)，不该让整体对比失败", () => {
+  // 用户上传真实备份复现的bug：一笔"交行惠民贷"(¥25000，先息后本，年化8.64%)首期
+  // 2026-05-23放款、覆盖到6-23，是完整一个月，但计划表里首期利息被记成300(而不是后续
+  // 每期稳定的180)——银行放款日不是每月固定天数，首期偶尔会比后续期长/短几天，这是真实、
+  // 合理的数据，不是录入错误。impliedAPR反推整份计划(含这条偏高的首期)算出的隐含年化会
+  // 比真实名义利率偏高一截(实测8.95% vs 名义8.64%，偏差0.31个百分点——比舍入噪声那条
+  // 回归测试的量级大得多，interestCoverTolerance那点容差盖不住)，拿这个偏高的年化去算
+  // "这期利息应该是多少"，会比这期真实要还的利息(180)更高，让一笔月供恰好等于真实利息的
+  // 正常先息后本债务被误判成"覆盖不了利息"。
+  const irregular = {
+    id: "bank", balance: 25000, rate: 8.95, monthly: 180,
+  };
+  const debts = [
+    { id: "a", balance: 2000, rate: 18, monthly: 200 },
+    irregular,
+  ];
+  const res = calc.simulateRepaymentOrder(debts, calc.snowballOrder(debts), 5000);
+  assert.notEqual(res, null);
 });
 
 test("simulateRepaymentOrder: orderIds没覆盖到的债务被忽略，不参与模拟", () => {
@@ -1089,80 +1169,6 @@ test("waivePeriod: 已经没有未还期次时返回null", () => {
 });
 
 // ===== pressureWindowMonths（"未来还款压力"图的窗口长度，2026-07-29）=====
-test("buildHistoryEvents: 没有真实还款事件时返回空数组", () => {
-  const debts = [{ id: "a", name: "A", settled: false, plan: [
-    { date: "2026-08-01", amount: 100, principal: 90, interest: 10, paid: false },
-  ] }];
-  assert.deepEqual(calc.buildHistoryEvents(debts), []);
-});
-
-test("buildHistoryEvents: 手动编辑器勾选的已还(paid=true但没有paidAt)不算真实事件", () => {
-  const debts = [{ id: "a", name: "A", settled: false, plan: [
-    { date: "2026-08-01", amount: 20000, principal: 20000, interest: 0, paid: true }, // 没有paidAt
-  ] }];
-  assert.deepEqual(calc.buildHistoryEvents(debts), []);
-});
-
-test("buildHistoryEvents: 结清事件——提前结清(settleRow)取该行date，销最后一期自动结清取最后一期paidAt", () => {
-  const debts = [
-    { id: "a", name: "提前结清的", settled: true, settledDate: "8/1", plan: [
-      { date: "2026-07-01", amount: 100, principal: 90, interest: 10, paid: true, paidAt: "2026-07-01" },
-      { date: "2026-08-01", amount: 500, principal: 480, interest: 20, paid: true, settleRow: true },
-    ] },
-    { id: "b", name: "销最后一期结清的", settled: true, settledDate: "9/5", plan: [
-      { date: "2026-09-05", amount: 200, principal: 200, interest: 0, paid: true, paidAt: "2026-09-05" },
-    ] },
-  ];
-  const events = calc.buildHistoryEvents(debts);
-  const settledEvents = events.filter((e) => e.type === "settled");
-  assert.deepEqual(settledEvents, [
-    { type: "settled", date: "2026-08-01", name: "提前结清的" },
-    { type: "settled", date: "2026-09-05", name: "销最后一期结清的" },
-  ]);
-});
-
-test("buildHistoryEvents: 累计还款跨过里程碑阈值时各记一条，按真实日期排序", () => {
-  const debts = [{ id: "a", name: "A", settled: false, plan: [
-    { date: "2026-01-01", amount: 6000, principal: 6000, interest: 0, paid: true, paidAt: "2026-01-01" }, // 累计6000，未跨线
-    { date: "2026-02-01", amount: 5000, principal: 5000, interest: 0, paid: true, paidAt: "2026-02-01" }, // 累计11000，跨过10000
-    { date: "2026-03-01", amount: 20000, principal: 20000, interest: 0, paid: true, paidAt: "2026-03-01" }, // 累计31000，跨过30000
-  ] }];
-  const events = calc.buildHistoryEvents(debts);
-  assert.deepEqual(events, [
-    { type: "milestone", date: "2026-02-01", amount: 10000 },
-    { type: "milestone", date: "2026-03-01", amount: 30000 },
-  ]);
-});
-
-test("buildHistoryEvents: 一次还款同时跨过多个阈值，各记一条、都用同一天的日期", () => {
-  const debts = [{ id: "a", name: "A", settled: false, plan: [
-    { date: "2026-05-01", amount: 120000, principal: 120000, interest: 0, paid: true, paidAt: "2026-05-01" },
-  ] }];
-  const events = calc.buildHistoryEvents(debts);
-  assert.deepEqual(events, [
-    { type: "milestone", date: "2026-05-01", amount: 10000 },
-    { type: "milestone", date: "2026-05-01", amount: 30000 },
-    { type: "milestone", date: "2026-05-01", amount: 50000 },
-    { type: "milestone", date: "2026-05-01", amount: 100000 },
-  ]);
-});
-
-test("buildHistoryEvents: 结清事件跟里程碑事件按真实日期混排，不是settled全排在milestone前面", () => {
-  const debts = [
-    { id: "a", name: "早还清的", settled: true, settledDate: "1/10", plan: [
-      { date: "2026-01-10", amount: 5000, principal: 5000, interest: 0, paid: true, settleRow: true },
-    ] },
-    { id: "b", name: "B", settled: false, plan: [
-      { date: "2026-03-01", amount: 20000, principal: 20000, interest: 0, paid: true, paidAt: "2026-03-01" }, // 跨过10000
-    ] },
-  ];
-  const events = calc.buildHistoryEvents(debts);
-  assert.deepEqual(events, [
-    { type: "settled", date: "2026-01-10", name: "早还清的" },
-    { type: "milestone", date: "2026-03-01", amount: 10000 },
-  ]);
-});
-
 test("pressureWindowMonths: 铺到最后一笔未还期次所在的月份，下限12上限60", () => {
   const today = new Date(2026, 6, 15); // 2026-07-15
   const mk = (dates, extra) => Object.assign({

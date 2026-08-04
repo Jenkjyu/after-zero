@@ -102,7 +102,7 @@ describe("report App（债务报告版）", () => {
     expect(screen.getByText("导出 PDF")).toBeInTheDocument();
   });
 
-  it("计算口径说明保留下来了（挪到页尾），默认收起、点开有六条口径", () => {
+  it("计算口径说明保留下来了（挪到页尾），默认收起、点开有七条口径（含2026-08-05合并进来的IRR说明）", () => {
     window.__azBridge = makeMockBridge({
       debts: [debtWith({ name: "A", type: "银行贷", rate: 6, months: 12, per: 500, interest: 20 })],
       premium: { premium: null },
@@ -114,6 +114,9 @@ describe("report App（债务报告版）", () => {
     expect(note.textContent).toContain("在还总负债 = 各未结清债务");
     expect(note.textContent).toContain("含已结清");
     expect(note.textContent).toContain("是预测不是承诺");
+    // 原来单独常驻的.rpt-foot（利率反推IRR说明）已经合并进这个可折叠区块，不再单独显示
+    expect(note.textContent).toContain("反推（IRR）");
+    expect(document.querySelector(".rpt-foot")).toBeNull();
   });
 
   it("有已结清历史时整页降级成完成态，不是堆一排「暂无数据」", () => {

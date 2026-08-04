@@ -186,6 +186,7 @@ export function StrategyCompareScreen() {
                         {s.key === bestKey && <span className="best-badge">总利息最省</span>}
                       </span>
                       <span className="strat-result-nums">
+                        <div className="kk">总利息</div>
                         <div className="v">¥{window.fmt(s.sim.totalInterest)}</div>
                         <div className="k">{payoffDate} 还清 · {s.sim.months} 个月</div>
                       </span>

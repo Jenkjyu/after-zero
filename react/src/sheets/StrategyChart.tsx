@@ -1,8 +1,12 @@
 // 多策略对比规划的压力曲线图——3条"剩余总余额随时间下降"的曲线叠在一起，纯视觉印证，
 // 不做scrub手势(理由见www/index.html里.strat-chart-wrap的注释：3条长度不同的线做逐帧
 // 命中判定成本明显更高，且核心数字(总利息/还清月份)已经在结果卡片里说清楚了)。
-// 不画坐标轴——跟Journey.tsx同一个判断，这里甚至更彻底：连里程碑文字标注都没有，因为
-// 3条线要是各自都标一遍"起点/终点"文字会互相打架，那些数字已经在图表上方的结果卡片里。
+// 不画完整坐标轴刻度——跟Journey.tsx同一个判断，精确数值已经在图表上方的结果卡片里，
+// 再画一遍是重复信息。**但2026-08-05补了两个最起码的方向提示**（用户反馈"坐标都没有，
+// 不知道想表达什么"，一个字的方向提示都没有确实比Journey.tsx更过头——那边好歹有三个
+// 里程碑文字标在图上）：左上角"剩余待还 ¥X"点明Y轴含义+起点数值(3条线起点相同，标一次
+// 够了)，右下角"时间→"点明X轴是往右流逝的时间。这两行文字本身不需要跟着每条线精确对齐，
+// 只是让人一眼看出"这是一张什么图"，不需要做成完整刻度轴。
 export interface StrategyChartSeries {
   key: string;
   dotClass: string;
@@ -24,19 +28,23 @@ export function StrategyChart({ series, labels }: StrategyChartProps) {
 
   return (
     <div className="strat-chart-wrap">
-      <svg viewBox={`0 0 ${PLOT_W + PAD * 2} ${CH}`} preserveAspectRatio="none" aria-hidden="true">
-        {series.map((s) => {
-          if (!s.points.length) return null;
-          const d = "M " + s.points.map((p) => `${px(p.month)},${py(p.balance)}`).join(" L ");
-          const last = s.points[s.points.length - 1];
-          return (
-            <g key={s.key}>
-              <path d={d} fill="none" stroke={`var(--${cssVar(s.dotClass)})`} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx={px(last.month)} cy={py(last.balance)} r={3.5} fill={`var(--${cssVar(s.dotClass)})`} />
-            </g>
-          );
-        })}
-      </svg>
+      <div className="strat-chart-plot">
+        <div className="strat-chart-axis-y">剩余待还 ¥{window.fmt(maxBalance)}</div>
+        <div className="strat-chart-axis-x">时间 →</div>
+        <svg viewBox={`0 0 ${PLOT_W + PAD * 2} ${CH}`} preserveAspectRatio="none" aria-hidden="true">
+          {series.map((s) => {
+            if (!s.points.length) return null;
+            const d = "M " + s.points.map((p) => `${px(p.month)},${py(p.balance)}`).join(" L ");
+            const last = s.points[s.points.length - 1];
+            return (
+              <g key={s.key}>
+                <path d={d} fill="none" stroke={`var(--${cssVar(s.dotClass)})`} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx={px(last.month)} cy={py(last.balance)} r={3.5} fill={`var(--${cssVar(s.dotClass)})`} />
+              </g>
+            );
+          })}
+        </svg>
+      </div>
       <div className="strat-legend">
         {series.map((s) => (
           <div className="strat-legend-item" key={s.key}>

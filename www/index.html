@@ -726,10 +726,13 @@
   .strat-order-btn:disabled { opacity: .35; }
   .strat-order-btn svg { width: 13px; height: 13px; }
 
-  /* 结果：3行，每行=一种策略(颜色点+名字+总利息+还清时间)，最省的那行加高亮标记 */
+  /* 结果：3行，每行=一种策略(颜色点+名字+总利息+还清时间)。⚠️2026-08-05删掉了
+     .strat-result-row.best那圈accent色描边+内阴影——这套"强调色描边"在这个App里到处都是
+     "可点选中态"的视觉语言(价格卡选中、分段控件选中态)，但这三行不是按钮，点了什么都不会
+     发生，描边纯粹是误导性的可交互信号，用户真机反馈"看起来像另外两个也能点"。"最省"这件事
+     已经由.best-badge文字胶囊说清楚了，不需要再借一圈选中框重复表达。 */
   .strat-result-row { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px;
     background: var(--card-grad); border: 1px solid var(--hair); margin-bottom: 8px; }
-  .strat-result-row.best { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
   .strat-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
   .strat-dot.s1 { background: var(--strat-1); }
   .strat-dot.s2 { background: var(--strat-2); }
@@ -738,6 +741,9 @@
   .strat-result-name .best-badge { display: inline-block; margin-left: 6px; font-size: 10.5px; font-weight: 700;
     color: var(--on-accent); background: var(--accent-fill); border-radius: 999px; padding: 1px 7px; vertical-align: 1px; }
   .strat-result-nums { text-align: right; flex: none; }
+  /* .kk是"总利息"这行小字标签——2026-08-05新增，原来加粗大字的¥数字没有任何文字说明它是
+     什么，用户反馈"莫名其妙"，补上标签跟这个App其它KPI卡片"大数字+小字说明"的既有模式统一。 */
+  .strat-result-nums .kk { font-size: 10px; color: var(--text-faint); margin-bottom: 1px; }
   .strat-result-nums .v { font-size: 14px; font-weight: 700; font-family: var(--font-num); }
   .strat-result-nums .k { font-size: 10.5px; color: var(--text-muted); }
 
@@ -747,26 +753,15 @@
   .strat-chart-wrap { position: relative; background: var(--card-grad); border: 1px solid var(--hair);
     border-radius: 16px; padding: 14px 14px 10px; margin: 14px 0; }
   .strat-chart-wrap svg { display: block; width: 100%; height: auto; }
+  /* strat-chart-plot单独包一层svg+两个方向提示(不含下面的图例)——这样"左上/右下"这两个
+     标签能相对"绘图区自己的盒子"定位，不用猜图例多高再拿wrap的bottom反推，2026-08-05
+     新增。左上"剩余待还 ¥X"(Y轴含义+起点值，3条线起点相同标一次够了)，右下"时间→"
+     (X轴方向)——两个最起码的方向提示，不是完整刻度轴，见StrategyChart.tsx顶部注释。 */
+  .strat-chart-plot { position: relative; }
+  .strat-chart-axis-y { position: absolute; left: 0; top: 0; font-size: 10.5px; color: var(--text-faint); }
+  .strat-chart-axis-x { position: absolute; right: 0; bottom: 0; font-size: 10.5px; color: var(--text-faint); }
   .strat-legend { display: flex; gap: 14px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
   .strat-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--text-muted); }
-
-  /* 还债历程(HistoryScreen)——统计tab里的入口卡片(.history-teaser)+ 时间线页面本身 */
-  .history-teaser { padding: 16px; }
-  .history-teaser-nums { display: flex; gap: 18px; margin: 8px 0 14px; }
-  .history-teaser-num .v { font-size: 19px; font-weight: 700; font-family: var(--font-num); }
-  .history-teaser-num .k { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
-  .history-teaser .btn { width: 100%; }
-
-  .history-event-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 2px; border-bottom: 1px solid var(--hair); }
-  .history-event-row:last-child { border-bottom: none; }
-  .history-event-ic { width: 30px; height: 30px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; }
-  .history-event-ic.settled { background: var(--accent-soft); color: var(--accent); }
-  .history-event-ic.milestone { background: var(--warning-soft); color: var(--warning); }
-  .history-event-ic svg { width: 15px; height: 15px; }
-  .history-event-text { flex: 1; min-width: 0; }
-  .history-event-title { font-size: 13.5px; font-weight: 600; }
-  .history-event-date { font-size: 11.5px; color: var(--text-faint); margin-top: 2px; }
-  .history-empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 13px; }
 
   .pf-list { margin: 4px 0 20px; }
   .pf-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
@@ -1018,7 +1013,6 @@
   .rpt-title em { font-style: normal; color: var(--ch-line); }
   .rpt-lede { font-size: 13.5px; line-height: 1.75; color: var(--text-muted); margin: 10px 0 0; }
   .rpt-lede b { color: var(--text); font-weight: 700; font-family: var(--font-num); }
-  .rpt-foot { font-size: 11px; color: var(--text-faint); line-height: 1.6; margin-top: 16px; }
   /* 计算口径说明展开后的正文。⚠️不复用全局 .footnote：这一页里走势图的免责说明
      也是 .footnote，两者共用类名会让"按类名找口径说明"抓到错的那个。 */
   .rpt-note { font-size: 11.5px; color: var(--text-muted); line-height: 1.7;
@@ -1230,7 +1224,6 @@
   .pie-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); text-align: center; pointer-events: none; }
   .pie-center .k { font-size: 9.5px; color: var(--text-faint); line-height: 1.2; }
   .pie-center .v { font-size: 16px; font-weight: 700; font-family: var(--font-num); letter-spacing: -.02em; line-height: 1.3; }
-  .pie-hint { font-size: 10.5px; color: var(--text-faint); text-align: center; margin-top: 2px; }
 
   /* ---------- 页尾结语（Outro.tsx） ---------- */
   .outro { background: var(--surface-2); border-radius: 14px; padding: 15px 16px; margin-top: 20px; }
@@ -1249,7 +1242,15 @@
   .popover-root { position: relative; display: inline-flex; }
   /* max-width兜底：组件那边会按视口钳制left，但前提是面板本身不能比视口还宽——
      否则钳出来的位置只能保证左边不溢出、右边照样跑出屏幕。 */
-  .popover-panel { position: fixed; z-index: 25; background: var(--card-grad);
+  /* ⚠️z-index必须高于.subpage(35)——原来是25(排在.tabbar=20和.scrim=30之间)，
+     在Popover只被InfoTip/ExportMenu用在普通.view标签页内容里时够用，但2026-08-05
+     曾经有个功能(还债历程蜿蜒轨迹节点详情，后来整个删除了)第一次把Popover用进了
+     .subpage内部，25这个z-index被.subpage(35)整个盖住，面板DOM/内容都在、
+     visibility:visible，但肉眼完全看不见——Playwright截图对比实测到的真问题，不是
+     靠代码审查看出来的。改成36(略高于.subpage，低于.login-gate=40/.modal-scrim=50)，
+     覆盖"Popover被用在.view/.sheet/.subpage任意一层"这三种已知场景，即使触发这个坑
+     的那个功能已经不在了，这条修复本身依然是对的，别再改回25。 */
+  .popover-panel { position: fixed; z-index: 36; background: var(--card-grad);
     border: 1px solid var(--hair); border-radius: 14px; box-shadow: var(--e2); min-width: 160px;
     max-width: calc(100vw - 20px); }
   .info-tip-btn { width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--hair);
@@ -2232,57 +2233,6 @@
       img.src = url;
     });
   }
-  // "还债历程"(HistoryScreen)分享卡片——Premium专属(react/src/sheets/HistoryScreen.tsx按钮
-  // 触发，门禁判断在React那边，跟其它导出按钮同一个套路)。SVG→PNG→存到设备沿用
-  // buildExportChartsSVG/svgStringToPngDataURL/dataURLToBlob/saveToDeviceDownloads这条现成
-  // 链路，没有引入任何新依赖。颜色固定用石墨主题的字面hex值(不跟随设备深色模式)——这是
-  // 一张要分享出去给别人看的"成就卡"，不是数据文档，效果要在任何人的屏幕上看起来一样，
-  // 跟PDF导出"固定浅色更易读"是同一类判断，只是这里选石墨深色因为更像"成就/纪念"的调性
-  // (呼应"在还债务"页hero卡的石墨配色)。不用emoji——这个项目一直是"克制的纯图标+文字"
-  // 方案(空状态那条既有原则)，这里延续，用简单的几何图形(勾/星)画事件类型的小标记。
-  function buildHistoryShareSvg(events, s) {
-    var W = 640, H = 800;
-    var G = { bgA: "#253039", bgB: "#151A20", text: "#FFFFFF", dim: "#9BA6B4", accent: "#6FBE9E" };
-    var p = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" font-family="sans-serif">'];
-    p.push('<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">' +
-      '<stop offset="0" stop-color="' + G.bgA + '"/><stop offset="1" stop-color="' + G.bgB + '"/></linearGradient></defs>');
-    p.push('<rect width="' + W + '" height="' + H + '" fill="url(#bg)"/>');
-    var y = 64;
-    p.push('<text x="40" y="' + y + '" font-size="15" font-weight="700" letter-spacing="1" fill="' + G.dim + '">AFTER ZERO</text>'); y += 40;
-    p.push('<text x="40" y="' + y + '" font-size="26" font-weight="700" fill="' + G.text + '">我的还债历程</text>'); y += 56;
-    p.push('<text x="40" y="' + y + '" font-size="13" fill="' + G.dim + '">累计已还本金</text>'); y += 46;
-    p.push('<text x="40" y="' + y + '" font-size="44" font-weight="700" fill="' + G.text + '">¥' + fmt(s.paidPrincipal) + '</text>'); y += 36;
-    p.push('<text x="40" y="' + y + '" font-size="14" fill="' + G.dim + '">另付利息 ¥' + fmt(s.paidInterest) + ' · 已结清 ' + s.settled + ' 笔</text>'); y += 50;
-    p.push('<line x1="40" y1="' + y + '" x2="' + (W - 40) + '" y2="' + y + '" stroke="' + G.dim + '" stroke-opacity=".25"/>'); y += 42;
-    // 最近的事件排在最上面(倒序)，跟HistoryScreen列表顺序一致；最多画8条，卡片高度有限
-    var recent = events.slice(-8).reverse();
-    if (!recent.length) {
-      p.push('<text x="40" y="' + y + '" font-size="13" fill="' + G.dim + '">还没有可回顾的还款记录</text>');
-    }
-    recent.forEach(function (ev) {
-      if (ev.type === "settled") {
-        p.push('<circle cx="48" cy="' + (y - 5) + '" r="9" fill="none" stroke="' + G.accent + '" stroke-width="1.6"/>');
-        p.push('<path d="M44 ' + (y - 5) + 'l3 3 6-6" fill="none" stroke="' + G.accent + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>');
-        p.push('<text x="68" y="' + y + '" font-size="13.5" fill="' + G.text + '">' + escSvg(ev.name) + ' 已还清</text>');
-      } else {
-        p.push('<path d="M48 ' + (y - 13) + 'l2.6 6.6 6.6.4-5.2 4.4 1.8 6.6-6-3.8-6 3.8 1.8-6.6-5.2-4.4 6.6-.4Z" fill="' + G.accent + '"/>');
-        p.push('<text x="68" y="' + y + '" font-size="13.5" fill="' + G.text + '">累计已还突破 ¥' + fmt(ev.amount) + '</text>');
-      }
-      p.push('<text x="' + (W - 40) + '" y="' + y + '" font-size="11.5" fill="' + G.dim + '" text-anchor="end">' + escSvg(ev.date) + '</text>');
-      y += 34;
-    });
-    p.push('<text x="40" y="' + (H - 32) + '" font-size="11" fill="' + G.dim + '">生成于 ' + escSvg(new Date().toLocaleDateString()) + '</text>');
-    p.push('</svg>');
-    return p.join("");
-  }
-  function generateHistoryShareCard() {
-    var events = buildHistoryEvents(debts), s = summarizeDebts(debts);
-    var svg = buildHistoryShareSvg(events, s);
-    return svgStringToPngDataURL(svg, 640, 800, 2).then(dataURLToBlob).then(function (blob) {
-      return saveToDeviceDownloads(blob, "after-zero-历程-" + fmtDate(today0()) + ".png", "image/png");
-    });
-  }
-
   function exportReportXlsx() {
     if (typeof XLSX === "undefined") { toast("导出组件未就绪，请重启 App 后重试"); return; }
     var data = computeReportData(debts);
@@ -2806,9 +2756,6 @@
     // 任何别的sheets屏幕内部打开(触发点在"统计"tab完全独立的另一棵React树)，也不从自己
     // 内部打开别的sheets屏幕，链里的位置不受"谁盖在谁上面"那条排序约束，放在链尾即可。
     if (window.__azStrategyScreenBack && window.__azStrategyScreenBack()) return true;
-    // 还债历程(react/src/sheets/HistoryScreen.tsx，2026-08-04新增)——同strategyScreen，
-    // 不受"谁盖在谁上面"排序约束，放在链尾。
-    if (window.__azHistoryScreenBack && window.__azHistoryScreenBack()) return true;
     return false;
   };
   // #topAvatarBtn(在还债务页头像)/"我的"页accountAvatarBtn/premiumEntryBtn的点击现在由
@@ -2947,10 +2894,7 @@
     callAiAdvisor: callAiAdvisor,
     // 2026-08-04新增："每日额度用完了怎么办"弹窗的"复制完整提示词"按钮要用——buildAiSummary()
     // 本身零DOM依赖、不调用云函数，直接原样暴露，不用像callAiAdvisor那样包一层。
-    buildAiSummary: buildAiSummary,
-    // "还债历程"(HistoryScreen)分享卡片——生成PNG+存到设备这条链路涉及Blob/Canvas/原生
-    // 插件调用，不可移植，包一层跟callAiAdvisor/downloadBackupFile同一个理由。
-    generateHistoryShareCard: generateHistoryShareCard
+    buildAiSummary: buildAiSummary
   };
 
   renderAll(); loadUploads(); renderAccountUI();

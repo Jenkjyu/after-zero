@@ -72,20 +72,12 @@ export function PremiumScreen() {
             <div className="price-card">
               <span className="pc-badge">永久解锁</span>
               <div className="pc-price-row">
-                <span className="pc-amt num">¥49</span>
+                <span className="pc-amt num">¥15</span>
               </div>
               <div className="pc-period">一次性付费，永久使用，不再另外收费</div>
             </div>
           </div>
         </div>
-        {/* 朴素陈述"为什么收这个钱"，不做营销话术——这个App的AI额度弹窗已经在用同一套
-            "坦诚说清楚成本"的口吻跟用户说话，订阅页不该是App里唯一还在打折促销的地方。
-            云备份/AI是真实服务器成本，其余(多策略对比/历程等)是纯客户端计算、零服务器
-            成本，诚实起见不笼统说"这些功能都很贵"，只说云备份/AI是真花钱的、其余是花
-            时间做的——跟"限时优惠"这种永不过期的假锚点相比，这句话经得起用户反复回来看。 */}
-        <p className="footnote" style={{ textAlign: "left" }}>
-          云备份和 AI 分析对我们来说有真实的服务器成本，其余功能是我们花时间做出来的——一次性 ¥49，全部解锁，用多久都不用再付。
-        </p>
 
         <div className="data-actions" style={{ marginTop: 4 }}>
           <button type="button" className="btn primary" onClick={onSubscribe}>开通 Premium</button>

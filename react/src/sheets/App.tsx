@@ -22,7 +22,6 @@ import { BackupScreen } from "./BackupScreen";
 import { DetailSheet } from "./DetailSheet";
 import { DocsScreen } from "./DocsScreen";
 import { EditSheet } from "./EditSheet";
-import { HistoryScreen } from "./HistoryScreen";
 import { NotifySheet } from "./NotifySheet";
 import { PremiumScreen } from "./PremiumScreen";
 import { PrivacyScreen } from "./PrivacyScreen";
@@ -53,7 +52,6 @@ export function App() {
       <BackupScreen />
       <AiScreen />
       <StrategyCompareScreen />
-      <HistoryScreen />
     </>
   );
 }

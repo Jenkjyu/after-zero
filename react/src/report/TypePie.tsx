@@ -192,7 +192,6 @@ export function TypePie({ data }: TypePieProps) {
           ))}
         </div>
       </div>
-      <div className="pie-hint">按住饼图可以转动</div>
     </div>
   );
 }

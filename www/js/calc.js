@@ -292,13 +292,24 @@ function normalize(d) {
 // 数学不统一(equalfee/custom没有良定义的"月利率"概念)，没法统一处理"注入一笔额外还款"。
 // 改用recompute()已经对所有债务统一算出的派生值(balance/monthly/rate)做标准等额本息
 // 模拟，不追各自生成器的原始逐行细节——这是一个明确的简化取舍。
+// "月供覆盖不了利息"这条判断需要一点容差，不能卡死0——balance/rate都是recompute()里
+// r2()舍入过的派生值，尤其d.rate(impliedAPR反推的隐含年化)本身就带着±0.01个百分点量级
+// 的舍入误差(实测：真实input rate=5.81，IRR反推r2后变成5.82)，拿这个舍入过的利率反推
+// "这期利息应该是多少"再去跟真实的下一期还款金额比，天然会有一层跟"月供是否真的不够"
+// 毫无关系的噪声。这层噪声实测跟balance近似线性(balance从500到200万，diff/balance比值
+// 稳定在1e-5量级，见PROGRESS.md 2026-08-05附近的排查记录)，这里按balance的量级给
+// 5倍安全余量的线性容差，不用固定的一个极小常数。
+// ⚠️这不只是浮点数误差修补——"先息后本"这类债务设计上就是"月供恰好=利息"（还本阶段
+// 开始前，每期只还利息、本金不动），这正是这条检查最容易被舍入噪声顶到误判边界的场景：
+// 一笔完全正常、按计划走的先息后本债务，会被误判成"利息都覆盖不了、永远还不完"。
+function interestCoverTolerance(balance) { return Math.max(0.02, (+balance || 0) * 0.00005); }
 function amortForward(balance, i, M, extraAt) {
   var bal = balance, months = 0, totalInterest = 0;
   while (bal > 0.005 && months < 1200) {
     var interest = bal * i;
-    if (M <= interest) return null; // 月供不足以覆盖利息，无法收敛
+    if (M <= interest - interestCoverTolerance(bal)) return null; // 月供明显不足以覆盖利息，无法收敛
     months++;
-    var principal = Math.min(M - interest, bal);
+    var principal = Math.max(0, Math.min(M - interest, bal));
     bal -= principal; totalInterest += interest;
     var extra = extraAt ? (extraAt(months) || 0) : 0;
     if (extra > 0) bal = Math.max(0, bal - Math.min(extra, bal));
@@ -317,8 +328,10 @@ function simulatePrepay(d, mode, atPeriod, extra) {
 
 // 多策略对比规划（统计tab"最该先动手的地方"下面的入口）：给定一个还款优先级顺序，
 // 模拟"雪球法/雪崩法/自定义顺序"这类经典债务偿还策略——每月固定预算(=全部债务当前
-// 月供之和+可选的额外投入)，按顺序把预算集中砸向队列里第一笔没还完的债务，其余债务
-// 只还各自的月供；一笔还完后，它的月供份额自动滚入下一笔(这就是"雪球"名字的由来)。
+// 月供之和+可选的额外投入)，沿着队列顺序依次喂给还没还完的债务：先给它自己的月供，
+// 预算还有剩就接着往这笔上砸，这笔被喂饱了(结清)、剩下的预算当月就继续流给队列里下一笔，
+// 不会在某一笔小额债务身上就把预算浪费掉；一笔还完后，它的月供份额从下个月起自动并入
+// 预算池子(这就是"雪球"名字的由来)。
 // 跟amortForward同样的简化取舍：不追4种计划生成器各自的逐行数学，统一用recompute()
 // 算出的balance/rate/monthly做标准等额本息模拟——见amortForward注释，这里不重复。
 //
@@ -327,9 +340,25 @@ function simulatePrepay(d, mode, atPeriod, extra) {
 // id会被忽略——调用方传子集是自己的选择，比如已经手动排除掉一次性结清的债务)。
 // extraMonthly: 每月额外投入(不分给哪笔债务，整体滚入当前队首)，默认0。
 //
-// 返回 null 的两种情况：①任意一笔债务的月供覆盖不了自己的利息(那笔永远还不完，见
-// amortForward同样的判断)；②超过600个月(50年)还没还完，数据大概率有问题，不返回
+// 返回 null 只有一种情况：超过600个月(50年)还没还完，数据大概率有问题，不返回
 // 一个看似合理实则荒谬的假结果。
+//
+// ⚠️2026-08-05删掉了"任意一笔债务的月供单独覆盖不了自己的利息就直接拒绝"这条逐笔预检查
+// (原来跟amortForward共用interestCoverTolerance那道容差)——真实用户数据踩出来的bug：
+// 一笔先息后本债务处在利息期、第一期因为放款日不是整月(比如23号放款、月供覆盖到下个月
+// 23号，第一期天数比后续每期都长)导致利息比后续几期略高，这类真实、合理的不规则会让
+// impliedAPR反推出的隐含年化跟这期真实适用的名义利率有实打实的偏差(不是舍入噪声，是
+// 明确存在但很小的偏差)，拿这个偏高的年化去算"这期利息应该是多少"，会比债务自己的真实
+// 还款计划算出来的利息更高，好端端的债务（月供恰好等于真实利息，先息期利息不动本金天经
+// 地义）被误判成"覆盖不了利息"——而这条预检查是**逐笔独立判断**的，只要队列里有这么一笔，
+// 不管这三种策略的排序、不管额外投入多少钱，三种策略会同时失败，用户完全没法用这个功能。
+// **这条预检查其实是多余的、比实际需要的更保守**：它只看"这笔债务自己的月供能不能覆盖
+// 自己的利息"，却没考虑这笔债务一旦排到队首会额外拿到rollover(其它已还清债务滚过来的
+// 月供+每月额外投入)——只要它排队等着的时候利息没有恶性失控到让余额飙升到MAX_MONTHS都
+// 收敛不了，轮到它成为队首后，`payment=min+rollover`几乎总能覆盖利息、开始正常还本金。
+// 删掉这条预检查后，真正"无论如何都还不完"的极端情况依然会被下面的`month>=MAX_MONTHS`
+// 兜住返回null，不会死循环；这笔债务排队等待期间余额确实会因为月供不够利息而缓慢增长
+// (负摊还)，但这如实反映了"钱没投给它、它自己利息又刚好打平或略亏"的真实情况，不是bug。
 function simulateRepaymentOrder(debts, orderIds, extraMonthly) {
   var extra = +extraMonthly || 0;
   var byId = {};
@@ -338,35 +367,59 @@ function simulateRepaymentOrder(debts, orderIds, extraMonthly) {
     var d = byId[id];
     return { id: id, balance: +d.balance || 0, i: (+d.rate || 0) / 1200, min: +d.monthly || 0 };
   });
-  for (var k = 0; k < state.length; k++) {
-    var s0 = state[k];
-    if (s0.balance > 0.005 && s0.min < s0.balance * s0.i - 0.005) return null;
-  }
   var month = 0, totalInterest = 0, totalPrincipal = 0;
   var monthly = [];
   var payoffMonth = {};
   var MAX_MONTHS = 600;
   while (state.some(function (s) { return s.balance > 0.005; }) && month < MAX_MONTHS) {
     month++;
-    // 已经还完的债务，它们的月供份额本月起自动滚入队首那笔还没还完的
-    var rollover = extra;
-    for (var a = 0; a < state.length; a++) {
-      if (state[a].balance <= 0.005) rollover += state[a].min;
-    }
-    var targetTaken = false;
+    // ⚠️2026-08-05修的一个真实bug（分两轮才修完整，都是拿用户真实备份数据验证出来的，
+    // 不是理论推演）：
+    // 第一轮：原来这一整个池子("已还清债务滚出来的月供"+"每月额外投入")只喂给队列里
+    // 第一笔还没还清的债务，那笔一旦花不完这笔钱(典型场景：排在队首的是笔余额很小的
+    // 债务，比如¥100，而池子里有¥5000)，多出来的钱直接作废，不会接着喂给队列第二名——
+    // 用户反馈"多投5000怎么好像没起作用"，逐月拆解这份模拟结果才揪出来：第1个月里，
+    // 池子5000里有4900完全没花出去。
+    // 第二轮（补第一轮没堵上的一个缺口）：第一轮的"沿队列顺序单趟流过去"只处理了"月初
+    // 就已经空出来的钱"，但**这个月执行过程中**如果队列靠后的某笔债务恰好这个月自己就
+    // 能用自己的月供结清(月供比它实际需要的多，通常是这笔debt本来就快还完了)，省下来的
+    // 零头没有办法倒流回给排在它前面、优先级更高、这个月早处理过的债务——这类"回流"场景
+    // 是回归测试(两笔对称债务，只是排序反过来)测出来的："雪崩法总利息不该比雪球法更多"
+    // 这条数学性质在这个场景下被打破了，因为雪崩法队列后面那笔小额债务结清省下的钱死
+    // 活流不回给排最前面的高息债务。
+    //
+    // 最终修法是拆成两轮，模拟真实理财顾问会怎么帮你分配这个月的钱：
+    // 第一轮——每笔活跃债务先按自己的月供结算利息+本金，但月供不能超过"这笔真实还欠多少"
+    // (通常只有最后一期会触发，多出来的部分不是白付的钱，收进池子)；已经结清的债务，
+    // 它的月供份额直接进池子。这一轮结束后，池子里汇总了：额外投入 + 已结清债务的月供 +
+    // 这个月刚发现"付多了"省下来的零头。
+    // 第二轮——池子按队列优先级顺序追加本金(不重复算利息，利息已经按月初余额在第一轮结
+    // 算过了)，一笔追加到位、还有剩就接着往下一笔追加，直到池子耗尽或者队列走完——这样
+    // 不管"钱够不够花"的判断是月初就知道、还是这个月执行到一半才发现，最终都会流向队列
+    // 里优先级最高、还没还清的那笔，不会有任何一分钱死在半路。
+    var pool = extra;
     var monthInterest = 0, monthPrincipal = 0;
-    for (var b = 0; b < state.length; b++) {
-      var s = state[b];
-      if (s.balance <= 0.005) continue;
-      var interest = s.balance * s.i;
-      var payment = s.min;
-      if (!targetTaken) { payment += rollover; targetTaken = true; } // 队列里第一笔未还清的独占全部滚入预算
-      if (payment > s.balance + interest) payment = s.balance + interest;
-      var principal = payment - interest;
-      s.balance = Math.max(0, s.balance - principal);
-      if (s.balance <= 0.005 && !payoffMonth[s.id]) payoffMonth[s.id] = month;
-      monthInterest += interest;
-      monthPrincipal += principal;
+    for (var a = 0; a < state.length; a++) {
+      var sa = state[a];
+      if (sa.balance <= 0.005) { pool += sa.min; continue; }
+      var interestA = sa.balance * sa.i;
+      var needA = sa.balance + interestA;
+      var paymentA = Math.min(sa.min, needA);
+      if (sa.min > needA) pool += sa.min - needA;
+      var principalA = paymentA - interestA;
+      sa.balance = Math.max(0, sa.balance - principalA);
+      if (sa.balance <= 0.005 && !payoffMonth[sa.id]) payoffMonth[sa.id] = month;
+      monthInterest += interestA;
+      monthPrincipal += principalA;
+    }
+    for (var b = 0; b < state.length && pool > 0.005; b++) {
+      var sb = state[b];
+      if (sb.balance <= 0.005) continue;
+      var extraPay = Math.min(pool, sb.balance);
+      sb.balance -= extraPay;
+      pool -= extraPay;
+      monthPrincipal += extraPay;
+      if (sb.balance <= 0.005 && !payoffMonth[sb.id]) payoffMonth[sb.id] = month;
     }
     totalInterest += monthInterest;
     totalPrincipal += monthPrincipal;
@@ -515,54 +568,6 @@ function summarizeDebts(debts) {
   });
   var zeroBase = paidPrincipal + total, pct = zeroBase > 0 ? Math.round(paidPrincipal / zeroBase * 100) : 0;
   return { total: r2(total), monthly: r2(monthly), active: active, settled: settled, paidPrincipal: r2(paidPrincipal), paidInterest: r2(paidInterest), pct: pct };
-}
-
-// "还债历程"(HistoryScreen)用：把散落在各笔债务plan里的真实还款事件，串成一条按时间
-// 排序的叙事时间线。故意不是"每一期还款都列一条"——一个12笔债务、每笔24期的用户会有
-// 几百条记录，那是流水账不是"历程"，看不出重点。只挑两类真正值得回顾的事件：
-// ①settled：这笔债务被还清的那一刻(纯庆祝性质，天然稀疏)
-// ②milestone：累计已还金额跨过整数关口(1万/3万/5万/10万...)的那一刻——用固定阈值表，
-//   不是"取整到最近"(niceCeil是给图表坐标轴用的，语义不一样，这里故意不复用)。
-// 只用真实发生过的事件(r.paidAt，或settleRow这种"没单独盖paidAt但date本身就是真实结清
-// 那天"的行)——手动编辑器勾选的"已还"没有真实日期，不算数(已知的数据模型缺口③定的
-// 同一条规矩：paidAt只在recordPayment/waivePeriod/applySettle这几个真实还款事件里写)。
-var HISTORY_MILESTONE_STEPS = [10000, 30000, 50000, 100000, 200000, 500000, 1000000, 2000000, 5000000];
-function buildHistoryEvents(debts) {
-  var payments = [], settled = [];
-  debts.forEach(function (d) {
-    var plan = d.plan || [];
-    plan.forEach(function (r) {
-      if (!r.paid) return;
-      var date = r.paidAt || (r.settleRow ? r.date : null);
-      if (!date) return;
-      payments.push({ date: date, amount: r.paidAmount != null ? +r.paidAmount : (+r.amount || 0) });
-    });
-    if (!d.settled) return;
-    // d.settledDate是"M/D"短格式(没有年份)，展示用的历史遗留格式，不能直接排序——
-    // 真实完整日期(YYYY-MM-DD)要么从settleRow那一行的date拿(提前结清路径)，要么从
-    // 最后一期的paidAt拿(销掉最后一期自动结清路径，见recordPayment/payInstallment)，
-    // 两条路径见calc.js"提前结清"一节，两者都能推出同一天，不需要再单独存一个字段。
-    var settleRow = null, lastPaid = null;
-    for (var i = 0; i < plan.length; i++) {
-      if (plan[i].settleRow) settleRow = plan[i];
-      if (plan[i].paid && plan[i].paidAt) lastPaid = plan[i];
-    }
-    var realDate = settleRow ? settleRow.date : (lastPaid ? lastPaid.paidAt : null);
-    if (realDate) settled.push({ date: realDate, name: d.name || "未命名" });
-  });
-  payments.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
-
-  var events = settled.map(function (s) { return { type: "settled", date: s.date, name: s.name }; });
-  var cum = 0, stepIdx = 0;
-  payments.forEach(function (p) {
-    cum += p.amount;
-    while (stepIdx < HISTORY_MILESTONE_STEPS.length && cum >= HISTORY_MILESTONE_STEPS[stepIdx]) {
-      events.push({ type: "milestone", date: p.date, amount: HISTORY_MILESTONE_STEPS[stepIdx] });
-      stepIdx++;
-    }
-  });
-  events.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
-  return events;
 }
 
 // 统计tab"月还款统计"图用的月度聚合：按 plan 里每一期的 date 所在月份分组，拆已还(actual)/
@@ -776,12 +781,11 @@ if (typeof module !== "undefined" && module.exports) {
     recompute: recompute, markPaidThrough: markPaidThrough, normalize: normalize, genDebtId: genDebtId,
     applySettle: applySettle, undoSettle: undoSettle, shortDateFromISO: shortDateFromISO,
     rowRemaining: rowRemaining, recordPayment: recordPayment, waivePeriod: waivePeriod,
-    amortForward: amortForward, simulatePrepay: simulatePrepay,
+    amortForward: amortForward, simulatePrepay: simulatePrepay, interestCoverTolerance: interestCoverTolerance,
     simulateRepaymentOrder: simulateRepaymentOrder, snowballOrder: snowballOrder, avalancheOrder: avalancheOrder,
     detectMatchingSort: detectMatchingSort,
     urgencyTier: urgencyTier, relLabel: relLabel, dueBucket: dueBucket,
     isBadRepeatDay: isBadRepeatDay, offsetLabel: offsetLabel, computeReportData: computeReportData, summarizeDebts: summarizeDebts,
-    buildHistoryEvents: buildHistoryEvents,
     computeMonthlyRepayment: computeMonthlyRepayment, computeUpcomingPressure: computeUpcomingPressure,
     remainingInterest: remainingInterest, niceCeil: niceCeil, pressureWindowMonths: pressureWindowMonths,
     computeNotifySchedule: computeNotifySchedule,

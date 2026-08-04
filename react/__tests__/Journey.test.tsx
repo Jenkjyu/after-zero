@@ -137,8 +137,4 @@ describe("Journey", () => {
     expect(document.querySelector(".sec-a")!.textContent).toContain("暂无足够数据");
   });
 
-  it("免责说明保留：预测不是历史轨迹", () => {
-    render(<Journey data={data()} s={summary} monthsLeft={26} />);
-    expect(document.querySelector(".footnote")!.textContent).toContain("不是实际走过的轨迹");
-  });
 });

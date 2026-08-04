@@ -307,16 +307,7 @@ export interface AzBridge {
   // 因为那条路径的token我们自己付、且每次提问都重发一遍。两条路径成本结构相反，
   // 所以刻意不共用同一份数据，详见www/index.html里buildAiSummary的注释。
   buildAiSummary(compact?: boolean): AiSummary;
-  // "还债历程"(react/src/sheets/HistoryScreen.tsx)"生成分享卡片"按钮用——Premium专属。
-  // SVG拼图+转PNG+存到设备这条链路涉及Blob/Canvas/原生插件调用，不可移植，包一层。
-  generateHistoryShareCard(): Promise<void>;
 }
-
-/** buildHistoryEvents(debts)(www/js/calc.js)的返回元素——见calc.js注释，只挑两类事件：
- *  settled(某笔债务被还清)/milestone(累计已还跨过整数关口)，不是逐期流水账。 */
-export type HistoryEvent =
-  | { type: "settled"; date: string; name: string }
-  | { type: "milestone"; date: string; amount: number };
 
 /** aiAdvisor云函数返回的本月用量（服务端权威值）。month按北京时间算，形如"2026-08"。 */
 export interface AiQuota { month: string; used: number; limit: number }

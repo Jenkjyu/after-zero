@@ -395,22 +395,3 @@ export function useStrategyScreenOpen(): boolean {
   return useSyncExternalStore(subscribeStrategyScreen, () => strategyScreenOpen);
 }
 
-// 还债历程——2026-08-04新增，跟strategyScreen同一个模式(全局布尔开关，不需要id参数)。
-// 从"统计"tab的HistoryTeaser.tsx(另一棵独立React树)触发。
-let historyScreenOpen = false;
-function subscribeHistoryScreen(callback: () => void) {
-  window.addEventListener("az:history-screen-changed", callback);
-  return () => window.removeEventListener("az:history-screen-changed", callback);
-}
-export function openHistoryScreen() {
-  historyScreenOpen = true;
-  window.dispatchEvent(new CustomEvent("az:history-screen-changed"));
-}
-export function closeHistoryScreen() {
-  historyScreenOpen = false;
-  window.dispatchEvent(new CustomEvent("az:history-screen-changed"));
-}
-export function useHistoryScreenOpen(): boolean {
-  return useSyncExternalStore(subscribeHistoryScreen, () => historyScreenOpen);
-}
-

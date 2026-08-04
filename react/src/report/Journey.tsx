@@ -15,7 +15,8 @@
 //
 // ⚠️数据是**预测**不是历史：timeline 由 computeReportData() 从"今天的总余额"出发、按现有
 // 还款计划里每一期的本金逐笔递减推算。这个 App 不保存任何历史余额快照，画不出真实走过的
-// 轨迹，footnote 必须说清楚，不能把预测包装成历史。
+// 轨迹——这条事实本身没变，但2026-08-05应用户要求删掉了图下方那句提示文案
+// （"按现有还款计划推算，不含提前还款…"），页面上不再有文字提示这一点。
 //
 // ⚠️2026-08-01改过两轮（真机反馈）：
 // 第一轮"拖动读数不跟手"——原来拖动读数（活动索引）是React state，每次touchmove都
@@ -234,9 +235,6 @@ export function Journey({ data, s, monthsLeft }: JourneyProps) {
             </>
           )}
         </div>
-      </div>
-      <div className="footnote" style={{ textAlign: "left", marginTop: 8, padding: 0 }}>
-        按现有还款计划推算，不含提前还款；本 App 不保存历史余额，这条线不是实际走过的轨迹。
       </div>
     </div>
   );

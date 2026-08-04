@@ -16,11 +16,11 @@ describe("PremiumScreen", () => {
     expect(container.querySelector("#premiumScreen")).not.toHaveClass("open");
   });
 
-  it("只有一张买断价卡：朴素现价¥49，没有划线原价/限时优惠这类促销话术，没有月付/年付选项", () => {
+  it("只有一张买断价卡：朴素现价¥15，没有划线原价/限时优惠这类促销话术，没有月付/年付选项", () => {
     window.__azBridge = makeMockBridge();
     const { container } = render(<PremiumScreen />);
     act(() => { openPremiumScreen(); });
-    expect(screen.getByText("¥49")).toBeInTheDocument();
+    expect(screen.getByText("¥15")).toBeInTheDocument();
     expect(container.querySelectorAll(".price-card")).toHaveLength(1);
     // 只有一张卡时没有"选中"这个语义，卡片不再常驻高亮描边
     expect(container.querySelector(".price-card")).not.toHaveClass("selected");
@@ -28,8 +28,8 @@ describe("PremiumScreen", () => {
     expect(screen.queryByText("限时优惠")).not.toBeInTheDocument();
     expect(screen.queryByText("¥5.9")).not.toBeInTheDocument();
     expect(screen.queryByText(/按月订阅/)).not.toBeInTheDocument();
-    // 朴素陈述为什么收这个钱，不是营销话术
-    expect(screen.getByText(/真实的服务器成本/)).toBeInTheDocument();
+    // 2026-08-05起不再展示"真实的服务器成本"这句说明文案，用户要求删掉
+    expect(screen.queryByText(/真实的服务器成本/)).not.toBeInTheDocument();
   });
 
   it("点开通Premium调用confirmAsync弹出暂未开放支付提示", () => {
