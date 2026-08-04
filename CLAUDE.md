@@ -460,6 +460,14 @@ ActionBar消失后，WebView内容直接从状态栏正后方开始铺，配合�
 
 **验证**：Playwright依次focus"新增债务"表单里的input（贷款产品）、input（还款日）、textarea（备注）、select（借款类型）四种控件，`getComputedStyle`确认`outlineStyle:none`+`boxShadow`是贴合圆角的`0 0 0 2px`，深色模式截图确认描边紧贴边框、零溢出，控制台零报错。
 
+**⚠️2026-08-05真机又报了一次"绿框溢出"，看着像同一个bug复发，实际是完全不同的根因——`.sheet-scroll`的隐性`overflow-x:auto`裁掉了box-shadow**：用户报"备注"框聚焦时绿色描边靠近屏幕两边就看不见了。像素级比对截图发现：描边只在上下圆角弧线附近可见，贴着左右两条**直边**的中段是纯灰色（`--border`），不是本节说的"圆角对不上"那种毛病（这次圆角处反而是对的）。
+
+根因：`.sheet-scroll { overflow-y: auto; }`没写`overflow-x`——CSS规范规定只要一侧显式设成非`visible`，另一侧会被浏览器强制按`auto`计算。`.sheet-scroll`自己没有左右padding（padding都在外层`.sheet`上），表单控件的宽度正好贴到它的内容盒边缘，`box-shadow`往外凸的2px正好被这层隐性的`overflow-x:auto`裁掉——纵向没事是因为在可滚动范围内，横向没有滚动，超出的部分直接永久裁掉。
+
+**修法**：`.sheet-scroll`加`margin: 0 -2px; padding: 0 2px;`——负margin让盒子往外扩2px、padding再把内容缩回2px，两者抵消，表单控件的实际位置/宽度完全不变，但`.sheet-scroll`自己的裁切边界（padding box）比控件边缘多出2px余量，box-shadow那2px就有地方画了。这条规则4个sheet（`DetailSheet`/`EditSheet`/`NotifySheet`/`SortSheet`+`#aiHistorySheet`）共用，改一处全部生效。用摘出真实CSS的最小复现页在无头浏览器里做了改前/改后对比截图验证：改前直边中段确实是灰色，改后同一位置准确显示`--accent`绿色。
+
+**同一轮还发现一处"颜色对但看起来像另一种绿"的问题，根因跟上面两个都不一样**：用户问"还款日的绿色描边和另外几个颜色是不是不一样"——"还款日（几号）"字段（`#f-day`）是`readOnly`+`className="f-day-auto"`，而`.f-day-auto { opacity: .6 }`把整个输入框（含聚焦时的box-shadow）都压到60%透明度，叠在白底上视觉效果约等于`rgb(116,143,137)`这种发灰的浅青绿，跟其它字段满透明度的`#18453B`深绿比明显更淡。这个字段本身只读、点了也改不了内容，照抄`.sort-sel:focus-visible`"不需要焦点环"的先例，直接`.f-day-auto:focus-visible { outline: none; box-shadow: none; }`整个关掉，不是去调颜色凑。
+
 ## 返回键处理（安卓硬件/手势返回）
 
 弹窗关闭 + 退出App这两件事，走的是"原生问JS，JS说了算"的桥接，两头都有各自的坑：
