@@ -52,6 +52,20 @@
 
 **一个真实的Dart类型系统坑，被116条测试当场抓出来**：`simulateRepaymentOrder`里`math.max(0, balA - principalA)`——`math.max<T extends num>`在字面量`0`（int）那个分支胜出时会返回**int**而不是double，这个int被存进`Map<String,dynamic>`后，之后代码里对同一个字段做`as double`强转就会在运行时崩溃（`type 'int' is not a subtype of type 'double'`）。`flutter analyze`的静态检查完全看不出这个问题——因为`Map<String,dynamic>`的value类型本来就是`dynamic`，编译期不做任何检查。是把116条JS测试跑一遍才在7个测试用例上现出原形。修法：把`0`改成`0.0`（double字面量），强制`math.max`的类型参数`T`推断成`double`，两个分支不管哪个赢都是double。**这条经验对以后所有阶段都适用**：以后再写"`Map<String,dynamic>`存值+之后`as double`强转"这种模式，只要中间经过了`math.max`/`math.min`且其中一个操作数是字面量`0`，一律记得写`0.0`不要写`0`，不能指望`flutter analyze`帮忙查。
 
+### 阶段2完成状态（2026-08-05）：`flutter/lib/data/` + `flutter/test/data_test.dart`
+
+新增4个文件：`models.dart`（数据模型类）、`debt_ops.dart`（Debt类↔calc.dart的Map桥接）、`local_store.dart`（SharedPreferences持久化）、`providers.dart`（Riverpod状态层）。
+
+**字段形状不是猜的，是先用一个Explore agent把`react/src/types.ts`（当前vanilla+React架构的权威TS定义）逐字段核对过一遍再翻译的**——Debt/PlanRow/GenSpec/Account/Premium/NotifySettings/NotifyRule/DocEntry全部对照过TS interface和实际读写代码（`setDebt()`/`normalize()`等）。**一个真实的认知过程**：原计划文本里提到"这次要把`aiUsageToday`/`aiUsageLeft`这两个calc.js里因为要mutate状态而没抽成纯函数的例外，按Riverpod方式处理干净"——但深入这块之后发现这个描述本身已经过时：2026-08-04那轮AI用量重构早就把计数权威上收到服务端了（按月、云函数计数），客户端`AI_USAGE_KEY`现在只是服务端返回值的只读缓存（`{month,used,limit}`），根本不存在"跨天要在本地重新计算"这种需要mutate状态的逻辑——`aiUsageToday`/`aiUsageLeft`这两个函数本来就不在calc.js的57个导出函数里（这份历史遗留问题在vanilla架构下也早就没有跟着搬过去）。按现状实现了一个简单的`AiUsageCache`只读缓存+`updateFromServer()`方法，没有做任何"清理遗留mutation逻辑"的多余工作，因为那个逻辑在当前架构下已经不存在了。
+
+**设计取舍——models层用真正的不可变类（immutable class+copyWith），跟阶段1的calc.dart故意保留`Map<String,dynamic>`不同**：这两层的目标不一样——calc.dart追求"跟calc.js逐行对照、降低翻译出错风险"，是阶段1限定的选择；到了数据模型这一层，Flutter的运行时和calc.dart已经用同一批测试验证过了，风险大幅降低，值得换成类型安全、Riverpod惯用的不可变类。两层通过`debt_ops.dart`的桥接函数（`recomputeDebt`/`normalizeDebt`/`applySettle`/`undoSettle`/`recordPayment`/`waivePeriod`——都是"Debt转Map、调用已验证的calc函数、转回新Debt"）衔接，**没有把calc.dart的计息逻辑重新翻译一遍**——那批函数已经有116条测试背书，重新实现只会引入新的出错机会。`Debt.copyWith()`故意不暴露修改`balance`/`rate`等派生字段的参数——这些字段只能通过`recomputeDebt()`产生，不给UI代码留手滑写出跟plan对不上的假数据的空子。
+
+**持久化key名沿用现有Capacitor版本的字符串**（`debt-manager-v5`/`after-zero-account-v1`等）**纯粹是命名习惯上的一致性，不是为了兼容旧版本数据**——WebView的localStorage和Flutter的`shared_preferences`是两套完全不同的底层存储机制，哪怕key名一模一样也不会自动共享数据。这个App目前还没有真实上线用户，"要不要做从旧版本导入数据的迁移功能"是阶段9切换时才需要决定的产品问题，不是这一步要解决的。
+
+**Riverpod状态层用`Notifier`/`NotifierProvider`（3.x非代码生成的手写API），没有加`riverpod_generator`/`build_runner`**——手写API足够表达清楚这一批provider，暂时不需要为了少写几行样板代码引入额外的构建工具链依赖；以后如果provider数量变多、样板代码负担明显了，再考虑要不要切代码生成，不是现在的决定。`sharedPreferencesProvider`故意不给默认实现、直接抛`UnimplementedError`——逼着`main()`必须显式做`overrideWithValue`注入，缺了初始化步骤要在开发期就炸出来，不能悄悄读到一份不存在的假数据。
+
+**测试**：`flutter/test/data_test.dart`新增23个测试，覆盖models往返、debt_ops桥接函数（复用阶段1同款`makeDebt`套路验证`applySettle`/`undoSettle`/`recordPayment`/`waivePeriod`跟calc_test.dart里对应Map版本测试断言一致）、`LocalStore`用`SharedPreferences.setMockInitialValues({})`做读写往返、Riverpod provider用`ProviderContainer`+`overrideWithValue`验证状态变化确实同步写盘（不是只改了内存state）。`flutter test`共140条全绿（117阶段0/1 + 23阶段2），`flutter analyze`零issue。
+
 `flutter create --org io.github.jenkjyu --project-name after_zero --platforms android,ios flutter`生成的Android `applicationId`是`io.github.jenkjyu.after_zero`（下划线），**故意跟现有Capacitor版本的`io.github.jenkjyu.afterzero`（无下划线）不同**——这样两个App能同时装在同一台测试机上对照，不会互相覆盖；包名是不是要在阶段9统一/怎么统一，那时候再定，现在不是要解决的问题。
 
 技术选型落地：`flutter_riverpod`（状态管理）+ `shared_preferences`（本地持久化，本阶段只加了依赖，还没写实际读写逻辑，那是阶段2的事）。测试脚手架：`flutter_test`（`test/widget_test.dart`）+ `integration_test`（`integration_test/app_test.dart`，跑真机/模拟器端到端测试的通道，本阶段只放了一个跟单元测试等价的冒烟测试，确认这条通道本身可用）。`.github/workflows/ci.yml`新增独立的`flutter`job（`working-directory: flutter`，跑`flutter analyze`+`flutter test`），跟现有Node.js那个job完全独立、互不影响；**iOS没有加进CI**——需要macOS runner，且现在`flutter/`里还没有任何真正依赖iOS原生代码的产出，加了也测不出什么，纯粹多花CI分钟数，等阶段3/4有实际iOS相关代码后再加。
