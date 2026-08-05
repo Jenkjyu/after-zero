@@ -66,6 +66,34 @@
 
 **测试**：`flutter/test/data_test.dart`新增23个测试，覆盖models往返、debt_ops桥接函数（复用阶段1同款`makeDebt`套路验证`applySettle`/`undoSettle`/`recordPayment`/`waivePeriod`跟calc_test.dart里对应Map版本测试断言一致）、`LocalStore`用`SharedPreferences.setMockInitialValues({})`做读写往返、Riverpod provider用`ProviderContainer`+`overrideWithValue`验证状态变化确实同步写盘（不是只改了内存state）。`flutter test`共140条全绿（117阶段0/1 + 23阶段2），`flutter analyze`零issue。
 
+### 阶段3完成状态（2026-08-05）：`flutter/lib/cloud/` + `flutter/test/cloud_test.dart`——CloudBase HTTP网关接线+微信登录编排，**真正的端到端登录还差一步控制台配置**
+
+**先用真实HTTP请求验证了整条技术路线站不站得住，不是先写代码再祈祷**：部署了一个一次性诊断云函数（`httpAuthTest`，验证完已删除，`cloudbaserc.json`也已清理干净，没有留痕迹），用`curl`直接打CloudBase的HTTP网关：
+
+1. `POST https://{envId}.api.tcloudbasegateway.com/auth/v1/signin/anonymously`（带`x-device-id`头）——拿到`access_token`/`refresh_token`，确认这条匿名登录HTTP API真实可用。
+2. 用这个token去调`POST .../v1/functions/httpAuthTest`（带`Authorization: Bearer`）——被拒绝，返回`{"code":"EXCEED_AUTHORITY"}`。**这个拒绝本身就是关键证据**：网关能识别出"这是一个匿名会话"才会按角色权限拒绝它，如果网关压根不认这个token、或者不传递调用者身份，报错形态会完全不同（比如"未授权"这种更笼统的错误，不会精确判断出"匿名"这个角色）。
+
+**据此确认了一个此前调研没覆盖到的关键事实（不是猜的，是翻文档+实测对照出来的）**：CloudBase的HTTP网关有一套独立的"网关权限控制"（控制台配置，按Admin/组织成员/注册用户/匿名用户四个角色分別授权），**跟现有云函数用的`{"*": {"invoke": "auth.loginType != 'ANONYMOUS' && auth != null"}, "wxLogin": {"invoke": true}}`那套调用权限完全是两码事**——后者只管CloudBase JS SDK的`callFunction()`那条路径（现有Capacitor版本走的路），根本不影响HTTP网关。网关侧默认策略比想象中更严格：连"注册用户"角色调用云函数都是默认拒绝的，只有Admin默认放行；匿名用户是四档里唯一"调用云函数"这一项被完全禁止的。
+
+**这意味着要让Flutter版真正登录成功，需要在CloudBase控制台"权限控制"页面（不是`tcb policy`那个CLI命令——它背后的鉴权引擎/输入schema完全没有公开文档，不能在生产环境安全策略上瞎猜，试过`tcb policy get`只返回空值，说明真正生效的是走另一套系统）手动加两条网关自定义策略，**这一步只能控制台操作，没有能安全脚本化的路径，需要用户配合**：
+1. 给"匿名用户"角色加 `{"version":"1.0","statement":[{"effect":"allow","action":"functions:/wxLogin","resource":"*"}]}`——wxLogin是登录流程的入口，客户端在这一步还没有真实身份，只能用匿名会话调它。
+2. 给"注册用户"角色加能调其余云函数的策略（绑定"FunctionsAccess"预设策略，或自定义`{"effect":"allow","action":"functions:*","resource":"*"}`）——真实登录（微信换到自定义票据）之后要能调`backupCreate`/`deleteAccount`/`aiAdvisor`这些。
+
+**代码本身不受这一步影响，已经全部写完并测试过**——`lib/cloud/`5个文件：
+- `cloudbase_session.dart`：会话模型（`accessToken`/`refreshToken`/`expiresAt`/`anonymous`），`fromSignInJson()`直接对应网关登录接口的真实响应形状（字段名照抄实测抓到的真实JSON，不是猜的）。
+- `cloudbase_client.dart`：`signInAnonymously`/`signInWithCustomTicket`/`callFunction`，网关错误统一包成`CloudBaseHttpException`（带`statusCode`/`code`/`message`）。
+- `cloud_session_store.dart`：会话持久化，独立于`data/local_store.dart`（网络客户端状态跟App业务数据是两个概念层，即使都用shared_preferences也不共用同一个封装类），新增key`after-zero-cloudbase-session-v1`——现有Capacitor版本没有对应物，因为JS SDK自带`persistence:"local"`会话持久化，不需要App自己管，Flutter这边没有SDK可用只能自己做。
+- `wechat_auth.dart`：`fluwx`包装层，`requestAuthCode()`拉起微信OAuth（`scope="snsapi_userinfo"`，跟现有原生插件一致，为了wxLogin云函数第2步能拿到昵称/头像）。**这一层的正确性没法在没有真机+真实微信App时完整验证**——跟现有Capacitor版本"必须真机验证微信登录"是同一条限制，微信官方要求走"移动应用"OAuth，拉起手机上的微信App本身走授权，这个交互没法在模拟器/单元测试里复现。
+- `cloud_auth_controller.dart`：登录编排（`loginWithWeChat`把"匿名登录→调wxLogin换票据→用票据换正式会话→存Account"串起来）+`logout()`+`isCloudLoggedInProvider`派生状态。**故意依赖`WeChatCodeProvider`这个函数类型而不是直接依赖`WeChatAuth`类**——这样编排逻辑本身能用假的"拿code"函数单测，把"登录编排对不对"和"fluwx到底能不能真正拉起微信"这两件事分开验证。
+
+**`fluwx`比现有手写的`WeChatLoginPlugin.java`简化了一层**：读它的README确认Android端不需要像vanilla那样手写一个`wxapi/WXEntryActivity.java`——fluwx的插件注册机制（跟`flutter_local_notifications`一样，`npx flutter pub get`+自动native清单合并）内部处理了微信回调路由，Android端唯一要求是"release签名的SHA1要在微信开放平台登记过"，这条限制两边一样，见`release-keystore` skill。**⚠️遗留问题：这个SHA1目前是给现有包名`io.github.jenkjyu.afterzero`注册的，新Flutter项目故意用了不同包名`io.github.jenkjyu.after_zero`（阶段0的决定，为了两个App能同时装在测试机上）——真机测微信登录前需要确认微信开放平台的这个AppID是否需要单独为新包名注册一遍，还没验证过，留到真机测试那一步处理。**
+
+**还没实现、刻意选择不猜的部分**：非匿名（真实微信登录）会话过期（2小时）后的静默续期——CloudBase有`refresh_token`（30天有效）但官方文档没有确认过对应的HTTP刷新端点长什么样，不确定之前不贸然实现一个可能是错的接口调用。当前处理：非匿名会话过期后直接当作"没有会话"，上层判断为需要重新登录（用户体验上是"2小时后要重新点一下微信登录"，不是理想状态，但功能上安全，等确认刷新端点后再补）。
+
+**测试**：`flutter/test/cloud_test.dart`新增14个测试——`CloudBaseSession`模型往返/过期判断、`CloudBaseClient`用`package:http/testing.dart`的`MockClient`打桩验证请求构造（URL/headers/body）和错误解析（含真实复现过的`EXCEED_AUTHORITY`场景）、`CloudSessionStore`读写往返、`cloudBaseClientProvider`按会话是否过期决定要不要自动恢复、`CloudAuthController`用假的`WeChatCodeProvider`验证完整登录编排（成功/wxLogin返回失败/登出三种路径）。**踩了一个纯测试层面的坑**：`http.Response(String,...)`不显式声明UTF-8 content-type的话按latin1编码body，响应体含中文（比如假昵称"小明"）直接抛`Contains invalid characters`——这是`MockClient`测试代码本身的问题，不是`CloudBaseClient`生产代码的bug（真实CloudBase网关返回的响应头本身就是正确的UTF-8 content-type）。`flutter test`共154条全绿，`flutter analyze`零issue，`flutter build apk --debug`加了`fluwx`原生依赖后仍编译成功。
+
+**用户需要做的事（下次有空时）**：登录CloudBase控制台（`https://tcb.cloud.tencent.com/dev`，环境`after-zero-d7gub5p5f09c8cc2d`）→"权限控制"→按上面两条加自定义策略，之后才能真机走通端到端登录验证。这一步做完之前，阶段3的代码在功能上是完整的、单测也全绿，只是没法用真实网络请求跑通完整登录流程——不是代码没写完，是等一个只有控制台能做的配置动作。
+
 `flutter create --org io.github.jenkjyu --project-name after_zero --platforms android,ios flutter`生成的Android `applicationId`是`io.github.jenkjyu.after_zero`（下划线），**故意跟现有Capacitor版本的`io.github.jenkjyu.afterzero`（无下划线）不同**——这样两个App能同时装在同一台测试机上对照，不会互相覆盖；包名是不是要在阶段9统一/怎么统一，那时候再定，现在不是要解决的问题。
 
 技术选型落地：`flutter_riverpod`（状态管理）+ `shared_preferences`（本地持久化，本阶段只加了依赖，还没写实际读写逻辑，那是阶段2的事）。测试脚手架：`flutter_test`（`test/widget_test.dart`）+ `integration_test`（`integration_test/app_test.dart`，跑真机/模拟器端到端测试的通道，本阶段只放了一个跟单元测试等价的冒烟测试，确认这条通道本身可用）。`.github/workflows/ci.yml`新增独立的`flutter`job（`working-directory: flutter`，跑`flutter analyze`+`flutter test`），跟现有Node.js那个job完全独立、互不影响；**iOS没有加进CI**——需要macOS runner，且现在`flutter/`里还没有任何真正依赖iOS原生代码的产出，加了也测不出什么，纯粹多花CI分钟数，等阶段3/4有实际iOS相关代码后再加。
