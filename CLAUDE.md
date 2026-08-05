@@ -40,6 +40,18 @@
 
 本机装了Flutter 3.44.8（`brew install --cask flutter`），复用现有安卓SDK（`flutter config --android-sdk /opt/homebrew/share/android-commandlinetools`）+ 复用现有`openjdk@21`（`flutter config --jdk-dir`），接受了Android SDK许可。`flutter doctor`确认Android工具链就绪；**iOS工具链还没装**——当前机器只有Xcode Command Line Tools，没有完整Xcode（`xcode-select -p`指向`/Library/Developer/CommandLineTools`），装完整Xcode是用户自己要做的事（App Store下载，几GB，需要交互），不是能脚本化代劳的一步，装好之前iOS相关工作都做不了。Chrome没装、`flutter doctor`报web target缺失——这个项目不需要web target，忽略。
 
+### 阶段1完成状态（2026-08-05）：`flutter/lib/calc/calc.dart` + `flutter/test/calc_test.dart`
+
+`calc.js`57个导出函数逐个翻译成Dart顶层函数（不是某个类的静态方法——这是Dart库文件的原生写法，跟calc.js"普通`<script>`里的顶层function声明"是同一种思路），**故意还用`Map<String, dynamic>`而不是强类型的Debt/PlanRow类**——这一阶段的目标是"跟calc.js行为完全对等，用现有测试当标准答案"，用Map保持翻译尽量字面、逐行可对照，减少翻译过程中引入新bug的风险；真正的类型安全数据模型是阶段2的事，到时候再决定是把这层整个替换掉还是在外面包一层适配器。
+
+`test/calc.test.js`的116条测试逐条翻译成`flutter/test/calc_test.dart`（`grep -c "^test("`两边数字对得上），当成移植是否正确的验收标准——不是重新设计一套覆盖范围，是同一份用例换个语言跑一遍。全部116条 + 阶段0的1条widget冒烟测试，`flutter test`共117条全绿，`flutter analyze`零issue（含lint info级别，不只是error/warning）。
+
+**移植过程中确认的两个跨语言细节**（不是踩坑，是翻译前主动核实过的，写下来是因为以后如果再有类似的JS→Dart移植，这两条可以直接复用结论，不用重新验证）：
+- **Dart的`DateTime`构造函数对年/月/日溢出的自动归一化行为，跟JS的`Date`构造函数逐位一致**（比如`DateTime(2026,13,1)`自动进位成2027-01-01、`DateTime(2026,2,31)`自动进位成2026-03-03）——用一个独立的小脚本（`dart run`）实测验证过，不是查文档猜的。这意味着`addMonths`/`parseDate`能直接照抄JS的算法，不需要手动处理月份溢出。**唯一要注意的是索引基准不同**：JS的`Date`月份是0-based（`getMonth()`返回0-11），Dart的`DateTime.month`是1-based（1-12）——`addMonths`直接用Dart自己的1-based月份做`+m`偏移，效果跟JS版本完全一致（两边都是"整体偏移m个月"，索引基准不同但偏移语义相同，不需要换算）；只有`parseDate`要注意JS版本里`(+p[1])-1`那个`-1`是专门做0-based转换的，Dart这边直接用解析出来的月份数字，不能照抄这个`-1`。
+- **JS的`Math.round`和Dart的`num.round()`在"整数.5"边界上的取整方向不同**（JS永远向`+Infinity`取整，Dart的`round()`向远离0的方向取整）——`r2()`没有用Dart内置的`round()`，是手写的`(x+0.5).floorToDouble()`，这正是ECMA规范里`Math.round`的定义式本身；两种语言的浮点数都是IEEE754双精度，同样的算式两边算出的是逐位相同的结果，用node脚本实测过`r2(2.345)`/`r2(-2.345)`等边界值的真实浮点表示，不是靠猜测。
+
+**一个真实的Dart类型系统坑，被116条测试当场抓出来**：`simulateRepaymentOrder`里`math.max(0, balA - principalA)`——`math.max<T extends num>`在字面量`0`（int）那个分支胜出时会返回**int**而不是double，这个int被存进`Map<String,dynamic>`后，之后代码里对同一个字段做`as double`强转就会在运行时崩溃（`type 'int' is not a subtype of type 'double'`）。`flutter analyze`的静态检查完全看不出这个问题——因为`Map<String,dynamic>`的value类型本来就是`dynamic`，编译期不做任何检查。是把116条JS测试跑一遍才在7个测试用例上现出原形。修法：把`0`改成`0.0`（double字面量），强制`math.max`的类型参数`T`推断成`double`，两个分支不管哪个赢都是double。**这条经验对以后所有阶段都适用**：以后再写"`Map<String,dynamic>`存值+之后`as double`强转"这种模式，只要中间经过了`math.max`/`math.min`且其中一个操作数是字面量`0`，一律记得写`0.0`不要写`0`，不能指望`flutter analyze`帮忙查。
+
 `flutter create --org io.github.jenkjyu --project-name after_zero --platforms android,ios flutter`生成的Android `applicationId`是`io.github.jenkjyu.after_zero`（下划线），**故意跟现有Capacitor版本的`io.github.jenkjyu.afterzero`（无下划线）不同**——这样两个App能同时装在同一台测试机上对照，不会互相覆盖；包名是不是要在阶段9统一/怎么统一，那时候再定，现在不是要解决的问题。
 
 技术选型落地：`flutter_riverpod`（状态管理）+ `shared_preferences`（本地持久化，本阶段只加了依赖，还没写实际读写逻辑，那是阶段2的事）。测试脚手架：`flutter_test`（`test/widget_test.dart`）+ `integration_test`（`integration_test/app_test.dart`，跑真机/模拟器端到端测试的通道，本阶段只放了一个跟单元测试等价的冒烟测试，确认这条通道本身可用）。`.github/workflows/ci.yml`新增独立的`flutter`job（`working-directory: flutter`，跑`flutter analyze`+`flutter test`），跟现有Node.js那个job完全独立、互不影响；**iOS没有加进CI**——需要macOS runner，且现在`flutter/`里还没有任何真正依赖iOS原生代码的产出，加了也测不出什么，纯粹多花CI分钟数，等阶段3/4有实际iOS相关代码后再加。
