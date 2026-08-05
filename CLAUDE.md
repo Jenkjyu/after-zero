@@ -16,6 +16,36 @@
 
 **例外：`android/app/src/main/java/io/github/jenkjyu/afterzero/` 下有手写的原生插件代码，不是sync产物。** 目前有 `SaveFilePlugin.java` 和 `WeChatLoginPlugin.java`（+ `wxapi/WXEntryActivity.java` + `MainActivity.java` 里几行注册代码），`npx cap sync android` 不会碰这些文件，是真正的项目源码，要跟着走版本控制，不要当成自动生成的东西误删或忽略。详见下面"原生插件"一节。
 
+## Flutter重写（2026-08-05启动，进行中）：`flutter/` ——目标是彻底替换掉Capacitor架构，本文件下面绝大部分内容描述的是即将被替换掉的现状
+
+**这是一次全量重写，不是渐进优化。** 起因是分析这个项目的技术栈风险时确认：Capacitor套壳系统WebView这套架构，体积小是真的，但强依赖各手机厂商WebView行为不一致这条风险也是真的（这个项目里"必须真机验证"的坑绝大多数根源都在这里）；且用户明确未来一定要上iOS，而WebView这条路线本身不支持iOS（Capacitor理论上能配iOS target，但底层还是同一个"依赖系统渲染引擎行为"的问题，没有解决根本risk）。讨论后排除了原生安卓（要跨平台）和React Native（这个App的视觉是一整套自定义手绘设计系统——石墨hero卡、磨砂玻璃、长按拖拽、左滑手势、图表拖拽读数、饼图手指旋转，Flutter"自己画每个像素、不映射系统原生控件"的渲染模型比"映射到原生控件"的RN更贴合；微信SDK在Flutter生态里`fluwx`维护也比RN同类插件更成熟），**定为Flutter**。目标是"一劳永逸"——用户原话，不想再因为底层技术栈的问题被逼着重来一次。
+
+**策略：新旧两套代码在同一个仓库里长期共存，功能完全对等后才一次性切换**，不做"MVP先切、功能陆续补齐"这条路（用户明确选择了"完全对等再切换"，理由是App目前还没上线、没有ICP备案，不急于求成，宁可换取用户体验不倒退）。`flutter/`是全新顶层目录（跟`www/`/`android/`/`react/`平级），`flutter create`自带的`lib/`/`android/`/`ios/`/`pubspec.yaml`等结构完全自成一体，不会跟Capacitor那套产生任何路径冲突——开发期间现有Capacitor版本原样可用、不受影响。等Flutter版本功能对等验证通过，才会一次性删除`www/`、旧`android/`（Capacitor那份）、`react/`、`capacitor.config.json`等Capacitor专属文件，`flutter/`转正为项目主体。
+
+### 关键调研结论（决定了阶段顺序，别按直觉重新排）
+
+- **微信登录**：`fluwx`是Flutter生态事实标准，维护良好，Android+iOS都支持，直接用替代现在的`WeChatLoginPlugin.java`手写插件。
+- **⚠️腾讯云开发（CloudBase）没有能用的官方Flutter SDK**——官方`cloudbase_core`等包已5年未更新、不兼容Dart 3，等于废弃，社区也没有靠谱替代品。唯一可行路径是**绕开SDK，直接用HTTP调用CloudBase的"HTTP访问服务"**，云函数可能需要改造成"Web云函数"直接处理HTTP请求；认证（匿名登录+自定义票据登录）也要照CloudBase的HTTP认证接口手写，不能像现在`www/index.html`里那样调JS SDK的方法就有会话管理。**这是整个重写里风险最高、最不确定的一块**，所以刻意排在阶段3（早于绝大部分UI工作）先验证，不能拖到后期才发现整条技术路线走不通。
+- **本地通知**：`flutter_local_notifications`是标准包，维护活跃，能对应现在"取消全部+根据当前数据重排"这套调度策略。
+- **文件"另存为"**：没有现成pub.dev包能完全复刻现在`SaveFilePlugin.java`的行为（`file_saver`实测不走真正的Android SAF，会掉进"存了但文件管理器分类视图看不见"这个已经在Capacitor版本里踩过、专门改成SAF选择器才解决的坑），大概率还是要自己写一个薄的Flutter插件包一层真正的SAF调用。iOS没有SAF这个概念，用分享面板/Files App保存，是完全不同的交互形态，不是对等替换，到阶段7再细化。
+- **PDF/Excel导出**：`pdf`（dart包）+`excel`包是标准选择。**这块甚至会比现在更好**——`pdf`包支持内嵌TTF字体，中文能做成真正可选中的文字，不用像现在jsPDF那样把整段文字栅格化成图片。
+
+### 阶段划分（10个阶段，见`TaskCreate`任务列表，每阶段做完验证+更新README/本文件/PROGRESS.md后停下来等确认，不会提前把后面阶段拆到细节）
+
+0. 项目脚手架 1. `calc.js`57个函数移植到Dart 2. 数据层（模型+本地持久化） 3. 云端接入层（微信登录+CloudBase HTTP，风险最高，提前做） 4. "在还债务"tab 5. "还款日"+"统计"tab 6. "我的"tab+全部subpage/sheet 7. 原生能力收尾（通知+文件保存） 8. 全面回归+真机/双端验证 9. 切换与清理
+
+完整背景、每个阶段的详细范围见规划过程产出的plan文件（这一轮对话里`EnterPlanMode`产出的），这里只记结论性的东西，不重复展开。
+
+### 阶段0完成状态（2026-08-05）
+
+本机装了Flutter 3.44.8（`brew install --cask flutter`），复用现有安卓SDK（`flutter config --android-sdk /opt/homebrew/share/android-commandlinetools`）+ 复用现有`openjdk@21`（`flutter config --jdk-dir`），接受了Android SDK许可。`flutter doctor`确认Android工具链就绪；**iOS工具链还没装**——当前机器只有Xcode Command Line Tools，没有完整Xcode（`xcode-select -p`指向`/Library/Developer/CommandLineTools`），装完整Xcode是用户自己要做的事（App Store下载，几GB，需要交互），不是能脚本化代劳的一步，装好之前iOS相关工作都做不了。Chrome没装、`flutter doctor`报web target缺失——这个项目不需要web target，忽略。
+
+`flutter create --org io.github.jenkjyu --project-name after_zero --platforms android,ios flutter`生成的Android `applicationId`是`io.github.jenkjyu.after_zero`（下划线），**故意跟现有Capacitor版本的`io.github.jenkjyu.afterzero`（无下划线）不同**——这样两个App能同时装在同一台测试机上对照，不会互相覆盖；包名是不是要在阶段9统一/怎么统一，那时候再定，现在不是要解决的问题。
+
+技术选型落地：`flutter_riverpod`（状态管理）+ `shared_preferences`（本地持久化，本阶段只加了依赖，还没写实际读写逻辑，那是阶段2的事）。测试脚手架：`flutter_test`（`test/widget_test.dart`）+ `integration_test`（`integration_test/app_test.dart`，跑真机/模拟器端到端测试的通道，本阶段只放了一个跟单元测试等价的冒烟测试，确认这条通道本身可用）。`.github/workflows/ci.yml`新增独立的`flutter`job（`working-directory: flutter`，跑`flutter analyze`+`flutter test`），跟现有Node.js那个job完全独立、互不影响；**iOS没有加进CI**——需要macOS runner，且现在`flutter/`里还没有任何真正依赖iOS原生代码的产出，加了也测不出什么，纯粹多花CI分钟数，等阶段3/4有实际iOS相关代码后再加。
+
+`main.dart`目前只是一个`ProviderScope`包裹的占位页（确认Riverpod接线正常），不是任何真实UI，`flutter analyze`零警告、`flutter test`通过、`flutter build apk --debug`编译成功（`build/app/outputs/flutter-apk/app-debug.apk`，151MB）——**这个体积不代表最终成品体积，debug构建天生巨大**（未瘦身的多ABI原生库、无minify、带调试符号），不能拿来跟现有Capacitor release包的4.6MB比，真正有意义的体积对比要等到阶段8/9出release构建才能做。
+
 ## 纯计算函数：`www/js/calc.js` + `test/calc.test.js`
 
 这是"单文件无构建步骤"原则下第一次真正拆出去的一份代码——**39个函数**从`www/index.html`主`<script>`里搬到了独立文件`www/js/calc.js`。这是2026-07-24"六续"那轮讨论定的长期方向（React迁移+测试优先，三步走）的第一步，分三轮做完：第一轮先搬了`recompute`/`genPlan`/`impliedAPR`/`amortForward`/`simulatePrepay`/`detectMatchingSort`/`urgencyTier`/`relLabel`/`dueBucket`/`isActive`/`rateClass`/`r2`/`pad`/`parseDate`/`addMonths`/`fmtDate`/`today0`/`npv`/`markPaidThrough`/`normalize`这20个明确点名的核心计息/日期函数；用户追问"是不是还是第一步"确认后，第二轮扫描全文件把剩下没碰DOM/localStorage的纯函数也一并搬完：`isBadRepeatDay`/`offsetLabel`/`computeReportData`（统计报表的数据计算）、`clone`/`fmt`/`money`/`todayStr`/`baseName`/`extOf`（通用格式化/工具函数）、`esc`/`inline`/`isHr`/`mdToHtml`/`escSvg`/`truncateLabel`（HTML转义+极简markdown渲染器，档案库预览用）；第三轮用户追问"剩下没搬的是不是都在等React迁移"，藉此机会把"等迁移"和"低价值/有状态暂不搬"这两类原因拆清楚后，又补搬了`hasPremium`/`premiumLabel`/`findAiConv`/`bumpAiConvTop`这4个——它们原本被跟"等迁移"那批混着说，其实跟迁移完全无关，只是需要参数化改造，评估后发现值得现在就搬。这批函数全部不碰DOM/localStorage，纯粹是"给定输入算出确定输出"，不管以后切不切React都不受影响，现在拆、现在测，都不会是白费功夫。

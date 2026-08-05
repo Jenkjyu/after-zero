@@ -12,6 +12,8 @@
 
 底部"统计"tab不是一张常规的数据看板，是一份自动生成的"债务报告"：开头用一句判断句总结当前状况，接着列出几条规则算出来的结论（比如"哪一笔债务实际吃掉了最多利息"——这跟"哪一笔利率最高"经常不是同一个答案，因为剩余利息取决于金额和期限、不只是利率）、点出最该优先处理的那一件事，然后是还清进度走势图（三个关键节点直接标在图上、可以按住拖动看任意时间点的余额）、未来几个月的还款压力（面积图/柱状图可切换，点某个月能展开当月要还哪些债务）、按欠款金额排的债务清单（只列到累计占大头的那几笔）、一个能用手指拖拽旋转的债务类型占比图，最后是导出报告和口径说明。
 
+**⚠️`flutter/`目录是一次正在进行的全量重写，目标是彻底替换掉本节描述的Capacitor架构（安卓+iOS双端），详见下面"Flutter重写"一节——现在描述的这套Capacitor/React架构仍是当前唯一可用、可发布的版本，重写完成前不受影响。**
+
 "我的"页有一个**单一 Premium** 订阅入口，只提供一次性买断这一种购买方式（¥15，没有按月/按年订阅），目前只是UI占位（App还没上架应用商店，暂时接不了真实支付），为未来的付费功能铺路。免费/付费的边界是按"这个功能有没有真实服务器/算力成本"划的：统计报告本身、提前还款收益模拟器、多策略对比规划（雪球法/雪崩法/自定义顺序对比总利息和还清时间），完全免费；报告页**导出**PDF/Excel、云备份（手动创建备份记录，可随时恢复）、**AI债务助手**（雪球/雪崩法分析生成分析报告 + 针对自己债务数据的多轮问答，服务端调用腾讯云开发内置大模型，每月限量50次，超限后可以一键复制包含全部债务信息的完整提示词去问其他AI助手），是Premium会员专属功能。
 
 ## 环境要求
@@ -60,7 +62,12 @@ cd android
 - `cloudbase/` —— 腾讯云开发（CloudBase）云函数的服务端代码，配合微信登录（`wxLogin`换取登录票据、`deleteAccount`处理注销账户）、Premium会员的云备份功能（`backupCreate`/`backupList`/`backupRestore`/`backupDelete`/`backupUploadFile`）、以及AI债务助手（`aiAdvisor`，调用CloudBase内置大模型）使用，不属于Capacitor/Android那套构建流程，需要单独部署，细节见 `CLAUDE.md`
 - `resources/` —— App图标的设计源文件，改图标时改这里，然后跑 `npx @capacitor/assets generate --android` 重新生成 `android/app/src/main/res/mipmap-*/` 下的实际图标文件（细节和一个工具默认值的坑见 `CLAUDE.md`）
 - `capacitor.config.json` —— 包名、显示名、web目录配置
+- `flutter/` —— 进行中的Flutter全量重写（安卓+iOS），跟以上Capacitor相关目录完全独立，见上面"Flutter重写"一节
 - `.github/workflows/ci.yml` —— GitHub Actions，每次push/PR自动跑`npm test`/`npm run test:react`/`tsc --noEmit`/`npm run build:react`这几条纯命令行的检查（Android编译和真机验证不在CI里，仍需手动做）
+
+## Flutter重写（进行中，安卓+iOS双端）
+
+Capacitor套壳系统WebView这套架构强依赖各手机厂商WebView行为，且不支持iOS。正在`flutter/`（独立顶层目录，自带`lib/`/`android/`/`ios/`/`pubspec.yaml`，跟`www/`/`android/`/`react/`不冲突）里用Flutter+Dart把整个App重写一遍，目标是彻底摆脱WebView依赖、同时支持iOS。开发期间两边共存，现有Capacitor版本不受影响；等Flutter版本做到功能完全对等，才会一次性删除`www/`/旧`android/`/`react/`等Capacitor专属文件，`flutter/`转正。状态管理用Riverpod，本地持久化第一版用`shared_preferences`（按现有localStorage的key对应，先求行为对齐）。腾讯云开发没有能用的官方Flutter SDK，云端接入层要绕开SDK直接用HTTP调用。详细阶段划分和当前进度见`CLAUDE.md`"Flutter重写"一节。
 
 ## 备注
 

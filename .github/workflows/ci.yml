@@ -28,3 +28,27 @@ jobs:
 
       - name: React build (Vite multi-entry)
         run: npm run build:react
+
+  # Flutter重写(flutter/)的CI——跟上面的Capacitor/React部分完全独立，两边互不影响。
+  # 只跑Android能覆盖的部分(analyze+test纯命令行、不需要模拟器)；iOS要macOS runner，
+  # 等flutter/里有实际iOS相关产出后再加，现在加了也测不出什么，纯粹多花CI分钟数。
+  flutter:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: 静态分析
+        run: flutter analyze
+
+      - name: 单元/组件测试
+        run: flutter test
