@@ -54,9 +54,18 @@ class DebtsNotifier extends Notifier<List<Debt>> {
   void deleteDebt(String id) =>
       _persist(state.where((d) => d.id != id).toList());
 
-  /// 按对象引用重排——对应vanilla的commitReorder()，拖拽排序那批手势代码到阶段4再移植，
-  /// 这里先把"提交新顺序"这一步的数据层动作准备好。
+  /// 完整替换顺序（导入/恢复时用）。
   void commitReorder(List<Debt> newOrder) => _persist(newOrder);
+
+  /// 只重排在还债务，同时保留已结清债务在原数组里的槽位——对应旧版commitReorder()。
+  /// UI传入的是当前展示顺序，不能直接用它替换state，否则已结清条目会被意外丢掉。
+  void commitActiveReorder(List<Debt> activeOrder) {
+    final queue = List<Debt>.from(activeOrder);
+    _persist([
+      for (final debt in state)
+        if (debt.settled == true) debt else queue.removeAt(0),
+    ]);
+  }
 
   /// 整体替换（导入JSON/恢复备份用）。
   void replaceAll(List<Debt> next) => _persist(next);
@@ -64,6 +73,21 @@ class DebtsNotifier extends Notifier<List<Debt>> {
 
 final debtsProvider = NotifierProvider<DebtsNotifier, List<Debt>>(
   DebtsNotifier.new,
+);
+
+/// 债务主页的显示排序（含自定义拖拽顺序）。这是用户偏好，不属于Debt本身的业务字段。
+class DebtSortNotifier extends Notifier<String> {
+  @override
+  String build() => ref.read(localStoreProvider).readDebtSort();
+
+  void set(String sort) {
+    state = sort;
+    ref.read(localStoreProvider).writeDebtSort(sort);
+  }
+}
+
+final debtSortProvider = NotifierProvider<DebtSortNotifier, String>(
+  DebtSortNotifier.new,
 );
 
 class AccountNotifier extends Notifier<Account?> {

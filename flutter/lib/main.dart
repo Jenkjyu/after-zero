@@ -1,8 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
-  runApp(const ProviderScope(child: AfterZeroApp()));
+import 'data/providers.dart';
+import 'ui/app_shell.dart';
+import 'ui/theme.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
+  runApp(
+    ProviderScope(
+      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+      child: const AfterZeroApp(),
+    ),
+  );
 }
 
 class AfterZeroApp extends StatelessWidget {
@@ -12,20 +24,9 @@ class AfterZeroApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'After Zero',
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF18453B))),
-      home: const ScaffoldSmokeTestPage(),
-    );
-  }
-}
-
-/// 阶段0脚手架验证页——确认Flutter/Riverpod/构建链路跑通，不是最终UI。
-class ScaffoldSmokeTestPage extends ConsumerWidget {
-  const ScaffoldSmokeTestPage({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return const Scaffold(
-      body: Center(child: Text('After Zero — Flutter重写脚手架已就绪')),
+      theme: buildAppTheme(Brightness.light),
+      darkTheme: buildAppTheme(Brightness.dark),
+      home: const AppShell(),
     );
   }
 }

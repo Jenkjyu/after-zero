@@ -12,6 +12,7 @@ import 'models.dart';
 
 class LocalStoreKeys {
   static const debts = 'debt-manager-v5';
+  static const debtSort = 'debt-manager-sort-v1';
   static const docs = 'debt-manager-docs-v5';
   static const account = 'after-zero-account-v1';
   static const notify = 'after-zero-notify-v1';
@@ -54,6 +55,13 @@ class LocalStore {
 
   Future<void> writeDebts(List<Debt> debts) =>
       _writeMapList(LocalStoreKeys.debts, debts.map((d) => d.toMap()).toList());
+
+  /// 债务主页的显示排序。它是纯展示偏好，和债务数据本身分开存，沿用现有 App 的 key 名。
+  String readDebtSort() =>
+      prefs.getString(LocalStoreKeys.debtSort) ?? 'rate-desc';
+
+  Future<void> writeDebtSort(String sort) =>
+      prefs.setString(LocalStoreKeys.debtSort, sort);
 
   // ===== 档案库(markdown文档，见models.dart的DocEntry注释——没有新写入路径，只为兼容老数据) =====
 

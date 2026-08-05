@@ -313,6 +313,12 @@ void main() {
       expect(back[0].balance, 0);
     });
 
+    test('debtSort: 未设置时回退默认值，写入后能读回', () async {
+      expect(store.readDebtSort(), 'rate-desc');
+      await store.writeDebtSort('custom');
+      expect(store.readDebtSort(), 'custom');
+    });
+
     test('account: 写入null等于清空，读回是null', () async {
       const account = Account(
         openid: 'o1',
@@ -409,6 +415,46 @@ void main() {
       expect(container.read(debtsProvider).map((d) => d.name).toList(), [
         'A改名',
         'B',
+      ]);
+    });
+
+    test('debtSortProvider: 修改状态时同步写入LocalStore', () {
+      expect(container.read(debtSortProvider), 'rate-desc');
+      container.read(debtSortProvider.notifier).set('terms-asc');
+      expect(container.read(debtSortProvider), 'terms-asc');
+      expect(LocalStore(prefs).readDebtSort(), 'terms-asc');
+    });
+
+    test('debtsProvider: 重排在还债务时保留已结清债务的槽位', () {
+      final base = makeDebt(0);
+      final first = Debt.fromMap({
+        ...base.toMap(),
+        'id': 'first',
+        'name': '第一笔',
+      });
+      final second = Debt.fromMap({
+        ...base.toMap(),
+        'id': 'second',
+        'name': '第二笔',
+      });
+      final settled = applySettle(
+        Debt.fromMap({...base.toMap(), 'id': 'settled', 'name': '已结清'}),
+        base.balance,
+        '2026-08-05',
+      )!;
+      container.read(debtsProvider.notifier)
+        ..setDebt(null, first)
+        ..setDebt(null, settled)
+        ..setDebt(null, second);
+
+      container.read(debtsProvider.notifier).commitActiveReorder([
+        second,
+        first,
+      ]);
+      expect(container.read(debtsProvider).map((debt) => debt.id).toList(), [
+        'second',
+        'settled',
+        'first',
       ]);
     });
 

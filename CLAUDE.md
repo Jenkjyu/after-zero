@@ -66,20 +66,16 @@
 
 **测试**：`flutter/test/data_test.dart`新增23个测试，覆盖models往返、debt_ops桥接函数（复用阶段1同款`makeDebt`套路验证`applySettle`/`undoSettle`/`recordPayment`/`waivePeriod`跟calc_test.dart里对应Map版本测试断言一致）、`LocalStore`用`SharedPreferences.setMockInitialValues({})`做读写往返、Riverpod provider用`ProviderContainer`+`overrideWithValue`验证状态变化确实同步写盘（不是只改了内存state）。`flutter test`共140条全绿（117阶段0/1 + 23阶段2），`flutter analyze`零issue。
 
-### 阶段3完成状态（2026-08-05）：`flutter/lib/cloud/` + `flutter/test/cloud_test.dart`——CloudBase HTTP网关接线+微信登录编排，**真正的端到端登录还差一步控制台配置**
+### 阶段3完成状态（2026-08-05）：`flutter/lib/cloud/` + `flutter/test/cloud_test.dart`——CloudBase HTTP网关接线+微信登录编排
 
 **先用真实HTTP请求验证了整条技术路线站不站得住，不是先写代码再祈祷**：部署了一个一次性诊断云函数（`httpAuthTest`，验证完已删除，`cloudbaserc.json`也已清理干净，没有留痕迹），用`curl`直接打CloudBase的HTTP网关：
 
 1. `POST https://{envId}.api.tcloudbasegateway.com/auth/v1/signin/anonymously`（带`x-device-id`头）——拿到`access_token`/`refresh_token`，确认这条匿名登录HTTP API真实可用。
-2. 用这个token去调`POST .../v1/functions/httpAuthTest`（带`Authorization: Bearer`）——被拒绝，返回`{"code":"EXCEED_AUTHORITY"}`。**这个拒绝本身就是关键证据**：网关能识别出"这是一个匿名会话"才会按角色权限拒绝它，如果网关压根不认这个token、或者不传递调用者身份，报错形态会完全不同（比如"未授权"这种更笼统的错误，不会精确判断出"匿名"这个角色）。
+2. 用这个token去调`POST .../v1/functions/httpAuthTest`（一个刚创建、没配置过任何调用权限的函数）——被拒绝，返回`{"code":"EXCEED_AUTHORITY"}`。
 
-**据此确认了一个此前调研没覆盖到的关键事实（不是猜的，是翻文档+实测对照出来的）**：CloudBase的HTTP网关有一套独立的"网关权限控制"（控制台配置，按Admin/组织成员/注册用户/匿名用户四个角色分別授权），**跟现有云函数用的`{"*": {"invoke": "auth.loginType != 'ANONYMOUS' && auth != null"}, "wxLogin": {"invoke": true}}`那套调用权限完全是两码事**——后者只管CloudBase JS SDK的`callFunction()`那条路径（现有Capacitor版本走的路），根本不影响HTTP网关。网关侧默认策略比想象中更严格：连"注册用户"角色调用云函数都是默认拒绝的，只有Admin默认放行；匿名用户是四档里唯一"调用云函数"这一项被完全禁止的。
+**⚠️这里曾经短暂下过一个过头的结论，已经用第二轮实测纠正——记录下来是因为这类"文档描述的默认行为 vs 实际生效的配置"的落差，以后遇到类似情况值得先怀疑"是不是有更具体的配置在起作用"，而不是直接采信文档的默认值描述。** 第一轮只测了`httpAuthTest`这一个新建、从没配置过权限的函数，就断定"HTTP网关有一套独立于现有`{"*":{"invoke":"..."}, "wxLogin":{"invoke":true}}`调用权限之外的网关级权限系统，且默认拒绝几乎所有角色"，并据此打算让用户去控制台加两条网关自定义策略。**用户追问"云端配置不能直接复用之前的吗"，倒逼着又做了两组对照实测**：①用匿名token调**已经配置过`{"invoke":true}`例外**的`wxLogin`——成功进到函数逻辑（返回`{"ok":false,"error":"缺少code"}`，不是权限拒绝）；②用同一个匿名token调**没配置过例外、走`*`通配**的`backupList`——被拒绝，返回`EXCEED_AUTHORITY`，行为跟`*`规则（`auth.loginType != 'ANONYMOUS' && auth != null`）精确对应。两组对照证实：**HTTP网关直接复用现有那套调用权限配置，不是独立的另一套系统**——之前查到的"网关权限控制"文档描述的默认角色表，只在函数完全没配置过调用权限时才会生效兜底，这个环境的函数早就配置过了，现有配置优先生效。**结论：不需要用户去控制台做任何额外配置**，等真机走通微信登录拿到真实(非匿名)会话后，调`backupCreate`/`deleteAccount`这些应该会直接命中现有`*`规则放行，会在真机测试那一步自然验证，不需要提前处理。
 
-**这意味着要让Flutter版真正登录成功，需要在CloudBase控制台"权限控制"页面（不是`tcb policy`那个CLI命令——它背后的鉴权引擎/输入schema完全没有公开文档，不能在生产环境安全策略上瞎猜，试过`tcb policy get`只返回空值，说明真正生效的是走另一套系统）手动加两条网关自定义策略，**这一步只能控制台操作，没有能安全脚本化的路径，需要用户配合**：
-1. 给"匿名用户"角色加 `{"version":"1.0","statement":[{"effect":"allow","action":"functions:/wxLogin","resource":"*"}]}`——wxLogin是登录流程的入口，客户端在这一步还没有真实身份，只能用匿名会话调它。
-2. 给"注册用户"角色加能调其余云函数的策略（绑定"FunctionsAccess"预设策略，或自定义`{"effect":"allow","action":"functions:*","resource":"*"}`）——真实登录（微信换到自定义票据）之后要能调`backupCreate`/`deleteAccount`/`aiAdvisor`这些。
-
-**代码本身不受这一步影响，已经全部写完并测试过**——`lib/cloud/`5个文件：
+代码本身从第一轮验证起就没受这个来回影响，已经全部写完并测试过——`lib/cloud/`5个文件：
 - `cloudbase_session.dart`：会话模型（`accessToken`/`refreshToken`/`expiresAt`/`anonymous`），`fromSignInJson()`直接对应网关登录接口的真实响应形状（字段名照抄实测抓到的真实JSON，不是猜的）。
 - `cloudbase_client.dart`：`signInAnonymously`/`signInWithCustomTicket`/`callFunction`，网关错误统一包成`CloudBaseHttpException`（带`statusCode`/`code`/`message`）。
 - `cloud_session_store.dart`：会话持久化，独立于`data/local_store.dart`（网络客户端状态跟App业务数据是两个概念层，即使都用shared_preferences也不共用同一个封装类），新增key`after-zero-cloudbase-session-v1`——现有Capacitor版本没有对应物，因为JS SDK自带`persistence:"local"`会话持久化，不需要App自己管，Flutter这边没有SDK可用只能自己做。
@@ -92,13 +88,29 @@
 
 **测试**：`flutter/test/cloud_test.dart`新增14个测试——`CloudBaseSession`模型往返/过期判断、`CloudBaseClient`用`package:http/testing.dart`的`MockClient`打桩验证请求构造（URL/headers/body）和错误解析（含真实复现过的`EXCEED_AUTHORITY`场景）、`CloudSessionStore`读写往返、`cloudBaseClientProvider`按会话是否过期决定要不要自动恢复、`CloudAuthController`用假的`WeChatCodeProvider`验证完整登录编排（成功/wxLogin返回失败/登出三种路径）。**踩了一个纯测试层面的坑**：`http.Response(String,...)`不显式声明UTF-8 content-type的话按latin1编码body，响应体含中文（比如假昵称"小明"）直接抛`Contains invalid characters`——这是`MockClient`测试代码本身的问题，不是`CloudBaseClient`生产代码的bug（真实CloudBase网关返回的响应头本身就是正确的UTF-8 content-type）。`flutter test`共154条全绿，`flutter analyze`零issue，`flutter build apk --debug`加了`fluwx`原生依赖后仍编译成功。
 
-**用户需要做的事（下次有空时）**：登录CloudBase控制台（`https://tcb.cloud.tencent.com/dev`，环境`after-zero-d7gub5p5f09c8cc2d`）→"权限控制"→按上面两条加自定义策略，之后才能真机走通端到端登录验证。这一步做完之前，阶段3的代码在功能上是完整的、单测也全绿，只是没法用真实网络请求跑通完整登录流程——不是代码没写完，是等一个只有控制台能做的配置动作。
+**用户不需要做任何控制台配置**——现有的调用权限配置已经覆盖了HTTP网关这条新路径，见上面的纠正说明。阶段3的代码在功能上是完整的、单测也全绿；真正的端到端登录验证只差一部装了微信的真机，不再有额外的后台配置阻塞。
 
 `flutter create --org io.github.jenkjyu --project-name after_zero --platforms android,ios flutter`生成的Android `applicationId`是`io.github.jenkjyu.after_zero`（下划线），**故意跟现有Capacitor版本的`io.github.jenkjyu.afterzero`（无下划线）不同**——这样两个App能同时装在同一台测试机上对照，不会互相覆盖；包名是不是要在阶段9统一/怎么统一，那时候再定，现在不是要解决的问题。
 
-技术选型落地：`flutter_riverpod`（状态管理）+ `shared_preferences`（本地持久化，本阶段只加了依赖，还没写实际读写逻辑，那是阶段2的事）。测试脚手架：`flutter_test`（`test/widget_test.dart`）+ `integration_test`（`integration_test/app_test.dart`，跑真机/模拟器端到端测试的通道，本阶段只放了一个跟单元测试等价的冒烟测试，确认这条通道本身可用）。`.github/workflows/ci.yml`新增独立的`flutter`job（`working-directory: flutter`，跑`flutter analyze`+`flutter test`），跟现有Node.js那个job完全独立、互不影响；**iOS没有加进CI**——需要macOS runner，且现在`flutter/`里还没有任何真正依赖iOS原生代码的产出，加了也测不出什么，纯粹多花CI分钟数，等阶段3/4有实际iOS相关代码后再加。
+技术选型落地：`flutter_riverpod`（状态管理）+ `shared_preferences`（本地持久化）。测试脚手架：`flutter_test`（`test/widget_test.dart`）+ `integration_test`（`integration_test/app_test.dart`，跑真机/模拟器端到端测试的通道）。`.github/workflows/ci.yml`新增独立的`flutter`job（`working-directory: flutter`，跑`flutter analyze`+`flutter test`），跟现有Node.js那个job完全独立、互不影响；**iOS没有加进CI**——需要macOS runner，且当前机器尚未装完整 Xcode，等阶段 8 的双端真机验证再接入。
 
-`main.dart`目前只是一个`ProviderScope`包裹的占位页（确认Riverpod接线正常），不是任何真实UI，`flutter analyze`零警告、`flutter test`通过、`flutter build apk --debug`编译成功（`build/app/outputs/flutter-apk/app-debug.apk`，151MB）——**这个体积不代表最终成品体积，debug构建天生巨大**（未瘦身的多ABI原生库、无minify、带调试符号），不能拿来跟现有Capacitor release包的4.6MB比，真正有意义的体积对比要等到阶段8/9出release构建才能做。
+### 阶段4完成状态（2026-08-05）："在还债务" tab——`flutter/lib/ui/` + `flutter/test/debt_sort_test.dart`
+
+`main.dart`不再是占位页：`AppShell`先建立四个底部 tab（还款日、统计、我的明确保留给阶段5/6），阶段4完整实现第一个“债务”tab。`SummaryHero`复用已验证的`calc.summarizeDebts()`；`DebtCard`保留出资方、类型、利率、下期金额、期数等既有信息口径；排序偏好独立持久化到`debt-manager-sort-v1`，预设排序同值时稳定保持用户顺序。`ReorderableListView`承接长按拖拽，拖动后会自动判断仍是哪个预设排序或改成“自定义”；`Dismissible`承接左滑“销这期”。已结清项目可恢复，空状态和悬浮“新增一笔”入口都能直接进表单。
+
+新增`DebtEditorScreen`和`DebtDetailScreen`。编辑器覆盖旧版五种计划生成方式（等额本息、等额本金、等本等费、先息后本、自定义），允许逐行修改日期/金额/本金/利息/已还、批量设置数值或每月还款日；金额和本金+利息仍按`0.015`容差校验。一次性还清不是只隐藏行：勾选时第2期起会暂存，取消前不丢数据（`oneTimeStash`状态机）；保存时通过`recomputeDebt()`回到阶段1已验证的计息函数，UI不手写派生字段。公式生成和批量日期都拒绝29–31日，逐行真实日期不受限。
+
+详情页按债务 id 观察最新 Riverpod 状态，展示完整账本（含部分还款和提前结清合成行）、编辑、销这期、协商减免、提前结清和提前还款模拟。真实还款/减免/结清一律调用阶段2的`recordPayment`/`waivePeriod`/`applySettle`桥接函数，确保`paidAt`、`paidAmount`和结清快照语义不被界面代码绕过。提前还款测算调用阶段1的`simulatePrepay()`，没有另写一份计算。
+
+验证：`flutter/test/debt_sort_test.dart`覆盖排序语义；widget 测试新增“公式生成→保存→列表→详情”流程。`flutter analyze`零 issue，`flutter test`共162条全绿，`flutter build apk --debug`成功（`build/app/outputs/flutter-apk/app-debug.apk`，163MB）。这是 debug 包，不能和旧 release 包体积比较；微信登录和 iOS UI 仍需阶段8真机验证。阶段4到此停止，下一步必须先由用户确认再开始阶段5。
+
+### 阶段5完成状态（2026-08-05）："还款日" + "统计" tab——`flutter/lib/ui/pay/` + `flutter/lib/ui/report/`
+
+还款日页用`buildPayItems()`把每笔在还债务的**每一期未还计划**展开成`PayItem`，金额取该期`row.amount`而不是`Debt.monthly`；因此自定义日期窗可以正确展示同一笔债务的多期。`isNextUnpaid`只标记每笔债务最早的未还期，非首期点“销这期”会明确提示先处理更早期次，不能跳期改账。筛选“下一期”是按债务视角，其余的逾期/7/15/30天和自定义日期是按期的累计窗口；顶部最近还款日会合并同日到期项目，三张小卡也严格按期、不含逾期。列表、卡片和左滑都复用阶段4的`requestInstallmentPayment()`和阶段2的`recordPayment()`，不会形成第二份还款逻辑。
+
+统计页不另造统计口径，直接消费阶段1移植的`computeReportData()`、`summarizeDebts()`、`computeUpcomingPressure()`、`pressureWindowMonths()`和`computeMonthlyRepayment()`：先给包含总余额/进度/归零日期的判断，再展示高息/逾期/峰值月提醒、还清路径、未来还款压力、月还款、余额集中度和类型构成。没有在还债务时会降级成明确的完成态。PDF/Excel导出、多策略对比和高级图表手势仍属于阶段6/7的子页面和原生收尾范围，未假装已经可用。
+
+测试：`flutter/test/pay_items_test.dart`固定今天日期验证“逐期展开、非首期不可销、下一期按债务、其余窗口按期且累计”的关键语义；widget 测试覆盖底部导航到还款日与统计空状态。`flutter analyze`零 issue，`flutter test`共165条全绿。按用户明确要求，本阶段**没有构建 APK**。阶段5到此停止，下一步必须先由用户确认再开始阶段6。
 
 ## 纯计算函数：`www/js/calc.js` + `test/calc.test.js`
 
