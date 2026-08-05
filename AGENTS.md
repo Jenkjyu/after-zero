@@ -1,12 +1,12 @@
-# CLAUDE.md
+# AGENTS.md
 
-这个文件给 Claude Code 看，记录这个项目非显而易见的技术细节和雷区。给人看的项目介绍在 `README.md`。
+这个文件给 Codex 看，记录这个项目非显而易见的技术细节和雷区。给人看的项目介绍在 `README.md`。
 
-**如果项目根目录下有 `PROGRESS.md`，先看那个文件。** 那是不进git、按时间记录"哪天做了什么、现在卡在哪一步"的进度日志（这份CLAUDE.md记的是相对稳定的技术细节，不记当前进度）——不是每个clone/checkout都会有这个文件（它是gitignored、因机器而异的本地文件），没有的话说明是全新环境，忽略这条即可。
+**如果项目根目录下有 `PROGRESS.md`，先看那个文件。** 那是不进git、按时间记录"哪天做了什么、现在卡在哪一步"的进度日志（这份AGENTS.md记的是相对稳定的技术细节，不记当前进度）——不是每个clone/checkout都会有这个文件（它是gitignored、因机器而异的本地文件），没有的话说明是全新环境，忽略这条即可。
 
-**⚠️`PROGRESS.md`只需要读最近的部分，不要整份读完**——它是按时间顺序累加的日志，早期条目的结论基本都已经沉淀进了这份CLAUDE.md，继续留着只是为了给"哪天做过什么"提供可追溯的存档，不是每次都要重新加载的上下文。**按"最近的自然日"定边界，不是按`## `标题数——同一天常常有好几个"续/再续/三续..."编号的子条目（活跃的日子一天能有七八个甚至十几个），数标题个数会跟"最近几天"对不上。** 做法：`grep -n "^## 20" PROGRESS.md | tail -20` 看最近这些标题都是哪天的，找到最近这个日期第一次出现的那一行，从那里读到文件末尾（通常就是最后1~2个自然日，含当天全部"续"条目）；如果这天内容明显偏短，往前再带一天。只有明确要追溯更早某次具体决策的完整经过时，才按关键词/日期搜更早的部分，不要因为"先看那个文件"这条规则就默认从头读到尾。
+**⚠️`PROGRESS.md`只需要读最近的部分，不要整份读完**——它是按时间顺序累加的日志，早期条目的结论基本都已经沉淀进了这份AGENTS.md，继续留着只是为了给"哪天做过什么"提供可追溯的存档，不是每次都要重新加载的上下文。**按"最近的自然日"定边界，不是按`## `标题数——同一天常常有好几个"续/再续/三续..."编号的子条目（活跃的日子一天能有七八个甚至十几个），数标题个数会跟"最近几天"对不上。** 做法：`grep -n "^## 20" PROGRESS.md | tail -20` 看最近这些标题都是哪天的，找到最近这个日期第一次出现的那一行，从那里读到文件末尾（通常就是最后1~2个自然日，含当天全部"续"条目）；如果这天内容明显偏短，往前再带一天。只有明确要追溯更早某次具体决策的完整经过时，才按关键词/日期搜更早的部分，不要因为"先看那个文件"这条规则就默认从头读到尾。
 
-**⚠️`.claude/skills/`下有几个项目专属skill，装的是"只有动到那块功能才用得上"的详细参考资料**（2026-08-01这轮从CLAUDE.md搬出去的，是为了不让这些低频细节每次session都占上下文）——`cloudbase-deploy`（云函数部署命令+三个坑）、`wechat-login-setup`（微信登录SDK接线的6个坑+自定义登录API用法）、`release-keystore`（release签名文件位置+构建命令）、`debt-model-history`（6条已修复数据模型缺口的完整前后经过）、`pay-tab-design`（还款日tab的急迫程度分档/筛选分组语义/左滑手势）、`edit-sheet-design`（新增编辑表单的oneTimeStash等状态机+genPlan四舍五入bug排查史）、`cloud-backup-design`（云备份5个云函数+配额规则）、`ai-advisor-design`（AI顾问的模型选型/用量上限/历史对话状态机）。CLAUDE.md正文里凡是写"见`xxx` skill"的地方，都是指这些——不需要手动去读那个文件，Claude Code会在做相关任务时自动判断要不要加载，正文里留的是压缩过的摘要/当前状态，不是要点开才能懂的残缺信息。
+**⚠️`.Codex/skills/`下有几个项目专属skill，装的是"只有动到那块功能才用得上"的详细参考资料**（2026-08-01这轮从AGENTS.md搬出去的，是为了不让这些低频细节每次session都占上下文）——`cloudbase-deploy`（云函数部署命令+三个坑）、`wechat-login-setup`（微信登录SDK接线的6个坑+自定义登录API用法）、`release-keystore`（release签名文件位置+构建命令）、`debt-model-history`（6条已修复数据模型缺口的完整前后经过）、`pay-tab-design`（还款日tab的急迫程度分档/筛选分组语义/左滑手势）、`edit-sheet-design`（新增编辑表单的oneTimeStash等状态机+genPlan四舍五入bug排查史）、`cloud-backup-design`（云备份5个云函数+配额规则）、`ai-advisor-design`（AI顾问的模型选型/用量上限/历史对话状态机）。AGENTS.md正文里凡是写"见`xxx` skill"的地方，都是指这些——不需要手动去读那个文件，Codex会在做相关任务时自动判断要不要加载，正文里留的是压缩过的摘要/当前状态，不是要点开才能懂的残缺信息。
 
 ## 项目是什么
 
@@ -21,6 +21,8 @@
 **这是一次全量重写，不是渐进优化。** 起因是分析这个项目的技术栈风险时确认：Capacitor套壳系统WebView这套架构，体积小是真的，但强依赖各手机厂商WebView行为不一致这条风险也是真的（这个项目里"必须真机验证"的坑绝大多数根源都在这里）；且用户明确未来一定要上iOS，而WebView这条路线本身不支持iOS（Capacitor理论上能配iOS target，但底层还是同一个"依赖系统渲染引擎行为"的问题，没有解决根本risk）。讨论后排除了原生安卓（要跨平台）和React Native（这个App的视觉是一整套自定义手绘设计系统——石墨hero卡、磨砂玻璃、长按拖拽、左滑手势、图表拖拽读数、饼图手指旋转，Flutter"自己画每个像素、不映射系统原生控件"的渲染模型比"映射到原生控件"的RN更贴合；微信SDK在Flutter生态里`fluwx`维护也比RN同类插件更成熟），**定为Flutter**。目标是"一劳永逸"——用户原话，不想再因为底层技术栈的问题被逼着重来一次。
 
 **策略：新旧两套代码在同一个仓库里长期共存，功能完全对等后才一次性切换**，不做"MVP先切、功能陆续补齐"这条路（用户明确选择了"完全对等再切换"，理由是App目前还没上线、没有ICP备案，不急于求成，宁可换取用户体验不倒退）。`flutter/`是全新顶层目录（跟`www/`/`android/`/`react/`平级），`flutter create`自带的`lib/`/`android/`/`ios/`/`pubspec.yaml`等结构完全自成一体，不会跟Capacitor那套产生任何路径冲突——开发期间现有Capacitor版本原样可用、不受影响。等Flutter版本功能对等验证通过，才会一次性删除`www/`、旧`android/`（Capacitor那份）、`react/`、`capacitor.config.json`等Capacitor专属文件，`flutter/`转正为项目主体。
+
+**协作节奏（每个阶段必须遵守）**：严格按下面的0～9阶段顺序推进；一个阶段的完整范围做完后，先跑与风险相称的自动测试和实际操作验证，再更新`README.md`、`CLAUDE.md`、本文件与本机的`PROGRESS.md`，然后**停下来等待用户确认**，才可以拆解并开始下一阶段。进行中的阶段只在`PROGRESS.md`记录临时进展，不能在这里或`README.md`/`CLAUDE.md`提前写成“完成”，也不能趁当前阶段一次性规划或实现后续阶段。
 
 ### 关键调研结论（决定了阶段顺序，别按直觉重新排）
 
@@ -96,21 +98,17 @@
 
 ### 阶段4完成状态（2026-08-05）："在还债务" tab——`flutter/lib/ui/` + `flutter/test/debt_sort_test.dart`
 
-`main.dart`不再是占位页：`AppShell`先建立四个底部 tab（还款日、统计、我的明确保留给阶段5/6），阶段4完整实现第一个“债务”tab。`SummaryHero`复用已验证的`calc.summarizeDebts()`；`DebtCard`保留出资方、类型、利率、下期金额、期数等既有信息口径；排序偏好独立持久化到`debt-manager-sort-v1`，预设排序同值时稳定保持用户顺序。`ReorderableListView`承接长按拖拽，拖动后会自动判断仍是哪个预设排序或改成“自定义”；`Dismissible`承接左滑“销这期”。已结清项目可恢复，空状态和悬浮“新增一笔”入口都能直接进表单。
+`AppShell`先建立四个底部 tab（还款日、统计、我的明确保留给阶段5/6），阶段4完整实现第一个“债务”tab。`SummaryHero`复用`calc.summarizeDebts()`；`DebtCard`保留既有信息口径；排序偏好独立持久化到`debt-manager-sort-v1`，预设排序同值时稳定保持用户顺序。`ReorderableListView`承接长按拖拽，拖动后自动判断仍是哪个预设排序或改成“自定义”；`Dismissible`承接左滑“销这期”。已结清项目可恢复，空状态和悬浮“新增一笔”入口都能直接进表单。
 
-新增`DebtEditorScreen`和`DebtDetailScreen`。编辑器覆盖旧版五种计划生成方式（等额本息、等额本金、等本等费、先息后本、自定义），允许逐行修改日期/金额/本金/利息/已还、批量设置数值或每月还款日；金额和本金+利息仍按`0.015`容差校验。一次性还清不是只隐藏行：勾选时第2期起会暂存，取消前不丢数据（`oneTimeStash`状态机）；保存时通过`recomputeDebt()`回到阶段1已验证的计息函数，UI不手写派生字段。公式生成和批量日期都拒绝29–31日，逐行真实日期不受限。
+新增`DebtEditorScreen`和`DebtDetailScreen`。编辑器覆盖旧版五种计划生成方式（等额本息、等额本金、等本等费、先息后本、自定义），支持逐行改计划及批量设置，保存用`recomputeDebt()`重算。一次性还清的第2期起会暂存，取消前不丢数据；公式生成和批量日期拒绝29–31日，逐行真实日期不受限。详情页展示完整账本，提供编辑、销这期、协商减免、提前结清和提前还款模拟，业务操作一律调用阶段2桥接函数。
 
-详情页按债务 id 观察最新 Riverpod 状态，展示完整账本（含部分还款和提前结清合成行）、编辑、销这期、协商减免、提前结清和提前还款模拟。真实还款/减免/结清一律调用阶段2的`recordPayment`/`waivePeriod`/`applySettle`桥接函数，确保`paidAt`、`paidAmount`和结清快照语义不被界面代码绕过。提前还款测算调用阶段1的`simulatePrepay()`，没有另写一份计算。
-
-验证：`flutter/test/debt_sort_test.dart`覆盖排序语义；widget 测试新增“公式生成→保存→列表→详情”流程。`flutter analyze`零 issue，`flutter test`共162条全绿，`flutter build apk --debug`成功（`build/app/outputs/flutter-apk/app-debug.apk`，163MB）。这是 debug 包，不能和旧 release 包体积比较；微信登录和 iOS UI 仍需阶段8真机验证。阶段4到此停止，下一步必须先由用户确认再开始阶段5。
+验证：排序单测+新增“公式生成→保存→列表→详情”widget 流程，`flutter analyze`零 issue，`flutter test`共162条全绿，`flutter build apk --debug`成功（163MB debug 包，不能与 release 包比较）。阶段4到此停止，下一步必须先由用户确认再开始阶段5。
 
 ### 阶段5完成状态（2026-08-05）："还款日" + "统计" tab——`flutter/lib/ui/pay/` + `flutter/lib/ui/report/`
 
-还款日页用`buildPayItems()`把每笔在还债务的**每一期未还计划**展开成`PayItem`，金额取该期`row.amount`而不是`Debt.monthly`；因此自定义日期窗可以正确展示同一笔债务的多期。`isNextUnpaid`只标记每笔债务最早的未还期，非首期点“销这期”会明确提示先处理更早期次，不能跳期改账。筛选“下一期”是按债务视角，其余的逾期/7/15/30天和自定义日期是按期的累计窗口；顶部最近还款日会合并同日到期项目，三张小卡也严格按期、不含逾期。列表、卡片和左滑都复用阶段4的`requestInstallmentPayment()`和阶段2的`recordPayment()`，不会形成第二份还款逻辑。
+还款日页按每一期未还计划展开，金额取该期`row.amount`而非`Debt.monthly`；只有每笔债务的最早未还期能销项。下一期筛选按债务，其余逾期/7/15/30天及自定义日期按期、累计筛选；同日到期在Hero合并，三张待还指标不含逾期。所有还款入口复用`requestInstallmentPayment()`与`recordPayment()`。
 
-统计页不另造统计口径，直接消费阶段1移植的`computeReportData()`、`summarizeDebts()`、`computeUpcomingPressure()`、`pressureWindowMonths()`和`computeMonthlyRepayment()`：先给包含总余额/进度/归零日期的判断，再展示高息/逾期/峰值月提醒、还清路径、未来还款压力、月还款、余额集中度和类型构成。没有在还债务时会降级成明确的完成态。PDF/Excel导出、多策略对比和高级图表手势仍属于阶段6/7的子页面和原生收尾范围，未假装已经可用。
-
-测试：`flutter/test/pay_items_test.dart`固定今天日期验证“逐期展开、非首期不可销、下一期按债务、其余窗口按期且累计”的关键语义；widget 测试覆盖底部导航到还款日与统计空状态。`flutter analyze`零 issue，`flutter test`共165条全绿。按用户明确要求，本阶段**没有构建 APK**。阶段5到此停止，下一步必须先由用户确认再开始阶段6。
+统计页直接复用`computeReportData()`、`summarizeDebts()`、`computeUpcomingPressure()`、`pressureWindowMonths()`和`computeMonthlyRepayment()`，展示报告头、风险提示、还清路径、未来压力、月还款、余额排行和类型构成；没有在还债务时展示完成态。PDF/Excel导出、多策略对比和高级图表手势留给阶段6/7。`pay_items_test.dart`覆盖逐期/筛选语义，widget测试覆盖底部tab切换；`flutter analyze`零 issue，`flutter test`共165条全绿。按用户要求未构建APK。阶段5到此停止，下一步必须先由用户确认再开始阶段6。
 
 ### 阶段6完成状态（2026-08-05）："我的" tab + 全部 subpage/sheet
 
@@ -190,7 +188,7 @@ Flutter 的全部源码与原生工程均在顶层`flutter/`，跟旧版`www/`�
 - `EditSheet.tsx`保存时校验`amount === principal + interest`（容差0.015，即1.5分钱，覆盖`genPlan()`边界情况下的四舍五入噪声），只堵"手动改金额输入框"这一条路径。
 - `Debt.day`字段已删除（2026-07-30）——`#f-day`只读输入框现算自`editingPlan[0].date`，不再持久化。
 
-**每一条当年具体怎么坏的、怎么修的、验证了多少用例，见`debt-model-history` skill**（`.claude/skills/debt-model-history/SKILL.md`）——通知调度窗口、导出含已结清债务、还款流水`paidAt`、部分还款分摊逻辑、amount一致性校验的0.015容差怎么算出来的、`d.day`死字段清理，都在里面。
+**每一条当年具体怎么坏的、怎么修的、验证了多少用例，见`debt-model-history` skill**（`.Codex/skills/debt-model-history/SKILL.md`）——通知调度窗口、导出含已结清债务、还款流水`paidAt`、部分还款分摊逻辑、amount一致性校验的0.015容差怎么算出来的、`d.day`死字段清理，都在里面。
 
 ## React 迁移：`react/` + "在还债务"页（绞杀者模式第一站）→ "还款日"+"统计"（第三步）→ "我的"（第四步，四个tab全部完成）→ `#detailSheet`（第五步，第一个非tab入口）→ `#editSheet`（第六步，全项目最复杂的一块UI）→ 收尾（第七~十一步，剩余全部subpage/sheet，已全部完成）——vanilla主`<script>`现在只剩数据模型+localStorage/IndexedDB读写+cloud函数/native插件调用这类impure逻辑，不再有任何JSX/DOM渲染代码
 
@@ -397,7 +395,7 @@ React组件挂载在同一份`index.html`文档里（不是iframe/独立页面�
 
 **为什么需要一个原生插件**：`<a download>` + `blob:` URL 这种纯网页写法在桌面浏览器没问题，但在安卓WebView里基本不生效（点了没反应）。
 
-**现在用的是系统"另存为"选择器（Storage Access Framework, `Intent.ACTION_CREATE_DOCUMENT`），不是早期版本静默写入`MediaStore.Downloads`那一套**——这是踩坑之后换的架构，原因见下面"踩过的坑"。用户点"下载"会弹系统自带的文件选择界面，自己挑文件夹（也能选Google Drive这类云盘）、确认文件名后再保存，不再是"点了就无声存完"。好处：完全不需要在`AndroidManifest.xml`里申请任何存储权限（SAF本身就不需要），且`ACTION_CREATE_DOCUMENT`从API 19（远早于这个项目`minSdkVersion=24`）就存在，不像旧的`MediaStore.Downloads`写法那样要求安卓10+——**这个插件现在对minSdk覆盖的所有安卓版本（7+）都支持，没有版本边界要特殊处理**，CLAUDE.md早前记录的"安卓10以下不支持"这条限制已经不存在。
+**现在用的是系统"另存为"选择器（Storage Access Framework, `Intent.ACTION_CREATE_DOCUMENT`），不是早期版本静默写入`MediaStore.Downloads`那一套**——这是踩坑之后换的架构，原因见下面"踩过的坑"。用户点"下载"会弹系统自带的文件选择界面，自己挑文件夹（也能选Google Drive这类云盘）、确认文件名后再保存，不再是"点了就无声存完"。好处：完全不需要在`AndroidManifest.xml`里申请任何存储权限（SAF本身就不需要），且`ACTION_CREATE_DOCUMENT`从API 19（远早于这个项目`minSdkVersion=24`）就存在，不像旧的`MediaStore.Downloads`写法那样要求安卓10+——**这个插件现在对minSdk覆盖的所有安卓版本（7+）都支持，没有版本边界要特殊处理**，AGENTS.md早前记录的"安卓10以下不支持"这条限制已经不存在。
 
 **踩过的坑（为什么从静默写入MediaStore.Downloads换成SAF选择器）**：老写法用`MediaStore.Downloads.EXTERNAL_CONTENT_URI` + `IS_PENDING`那套流程写入，原生层面`call.resolve()`确实是在真正写入成功之后才触发的，不是假成功。但**很多国产手机的文件管理器"下载"这个分类入口，只按识别得出的mime类型（图片/视频/文档/安装包...）过滤显示**——图片/PDF能命中分类、正常可见，但备份文件用的`application/json`是冷门类型，命中不了任何分类，会被过滤掉不显示，文件其实原样躺在"所有文件→内部存储→Download"这个真实文件夹里，只是分类视图里看不到。表现为"App提示已保存到下载，用户去文件管理器翻却怎么也找不到"，很容易被误判成"保存失败"，实际上原生代码从来没有真的失败过。换成SAF"另存为"选择器后，文件存在哪是用户自己点出来确认的，不存在"看不见"这个问题。
 
@@ -417,15 +415,15 @@ React组件挂载在同一份`index.html`文档里（不是iframe/独立页面�
 
 **为什么需要原生插件（不只是JS调API）**：微信登录在原生App里官方要求走"移动应用"OAuth流程——拉起手机上装的微信App本身走授权，不是网页扫码，这个交互没法用纯JS实现，必须靠微信官方Android SDK（`com.tencent.mm.opensdk`，Maven Central发布，见`android/app/build.gradle`）。
 
-**SDK硬编码写死不能改的路径、CloudBase接线时按顺序会踩到的6个坑、`createTicket`/`signInWithCustomTicket`用法、release签名要求，全部见`wechat-login-setup` skill**（`.claude/skills/wechat-login-setup/SKILL.md`），不在这里重复。
+**SDK硬编码写死不能改的路径、CloudBase接线时按顺序会踩到的6个坑、`createTicket`/`signInWithCustomTicket`用法、release签名要求，全部见`wechat-login-setup` skill**（`.Codex/skills/wechat-login-setup/SKILL.md`），不在这里重复。
 
 **JS这边怎么调用**：`www/index.html` 里点击"微信登录"按钮，跟`SaveFile`同样的模式检测 `window.Capacitor.Plugins.WeChatLogin` 是否存在，不存在（桌面浏览器测试）就提示"仅支持安卓App内使用"。存在的话调用原生插件的`login()`拉起微信，真正的授权结果是异步的，通过 `wechatAuthResult` 事件回传（因为微信App拉起和用户授权跨越了Activity生命周期，`PluginCall`没法跨这段存活，只能用事件而不是直接resolve这次调用）。拿到微信返回的`code`后，调用腾讯云开发（CloudBase）的云函数换取自定义登录票据完成登录——**AppSecret绝不出现在客户端代码里**，只存在云函数的环境变量中，客户端只带AppID（AppID本身不是秘密）。
 
 **目前的完成状态**：微信登录已经端到端跑通验证成功（真机测试，"我的"tab顶部正确显示头像+昵称）。`WeChatLoginPlugin.java`里的`APP_ID`已填真实值，云函数`WX_APPID`/`WX_APPSECRET`已配置。CloudBase环境`after-zero-d7gub5p5f09c8cc2d`，`wxLogin`云函数已部署，"自定义登录"已启用并配好私钥。
 
-**CDN脚本加载顺序、`signInAnonymously()`规避bug、匿名登录开关、`wxLogin`权限例外、`users`集合手建、release包WebView调试这6个坑，以及`createTicket`/`signInWithCustomTicket`API用法、"别启用内置微信开放平台登录"，全部见`wechat-login-setup` skill**（`.claude/skills/wechat-login-setup/SKILL.md`）。
+**CDN脚本加载顺序、`signInAnonymously()`规避bug、匿名登录开关、`wxLogin`权限例外、`users`集合手建、release包WebView调试这6个坑，以及`createTicket`/`signInWithCustomTicket`API用法、"别启用内置微信开放平台登录"，全部见`wechat-login-setup` skill**（`.Codex/skills/wechat-login-setup/SKILL.md`）。
 
-**部署云函数、`cloudbaserc.json`要求、环境变量/权限控制的坑，见`cloudbase-deploy` skill**（`.claude/skills/cloudbase-deploy/SKILL.md`）——不在这里重复，那边有完整的部署命令、三个必查的坑、验证方法、当前全部云函数一览。
+**部署云函数、`cloudbaserc.json`要求、环境变量/权限控制的坑，见`cloudbase-deploy` skill**（`.Codex/skills/cloudbase-deploy/SKILL.md`）——不在这里重复，那边有完整的部署命令、三个必查的坑、验证方法、当前全部云函数一览。
 
 ### 云函数：`deleteAccount`（注销账户）
 
@@ -771,13 +769,13 @@ ActionBar消失后，WebView内容直接从状态栏正后方开始铺，配合�
 
 **⚠️列表的一行 = 一期，不是一笔债务，是本页最重要的一条当前事实**：`PayItem`按日期逐期展开（不是每笔债务只显示下一期），`amount`必须读这一期的`r.amount`（不能用`d.monthly`，先息后本这类计划每期金额不同）。
 
-急迫程度4档阈值、分组(`dueBucket`)跟筛选(`PayFilter`)两套"7天内/30天内"语义为什么不同（互斥分段 vs 累计口径）、左滑手势实现细节（`__justDragged`标记复位坑）、筛选条5档+日历自定义天数改版，全部见`pay-tab-design` skill（`.claude/skills/pay-tab-design/SKILL.md`）。
+急迫程度4档阈值、分组(`dueBucket`)跟筛选(`PayFilter`)两套"7天内/30天内"语义为什么不同（互斥分段 vs 累计口径）、左滑手势实现细节（`__justDragged`标记复位坑）、筛选条5档+日历自定义天数改版，全部见`pay-tab-design` skill（`.Codex/skills/pay-tab-design/SKILL.md`）。
 
 **⚠️2026-08-04修的一个真机截图报的bug**：Hero卡原来只显示`items[0]`单独一笔（`react/src/pay/App.tsx`），同一天到期的其它债务会被吞掉——用户报的现象是"3天后有不止一笔要还，卡片却只显示一笔"。改成按"跟`items[0]`同一天"分组，笔数按`debt.id`去重、金额原样加总这些期次，名称显示成"test3 等6笔"这种形式，金额也是当天全部到期笔的合计，不再是单笔的数字。同一轮顺手在`PayList.tsx`的`section-label`（"下一期 · 12 期"这行）后面加了总金额（"· ¥XXX"），一眼看出这个筛选窗口内一共要还多少钱。
 
 ## 新增/编辑债务表单（`#editSheet`）——设计细节见`edit-sheet-design` skill
 
-全项目最复杂的一块UI（公式生成器、批量设置还款日、`oneTimeStash`状态机）。`oneTimeStash`暂存机制、`planMode`切换、`#gFirstField`的DOM搬家技巧、批量设置日期确认框、29/30/31号限制、计息方式选择器+等额本金新增、`genPlan()`四舍五入/负数bug的完整排查过程，全部见`edit-sheet-design` skill（`.claude/skills/edit-sheet-design/SKILL.md`）。
+全项目最复杂的一块UI（公式生成器、批量设置还款日、`oneTimeStash`状态机）。`oneTimeStash`暂存机制、`planMode`切换、`#gFirstField`的DOM搬家技巧、批量设置日期确认框、29/30/31号限制、计息方式选择器+等额本金新增、`genPlan()`四舍五入/负数bug的完整排查过程，全部见`edit-sheet-design` skill（`.Codex/skills/edit-sheet-design/SKILL.md`）。
 
 **⚠️唯一提前抽出来的通用规则**：跟主表单共用同一个`<form>`、靠`display:none`切换显隐的子面板里的字段，不能带原生`required`属性——哪怕字段所在tab当前不可见，只要它是空的，点提交按钮就会被浏览器原生表单校验拦截，安卓WebView不会像桌面浏览器那样弹提示气泡，表现是"点了彻底没反应"，很难排查。校验都要挪到具体按钮的点击事件里手动`toast()`。
 
@@ -1031,7 +1029,7 @@ sync android`+`assembleRelease`后解包核对：APK内`index.html`跟工作区`
 
 ---
 
-**以下压缩自这个页面"看板"版本时期（2026-07-28～30）的完整演进史**——`Hero.tsx`/`PressureChart.tsx`/`PayoffLine.tsx`/`BalanceBars.tsx`/`TypeStack.tsx`/`SummaryCard.tsx`/`MonthlyChart.tsx`/`ReportTables.tsx`等文件、`renderReportScreen()`等vanilla函数早已不是当前代码，具体的P0/P1/P2/BUG编号narrative和逐项UI改版细节见`git log -p -- CLAUDE.md`；这里只留下**跨版本依然成立的技术事实**：
+**以下压缩自这个页面"看板"版本时期（2026-07-28～30）的完整演进史**——`Hero.tsx`/`PressureChart.tsx`/`PayoffLine.tsx`/`BalanceBars.tsx`/`TypeStack.tsx`/`SummaryCard.tsx`/`MonthlyChart.tsx`/`ReportTables.tsx`等文件、`renderReportScreen()`等vanilla函数早已不是当前代码，具体的P0/P1/P2/BUG编号narrative和逐项UI改版细节见`git log -p -- AGENTS.md`；这里只留下**跨版本依然成立的技术事实**：
 
 **导出（`exportReportXlsx`/`exportReportPdf`）100%vanilla，从看板版沿用至今，未受统计页重写影响**：
 - `jspdf@2.5.1`/`xlsx@0.20.2`本地打包在`www/js/`（`jspdf.umd.min.js`/`xlsx.full.min.js`），**不走CDN**——国内移动网络下`cdn.jsdelivr.net`/`cdn.sheetjs.com`常加载失败，真机点导出会弹"组件未就绪"、桌面浏览器却测不出来（能连通CDN）。以后引入任何第三方前端库都应下载到`www/js/`本地引入，别用国内不稳的CDN（CloudBase那三个`static.cloudbase.net`脚本是例外，腾讯自家CDN国内稳）。
@@ -1049,7 +1047,7 @@ sync android`+`assembleRelease`后解包核对：APK内`index.html`跟工作区`
 
 ## 云备份（Premium）——设计细节见`cloud-backup-design` skill
 
-"我的"页"云备份"入口打开`#backupScreen`（`react/src/sheets/BackupScreen.tsx`）：手动、每次创建一条独立备份记录（不是自动同步/覆盖），5个云函数+配额数字+集合寻址方式+客户端恢复逻辑+真机验证边界，全部见`cloud-backup-design` skill（`.claude/skills/cloud-backup-design/SKILL.md`）。
+"我的"页"云备份"入口打开`#backupScreen`（`react/src/sheets/BackupScreen.tsx`）：手动、每次创建一条独立备份记录（不是自动同步/覆盖），5个云函数+配额数字+集合寻址方式+客户端恢复逻辑+真机验证边界，全部见`cloud-backup-design` skill（`.Codex/skills/cloud-backup-design/SKILL.md`）。
 
 **⚠️这条是跨功能的核心认证修复，AI债务助手也依赖同一套，别挪进skill**：早期`ensureCbAuthReady()`无条件调`signInAnonymously()`垫底（绕开CloudBase SDK对null凭证读`.scope`的崩溃bug），但这会把微信自定义登录建立的"非匿名"会话**降级成匿名**，导致任何云函数调用命中权限规则被拒`[PERMISSION_DENIED]`。修法：`ensureCbAuthReady()`改成只在本地**连`account`记录都没有**时才`signInAnonymously()`——用`account`这个自己可靠掌握的信号判断"是否已登录"，比猜SDK内部登录态形状稳妥。新增`cbAuth()`统一入口（`cbApp().auth({persistence:"local"})`显式要求会话持久化），**所有拿auth的地方都走`cbAuth()`，别再直接`cbApp().auth()`**。桌面浏览器伪造`account`跳过登录门的老技巧对**任何调云函数的功能都不适用**——会让`ensureCbAuthReady()`误判已登录、连匿名会话都没有，这类功能的真实端到端往返必须真机验证。
 
@@ -1098,7 +1096,7 @@ sync android`+`assembleRelease`后解包核对：APK内`index.html`跟工作区`
 
 ## AI 债务助手（Premium）——设计细节见`ai-advisor-design` skill
 
-"在还债务"页AI banner是入口（`hasPremium()`门禁），聊天式界面（`react/src/sheets/AiScreen.tsx`）。欢迎态芯片、云函数模型选型（`hy3`混元，DeepSeek被套餐锁住）、每日用量软上限、历史对话可继续追问的状态机、z-index坑，全部见`ai-advisor-design` skill（`.claude/skills/ai-advisor-design/SKILL.md`）。
+"在还债务"页AI banner是入口（`hasPremium()`门禁），聊天式界面（`react/src/sheets/AiScreen.tsx`）。欢迎态芯片、云函数模型选型（`hy3`混元，DeepSeek被套餐锁住）、每日用量软上限、历史对话可继续追问的状态机、z-index坑，全部见`ai-advisor-design` skill（`.Codex/skills/ai-advisor-design/SKILL.md`）。
 
 真实"生成报告/追问"往返依赖真实微信登录会话，跟云备份同一条限制（见上面"云备份"一节），桌面/CLI都测不出，必须真机验证。
 
@@ -1144,7 +1142,7 @@ cd android && ./gradlew assembleDebug
 
 产出：`android/app/build/outputs/apk/debug/app-debug.apk`
 
-**要测微信登录必须编译release包**（debug签名过不了微信的签名校验）——release签名文件位置、构建命令、丢失后果见`release-keystore` skill（`.claude/skills/release-keystore/SKILL.md`）。
+**要测微信登录必须编译release包**（debug签名过不了微信的签名校验）——release签名文件位置、构建命令、丢失后果见`release-keystore` skill（`.Codex/skills/release-keystore/SKILL.md`）。
 
 ## 本地网页测试（不用编译安卓包）
 
@@ -1166,7 +1164,7 @@ localStorage.setItem("after-zero-account-v1", JSON.stringify({openid:"test",nick
 - **macOS + Homebrew装的`openjdk@21`默认不会链接到`java`命令**（Homebrew的openjdk是keg-only，不进`/usr/bin`，不改`JAVA_HOME`）。`java -version`可能直接报"Unable to locate a Java Runtime"，就算`brew install openjdk@21`已经装过了。跑Gradle时要显式指定：`JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew assembleDebug`（Apple Silicon路径；Intel Mac是`/usr/local/opt/openjdk@21`）。
 - 需要安卓SDK的 `platform-tools` + `platforms;android-34` + `build-tools;34.0.0`。
 - `android/local.properties` 要写 `sdk.dir=<SDK路径>`，这个文件因机器而异、已被gitignore，每台机器自己建。
-- **如果在配了网络代理的 Claude Code session 里跑构建，或者 `git push`/`git pull` 到GitHub**：`sdkmanager` 装SDK组件、Gradle编译需要连 `dl.google.com` / `maven.google.com`，`git push` 需要连 `github.com`；这个session之前用的一个住宅代理连这些域名会失败（`dl.google.com`/`maven.google.com` 报连接重置 Recv failure，`github.com` 报 `Proxy CONNECT aborted`）。遇到这种情况，把要用到网络的命令加上 `env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy` 前缀去掉代理再跑，能直接连通。
+- **如果在配了网络代理的 Codex session 里跑构建，或者 `git push`/`git pull` 到GitHub**：`sdkmanager` 装SDK组件、Gradle编译需要连 `dl.google.com` / `maven.google.com`，`git push` 需要连 `github.com`；这个session之前用的一个住宅代理连这些域名会失败（`dl.google.com`/`maven.google.com` 报连接重置 Recv failure，`github.com` 报 `Proxy CONNECT aborted`）。遇到这种情况，把要用到网络的命令加上 `env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy` 前缀去掉代理再跑，能直接连通。
 
 ## 硬性铁律，改代码前必看
 

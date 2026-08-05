@@ -1,5 +1,4 @@
 // “在还债务”tab——主页信息、排序、原生拖拽、左滑还款，以及详情/编辑入口。
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -39,29 +38,45 @@ class DebtsTab extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('债务'),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        surfaceTintColor: Colors.transparent,
+        titleSpacing: 16,
+        toolbarHeight: 52,
+        title: Text(
+          'After Zero',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+            fontStyle: FontStyle.italic,
+            letterSpacing: -.5,
+          ),
+        ),
         actions: [
           IconButton(
             tooltip: '账户',
             onPressed: () => Navigator.of(
               context,
             ).push(MaterialPageRoute(builder: (_) => const AccountScreen())),
-            icon: CircleAvatar(
-              radius: 15,
-              backgroundImage: account?.avatarUrl.isNotEmpty == true
-                  ? NetworkImage(account!.avatarUrl)
-                  : null,
+            icon: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
               child: account?.avatarUrl.isNotEmpty == true
-                  ? null
-                  : const Icon(Icons.person_outline, size: 18),
+                  ? Image.network(account!.avatarUrl, fit: BoxFit.cover)
+                  : Icon(
+                      Icons.person_outline,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
             ),
           ),
-          if (kDebugMode)
-            IconButton(
-              icon: const Icon(Icons.bug_report_outlined),
-              tooltip: '开发用：添加示例数据',
-              onPressed: () => _seedSampleData(ref),
-            ),
+          const SizedBox(width: 6),
         ],
       ),
       body: active.isEmpty && settled.isEmpty
@@ -167,12 +182,15 @@ class DebtsTab extends ConsumerWidget {
                   ),
               ],
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const Key('add-debt'),
-        onPressed: () => _openEditor(context, null),
-        icon: const Icon(Icons.add),
-        label: const Text('新增一笔'),
-      ),
+      // 空状态已有完整宽度的新增入口；不再叠一个Material FAB，避免同一操作抢占两次视觉焦点。
+      floatingActionButton: active.isEmpty && settled.isEmpty
+          ? null
+          : FloatingActionButton.extended(
+              key: const Key('add-debt'),
+              onPressed: () => _openEditor(context, null),
+              icon: const Icon(Icons.add),
+              label: const Text('新增一笔'),
+            ),
     );
   }
 
@@ -265,24 +283,6 @@ class DebtsTab extends ConsumerWidget {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _seedSampleData(WidgetRef ref) {
-    final plan = calc.genPlan({
-      'kind': 'amort',
-      'P': 12000,
-      'rate': 12,
-      'n': 12,
-      'first': '2026-01-15',
-    });
-    final map = <String, dynamic>{
-      'id': calc.genDebtId(),
-      'name': '示例：银行消费贷',
-      'funder': '示例银行',
-      'type': '银行贷',
-      'plan': plan,
-    };
-    calc.recompute(map);
-    ref.read(debtsProvider.notifier).setDebt(null, Debt.fromMap(map));
-  }
 }
 
 class _ListHeader extends StatelessWidget {
@@ -380,6 +380,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
+              key: const Key('add-debt'),
               onPressed: onAdd,
               icon: const Icon(Icons.add),
               label: const Text('新增一笔债务'),
@@ -399,24 +400,68 @@ class _AiBanner extends StatelessWidget {
   const _AiBanner({required this.premium, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-    color: premium.hasPremium
-        ? Theme.of(context).colorScheme.tertiaryContainer
-        : null,
-    child: ListTile(
-      leading: Icon(
-        Icons.auto_awesome,
-        color: premium.hasPremium
-            ? Theme.of(context).colorScheme.tertiary
-            : Theme.of(context).colorScheme.outline,
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final active = premium.hasPremium;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+      child: Material(
+        color: scheme.surface,
+        elevation: 1.5,
+        shadowColor: Colors.black.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 11, 14, 11),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: active ? scheme.primary.withValues(alpha: .45) : scheme.outlineVariant,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 33,
+                  height: 33,
+                  decoration: BoxDecoration(
+                    color: active ? scheme.primaryContainer : scheme.surfaceContainerHighest,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.auto_awesome,
+                    size: 18,
+                    color: active ? scheme.primary : scheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        active ? 'AI 债务助手' : 'AI 债务分析报告',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        active ? '优先还款建议，围绕你的债务随问随答' : '开通 Premium，获取更省钱的还款顺序',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+              ],
+            ),
+          ),
+        ),
       ),
-      title: Text(premium.hasPremium ? 'AI 债务助手' : 'AI 债务分析报告'),
-      subtitle: Text(
-        premium.hasPremium ? '优先还款建议，围绕你的债务随问随答' : '开通 Premium，获取更省钱的还款顺序',
-      ),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: onTap,
-    ),
-  );
+    );
+  }
 }

@@ -18,8 +18,8 @@ class _AppShellState extends State<AppShell> {
 
   static const _tabs = [
     (
-      icon: Icons.account_balance_wallet_outlined,
-      selectedIcon: Icons.account_balance_wallet,
+      icon: Icons.credit_card_outlined,
+      selectedIcon: Icons.credit_card,
       label: '债务',
     ),
     (icon: Icons.event_outlined, selectedIcon: Icons.event, label: '还款日'),
@@ -38,17 +38,70 @@ class _AppShellState extends State<AppShell> {
         index: _index,
         children: const [DebtsTab(), PayTab(), ReportTab(), MineTab()],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: [
-          for (final t in _tabs)
-            NavigationDestination(
-              icon: Icon(t.icon),
-              selectedIcon: Icon(t.selectedIcon),
-              label: t.label,
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          border: Border(
+            top: BorderSide(color: Theme.of(context).colorScheme.outline),
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 52,
+            child: Row(
+              children: [
+                for (var i = 0; i < _tabs.length; i++)
+                  Expanded(
+                    child: _TabButton(
+                      label: _tabs[i].label,
+                      icon: _tabs[i].icon,
+                      selectedIcon: _tabs[i].selectedIcon,
+                      selected: _index == i,
+                      onTap: () => setState(() => _index = i),
+                    ),
+                  ),
+              ],
             ),
-        ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TabButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _TabButton({
+    required this.label,
+    required this.icon,
+    required this.selectedIcon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.onSurfaceVariant;
+    return Semantics(
+      label: label,
+      button: true,
+      selected: selected,
+      child: InkResponse(
+        key: Key('tab-$label'),
+        onTap: onTap,
+        radius: 28,
+        containedInkWell: true,
+        child: Center(
+          child: Icon(selected ? selectedIcon : icon, color: color, size: 23),
+        ),
       ),
     );
   }

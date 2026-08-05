@@ -25,7 +25,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('债务'), findsWidgets); // AppBar标题+底部导航label都叫这个
+    expect(find.text('After Zero'), findsOneWidget);
+    expect(find.byKey(const Key('tab-债务')), findsOneWidget);
     expect(find.text('还没有在还的债务'), findsOneWidget);
   });
 
@@ -126,11 +127,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('还款日').last);
+    await tester.tap(find.byKey(const Key('tab-还款日')));
     await tester.pumpAndSettle();
     expect(find.text('全部结清'), findsOneWidget);
 
-    await tester.tap(find.text('统计').last);
+    await tester.tap(find.byKey(const Key('tab-统计')));
     await tester.pumpAndSettle();
     expect(find.text('目前没有在还的债务'), findsOneWidget);
   });
@@ -148,7 +149,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('我的').last);
+    await tester.tap(find.byKey(const Key('tab-我的')));
     await tester.pumpAndSettle();
     expect(find.text('关于我们'), findsOneWidget);
     await tester.tap(find.text('升级 Premium'));
@@ -175,7 +176,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('还款日').last);
+    await tester.tap(find.byKey(const Key('tab-还款日')));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('还款提醒通知'));
     await tester.pumpAndSettle();
@@ -225,7 +226,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('统计').last);
+    await tester.tap(find.byKey(const Key('tab-统计')));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('多策略对比规划'));
     await tester.tap(find.text('多策略对比规划'));

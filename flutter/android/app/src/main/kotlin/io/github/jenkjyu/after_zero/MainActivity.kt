@@ -3,7 +3,6 @@ package io.github.jenkjyu.after_zero
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
-import androidx.activity.result.contract.ActivityResultContracts
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
@@ -14,6 +13,7 @@ import java.io.FileInputStream
 class MainActivity : FlutterActivity() {
     private companion object {
         const val FILE_SAVE_CHANNEL = "after_zero/file_save"
+        const val FILE_SAVE_REQUEST_CODE = 0xA701
     }
 
     private data class PendingSave(
@@ -23,21 +23,22 @@ class MainActivity : FlutterActivity() {
 
     private var pendingSave: PendingSave? = null
 
-    private val createDocument = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult(),
-    ) { activityResult ->
-        val pending = pendingSave ?: return@registerForActivityResult
+    @Deprecated("Deprecated in Android SDK; required for FlutterActivity compatibility")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != FILE_SAVE_REQUEST_CODE) return
+        val pending = pendingSave ?: return
         pendingSave = null
         val source = File(pending.sourcePath)
         try {
-            val destination: Uri? = activityResult.data?.data
-            if (activityResult.resultCode != Activity.RESULT_OK || destination == null) {
+            val destination: Uri? = data?.data
+            if (resultCode != Activity.RESULT_OK || destination == null) {
                 pending.result.success(mapOf("cancelled" to true))
-                return@registerForActivityResult
+                return
             }
             if (!source.exists()) {
                 pending.result.error("MISSING_TEMP_FILE", "临时导出文件已丢失，请重试", null)
-                return@registerForActivityResult
+                return
             }
             FileInputStream(source).use { input ->
                 contentResolver.openOutputStream(destination)?.use { output ->
@@ -84,8 +85,6 @@ class MainActivity : FlutterActivity() {
             .addCategory(Intent.CATEGORY_OPENABLE)
             .setType(mimeType)
             .putExtra(Intent.EXTRA_TITLE, filename)
-        createDocument.launch(intent)
+        startActivityForResult(intent, FILE_SAVE_REQUEST_CODE)
     }
 }
-
-class MainActivity : FlutterActivity()

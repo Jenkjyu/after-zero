@@ -69,7 +69,7 @@ cd android
 
 Capacitor套壳系统WebView这套架构强依赖各手机厂商WebView行为，且不支持iOS。正在`flutter/`（独立顶层目录，自带`lib/`/`android/`/`ios/`/`pubspec.yaml`，跟`www/`/`android/`/`react/`不冲突）里用Flutter+Dart把整个App重写一遍，目标是彻底摆脱WebView依赖、同时支持iOS。开发期间两边共存，现有Capacitor版本不受影响；等Flutter版本做到功能完全对等，才会一次性删除`www/`/旧`android/`/`react/`等Capacitor专属文件，`flutter/`转正。状态管理用Riverpod，本地持久化第一版用`shared_preferences`（按现有localStorage的key对应，先求行为对齐）。腾讯云开发没有能用的官方Flutter SDK，云端接入层要绕开SDK直接用HTTP调用。
 
-目前已完成阶段 0–7：计算层、数据/本地持久化、CloudBase HTTP 与微信登录编排、四个主 tab、全部子页面以及原生能力收尾。还款提醒会在数据或规则变化后全量重排；PDF/Excel/JSON 备份可通过系统“另存为”输出，PDF 是内嵌中文字体的可选中文文字；档案可分享并在 App 内逐页预览 PDF。下一阶段是全面回归与安卓/iOS 真机验证。详细阶段划分和当前进度见`CLAUDE.md`"Flutter重写"一节。
+目前已完成阶段 0–7；阶段 8 正在进行 Android 模拟器回归、真机/双端验证与逐页视觉收敛。Flutter Android 工程和所有 Dart 代码都只在`flutter/`内，原有`www/`、`react/`和根目录`android/`没有被改写；两套本地存储也不共享，因此旧版数据需通过既有 JSON 导入入口迁入。为便于未登记微信 OAuth 的体验，debug 包可传`--dart-define=AFTER_ZERO_PREVIEW=true`跳过登录门；该开关由`kDebugMode`限定，release/profile 仍强制登录。当前已通过`flutter analyze`、178 条测试和 Android 14 模拟器启动验证；iOS 与装有微信的 Android 真机验证尚未完成。详细阶段划分和当前进度见`CLAUDE.md`"Flutter重写"一节。
 
 ## 备注
 
