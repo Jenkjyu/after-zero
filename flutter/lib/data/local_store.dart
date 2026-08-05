@@ -18,6 +18,7 @@ class LocalStoreKeys {
   static const notify = 'after-zero-notify-v1';
   static const premium = 'after-zero-premium-v1';
   static const aiUsage = 'after-zero-ai-usage-v1';
+  static const backupMeta = 'after-zero-backup-v1';
 }
 
 class LocalStore {
@@ -105,4 +106,13 @@ class LocalStore {
 
   Future<void> writeAiUsage(AiUsageCache usage) =>
       _writeMap(LocalStoreKeys.aiUsage, usage.toMap());
+
+  // ===== 云备份页面的本地轻量元数据 =====
+
+  int readLastBackupAt() =>
+      (_readMap(LocalStoreKeys.backupMeta)?['lastBackupAt'] as num?)?.toInt() ??
+      0;
+
+  Future<void> writeLastBackupAt(int value) =>
+      _writeMap(LocalStoreKeys.backupMeta, {'lastBackupAt': value});
 }

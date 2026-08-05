@@ -20,7 +20,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
-        child: const AfterZeroApp(),
+        child: const AfterZeroApp(requireLogin: false),
       ),
     );
     await tester.pumpAndSettle();
@@ -60,7 +60,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
-        child: const AfterZeroApp(),
+        child: const AfterZeroApp(requireLogin: false),
       ),
     );
     await tester.pumpAndSettle();
@@ -74,9 +74,7 @@ void main() {
     expect(cards.first.debt.rate, greaterThan(cards.last.debt.rate));
   });
 
-  testWidgets('新增债务：公式生成计划、保存并从详情打开还款确认', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('新增债务：公式生成计划、保存并从详情打开还款确认', (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1200));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     SharedPreferences.setMockInitialValues({});
@@ -84,7 +82,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
-        child: const AfterZeroApp(),
+        child: const AfterZeroApp(requireLogin: false),
       ),
     );
     await tester.pumpAndSettle();
@@ -123,7 +121,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
-        child: const AfterZeroApp(),
+        child: const AfterZeroApp(requireLogin: false),
       ),
     );
     await tester.pumpAndSettle();
@@ -135,5 +133,110 @@ void main() {
     await tester.tap(find.text('统计').last);
     await tester.pumpAndSettle();
     expect(find.text('目前没有在还的债务'), findsOneWidget);
+  });
+
+  testWidgets('我的页可进入Premium并用兑换码解锁', (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+        child: const AfterZeroApp(requireLogin: false),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('我的').last);
+    await tester.pumpAndSettle();
+    expect(find.text('关于我们'), findsOneWidget);
+    await tester.tap(find.text('升级 Premium'));
+    await tester.pumpAndSettle();
+    expect(find.text('升级你的 After Zero'), findsOneWidget);
+
+    await tester.tap(find.text('我有兑换码'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '0000');
+    await tester.tap(find.text('兑换'));
+    await tester.pumpAndSettle();
+    expect(find.text('Premium 已解锁'), findsOneWidget);
+    expect(prefs.getString(LocalStoreKeys.premium), contains('redeemed'));
+  });
+
+  testWidgets('还款日通知面板启用时自动补当天09:00默认规则', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+        child: const AfterZeroApp(requireLogin: false),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('还款日').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('还款提醒通知'));
+    await tester.pumpAndSettle();
+    expect(find.text('还款提醒通知'), findsWidgets);
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+
+    expect(find.text('当天到期 · 09:00'), findsOneWidget);
+    final stored = prefs.getString(LocalStoreKeys.notify)!;
+    expect(stored, contains('09:00'));
+  });
+
+  testWidgets('Premium用户可从统计页进入多策略对比并得到三组结果', (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    Map<String, dynamic> debt(String id, String name, num balance, num rate) {
+      final map = <String, dynamic>{
+        'id': id,
+        'name': name,
+        'plan': calc.genPlan({
+          'kind': 'amort',
+          'P': balance,
+          'rate': rate,
+          'n': 12,
+          'first': '2026-09-15',
+        }),
+      };
+      calc.recompute(map);
+      return map;
+    }
+
+    SharedPreferences.setMockInitialValues({
+      LocalStoreKeys.debts: jsonEncode([
+        debt('d1', '低余额', 3000, 8),
+        debt('d2', '高利率', 6000, 20),
+      ]),
+      LocalStoreKeys.premium: jsonEncode({
+        'premium': {'method': 'redeemed', 'at': '2026-08-05'},
+      }),
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+        child: const AfterZeroApp(requireLogin: false),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('统计').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('多策略对比规划'));
+    await tester.tap(find.text('多策略对比规划'));
+    await tester.pumpAndSettle();
+    expect(find.text('对比这三种策略'), findsOneWidget);
+    await tester.tap(find.text('对比这三种策略'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('雪球法'), findsOneWidget);
+    expect(find.text('雪崩法'), findsOneWidget);
+    expect(find.text('自定义'), findsOneWidget);
+    expect(find.text('总利息最省'), findsOneWidget);
   });
 }

@@ -112,6 +112,18 @@
 
 测试：`flutter/test/pay_items_test.dart`固定今天日期验证“逐期展开、非首期不可销、下一期按债务、其余窗口按期且累计”的关键语义；widget 测试覆盖底部导航到还款日与统计空状态。`flutter analyze`零 issue，`flutter test`共165条全绿。按用户明确要求，本阶段**没有构建 APK**。阶段5到此停止，下一步必须先由用户确认再开始阶段6。
 
+### 阶段6完成状态（2026-08-05）："我的" tab + 全部 subpage/sheet
+
+`MineTab`补齐账户头像、Premium、云备份、档案库、本地备份导入/导出入口与“关于我们”；登录门正式接入阶段3的`CloudAuthController`/`fluwx`编排。账户页支持退出、服务器注销和仅重置本地数据；Premium页沿用¥15买断展示和兑换码；隐私政策、用户协议、会员协议及账户信息入口均已迁移成Flutter路由。债务页也补回账户头像和AI入口，还款日页补回通知设置入口。
+
+云备份严格沿用`cloud-backup-design` skill的手动多记录模型：`backup_service.dart`逐个文件调用`backupUploadFile`代理，再调用`backupCreate`新增一条记录；列表/整体恢复/删除分别走既有三个云函数。恢复会先清空本机档案文件，再用临时URL完整铺回，不做字段级合并。档案二进制新增`archive_repository.dart`，`SharedPreferences`只存元数据，真实字节放应用文档目录；`file_picker`负责导入、`path_provider`负责定位目录，避免重走旧版把PDF塞进localStorage的容量坑。旧版version 6 JSON备份（含`uploads[].dataURL`）可以直接导入。
+
+AI助手沿用`ai-advisor-design` skill的标准聊天心智：报告和问答共用消息流，历史会话可继续追问并按同一id置顶，不生成重复快照；消息/会话分别限40/50条。服务端月度quota仍是权威值；支持建议芯片、按消息下标重试、段落/列表/粗体、思考秒数、一次性响应后的客户端打字回放，以及额度耗尽时复制**全量逐期计划**提示词到外部AI。`buildAiSummary(compact:true)`只压缩已还期次，未还计划始终逐期完整发送。
+
+统计页完成阶段5留下的交互与子页：还清曲线可拖动读日期/余额、压力柱可点选月份、类型环图可旋转；多策略对比复用`simulateRepaymentOrder()`，并列雪球/雪崩/自定义顺序、最省利息标记和余额曲线。PDF/Excel/本地备份的真正系统“另存为”、通知权限与排程、档案分享及PDF逐页预览明确保留给阶段7原生能力收尾——阶段6的按钮会如实提示尚未接入，不伪装成功。
+
+验证：新增`phase6_test.dart`覆盖档案真实落盘/删除、AI摘要与历史去重、云备份上传代理→创建/列表/整体恢复/删除；widget测试覆盖Premium兑换、通知默认规则及三策略结果。`flutter analyze`零issue，`flutter test`共174条全绿，`git diff --check`通过。按用户要求未构建APK。阶段6到此停止，下一步必须先由用户确认再开始阶段7。
+
 ## 纯计算函数：`www/js/calc.js` + `test/calc.test.js`
 
 这是"单文件无构建步骤"原则下第一次真正拆出去的一份代码——**39个函数**从`www/index.html`主`<script>`里搬到了独立文件`www/js/calc.js`。这是2026-07-24"六续"那轮讨论定的长期方向（React迁移+测试优先，三步走）的第一步，分三轮做完：第一轮先搬了`recompute`/`genPlan`/`impliedAPR`/`amortForward`/`simulatePrepay`/`detectMatchingSort`/`urgencyTier`/`relLabel`/`dueBucket`/`isActive`/`rateClass`/`r2`/`pad`/`parseDate`/`addMonths`/`fmtDate`/`today0`/`npv`/`markPaidThrough`/`normalize`这20个明确点名的核心计息/日期函数；用户追问"是不是还是第一步"确认后，第二轮扫描全文件把剩下没碰DOM/localStorage的纯函数也一并搬完：`isBadRepeatDay`/`offsetLabel`/`computeReportData`（统计报表的数据计算）、`clone`/`fmt`/`money`/`todayStr`/`baseName`/`extOf`（通用格式化/工具函数）、`esc`/`inline`/`isHr`/`mdToHtml`/`escSvg`/`truncateLabel`（HTML转义+极简markdown渲染器，档案库预览用）；第三轮用户追问"剩下没搬的是不是都在等React迁移"，藉此机会把"等迁移"和"低价值/有状态暂不搬"这两类原因拆清楚后，又补搬了`hasPremium`/`premiumLabel`/`findAiConv`/`bumpAiConvTop`这4个——它们原本被跟"等迁移"那批混着说，其实跟迁移完全无关，只是需要参数化改造，评估后发现值得现在就搬。这批函数全部不碰DOM/localStorage，纯粹是"给定输入算出确定输出"，不管以后切不切React都不受影响，现在拆、现在测，都不会是白费功夫。

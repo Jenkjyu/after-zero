@@ -1,8 +1,8 @@
-// 底部四个tab的外壳——债务/还款日/统计/我的，对应vanilla的tabbar。这一步只有"债务"tab有
-// 真实内容(阶段4)，其余三个是占位("敬请期待")，到对应阶段(5/6)才会填上真实内容。
+// 底部四个tab的外壳——债务/还款日/统计/我的，对应旧版tabbar。
 import 'package:flutter/material.dart';
 
 import 'debts/debts_tab.dart';
+import 'mine/mine_tab.dart';
 import 'pay/pay_tab.dart';
 import 'report/report_tab.dart';
 
@@ -36,12 +36,7 @@ class _AppShellState extends State<AppShell> {
     return Scaffold(
       body: IndexedStack(
         index: _index,
-        children: const [
-          DebtsTab(),
-          PayTab(),
-          ReportTab(),
-          _ComingSoonTab(title: '我的'),
-        ],
+        children: const [DebtsTab(), PayTab(), ReportTab(), MineTab()],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
@@ -55,20 +50,6 @@ class _AppShellState extends State<AppShell> {
             ),
         ],
       ),
-    );
-  }
-}
-
-class _ComingSoonTab extends StatelessWidget {
-  final String title;
-
-  const _ComingSoonTab({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: const Center(child: Text('这一页还在搬过来的路上')),
     );
   }
 }

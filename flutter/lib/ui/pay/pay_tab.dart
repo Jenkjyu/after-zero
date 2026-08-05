@@ -8,6 +8,7 @@ import 'package:after_zero/ui/debts/debt_detail.dart';
 import 'package:after_zero/ui/debts/payment_sheet.dart';
 
 import 'pay_items.dart';
+import 'notify_screen.dart';
 
 class PayTab extends ConsumerStatefulWidget {
   const PayTab({super.key});
@@ -24,7 +25,22 @@ class _PayTabState extends ConsumerState<PayTab> {
     final items = buildPayItems(ref.watch(debtsProvider));
     final visible = filterPayItems(items, _filter, _customDays);
     return Scaffold(
-      appBar: AppBar(title: const Text('还款日')),
+      appBar: AppBar(
+        title: const Text('还款日'),
+        actions: [
+          IconButton(
+            tooltip: '还款提醒通知',
+            icon: Icon(
+              ref.watch(notifyProvider).enabled
+                  ? Icons.notifications_active
+                  : Icons.notifications_none,
+            ),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const NotifyScreen()),
+            ),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 30),
         children: [

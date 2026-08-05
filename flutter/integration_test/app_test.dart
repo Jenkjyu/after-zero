@@ -19,7 +19,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
-        child: const AfterZeroApp(),
+        child: const AfterZeroApp(requireLogin: false),
       ),
     );
     await tester.pumpAndSettle();

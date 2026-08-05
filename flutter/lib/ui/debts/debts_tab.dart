@@ -7,6 +7,9 @@ import 'package:after_zero/calc/calc.dart' as calc;
 import 'package:after_zero/data/debt_ops.dart';
 import 'package:after_zero/data/models.dart';
 import 'package:after_zero/data/providers.dart';
+import 'package:after_zero/ui/account/account_screen.dart';
+import 'package:after_zero/ui/ai/ai_screen.dart';
+import 'package:after_zero/ui/mine/premium_screen.dart';
 
 import 'debt_card.dart';
 import 'debt_detail.dart';
@@ -25,11 +28,34 @@ class DebtsTab extends ConsumerWidget {
     final active = debts.where((debt) => debt.settled != true).toList();
     final settled = debts.where((debt) => debt.settled == true).toList();
     final sortedActive = sortDebts(active, selectedSort);
+    final premium = ref.watch(premiumProvider);
+    final account = ref.watch(accountProvider);
+    void openAi() => Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            premium.hasPremium ? const AiScreen() : const PremiumScreen(),
+      ),
+    );
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('债务'),
         actions: [
+          IconButton(
+            tooltip: '账户',
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const AccountScreen())),
+            icon: CircleAvatar(
+              radius: 15,
+              backgroundImage: account?.avatarUrl.isNotEmpty == true
+                  ? NetworkImage(account!.avatarUrl)
+                  : null,
+              child: account?.avatarUrl.isNotEmpty == true
+                  ? null
+                  : const Icon(Icons.person_outline, size: 18),
+            ),
+          ),
           if (kDebugMode)
             IconButton(
               icon: const Icon(Icons.bug_report_outlined),
@@ -39,12 +65,17 @@ class DebtsTab extends ConsumerWidget {
         ],
       ),
       body: active.isEmpty && settled.isEmpty
-          ? _EmptyState(onAdd: () => _openEditor(context, null))
+          ? _EmptyState(
+              onAdd: () => _openEditor(context, null),
+              premium: premium,
+              onAi: openAi,
+            )
           : active.isEmpty
           ? ListView(
               padding: const EdgeInsets.only(bottom: 28),
               children: [
                 SummaryHero(debts: debts),
+                _AiBanner(premium: premium, onTap: openAi),
                 const _SettledTitle(),
                 ...settled.map(
                   (debt) => _SettledDebtRow(
@@ -59,6 +90,7 @@ class DebtsTab extends ConsumerWidget {
               header: Column(
                 children: [
                   SummaryHero(debts: debts),
+                  _AiBanner(premium: premium, onTap: openAi),
                   _ListHeader(
                     sortLabel: debtSortLabel(selectedSort),
                     onSort: () => _openSortSheet(context, ref, selectedSort),
@@ -177,15 +209,15 @@ class DebtsTab extends ConsumerWidget {
   }
 
   void _openDetail(BuildContext context, Debt debt) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => DebtDetailScreen(debtId: debt.id)));
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => DebtDetailScreen(debtId: debt.id)),
+    );
   }
 
   void _openEditor(BuildContext context, Debt? debt) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => DebtEditorScreen(debt: debt)),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => DebtEditorScreen(debt: debt)));
   }
 
   void _restoreDebt(BuildContext context, WidgetRef ref, Debt debt) {
@@ -317,8 +349,14 @@ class _SettledDebtRow extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   final VoidCallback onAdd;
+  final Premium premium;
+  final VoidCallback onAi;
 
-  const _EmptyState({required this.onAdd});
+  const _EmptyState({
+    required this.onAdd,
+    required this.premium,
+    required this.onAi,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -346,9 +384,39 @@ class _EmptyState extends StatelessWidget {
               icon: const Icon(Icons.add),
               label: const Text('新增一笔债务'),
             ),
+            const SizedBox(height: 20),
+            _AiBanner(premium: premium, onTap: onAi),
           ],
         ),
       ),
     );
   }
+}
+
+class _AiBanner extends StatelessWidget {
+  final Premium premium;
+  final VoidCallback onTap;
+  const _AiBanner({required this.premium, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+    color: premium.hasPremium
+        ? Theme.of(context).colorScheme.tertiaryContainer
+        : null,
+    child: ListTile(
+      leading: Icon(
+        Icons.auto_awesome,
+        color: premium.hasPremium
+            ? Theme.of(context).colorScheme.tertiary
+            : Theme.of(context).colorScheme.outline,
+      ),
+      title: Text(premium.hasPremium ? 'AI 债务助手' : 'AI 债务分析报告'),
+      subtitle: Text(
+        premium.hasPremium ? '优先还款建议，围绕你的债务随问随答' : '开通 Premium，获取更省钱的还款顺序',
+      ),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: onTap,
+    ),
+  );
 }

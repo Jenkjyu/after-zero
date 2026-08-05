@@ -4,23 +4,8 @@
 //   POST /auth/v1/signin/custom       用wxLogin云函数换到的票据登录
 //   POST /v1/functions/{name}         调云函数，带 Authorization: Bearer {access_token}
 //
-// ⚠️这条HTTP网关路径(api.tcloudbasegateway.com)有自己独立的"网关权限控制"（控制台配置，
-// 按角色Admin/组织成员/注册用户/匿名用户分別授权，JSON policy），**跟现有云函数用的那套
-// `{"*": {"invoke": "..."}}`调用权限完全是两码事**——后者只管JS SDK的callFunction()那条
-// 路径，不管这条HTTP网关。实测确认：这个环境目前网关权限是空的（`tcb policy get`返回空），
-// 触发的是平台默认策略——默认策略下"Cloud Functions (via HTTP API)"这一项，连"注册用户"
-// 角色都是拒绝的，只有Admin默认放行；匿名用户更是所有角色里唯一被禁止调用任何云函数的一档。
-// **这意味着要让Flutter版真正跑通，需要在CloudBase控制台"权限控制"页面加两条网关自定义策略**
-// （这一步只能在控制台做，没有能安全脚本化的CLI/API路径——`tcb policy set`背后是什么鉴权
-// 引擎、input schema长什么样，公开文档完全没有记录，不能在生产环境的安全策略上瞎猜）：
-//   1. 给"匿名用户"角色加 {"effect":"allow","action":"functions:/wxLogin","resource":"*"}
-//      ——wxLogin是整个登录流程的入口，这一步客户端还没有真实身份，只能先用匿名会话调它。
-//   2. 给"注册用户"角色加能调其余云函数的策略（比如绑定"FunctionsAccess"预设策略，或者
-//      自定义{"effect":"allow","action":"functions:*","resource":"*"}）——真实登录（微信换到
-//      自定义票据）之后的用户要能调backupCreate/deleteAccount/aiAdvisor这些。
-// 这一步不影响本文件的代码本身对不对——下面的实现已经用真实HTTP请求验证过"网关能正确识别
-// 调用者身份"这件事本身是成立的（匿名调用被EXCEED_AUTHORITY拒绝，恰恰证明网关认出了
-// "这是匿名会话"，不是网络层面就失败）。等控制台配置做完，端到端登录才能真正跑通。
+// HTTP网关会复用这个环境现有的云函数调用权限：wxLogin已有匿名例外，其余函数走要求
+// 非匿名登录的`*`规则。阶段3用wxLogin/backupList做过正反对照实测，不需要另配一套网关策略。
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;

@@ -38,6 +38,8 @@ dependencies:
   shared_preferences: ^2.5.5
   http: ^1.6.0
   fluwx: ^6.0.2
+  file_picker: ^10.3.10
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:

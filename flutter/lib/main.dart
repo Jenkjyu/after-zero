@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'cloud/cloud_auth_controller.dart';
 import 'data/providers.dart';
+import 'ui/account/login_gate.dart';
 import 'ui/app_shell.dart';
 import 'ui/theme.dart';
 
@@ -17,16 +19,19 @@ Future<void> main() async {
   );
 }
 
-class AfterZeroApp extends StatelessWidget {
-  const AfterZeroApp({super.key});
+class AfterZeroApp extends ConsumerWidget {
+  final bool requireLogin;
+
+  const AfterZeroApp({super.key, this.requireLogin = true});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final loggedIn = ref.watch(isCloudLoggedInProvider);
     return MaterialApp(
       title: 'After Zero',
       theme: buildAppTheme(Brightness.light),
       darkTheme: buildAppTheme(Brightness.dark),
-      home: const AppShell(),
+      home: requireLogin && !loggedIn ? const LoginGate() : const AppShell(),
     );
   }
 }

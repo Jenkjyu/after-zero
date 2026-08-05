@@ -13,6 +13,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'archive_repository.dart';
 import 'local_store.dart';
 import 'models.dart';
 
@@ -24,6 +25,10 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
 
 final localStoreProvider = Provider<LocalStore>(
   (ref) => LocalStore(ref.watch(sharedPreferencesProvider)),
+);
+
+final archiveRepositoryProvider = Provider<ArchiveRepository>(
+  (ref) => ArchiveRepository(ref.watch(sharedPreferencesProvider)),
 );
 
 /// 债务列表——对应vanilla的`debts`模块变量+`saveAll()`/`renderAll()`那套"改完存、存完通知"
@@ -140,6 +145,8 @@ class NotifySettingsNotifier extends Notifier<NotifySettings> {
       ],
     ),
   );
+
+  void replace(NotifySettings next) => _persist(next);
 }
 
 final notifyProvider = NotifierProvider<NotifySettingsNotifier, NotifySettings>(

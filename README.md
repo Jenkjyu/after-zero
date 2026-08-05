@@ -69,7 +69,7 @@ cd android
 
 Capacitor套壳系统WebView这套架构强依赖各手机厂商WebView行为，且不支持iOS。正在`flutter/`（独立顶层目录，自带`lib/`/`android/`/`ios/`/`pubspec.yaml`，跟`www/`/`android/`/`react/`不冲突）里用Flutter+Dart把整个App重写一遍，目标是彻底摆脱WebView依赖、同时支持iOS。开发期间两边共存，现有Capacitor版本不受影响；等Flutter版本做到功能完全对等，才会一次性删除`www/`/旧`android/`/`react/`等Capacitor专属文件，`flutter/`转正。状态管理用Riverpod，本地持久化第一版用`shared_preferences`（按现有localStorage的key对应，先求行为对齐）。腾讯云开发没有能用的官方Flutter SDK，云端接入层要绕开SDK直接用HTTP调用。
 
-目前已完成阶段 0–5：计算层、数据/本地持久化、CloudBase HTTP 与微信登录编排，以及“债务”“还款日”“统计”三个 tab。还款日页按未还**期次**展开、支持累计时间窗和左滑还款；统计页复用既有报告/压力计算，展示还清路径、未来压力、月还款、余额排行与类型构成。“我的”和其余子页面仍在后续阶段。详细阶段划分和当前进度见`CLAUDE.md`"Flutter重写"一节。
+目前已完成阶段 0–6：计算层、数据/本地持久化、CloudBase HTTP 与微信登录编排、四个主 tab，以及登录门、账户/Premium/协议、通知设置、档案库、手动云备份、AI 债务助手和多策略对比等子页面。统计图表已支持拖动/点击读数与类型环图旋转。下一阶段收尾系统通知、PDF/Excel与本地备份“另存为”、档案分享/PDF预览等原生能力；之后才进入全面回归和双端真机验证。详细阶段划分和当前进度见`CLAUDE.md`"Flutter重写"一节。
 
 ## 备注
 
