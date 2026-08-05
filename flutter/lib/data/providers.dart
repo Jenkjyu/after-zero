@@ -10,12 +10,17 @@
 //
 // 不覆盖直接使用会在读取时抛UnimplementedError——这是故意的，缺了初始化步骤要在开发期就
 // 炸出来，不能悄悄读到一个不存在的假数据。
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'archive_repository.dart';
 import 'local_store.dart';
 import 'models.dart';
+import '../export/report_export_service.dart';
+import '../native/system_file_saver.dart';
+import '../notifications/reminder_scheduler.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError(
@@ -31,6 +36,26 @@ final archiveRepositoryProvider = Provider<ArchiveRepository>(
   (ref) => ArchiveRepository(ref.watch(sharedPreferencesProvider)),
 );
 
+final notificationPortProvider = Provider<NotificationPort>(
+  (ref) => FlutterNotificationPort(),
+);
+
+final reminderSchedulerProvider = Provider<ReminderScheduler>(
+  (ref) => ReminderScheduler(ref.watch(notificationPortProvider)),
+);
+
+final reportExportServiceProvider = Provider<ReportExportService>(
+  (ref) => ReportExportService(),
+);
+
+final localBackupServiceProvider = Provider<LocalBackupService>(
+  (ref) => LocalBackupService(ref.watch(archiveRepositoryProvider)),
+);
+
+final systemFileSaverProvider = Provider<SystemFileSaver>(
+  (ref) => SystemFileSaver(),
+);
+
 /// 债务列表——对应vanilla的`debts`模块变量+`saveAll()`/`renderAll()`那套"改完存、存完通知"
 /// 的模式，只是这里状态变化本身就是通知（Riverpod的watch机制），不需要额外派发事件。
 class DebtsNotifier extends Notifier<List<Debt>> {
@@ -40,6 +65,11 @@ class DebtsNotifier extends Notifier<List<Debt>> {
   void _persist(List<Debt> next) {
     state = next;
     ref.read(localStoreProvider).writeDebts(next);
+    unawaited(
+      ref
+          .read(reminderSchedulerProvider)
+          .reschedule(debts: next, settings: ref.read(notifyProvider)),
+    );
   }
 
   /// id为null=新增(debt.id必须由调用方先用genDebtId()生成好——这里不像vanilla的setDebt()
@@ -130,6 +160,11 @@ class NotifySettingsNotifier extends Notifier<NotifySettings> {
   void _persist(NotifySettings next) {
     state = next;
     ref.read(localStoreProvider).writeNotify(next);
+    unawaited(
+      ref
+          .read(reminderSchedulerProvider)
+          .reschedule(debts: ref.read(debtsProvider), settings: next),
+    );
   }
 
   void setEnabled(bool enabled) => _persist(state.copyWith(enabled: enabled));

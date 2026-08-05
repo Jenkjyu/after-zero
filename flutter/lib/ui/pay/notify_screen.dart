@@ -26,23 +26,13 @@ class _NotifyScreenState extends ConsumerState<NotifyScreen> {
           Card(
             child: SwitchListTile(
               title: const Text('启用通知'),
-              subtitle: const Text('阶段 7 将接入系统通知权限和真实排程'),
+              subtitle: const Text('会申请系统权限，并在债务或规则变化时自动重排提醒'),
               value: notify.enabled,
-              onChanged: (value) {
-                final notifier = ref.read(notifyProvider.notifier);
-                notifier.setEnabled(value);
-                if (value && notify.rules.isEmpty) {
-                  notifier.addRule(
-                    const NotifyRule(offsetDays: 0, time: '09:00'),
-                  );
-                }
-              },
+              onChanged: _changeEnabled,
             ),
           ),
           OutlinedButton.icon(
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('测试通知会在阶段 7 接入原生通知后生效')),
-            ),
+            onPressed: notify.enabled ? _sendTest : null,
             icon: const Icon(Icons.notifications_active_outlined),
             label: const Text('发送测试通知（10秒后）'),
           ),
@@ -110,6 +100,54 @@ class _NotifyScreenState extends ConsumerState<NotifyScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _changeEnabled(bool enabled) async {
+    final notifier = ref.read(notifyProvider.notifier);
+    if (!enabled) {
+      notifier.setEnabled(false);
+      return;
+    }
+    try {
+      final permitted = await ref
+          .read(reminderSchedulerProvider)
+          .enableNotifications();
+      if (!permitted) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('未获得系统通知权限，已保持关闭')));
+        }
+        return;
+      }
+      if (ref.read(notifyProvider).rules.isEmpty) {
+        notifier.addRule(const NotifyRule(offsetDays: 0, time: '09:00'));
+      }
+      notifier.setEnabled(true);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('通知设置失败：$error')));
+      }
+    }
+  }
+
+  Future<void> _sendTest() async {
+    try {
+      await ref.read(reminderSchedulerProvider).scheduleTestNotification();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('测试通知将在10秒后送达')));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('测试通知发送失败：$error')));
+      }
+    }
   }
 }
 

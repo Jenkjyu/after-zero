@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:after_zero/calc/calc.dart' as calc;
 import 'package:after_zero/data/models.dart';
 import 'package:after_zero/data/providers.dart';
+import 'package:after_zero/export/report_export_service.dart';
 import 'package:after_zero/ui/mine/premium_screen.dart';
 
 import 'strategy_compare_screen.dart';
@@ -83,11 +84,11 @@ class _StrategyCta extends StatelessWidget {
   );
 }
 
-class _ExportCard extends StatelessWidget {
+class _ExportCard extends ConsumerWidget {
   final Premium premium;
   const _ExportCard({required this.premium});
   @override
-  Widget build(BuildContext context) => Card(
+  Widget build(BuildContext context, WidgetRef ref) => Card(
     child: Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -99,7 +100,7 @@ class _ExportCard extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _export(context, 'Excel'),
+                  onPressed: () => _export(context, ref, 'Excel'),
                   icon: const Icon(Icons.table_chart_outlined),
                   label: const Text('Excel'),
                 ),
@@ -107,7 +108,7 @@ class _ExportCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _export(context, 'PDF'),
+                  onPressed: () => _export(context, ref, 'PDF'),
                   icon: const Icon(Icons.picture_as_pdf_outlined),
                   label: const Text('PDF'),
                 ),
@@ -119,16 +120,38 @@ class _ExportCard extends StatelessWidget {
     ),
   );
 
-  void _export(BuildContext context, String kind) {
+  Future<void> _export(BuildContext context, WidgetRef ref, String kind) async {
     if (!premium.hasPremium) {
       Navigator.of(
         context,
       ).push(MaterialPageRoute(builder: (_) => const PremiumScreen()));
       return;
     }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$kind 生成与系统“另存为”将在阶段 7 接入')));
+    try {
+      final debts = ref.read(debtsProvider);
+      final exporter = ref.read(reportExportServiceProvider);
+      final saver = ref.read(systemFileSaverProvider);
+      final stamp = exportDateStamp();
+      final bytes = kind == 'Excel'
+          ? exporter.buildExcel(debts)
+          : await exporter.buildPdf(debts);
+      final saved = await saver.saveBytes(
+        bytes: bytes,
+        filename: 'AfterZero统计报表$stamp.${kind == 'Excel' ? 'xlsx' : 'pdf'}',
+        mimeType: kind == 'Excel' ? reportExcelMime : reportPdfMime,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(saved ? '$kind 已保存 ✓' : '已取消保存')),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$kind 导出失败：$error')));
+      }
+    }
   }
 }
 

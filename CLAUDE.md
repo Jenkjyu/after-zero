@@ -124,6 +124,16 @@ AI助手沿用`ai-advisor-design` skill的标准聊天心智：报告和问答�
 
 验证：新增`phase6_test.dart`覆盖档案真实落盘/删除、AI摘要与历史去重、云备份上传代理→创建/列表/整体恢复/删除；widget测试覆盖Premium兑换、通知默认规则及三策略结果。`flutter analyze`零issue，`flutter test`共174条全绿，`git diff --check`通过。按用户要求未构建APK。阶段6到此停止，下一步必须先由用户确认再开始阶段7。
 
+### 阶段7完成状态（2026-08-06）：原生能力收尾——通知、系统保存、导出与PDF预览
+
+还款提醒不只是在设置页“存规则”：`ReminderScheduler`复用阶段1的`computeNotifySchedule()`，始终先取消全部待发通知、再按**未来6个月内每一未还期次 × 每条规则**全量重排（上限450条），因此债务、还款状态或规则变化都会同步刷新原生通知。Android接入`flutter_local_notifications`的通知权限、精确闹钟、开机/应用更新后重排receiver和状态栏小图标；未获精确闹钟授权时降级为inexact排程，不会让已开启的提醒完全失效；iOS通过User Notifications请求权限。测试通知会真实排在10秒后。Android厂商后台限制、精确闹钟授权和iOS 64条待发上限仍需阶段8真机验证，不能只依赖模拟器/单测。
+
+文件保存新增`SystemFileSaver`：Android用手写的Flutter MethodChannel调用真正的`ACTION_CREATE_DOCUMENT`（SAF），先由Dart把字节落到cache临时文件，原生侧只携带短路径跨系统Activity、再以64KB流复制到用户选择的URI——刻意复刻旧`SaveFilePlugin`规避大PDF/base64跨Activity导致Binder超限或0B文件的修复；iOS没有SAF，正确对应交互是系统分享面板里的“存储到文件”。档案页也支持真正的分享和另存为。
+
+报告导出使用`pdf`+`excel`：Excel有“债务明细/还款计划明细/汇总KPI”三张可编辑工作表；PDF包含概览、债务明细、未来走势和每笔还款计划。`assets/fonts/NotoSansSC-wght.ttf`是嵌入式开源中文字库，PDF生成的是可选中的文本而非旧版SVG/PNG栅格图；专门生成并用Poppler渲染样例检查过中文、表格、页边距和分页。下载本地备份沿用旧版version 6 JSON形状，包含`uploads[].dataURL`，所以也能被既有导入逻辑恢复。档案页接入`flutter_pdfview`，PDF可在App内显示页码、翻页和缩放。
+
+验证：新增`phase7_test.dart`覆盖“先取消再重排”的提醒ID/文案、中文PDF字节、三张Excel表的可读性和带档案dataURL的JSON备份；`flutter analyze`零issue，`flutter test`共178条全绿；PDF实际渲染视觉检查通过。按用户要求未构建APK。阶段7到此停止，下一步必须先由用户确认再开始阶段8。
+
 ## 纯计算函数：`www/js/calc.js` + `test/calc.test.js`
 
 这是"单文件无构建步骤"原则下第一次真正拆出去的一份代码——**39个函数**从`www/index.html`主`<script>`里搬到了独立文件`www/js/calc.js`。这是2026-07-24"六续"那轮讨论定的长期方向（React迁移+测试优先，三步走）的第一步，分三轮做完：第一轮先搬了`recompute`/`genPlan`/`impliedAPR`/`amortForward`/`simulatePrepay`/`detectMatchingSort`/`urgencyTier`/`relLabel`/`dueBucket`/`isActive`/`rateClass`/`r2`/`pad`/`parseDate`/`addMonths`/`fmtDate`/`today0`/`npv`/`markPaidThrough`/`normalize`这20个明确点名的核心计息/日期函数；用户追问"是不是还是第一步"确认后，第二轮扫描全文件把剩下没碰DOM/localStorage的纯函数也一并搬完：`isBadRepeatDay`/`offsetLabel`/`computeReportData`（统计报表的数据计算）、`clone`/`fmt`/`money`/`todayStr`/`baseName`/`extOf`（通用格式化/工具函数）、`esc`/`inline`/`isHr`/`mdToHtml`/`escSvg`/`truncateLabel`（HTML转义+极简markdown渲染器，档案库预览用）；第三轮用户追问"剩下没搬的是不是都在等React迁移"，藉此机会把"等迁移"和"低价值/有状态暂不搬"这两类原因拆清楚后，又补搬了`hasPremium`/`premiumLabel`/`findAiConv`/`bumpAiConvTop`这4个——它们原本被跟"等迁移"那批混着说，其实跟迁移完全无关，只是需要参数化改造，评估后发现值得现在就搬。这批函数全部不碰DOM/localStorage，纯粹是"给定输入算出确定输出"，不管以后切不切React都不受影响，现在拆、现在测，都不会是白费功夫。

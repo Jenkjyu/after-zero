@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/debt_ops.dart';
 import '../../data/models.dart';
 import '../../data/providers.dart';
+import '../../export/report_export_service.dart';
 import '../account/account_screen.dart';
 import 'archive_screen.dart';
 import 'backup_screen.dart';
@@ -81,9 +82,7 @@ class MineTab extends ConsumerWidget {
             icon: Icons.download_outlined,
             title: '下载备份文件',
             subtitle: '导出全部债务和档案，存到本地',
-            onTap: () => ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('系统“另存为”将在阶段 7 接入'))),
+            onTap: () => _downloadBackup(context, ref),
           ),
           _EntryTile(
             icon: Icons.upload_outlined,
@@ -219,6 +218,32 @@ Future<void> _importBackup(BuildContext context, WidgetRef ref) async {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('导入失败：$error')));
+    }
+  }
+}
+
+Future<void> _downloadBackup(BuildContext context, WidgetRef ref) async {
+  try {
+    final bytes = await ref
+        .read(localBackupServiceProvider)
+        .build(debts: ref.read(debtsProvider), docs: ref.read(docsProvider));
+    final saved = await ref
+        .read(systemFileSaverProvider)
+        .saveBytes(
+          bytes: bytes,
+          filename: 'AfterZero备份${exportDateStamp()}.json',
+          mimeType: backupJsonMime,
+        );
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(saved ? '备份文件已保存 ✓' : '已取消保存')));
+    }
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('备份导出失败：$error')));
     }
   }
 }

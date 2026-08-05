@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_pdfview/flutter_pdfview.dart';
 
 import '../../data/archive_repository.dart';
 import '../../data/providers.dart';
@@ -58,7 +59,8 @@ class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
                 trailing: PopupMenuButton<String>(
                   onSelected: (action) => _fileAction(action, item),
                   itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'save', child: Text('分享 / 保存')),
+                    PopupMenuItem(value: 'save', child: Text('另存为')),
+                    PopupMenuItem(value: 'share', child: Text('分享')),
                     PopupMenuItem(value: 'delete', child: Text('删除')),
                   ],
                 ),
@@ -140,9 +142,40 @@ class _ArchiveScreenState extends ConsumerState<ArchiveScreen> {
 
   Future<void> _fileAction(String action, ArchiveFile item) async {
     if (action == 'save') {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('系统分享 / 另存为将在阶段 7 接入')));
+      try {
+        final saved = await ref
+            .read(systemFileSaverProvider)
+            .saveFile(
+              source: File(item.path),
+              filename: item.name,
+              mimeType: item.mime,
+            );
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(saved ? '文件已保存 ✓' : '已取消保存')));
+        }
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('保存失败：$error')));
+        }
+      }
+      return;
+    }
+    if (action == 'share') {
+      try {
+        await ref
+            .read(systemFileSaverProvider)
+            .shareFile(File(item.path), title: item.name);
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('分享失败：$error')));
+        }
+      }
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -196,17 +229,92 @@ class _ArchivePreview extends StatelessWidget {
         ),
       );
     }
+    if (item.mime == 'application/pdf') {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('PDF 可在 App 内逐页阅读。'),
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ArchivePdfScreen(
+                      file: File(item.path),
+                      name: item.name,
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.picture_as_pdf_outlined),
+                label: const Text('打开 PDF 预览'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Text(
           item.mime == 'application/pdf'
-              ? 'PDF 已安全保存在本机档案库。Flutter 内嵌逐页预览会在原生能力收尾时接入。'
-              : '此文件类型不支持内嵌预览，可在阶段 7 接入分享/保存后用其他应用打开。',
+              ? 'PDF 可在 App 内逐页阅读。'
+              : '此文件类型不支持内嵌预览，可通过“分享”或“另存为”在其他应用打开。',
         ),
       ),
     );
   }
+}
+
+class ArchivePdfScreen extends StatefulWidget {
+  final File file;
+  final String name;
+
+  const ArchivePdfScreen({super.key, required this.file, required this.name});
+
+  @override
+  State<ArchivePdfScreen> createState() => _ArchivePdfScreenState();
+}
+
+class _ArchivePdfScreenState extends State<ArchivePdfScreen> {
+  int? _pages;
+  int _page = 0;
+  String? _error;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: Text(widget.name, overflow: TextOverflow.ellipsis),
+      bottom: _pages == null
+          ? null
+          : PreferredSize(
+              preferredSize: const Size.fromHeight(26),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text('第 ${_page + 1} / $_pages 页'),
+              ),
+            ),
+    ),
+    body: _error != null
+        ? Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(_error!),
+            ),
+          )
+        : PDFView(
+            filePath: widget.file.path,
+            enableSwipe: true,
+            swipeHorizontal: false,
+            pageFling: true,
+            autoSpacing: true,
+            onRender: (pages) => setState(() => _pages = pages),
+            onPageChanged: (page, _) => setState(() => _page = page ?? 0),
+            onError: (error) => setState(() => _error = 'PDF 预览失败：$error'),
+          ),
+  );
 }
 
 IconData _iconFor(String mime) {
