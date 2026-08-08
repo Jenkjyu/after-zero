@@ -41,32 +41,39 @@ class ReportTab extends ConsumerWidget {
     );
     final lead = findings.where((finding) => finding.actionable).firstOrNull;
     return Scaffold(
-      appBar: AppBar(title: const Text('统计')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 36),
-        children: [
-          _ReportHead(data: data, summary: summary, monthsLeft: monthsLeft),
-          const SizedBox(height: 26),
-          _InsightSection(findings: findings),
-          if (findings.isNotEmpty)
-            _ActionBox(lead: findings.where((f) => f.actionable).firstOrNull),
-          if (active.length >= 2) ...[
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 36),
+          children: [
+            _ReportHead(data: data, summary: summary, monthsLeft: monthsLeft),
             const SizedBox(height: 26),
-            const _StrategyCtaSection(),
+            _InsightSection(findings: findings),
+            if (findings.isNotEmpty)
+              _ActionBox(
+                lead: findings.where((f) => f.actionable).firstOrNull,
+              ),
+            if (active.length >= 2) ...[
+              const SizedBox(height: 26),
+              const _StrategyCtaSection(),
+            ],
+            const SizedBox(height: 26),
+            _JourneyCard(
+              data: data,
+              summary: summary,
+              monthsLeft: monthsLeft,
+            ),
+            const SizedBox(height: 26),
+            _PressureCard(pressure: pressure),
+            const SizedBox(height: 26),
+            _RankCard(active: active),
+            const SizedBox(height: 26),
+            _TypeCard(data: data),
+            const SizedBox(height: 26),
+            _OutroCard(lead: lead, premium: premium),
+            const SizedBox(height: 8),
+            const _NoteToggle(),
           ],
-          const SizedBox(height: 26),
-          _JourneyCard(data: data, summary: summary, monthsLeft: monthsLeft),
-          const SizedBox(height: 26),
-          _PressureCard(pressure: pressure),
-          const SizedBox(height: 26),
-          _RankCard(active: active),
-          const SizedBox(height: 26),
-          _TypeCard(data: data),
-          const SizedBox(height: 26),
-          _OutroCard(lead: lead, premium: premium),
-          const SizedBox(height: 8),
-          const _NoteToggle(),
-        ],
+        ),
       ),
     );
   }
@@ -88,31 +95,35 @@ class _ReportEmpty extends StatelessWidget {
   const _ReportEmpty({required this.summary, required this.premium});
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('统计')),
-    body: Padding(
-      padding: const EdgeInsets.all(28),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.verified_outlined,
-            size: 56,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(height: 14),
-          Text('目前没有在还的债务', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(
-            (summary['settled'] as int) > 0
-                ? '已经结清 ${summary['settled']} 笔，累计还掉本金 ¥${calc.fmt(summary['paidPrincipal'])}。'
-                : '还没有记录任何债务。到"首页"新增一笔之后，这里会生成一份完整的分析报告。',
-            textAlign: TextAlign.center,
-          ),
-          if ((summary['settled'] as int) > 0) ...[
-            const SizedBox(height: 18),
-            _ExportRow(premium: premium),
+    body: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.verified_outlined,
+              size: 56,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              '目前没有在还的债务',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              (summary['settled'] as int) > 0
+                  ? '已经结清 ${summary['settled']} 笔，累计还掉本金 ¥${calc.fmt(summary['paidPrincipal'])}。'
+                  : '还没有记录任何债务。到"首页"新增一笔之后，这里会生成一份完整的分析报告。',
+              textAlign: TextAlign.center,
+            ),
+            if ((summary['settled'] as int) > 0) ...[
+              const SizedBox(height: 18),
+              _ExportRow(premium: premium),
+            ],
           ],
-        ],
+        ),
       ),
     ),
   );
@@ -420,21 +431,17 @@ class _StrategyCta extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final premium = ref.watch(premiumProvider);
-    return Card(
-      color: Theme.of(context).colorScheme.primaryContainer,
-      child: ListTile(
-        leading: const Icon(Icons.compare_arrows),
-        title: const Text('多策略对比规划'),
-        subtitle: const Text('雪球法、雪崩法和自定义顺序，看看哪种最省利息'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => premium.hasPremium
-                ? const StrategyCompareScreen()
-                : const PremiumScreen(),
-          ),
+    return FilledButton.icon(
+      key: const Key('strategy-cta'),
+      onPressed: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => premium.hasPremium
+              ? const StrategyCompareScreen()
+              : const PremiumScreen(),
         ),
       ),
+      icon: const Icon(Icons.compare_arrows),
+      label: const Text('多策略对比规划'),
     );
   }
 }
@@ -482,62 +489,80 @@ class _JourneyCardState extends State<_JourneyCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            selected == null
-                ? '按住曲线左右拖，看任意时间点的余额'
-                : '${selected['date']} · 余额 ¥${calc.fmt(selected['balance'])}',
-            style: TextStyle(
-              fontWeight: selected == null ? FontWeight.w400 : FontWeight.w700,
-              color: selected == null
-                  ? Theme.of(context).colorScheme.onSurfaceVariant
-                  : null,
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest
+                  .withValues(alpha: .45),
             ),
-          ),
-          const SizedBox(height: 8),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final width = constraints.maxWidth;
-              return GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onHorizontalDragStart: (details) => _pick(
-                  details.localPosition.dx,
-                  width,
-                  n,
-                ),
-                onHorizontalDragUpdate: (details) => _pick(
-                  details.localPosition.dx,
-                  width,
-                  n,
-                ),
-                onHorizontalDragEnd: (_) => setState(() => _active = null),
-                onTapDown: (details) => _pick(
-                  details.localPosition.dx,
-                  width,
-                  n,
-                ),
-                child: SizedBox(
-                  height: 180,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: CustomPaint(
-                          painter: _TimelinePainter(
-                            timeline,
-                            Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                      ),
-                      ..._milestoneNodes(
-                        context,
-                        timeline,
-                        halfIdx,
-                        width,
-                      ),
-                    ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  selected == null
+                      ? '按住曲线左右拖，看任意时间点的余额'
+                      : '${selected['date']} · 余额 ¥${calc.fmt(selected['balance'])}',
+                  style: TextStyle(
+                    fontWeight:
+                        selected == null ? FontWeight.w400 : FontWeight.w700,
+                    color: selected == null
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : null,
                   ),
                 ),
-              );
-            },
+                const SizedBox(height: 8),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = constraints.maxWidth;
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onHorizontalDragStart: (details) => _pick(
+                        details.localPosition.dx,
+                        width,
+                        n,
+                      ),
+                      onHorizontalDragUpdate: (details) => _pick(
+                        details.localPosition.dx,
+                        width,
+                        n,
+                      ),
+                      onHorizontalDragEnd: (_) =>
+                          setState(() => _active = null),
+                      onTapDown: (details) => _pick(
+                        details.localPosition.dx,
+                        width,
+                        n,
+                      ),
+                      child: SizedBox(
+                        height: 180,
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: CustomPaint(
+                                painter: _TimelinePainter(
+                                  timeline,
+                                  Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                            ..._milestoneNodes(
+                              context,
+                              timeline,
+                              halfIdx,
+                              width,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1146,58 +1171,66 @@ class _OutroCard extends StatelessWidget {
   final Premium premium;
   const _OutroCard({required this.lead, required this.premium});
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text('如果只做一件事', style: Theme.of(context).textTheme.labelLarge),
-      const SizedBox(height: 4),
-      Text(
-        lead != null && lead!.actionTitle != null
-            ? '${lead!.actionTitle}。'
-            : '保持现在的还款节奏。',
-        style: Theme.of(context).textTheme.titleLarge,
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: dark ? const Color(0xFF2E3239) : const Color(0xFFEFF1F6),
+        borderRadius: BorderRadius.circular(14),
       ),
-      const SizedBox(height: 12),
-      _ExportRow(premium: premium),
-    ],
-  );
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('如果只做一件事', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 6),
+          Text(
+            lead != null && lead!.actionTitle != null
+                ? '${lead!.actionTitle}。'
+                : '保持现在的还款节奏。',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(height: 1.75),
+          ),
+          const SizedBox(height: 13),
+          _ExportRow(premium: premium),
+        ],
+      ),
+    );
+  }
 }
 
 class _ExportRow extends ConsumerWidget {
   final Premium premium;
   const _ExportRow({required this.premium});
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('导出这份报告', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _export(context, ref, 'Excel'),
-                  icon: const Icon(Icons.table_chart_outlined),
-                  label: const Text('Excel'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _export(context, ref, 'PDF'),
-                  icon: const Icon(Icons.picture_as_pdf_outlined),
-                  label: const Text('PDF'),
-                ),
-              ),
-            ],
-          ),
-        ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final buttons = [
+      Expanded(
+        child: OutlinedButton.icon(
+          onPressed: () => _export(context, ref, 'Excel'),
+          icon: const Icon(Icons.table_chart_outlined, size: 18),
+          label: const Text('Excel'),
+        ),
       ),
-    ),
-  );
+      const SizedBox(width: 8),
+      Expanded(
+        child: OutlinedButton.icon(
+          onPressed: () => _export(context, ref, 'PDF'),
+          icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+          label: const Text('PDF'),
+        ),
+      ),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 6),
+        Row(children: buttons),
+      ],
+    );
+  }
 
   Future<void> _export(BuildContext context, WidgetRef ref, String kind) async {
     if (!premium.hasPremium) {
@@ -1303,19 +1336,44 @@ class _SectionCard extends StatelessWidget {
     required this.child,
   });
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
+  Widget build(BuildContext context) {
+    final faint = Theme.of(context).colorScheme.onSurfaceVariant.withValues(
+      alpha: .72,
+    );
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: Theme.of(
+              context,
+            ).colorScheme.outlineVariant.withValues(alpha: .55),
+          ),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(eyebrow, style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 3),
-          Text(title, style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            eyebrow,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: faint,
+              fontWeight: FontWeight.w600,
+              letterSpacing: .04,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              height: 1.45,
+            ),
+          ),
           const SizedBox(height: 14),
           child,
         ],
       ),
-    ),
-  );
+    );
+  }
 }

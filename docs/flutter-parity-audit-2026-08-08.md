@@ -181,3 +181,10 @@
 - 我的 tab 暗色布局仍有约 21% 像素差异（去掉标题栏后从 49% 降到 21%，本轮补了头像容器），剩余为卡片间距/高度等视觉细节，需要肉眼/像素级复核。
 - jiggle 模式的"按住不动 450ms 退出编辑"（不点保存）这一细项未复刻，其余（长按进入/抖动/拖拽/保存退出）已实现。
 - 真机手势手感、SAF/通知/微信登录端到端验证仍按约定延后。
+
+## 第四轮（2026-08-09）：逻辑层差分对账 + 还款日/统计页结构收口
+
+- **逻辑层差分对账**：新增 `flutter/tool/calc_probe.dart` + JS 探针，同一批边界值（fmt/money/r2/niceCeil/rateClass/urgencyTier/relLabel/dueBucket/parseDate/addMonths）在 JS 与 Dart 两侧逐位对比——全部一致，唯一差异是 `parseDate('abc')` 旧版返回 `"NaN-NaN-NaN"`（JS 无效日期怪癖），Dart 返回 null，属合理改进而非缺陷。阶段1/2/3 逻辑层结论：不需要重做。
+- **还款日页**：去掉"还款日"AppBar（旧版顶部就是 hero），铃铛移进 hero 右上（与旧版 `.pay-hero-top` 一致）；hero 配色改为旧版五档（逾期实心红底 `--critical-fill`、临期/警告/平静用 soft 底+对应文字色、空态 good-soft），替换 Material errorContainer 淡色容器。暗色像素差 42%→30%。
+- **统计页**：去掉"统计"AppBar；报告分区从"每节一张 Card"改为旧版"流动文本+顶部细线分隔"（`.sec` 语义）；还清路径图放进 `plot-box` 容器（描边+浅底）；"如果只做一件事"+导出改为 `surface-2` 圆角块（`.outro` 语义）；多策略入口从 Card+ListTile 改为旧版主按钮。暗色像素差仍在约31%，剩余差异集中在字体/行距/间距等观感层（旧版数字用等宽字体 `ui-monospace`，Flutter 全局未应用打包的 NotoSansSC），已判断为"需要肉眼/视觉模型复核"的部分，未盲目盲调。
+- 验证：`flutter analyze`零issue、178条测试全绿（修正通知铃铛 tooltip 断言为"还款提醒通知设置"）。

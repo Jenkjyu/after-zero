@@ -26,48 +26,42 @@ class _PayTabState extends ConsumerState<PayTab> {
   Widget build(BuildContext context) {
     final items = buildPayItems(ref.watch(debtsProvider));
     final visible = filterPayItems(items, _filter, _customDays);
+    final notifyEnabled = ref.watch(notifyProvider).enabled;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('还款日'),
-        actions: [
-          IconButton(
-            tooltip: '还款提醒通知',
-            icon: Icon(
-              ref.watch(notifyProvider).enabled
-                  ? Icons.notifications_active
-                  : Icons.notifications_none,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 30),
+          children: [
+            _PayHero(
+              items: items,
+              notifyEnabled: notifyEnabled,
+              onBellClick: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotifyScreen()),
+              ),
             ),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const NotifyScreen()),
-            ),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 30),
-        children: [
-          _PayHero(items: items),
-          if (items.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _PayStats(items: items),
-            const SizedBox(height: 18),
-            _FilterBar(
-              selected: _filter,
-              customDays: _customDays,
-              onChanged: (next) => setState(() => _filter = next),
-              onPickCustom: _pickCustomRange,
-            ),
-            const SizedBox(height: 12),
-            _PayList(
-              items: visible,
-              label: payFilterLabel(_filter, _customDays),
-              onPay: _pay,
-              openSwipeId: _openSwipeId,
-              onOpenChanged: (id) =>
-                  setState(() => _openSwipeId = _openSwipeId == id ? null : id),
-            ),
+            if (items.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _PayStats(items: items),
+              const SizedBox(height: 18),
+              _FilterBar(
+                selected: _filter,
+                customDays: _customDays,
+                onChanged: (next) => setState(() => _filter = next),
+                onPickCustom: _pickCustomRange,
+              ),
+              const SizedBox(height: 12),
+              _PayList(
+                items: visible,
+                label: payFilterLabel(_filter, _customDays),
+                onPay: _pay,
+                openSwipeId: _openSwipeId,
+                onOpenChanged: (id) => setState(
+                  () => _openSwipeId = _openSwipeId == id ? null : id,
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -110,16 +104,64 @@ class _PayTabState extends ConsumerState<PayTab> {
 
 class _PayHero extends StatelessWidget {
   final List<PayItem> items;
-  const _PayHero({required this.items});
+  final bool notifyEnabled;
+  final VoidCallback onBellClick;
+  const _PayHero({
+    required this.items,
+    required this.notifyEnabled,
+    required this.onBellClick,
+  });
 
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) {
+      final dark = Theme.of(context).brightness == Brightness.dark;
+      final bg = dark ? const Color(0xFF29353E) : const Color(0xFFE1EBF4);
+      final fg = dark ? const Color(0xFF6FA8D6) : const Color(0xFF2E5F8A);
       return Card(
-        color: Theme.of(context).colorScheme.primaryContainer,
-        child: const Padding(
-          padding: EdgeInsets.all(28),
-          child: Column(children: [Icon(Icons.check_circle, size: 48), SizedBox(height: 10), Text('全部结清', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)), SizedBox(height: 4), Text('暂无待还款项')]),
+        color: bg,
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Text(
+                    '最近还款日',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const Spacer(),
+                  _Bell(
+                    enabled: notifyEnabled,
+                    onTap: onBellClick,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Icon(Icons.check_circle, size: 48, color: fg),
+              const SizedBox(height: 10),
+              Text(
+                '全部结清',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '暂无待还款项',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -129,17 +171,41 @@ class _PayHero extends StatelessWidget {
     final total = sameDay.fold<num>(0, (sum, item) => sum + item.amount);
     final name = names > 1 ? '${first.debt.name} 等$names笔' : first.debt.name;
     final urgency = calc.urgencyTier(first.daysFromToday);
-    final color = switch (urgency) {
-      'overdue' => Theme.of(context).colorScheme.errorContainer,
-      'crit' => Theme.of(context).colorScheme.tertiaryContainer,
-      _ => Theme.of(context).colorScheme.primaryContainer,
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final (bg, fg) = switch (urgency) {
+      'overdue' => (
+        dark ? const Color(0xFFB04040) : const Color(0xFFBE3A3A),
+        dark ? const Color(0xFF2A1113) : Colors.white,
+      ),
+      'crit' => (
+        dark ? const Color(0xFF402F31) : const Color(0xFFF9E8E8),
+        dark ? const Color(0xFFEE7B7B) : const Color(0xFFBE3A3A),
+      ),
+      'warn' => (
+        dark ? const Color(0xFF3A3225) : const Color(0xFFFAF0D9),
+        dark ? const Color(0xFFD69A3C) : const Color(0xFFA66A0A),
+      ),
+      _ => (
+        dark ? const Color(0xFF29353E) : const Color(0xFFE1EBF4),
+        dark ? const Color(0xFF6FA8D6) : const Color(0xFF2E5F8A),
+      ),
     };
     return Card(
-      color: color,
+      color: bg,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('最近还款日', style: Theme.of(context).textTheme.labelLarge),
+          Row(
+            children: [
+              Text('最近还款日', style: Theme.of(context).textTheme.labelLarge),
+              const Spacer(),
+              _Bell(
+                enabled: notifyEnabled,
+                onTap: onBellClick,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           Row(children: [
             Expanded(
@@ -148,22 +214,55 @@ class _PayHero extends StatelessWidget {
                 children: [
                   Text(
                     '${first.dueDate.month}月${first.dueDate.day}日',
-                    style: Theme.of(context).textTheme.titleLarge,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: fg,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   Text(
                     calc.relLabel(first.daysFromToday),
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: fg,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
               ),
             ),
-            Text('¥${calc.fmt(total)}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+            Text(
+              '¥${calc.fmt(total)}',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: fg,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
           ]),
           const SizedBox(height: 5),
-          Text(name),
+          Text(
+            name,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
         ]),
+      ),
+    );
+  }
+}
+
+class _Bell extends StatelessWidget {
+  final bool enabled;
+  final VoidCallback onTap;
+  final Color color;
+  const _Bell({required this.enabled, required this.onTap, required this.color});
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: '还款提醒通知设置',
+      onPressed: onTap,
+      icon: Icon(
+        enabled ? Icons.notifications_active : Icons.notifications_none,
+        color: color,
       ),
     );
   }

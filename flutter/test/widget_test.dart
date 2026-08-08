@@ -178,7 +178,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('tab-还款日')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('还款提醒通知'));
+    await tester.tap(find.byTooltip('还款提醒通知设置'));
     await tester.pumpAndSettle();
     expect(find.text('还款提醒通知'), findsWidgets);
     await tester.tap(find.byType(Switch));
