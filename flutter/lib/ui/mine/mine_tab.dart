@@ -15,6 +15,13 @@ import 'backup_screen.dart';
 import 'legal_screens.dart';
 import 'premium_screen.dart';
 
+/// 旧版"我的"页彩色图标徽章色（--ic-brand/blue/violet/rose/amber，明暗主题共用同一套）。
+const _icBrand = (Color(0xFFACECD4), Color(0xFF1D6D4F));
+const _icBlue = (Color(0xFFACCEEC), Color(0xFF1D486D));
+const _icViolet = (Color(0xFFC6ACEC), Color(0xFF3D1D6D));
+const _icRose = (Color(0xFFECACC1), Color(0xFF6D1D38));
+const _icAmber = (Color(0xFFECD2AC), Color(0xFF6D4D1D));
+
 class MineTab extends ConsumerWidget {
   const MineTab({super.key});
 
@@ -65,6 +72,7 @@ class MineTab extends ConsumerWidget {
             icon: Icons.auto_awesome,
             title: premium.hasPremium ? 'Premium 会员' : '升级 Premium',
             subtitle: premium.hasPremium ? '查看会员详情' : '云备份 · 报表导出 · AI 债务助手',
+            filled: premium.hasPremium,
             onTap: () => _push(context, const PremiumScreen()),
           ),
           const SizedBox(height: 12),
@@ -72,6 +80,7 @@ class MineTab extends ConsumerWidget {
             icon: Icons.cloud_outlined,
             title: '云备份',
             subtitle: 'Premium · 云端多份记录，换手机也能找回',
+            badge: _icBlue,
             onTap: () {
               if (!premium.hasPremium) {
                 _push(context, const PremiumScreen());
@@ -84,6 +93,7 @@ class MineTab extends ConsumerWidget {
             icon: Icons.inventory_2_outlined,
             title: '档案库',
             subtitle: '合同、还款回执等文档，仅存本机',
+            badge: _icViolet,
             onTap: () => _push(context, const ArchiveScreen()),
           ),
           const SizedBox(height: 12),
@@ -91,12 +101,14 @@ class MineTab extends ConsumerWidget {
             icon: Icons.download_outlined,
             title: '下载备份文件',
             subtitle: '导出全部债务和档案，存到本地',
+            badge: _icRose,
             onTap: () => _downloadBackup(context, ref),
           ),
           _EntryTile(
             icon: Icons.upload_outlined,
             title: '上传备份文件',
             subtitle: '从备份文件恢复，会覆盖当前数据',
+            badge: _icAmber,
             onTap: () => _importBackup(context, ref),
           ),
           const SizedBox(height: 12),
@@ -104,6 +116,7 @@ class MineTab extends ConsumerWidget {
             icon: Icons.info_outline,
             title: '关于我们',
             subtitle: '版本、协议与联系方式',
+            badge: _icBrand,
             onTap: () => _push(context, const AboutScreen()),
           ),
         ],
@@ -118,31 +131,41 @@ class _EntryTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final (Color, Color)? badge;
+  final bool filled;
   const _EntryTile({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.badge,
+    this.filled = false,
   });
   @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.symmetric(vertical: 4),
-    child: ListTile(
-      leading: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(12),
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final (bg, fg) = filled
+        ? (dark ? const Color(0xFF6FBE9E) : const Color(0xFF1E715F), dark ? const Color(0xFF0E2119) : Colors.white)
+        : (badge ?? _icBrand);
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ListTile(
+        leading: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Icon(icon, size: 20, color: fg),
         ),
-        child: Icon(icon),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: onTap,
       ),
-      title: Text(title),
-      subtitle: Text(subtitle),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: onTap,
-    ),
-  );
+    );
+  }
 }
 
 void _push(BuildContext context, Widget screen) =>
