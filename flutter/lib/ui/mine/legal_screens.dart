@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../account/account_screen.dart';
 
@@ -23,7 +25,7 @@ class AboutScreen extends StatelessWidget {
             context,
           ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
         ),
-        const Text('版本 1.0.0', textAlign: TextAlign.center),
+        const Text('版本 1.0', textAlign: TextAlign.center),
         const SizedBox(height: 24),
         const Card(
           child: ListTile(
@@ -84,100 +86,324 @@ class LegalScreen extends StatelessWidget {
   final LegalKind kind;
   const LegalScreen({super.key, required this.kind});
 
+  String get _title => switch (kind) {
+    LegalKind.privacy => '隐私政策',
+    LegalKind.agreement => '用户服务协议',
+    LegalKind.premiumTerms => '会员服务协议',
+  };
+
+  String get _asset => switch (kind) {
+    LegalKind.privacy => 'assets/legal/隐私政策.md',
+    LegalKind.agreement => 'assets/legal/用户服务协议.md',
+    LegalKind.premiumTerms => 'assets/legal/会员服务协议.md',
+  };
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(_title)),
+    body: FutureBuilder<String>(
+      future: rootBundle.loadString(_asset),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text('文档加载失败：${snapshot.error}'));
+        }
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return _LegalBody(raw: snapshot.data!);
+      },
+    ),
+  );
+}
+
+enum _BlockKind { h3, h4, p, ol, ul, table }
+
+class _Block {
+  final _BlockKind kind;
+  final List<dynamic> items; // String 或 List<String>（表格行/列表项）
+  const _Block(this.kind, this.items);
+}
+
+class _LegalBody extends StatelessWidget {
+  final String raw;
+  const _LegalBody({required this.raw});
+
   @override
   Widget build(BuildContext context) {
-    final document = _documents[kind]!;
-    return Scaffold(
-      appBar: AppBar(title: Text(document.$1)),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 36),
-        children: [
-          Text('更新日期：2026年8月', style: Theme.of(context).textTheme.bodySmall),
-          const SizedBox(height: 14),
-          for (final section in document.$2) ...[
-            Text(
-              section.$1,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 7),
-            SelectableText(section.$2, style: const TextStyle(height: 1.65)),
-            const SizedBox(height: 18),
-          ],
-        ],
-      ),
+    final blocks = _parse(raw);
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    final bodyStyle = TextStyle(
+      fontSize: 13.5,
+      height: 1.7,
+      color: muted,
     );
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 36),
+      children: [
+        for (final block in blocks) ...[
+          switch (block.kind) {
+            _BlockKind.h3 => Padding(
+              padding: const EdgeInsets.only(top: 18, bottom: 6),
+              child: Text(
+                block.items.first as String,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            _BlockKind.h4 => Padding(
+              padding: const EdgeInsets.only(top: 14, bottom: 4),
+              child: Text(
+                block.items.first as String,
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            _BlockKind.p => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: SelectableText.rich(
+                _inline(block.items.first as String, bodyStyle),
+                style: bodyStyle,
+              ),
+            ),
+            _BlockKind.ol || _BlockKind.ul => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final item in block.items)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 3),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            block.kind == _BlockKind.ol
+                                ? '${block.items.indexOf(item) + 1}. '
+                                : '• ',
+                            style: bodyStyle,
+                          ),
+                          Expanded(
+                            child: SelectableText.rich(
+                              _inline(item as String, bodyStyle),
+                              style: bodyStyle,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            _BlockKind.table => SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Table(
+                  border: TableBorder.all(
+                    color: theme.colorScheme.outlineVariant,
+                    width: 0.6,
+                  ),
+                  columnWidths: const {
+                    0: FixedColumnWidth(110),
+                    1: FixedColumnWidth(110),
+                    2: FixedColumnWidth(110),
+                  },
+                  defaultVerticalAlignment: TableCellVerticalAlignment.top,
+                  children: [
+                    for (final row in block.items)
+                      TableRow(
+                        decoration: BoxDecoration(
+                          color: block.items.indexOf(row) == 0
+                              ? theme.colorScheme.surfaceContainerHighest
+                              : null,
+                        ),
+                        children: [
+                          for (final cell in row as List<String>)
+                            Padding(
+                              padding: const EdgeInsets.all(6),
+                              child: SelectableText.rich(
+                                _inline(cell, bodyStyle),
+                                style: bodyStyle.copyWith(fontSize: 12.5),
+                              ),
+                            ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          },
+          const SizedBox(height: 2),
+        ],
+      ],
+    );
+  }
+
+  /// 解析 **加粗**、[链接](url) 与 `代码`（代码按纯文本处理，旧版渲染里没有代码样式）。
+  TextSpan _inline(String text, TextStyle base) {
+    final plain = text.replaceAll('`', '');
+    final spans = <InlineSpan>[];
+    final bold = RegExp(r'\*\*(.+?)\*\*');
+    var cursor = 0;
+    for (final match in bold.allMatches(plain)) {
+      if (match.start > cursor) {
+        spans.addAll(_linkify(plain.substring(cursor, match.start), base));
+      }
+      spans.addAll(
+        _linkify(match.group(1)!, base.copyWith(fontWeight: FontWeight.w700)),
+      );
+      cursor = match.end;
+    }
+    if (cursor < plain.length) {
+      spans.addAll(_linkify(plain.substring(cursor), base));
+    }
+    return TextSpan(style: base, children: spans);
+  }
+
+  List<InlineSpan> _linkify(String text, TextStyle base) {
+    final spans = <InlineSpan>[];
+    final link = RegExp(r'\[([^\]]+)\]\(([^)]+)\)');
+    var cursor = 0;
+    for (final match in link.allMatches(text)) {
+      if (match.start > cursor) {
+        spans.add(TextSpan(text: text.substring(cursor, match.start)));
+      }
+      final url = match.group(2)!;
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+          child: GestureDetector(
+            onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+            child: Text(
+              match.group(1)!,
+              style: base.copyWith(
+                color: Colors.blue,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+        ),
+      );
+      cursor = match.end;
+    }
+    if (cursor < text.length) {
+      spans.add(TextSpan(text: text.substring(cursor)));
+    }
+    return spans;
   }
 }
 
-final _documents = <LegalKind, (String, List<(String, String)>)>{
-  LegalKind.privacy: (
-    '隐私政策',
-    [
-      (
-        '一、我们处理哪些信息',
-        '债务记录、还款计划、档案文件和通知设置默认仅保存在您的设备本地。微信登录时，我们会取得微信返回的用户标识、昵称和头像，用于建立账户。您主动创建云备份时，相应债务、设置和档案会上传至云端；使用 AI 债务助手时，您的问题和结构化债务摘要会发送给 AI 服务生成回复。',
-      ),
-      (
-        '二、权限与设备能力',
-        '网络权限用于登录、云备份和 AI；通知权限用于还款提醒；文件访问能力仅在您主动导入、导出或保存档案时使用。我们不会在后台扫描您的相册或其他文件。',
-      ),
-      (
-        '三、保存与保护',
-        '本地数据由设备系统保护。云备份按您的账户隔离，并通过已认证的云函数访问；您可以逐条删除备份，也可以注销账户并清除服务器上的账户及云备份。AI 对话历史保存在本机，服务器不将其作为聊天记录长期保存，但服务运行日志可能按云平台规则短期留存。',
-      ),
-      (
-        '四、第三方处理',
-        '本产品使用腾讯云开发提供身份认证、云函数、云存储和 AI 生成服务。只有在您主动使用对应功能时，完成服务所必需的数据才会传输给相应服务方。',
-      ),
-      (
-        '五、您的权利与联系我们',
-        '您可以在应用内查看、更正和删除本地数据，删除云备份，或注销账户。如需咨询隐私问题，请联系 jenkjyu36@outlook.com。',
-      ),
-    ],
-  ),
-  LegalKind.agreement: (
-    '用户服务协议',
-    [
-      (
-        '一、服务说明',
-        'After Zero 是个人债务记录和计划工具，提供债务台账、还款提醒、统计分析、模拟测算，以及 Premium 会员专属的云备份、AI 债务助手和报表导出等能力。',
-      ),
-      (
-        '二、账户与数据',
-        '您应妥善保管自己的设备和微信账户，并保证录入信息合法。默认情况下用户内容只保存在设备本地；只有您主动使用云备份或 AI 功能时，相关数据才会经过服务器。恢复备份会整体覆盖本机数据，请在确认后操作。',
-      ),
-      ('三、使用规范', '不得利用本产品从事违法活动、攻击服务、绕过访问限制或侵害他人权益。我们可能对危害服务安全或违反法律的行为采取限制措施。'),
-      (
-        '四、重要提示',
-        '本产品的还款计划、利率反推、模拟测算和 AI 分析仅供参考，不构成财务、法律或投资建议。银行或平台的实际账单与合同约定优先，您应结合自身情况独立判断。',
-      ),
-      (
-        '五、变更与联系',
-        '服务内容和协议可能随产品发展依法更新，重要变更会在应用内说明。如有问题，请联系 jenkjyu36@outlook.com。',
-      ),
-    ],
-  ),
-  LegalKind.premiumTerms: (
-    '会员服务协议',
-    [
-      (
-        '一、会员权益',
-        'Premium 是目前唯一的付费会员等级，包含云备份、AI 债务助手、多策略对比规划和高级报表导出等权益，具体以购买时应用内展示为准。',
-      ),
-      (
-        '二、购买与价格',
-        '当前版本尚未开放真实支付，页面价格仅作产品展示。正式接入后，价格、扣款方式和退款规则以届时的应用商店或支付渠道页面为准。兑换码应通过官方认可渠道取得。',
-      ),
-      (
-        '三、账号与设备',
-        '会员权益与登录账户关联，不得转售、出租或通过技术手段绕过校验。注销账户会同时终止该账户的云端数据和相关权益，请谨慎操作。',
-      ),
-      (
-        '四、服务调整',
-        'AI 和云存储会持续产生服务成本，我们可能在合理范围内调整使用额度、模型或功能范围，并对重大变化提前说明；已经明确承诺的买断权益不会无故失效。',
-      ),
-    ],
-  ),
-};
+List<_Block> _parse(String raw) {
+  final lines = raw
+      .split('\n')
+      .map((line) => line.trimRight())
+      .toList();
+  final blocks = <_Block>[];
+  var i = 0;
+  // 跳过起草说明（blockquote）和标题前的空行
+  while (i < lines.length &&
+      (lines[i].trim().isEmpty || lines[i].trimLeft().startsWith('>'))) {
+    i++;
+  }
+  // 跳过 H1 标题
+  if (i < lines.length && lines[i].startsWith('# ')) i++;
+
+  String? pendingParagraph;
+  void flushParagraph() {
+    if (pendingParagraph != null) {
+      blocks.add(_Block(_BlockKind.p, [pendingParagraph!]));
+      pendingParagraph = null;
+    }
+  }
+
+  while (i < lines.length) {
+    final line = lines[i].trim();
+    if (line.isEmpty) {
+      flushParagraph();
+      i++;
+      continue;
+    }
+    // 生效/更新日期合并为一行（与旧版一致）
+    final effective = RegExp(r'^\*\*生效日期：(.+?)\*\*$');
+    final updated = RegExp(r'^\*\*更新日期：(.+?)\*\*$');
+    if (effective.hasMatch(line)) {
+      final e = effective.firstMatch(line)!.group(1)!;
+      var j = i + 1;
+      while (j < lines.length && lines[j].trim().isEmpty) {
+        j++;
+      }
+      if (j < lines.length && updated.hasMatch(lines[j].trim())) {
+        final u = updated.firstMatch(lines[j].trim())!.group(1)!;
+        flushParagraph();
+        blocks.add(_Block(_BlockKind.p, ['生效日期：$e　更新日期：$u']));
+        i = j + 1;
+        continue;
+      }
+    }
+    if (line.startsWith('## ')) {
+      flushParagraph();
+      blocks.add(_Block(_BlockKind.h3, [line.substring(3).trim()]));
+      i++;
+      continue;
+    }
+    if (line.startsWith('### ')) {
+      flushParagraph();
+      blocks.add(_Block(_BlockKind.h4, [line.substring(4).trim()]));
+      i++;
+      continue;
+    }
+    if (line.startsWith('|')) {
+      flushParagraph();
+      final rows = <List<String>>[];
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        final cells = lines[i]
+            .trim()
+            .trimLeft()
+            .trimRight()
+            .replaceAll(RegExp(r'^\||\|$'), '')
+            .split('|')
+            .map((cell) => cell.trim())
+            .toList();
+        if (!cells.every((cell) => RegExp(r'^:?-{3,}:?$').hasMatch(cell))) {
+          rows.add(cells);
+        }
+        i++;
+      }
+      if (rows.isNotEmpty) blocks.add(_Block(_BlockKind.table, rows));
+      continue;
+    }
+    final ol = RegExp(r'^\d+\.\s+(.+)$');
+    if (ol.hasMatch(line)) {
+      flushParagraph();
+      final items = <String>[];
+      while (i < lines.length) {
+        final m = ol.firstMatch(lines[i].trim());
+        if (m == null) break;
+        items.add(m.group(1)!);
+        i++;
+      }
+      blocks.add(_Block(_BlockKind.ol, items));
+      continue;
+    }
+    if (line.startsWith('- ')) {
+      flushParagraph();
+      final items = <String>[];
+      while (i < lines.length && lines[i].trim().startsWith('- ')) {
+        items.add(lines[i].trim().substring(2));
+        i++;
+      }
+      blocks.add(_Block(_BlockKind.ul, items));
+      continue;
+    }
+    pendingParagraph = line;
+    i++;
+  }
+  flushParagraph();
+  return blocks;
+}

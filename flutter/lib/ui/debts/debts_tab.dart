@@ -16,12 +16,48 @@ import 'debt_editor.dart';
 import 'debt_sort.dart';
 import 'payment_sheet.dart';
 import 'summary_hero.dart';
+import '../shared/swipe_reveal.dart';
 
-class DebtsTab extends ConsumerWidget {
+class DebtsTab extends ConsumerStatefulWidget {
   const DebtsTab({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DebtsTab> createState() => _DebtsTabState();
+}
+
+class _DebtsTabState extends ConsumerState<DebtsTab>
+    with SingleTickerProviderStateMixin {
+  String? _openSwipeId;
+  bool _jiggle = false;
+  late final AnimationController _jiggleAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _jiggleAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 380),
+    );
+  }
+
+  @override
+  void dispose() {
+    _jiggleAnim.dispose();
+    super.dispose();
+  }
+
+  void _setJiggle(bool value) {
+    if (value == _jiggle) return;
+    setState(() => _jiggle = value);
+    if (value) {
+      _jiggleAnim.repeat(reverse: true);
+    } else {
+      _jiggleAnim.stop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final debts = ref.watch(debtsProvider);
     final selectedSort = normalizedDebtSort(ref.watch(debtSortProvider));
     final active = debts.where((debt) => debt.settled != true).toList();
@@ -51,6 +87,11 @@ class DebtsTab extends ConsumerWidget {
           ),
         ),
         actions: [
+          if (_jiggle)
+            TextButton(
+              onPressed: () => _setJiggle(false),
+              child: const Text('保存'),
+            ),
           IconButton(
             tooltip: '账户',
             onPressed: () => Navigator.of(
@@ -91,6 +132,7 @@ class DebtsTab extends ConsumerWidget {
               children: [
                 SummaryHero(debts: debts),
                 _AiBanner(premium: premium, onTap: openAi),
+                const _DebtNoteToggle(),
                 const _SettledTitle(),
                 ...settled.map(
                   (debt) => _SettledDebtRow(
@@ -106,9 +148,13 @@ class DebtsTab extends ConsumerWidget {
                 children: [
                   SummaryHero(debts: debts),
                   _AiBanner(premium: premium, onTap: openAi),
+                  const _DebtNoteToggle(),
                   _ListHeader(
                     sortLabel: debtSortLabel(selectedSort),
-                    onSort: () => _openSortSheet(context, ref, selectedSort),
+                    onSort: () {
+                      if (_jiggle) return;
+                      _openSortSheet(context, ref, selectedSort);
+                    },
                   ),
                   const Padding(
                     padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
@@ -134,51 +180,32 @@ class DebtsTab extends ConsumerWidget {
                     ),
               onReorderItem: (oldIndex, newIndex) =>
                   _reorderActive(ref, sortedActive, oldIndex, newIndex),
+              buildDefaultDragHandles: false,
               children: [
-                for (final debt in sortedActive)
+                for (var index = 0; index < sortedActive.length; index++)
                   KeyedSubtree(
-                    key: ValueKey(debt.id),
-                    child: Dismissible(
-                      key: ValueKey('pay-${debt.id}'),
-                      direction: DismissDirection.endToStart,
-                      dismissThresholds: const {
-                        DismissDirection.endToStart: .35,
-                      },
-                      // Dismissible的framework契约要求secondaryBackground存在时也必须给background；
-                      // 本页只允许endToStart，所以正向层永远不会显示。
-                      background: const SizedBox.expand(),
-                      secondaryBackground: Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        padding: const EdgeInsets.only(right: 24),
-                        alignment: Alignment.centerRight,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.check_circle_outline,
-                              color: Colors.white,
+                    key: ValueKey(sortedActive[index].id),
+                    child: _jiggle
+                        ? ReorderableDragStartListener(
+                            index: index,
+                            child: _JiggleCard(
+                              index: index,
+                              animation: _jiggleAnim,
+                              child: _debtSwipeRow(
+                                context,
+                                ref,
+                                sortedActive[index],
+                              ),
                             ),
-                            SizedBox(height: 4),
-                            Text('销这期', style: TextStyle(color: Colors.white)),
-                          ],
-                        ),
-                      ),
-                      confirmDismiss: (_) async {
-                        await _payInstallment(context, ref, debt);
-                        return false;
-                      },
-                      child: DebtCard(
-                        debt: debt,
-                        onTap: () => _openDetail(context, debt),
-                      ),
-                    ),
+                          )
+                        : GestureDetector(
+                            onLongPress: () => _setJiggle(true),
+                            child: _debtSwipeRow(
+                              context,
+                              ref,
+                              sortedActive[index],
+                            ),
+                          ),
                   ),
               ],
             ),
@@ -191,6 +218,29 @@ class DebtsTab extends ConsumerWidget {
               icon: const Icon(Icons.add),
               label: const Text('新增一笔'),
             ),
+    );
+  }
+
+  Widget _debtSwipeRow(
+    BuildContext context,
+    WidgetRef ref,
+    Debt debt,
+  ) {
+    return SwipeReveal(
+      open: !_jiggle && _openSwipeId == debt.id,
+      onOpenChanged: (open) => setState(
+        () => _openSwipeId = open ? debt.id : null,
+      ),
+      actionLabel: '销这期',
+      actionColor: Theme.of(context).colorScheme.primary,
+      onAction: () => _payInstallment(context, ref, debt),
+      child: DebtCard(
+        debt: debt,
+        onTap: () {
+          if (_jiggle) return;
+          _openDetail(context, debt);
+        },
+      ),
     );
   }
 
@@ -315,6 +365,25 @@ class _ListHeader extends StatelessWidget {
   }
 }
 
+class _JiggleCard extends StatelessWidget {
+  final int index;
+  final Animation<double> animation;
+  final Widget child;
+  const _JiggleCard({
+    required this.index,
+    required this.animation,
+    required this.child,
+  });
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: animation,
+    builder: (context, _) {
+      final phase = (index.isEven ? 1.0 : -1.0) * animation.value;
+      return Transform.rotate(angle: .018 * phase, child: child);
+    },
+  );
+}
+
 class _SettledTitle extends StatelessWidget {
   const _SettledTitle();
 
@@ -379,11 +448,10 @@ class _EmptyState extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 20),
-            FilledButton.icon(
+            FilledButton(
               key: const Key('add-debt'),
               onPressed: onAdd,
-              icon: const Icon(Icons.add),
-              label: const Text('新增一笔债务'),
+              child: const Text('＋ 新增一笔'),
             ),
             const SizedBox(height: 20),
             _AiBanner(premium: premium, onTap: onAi),
@@ -448,7 +516,9 @@ class _AiBanner extends StatelessWidget {
                       ),
                       const SizedBox(height: 1),
                       Text(
-                        active ? '优先还款建议，围绕你的债务随问随答' : '开通 Premium，获取更省钱的还款顺序',
+                        active
+                            ? '雪球/雪崩法分析、优先还款建议，随问随答'
+                            : '开通 Premium，获取雪球/雪崩法分析与更省钱的还款顺序',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
@@ -461,6 +531,65 @@ class _AiBanner extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DebtNoteToggle extends StatefulWidget {
+  const _DebtNoteToggle();
+  @override
+  State<_DebtNoteToggle> createState() => _DebtNoteToggleState();
+}
+
+class _DebtNoteToggleState extends State<_DebtNoteToggle> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _open = !_open),
+            borderRadius: BorderRadius.circular(6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '计算口径说明',
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  _open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  size: 16,
+                  color: accent,
+                ),
+              ],
+            ),
+          ),
+          if (_open)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '在还总负债 = 各未结清债务「未还本金」之和（只算本金、不含未来利息/手续费）。\n'
+                '已还本金 = 全部债务（含已结清）「已还期数」的本金之和；另付利息 = 这些已还期数对应的利息/手续费之和。\n'
+                '经常性月供 = 各未结清债务下一期应还之和（不含标记为「一次性还清」的借款）。\n'
+                '已完成% = 已还本金 ÷（已还本金 + 在还总负债）。「提前结清」会问你实际付了多少钱，剩余本金计入已还本金，实付超出的部分计入另付利息（协商减免记为负数）。',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(height: 1.7),
+              ),
+            ),
+        ],
       ),
     );
   }

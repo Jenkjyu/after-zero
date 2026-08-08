@@ -23,10 +23,10 @@ class MineTab extends ConsumerWidget {
     final account = ref.watch(accountProvider);
     final premium = ref.watch(premiumProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('我的')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 32),
-        children: [
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 32),
+          children: [
           Center(
             child: InkWell(
               borderRadius: BorderRadius.circular(60),
@@ -34,13 +34,22 @@ class MineTab extends ConsumerWidget {
               child: Column(
                 children: [
                   CircleAvatar(
-                    radius: 38,
+                    radius: 39,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     backgroundImage: account?.avatarUrl.isNotEmpty == true
                         ? NetworkImage(account!.avatarUrl)
                         : null,
                     child: account?.avatarUrl.isNotEmpty == true
                         ? null
-                        : const Icon(Icons.person_outline, size: 36),
+                        : Icon(
+                            Icons.person_outline,
+                            size: 36,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -87,7 +96,7 @@ class MineTab extends ConsumerWidget {
           _EntryTile(
             icon: Icons.upload_outlined,
             title: '上传备份文件',
-            subtitle: '从 JSON 备份恢复，会覆盖当前数据',
+            subtitle: '从备份文件恢复，会覆盖当前数据',
             onTap: () => _importBackup(context, ref),
           ),
           const SizedBox(height: 12),
@@ -98,6 +107,7 @@ class MineTab extends ConsumerWidget {
             onTap: () => _push(context, const AboutScreen()),
           ),
         ],
+      ),
       ),
     );
   }

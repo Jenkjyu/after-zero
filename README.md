@@ -69,7 +69,7 @@ cd android
 
 Capacitor套壳系统WebView这套架构强依赖各手机厂商WebView行为，且不支持iOS。正在`flutter/`（独立顶层目录，自带`lib/`/`android/`/`ios/`/`pubspec.yaml`，跟`www/`/`android/`/`react/`不冲突）里用Flutter+Dart把整个App重写一遍，目标是彻底摆脱WebView依赖、同时支持iOS。开发期间两边共存，现有Capacitor版本不受影响；等Flutter版本做到功能完全对等，才会一次性删除`www/`/旧`android/`/`react/`等Capacitor专属文件，`flutter/`转正。状态管理用Riverpod，本地持久化第一版用`shared_preferences`（按现有localStorage的key对应，先求行为对齐）。腾讯云开发没有能用的官方Flutter SDK，云端接入层要绕开SDK直接用HTTP调用。
 
-目前已完成阶段 0–7；阶段 8 正在进行 Android 模拟器回归、真机/双端验证与逐页视觉收敛。Flutter Android 工程和所有 Dart 代码都只在`flutter/`内，原有`www/`、`react/`和根目录`android/`没有被改写；两套本地存储也不共享，因此旧版数据需通过既有 JSON 导入入口迁入。为便于未登记微信 OAuth 的体验，debug 包可传`--dart-define=AFTER_ZERO_PREVIEW=true`跳过登录门；该开关由`kDebugMode`限定，release/profile 仍强制登录。当前已通过`flutter analyze`、178 条测试和 Android 14 模拟器启动验证；iOS 与装有微信的 Android 真机验证尚未完成。详细阶段划分和当前进度见`CLAUDE.md`"Flutter重写"一节。
+目前已完成阶段 0–7；阶段 8 进行中以旧版为唯一基准的逐页对齐（内容/UI/交互/手势/功能）。2026-08-08 起完成了全量逐页审计，并按影响顺序修复了主要差异：三份法律文档接入完整原文、统计页结论引擎与各分区逐字对齐、各子页文案与字段对齐、左滑"露出销这期按钮"与长按拖拽编辑模式按旧版手势复刻；差异清单与修复记录见`docs/flutter-parity-audit-2026-08-08.md`。Flutter Android 工程和所有 Dart 代码都只在`flutter/`内，原有`www/`、`react/`和根目录`android/`没有被改写；两套本地存储也不共享，因此旧版数据需通过既有 JSON 导入入口迁入。为便于未登记微信 OAuth 的体验，debug 包可传`--dart-define=AFTER_ZERO_PREVIEW=true`跳过登录门；该开关由`kDebugMode`限定，release/profile 仍强制登录。当前已通过`flutter analyze`、178 条测试和 Android 14 模拟器验证；iOS 已按用户决定暂缓，装有微信的 Android 真机（微信登录/通知/SAF/分享）验证仍未完成。详细阶段划分和当前进度见`CLAUDE.md`"Flutter重写"一节。
 
 ## 备注
 

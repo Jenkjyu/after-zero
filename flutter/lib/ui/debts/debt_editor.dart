@@ -261,6 +261,13 @@ class _DebtEditorScreenState extends ConsumerState<DebtEditorScreen> {
   Widget build(BuildContext context) {
     final borrow = _plan.fold<num>(0, (sum, row) => sum + row.principal);
     final remaining = _plan.where((row) => !row.paid).fold<num>(0, (sum, row) => sum + row.principal);
+    final paidTerms = _plan.where((row) => row.paid).length;
+    final draft = <String, dynamic>{'plan': _plan.map((row) => row.toMap()).toList()};
+    calc.recompute(draft);
+    final rate = (draft['rate'] as num?) ?? 0;
+    final firstDay = _plan.isEmpty || calc.parseDate(_plan.first.date) == null
+        ? ''
+        : '${calc.parseDate(_plan.first.date)!.day}';
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.debt == null ? '新增债务' : '编辑债务'),
@@ -278,12 +285,40 @@ class _DebtEditorScreenState extends ConsumerState<DebtEditorScreen> {
             DropdownButtonFormField<String>(initialValue: _type, decoration: const InputDecoration(labelText: '借款类型', border: OutlineInputBorder()), items: const ['银行贷', '信用卡分期', '网贷', '私人借款'].map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(), onChanged: (value) => setState(() => _type = value!)),
             const SizedBox(height: 12),
             TextFormField(controller: _opened, keyboardType: TextInputType.datetime, decoration: const InputDecoration(labelText: '借款日（YYYY-MM-DD）', border: OutlineInputBorder()), validator: (value) => calc.parseDate(value ?? '') == null ? '请输入有效日期' : null),
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '还款日（几号）',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                  Text(
+                    firstDay,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+            ),
             SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('一次性还清'), subtitle: const Text('不计入经常性月供，销项即结清'), value: _oneTime, onChanged: _toggleOneTime),
             TextFormField(controller: _notes, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: '备注', border: OutlineInputBorder())),
             const Divider(height: 36),
             Text('还款计划', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 5),
-            Text('借款金额 ¥${calc.fmt(borrow)} · 剩余待还 ¥${calc.fmt(remaining)} · 共 ${_plan.length} 期', style: Theme.of(context).textTheme.bodySmall),
+            Wrap(
+              spacing: 20,
+              runSpacing: 8,
+              children: [
+                _summaryItem(context, '借款金额', '¥${calc.fmt(borrow)}'),
+                _summaryItem(context, '剩余待还', '¥${calc.fmt(remaining)}'),
+                _summaryItem(context, '年化', rate == 0 ? '0%' : '${rate.toStringAsFixed(2)}%'),
+                _summaryItem(context, '期数', '共 ${_plan.length} 期 · 已还 $paidTerms'),
+              ],
+            ),
             if (!_oneTime) ...[
               const SizedBox(height: 14),
               SegmentedButton<String>(segments: const [ButtonSegment(value: 'manual', label: Text('手动添加')), ButtonSegment(value: 'gen', label: Text('公式生成'))], selected: {_planMode}, onSelectionChanged: (value) => setState(() => _planMode = value.first)),
@@ -305,6 +340,26 @@ class _DebtEditorScreenState extends ConsumerState<DebtEditorScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _summaryItem(
+    BuildContext context,
+    String label,
+    String value,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.labelSmall),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ],
     );
   }
 }
@@ -344,6 +399,7 @@ class _BatchPanel extends StatelessWidget {
   const _BatchPanel({required this.column, required this.value, required this.month, required this.onColumn, required this.onApply});
   @override
   Widget build(BuildContext context) => ExpansionTile(
+    initiallyExpanded: true,
     title: const Text('批量设置'),
     childrenPadding: const EdgeInsets.only(bottom: 8),
     children: [
@@ -383,7 +439,7 @@ class _PlanRowEditorState extends State<_PlanRowEditor> {
     child: Padding(
       padding: const EdgeInsets.all(12),
       child: Column(children: [
-        Row(children: [Text('第 ${widget.index + 1} 期', style: Theme.of(context).textTheme.titleSmall), const Spacer(), Checkbox(value: widget.row.paid, onChanged: (value) => widget.onChanged(widget.row.copyWith(paid: value ?? false, paidAt: value == true ? widget.row.paidAt : null, paidAmount: value == true ? widget.row.paidAmount : null))), const Text('已还'), IconButton(onPressed: widget.onDelete, icon: const Icon(Icons.close), tooltip: '删除本期')]),
+        Row(children: [Text('第${widget.index + 1}期', style: Theme.of(context).textTheme.titleSmall), const Spacer(), Checkbox(value: widget.row.paid, onChanged: (value) => widget.onChanged(widget.row.copyWith(paid: value ?? false, paidAt: value == true ? widget.row.paidAt : null, paidAmount: value == true ? widget.row.paidAmount : null))), const Text('已还'), IconButton(onPressed: widget.onDelete, icon: const Icon(Icons.close), tooltip: '删除本期')]),
         TextField(controller: _date, onChanged: (value) => widget.onChanged(widget.row.copyWith(date: value)), decoration: const InputDecoration(labelText: '还款日（YYYY-MM-DD）', border: OutlineInputBorder())),
         const SizedBox(height: 8),
         Row(children: [Expanded(child: TextField(controller: _amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (value) => widget.onChanged(widget.row.copyWith(amount: _number(value))), decoration: const InputDecoration(labelText: '金额', border: OutlineInputBorder()))), const SizedBox(width: 8), Expanded(child: TextField(controller: _principal, keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: _principalChanged, decoration: const InputDecoration(labelText: '本金', border: OutlineInputBorder()))), const SizedBox(width: 8), Expanded(child: TextField(controller: _interest, keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: _interestChanged, decoration: const InputDecoration(labelText: '利息/费', border: OutlineInputBorder())))])

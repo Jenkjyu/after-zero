@@ -132,11 +132,13 @@ AI助手沿用`ai-advisor-design` skill的标准聊天心智：报告和问答�
 
 验证：新增`phase7_test.dart`覆盖“先取消再重排”的提醒ID/文案、中文PDF字节、三张Excel表的可读性和带档案dataURL的JSON备份；`flutter analyze`零issue，`flutter test`共178条全绿；PDF实际渲染视觉检查通过。按用户要求未构建APK。阶段7到此停止，下一步必须先由用户确认再开始阶段8。
 
-### 阶段8当前状态（2026-08-06，进行中）：Android 模拟器回归 + 视觉收敛，尚未完成
+### 阶段8当前状态（2026-08-09，进行中）：逐页对齐审计完成 + 主要差异已修复，视觉细节与真机验证待收尾
 
 Flutter 的全部源码与原生工程均在顶层`flutter/`，跟旧版`www/`、`react/`和根目录`android/`完全隔离；**不能把Flutter的`shared_preferences`误认为会读取Capacitor WebView的localStorage**，两者互不共享，旧版数据需用现有 JSON 导入功能迁入。模拟器回归已修复`flutter/android/.../MainActivity.kt`的重复类声明，以及`FlutterActivity`不能使用`registerForActivityResult()`的问题；SAF 改为`startActivityForResult()`+`onActivityResult()`，保留短临时路径、64KB流复制和清理语义。`flutter analyze`零issue、`flutter test`178条全绿、Android 14模拟器集成测试/登录门启动/preview启动都通过。
 
-为在新包名尚未完成微信真机登记前体验界面，`main.dart`提供`kDebugMode && bool.fromEnvironment('AFTER_ZERO_PREVIEW')`限定的预览开关：用`flutter build apk --debug --dart-define=AFTER_ZERO_PREVIEW=true`构建时可跳过登录门；release/profile无论是否传参都不能绕过。预览不会伪造云端账户，云备份/AI等仍按未登录处理。用户指出初版Material界面与旧版不一致后，已开始以旧版为视觉基线收敛：复用应用名/启动图标、雾灰石墨绿token、纯图标底栏、品牌页眉/头像和AI胶囊入口，并去掉DEBUG横幅和用户可见开发按钮；其余页面与有数据态仍要逐页核验。iOS和装有微信的Android真机、通知精确闹钟、SAF/分享、OAuth仍待完成，不能宣称阶段8完成。
+为在新包名尚未完成微信真机登记前体验界面，`main.dart`提供`kDebugMode && bool.fromEnvironment('AFTER_ZERO_PREVIEW')`限定的预览开关：用`flutter build apk --debug --dart-define=AFTER_ZERO_PREVIEW=true`构建时可跳过登录门；release/profile无论是否传参都不能绕过。预览不会伪造云端账户，云备份/AI等仍按未登录处理。
+
+2026-08-08 用户确认**先不做iOS端**（Xcode/CocoaPods暂缓，阶段8的iOS构建/双端验证整体推迟），并把阶段8的验收标准升级为"以旧版为唯一基准的全量对齐（内容/UI/交互/手势/功能）"。随后完成全量逐页审计（差异清单见`docs/flutter-parity-audit-2026-08-08.md`）并按影响顺序修复：三份法律文档改为直接渲染`docs/legal/`原文（新增`flutter/assets/legal/`+小型markdown渲染器+url_launcher）；统计页结论引擎完整移植（`flutter/lib/report/findings.dart`：利息集中度/高息/峰值月/负担四条规则+severity排序+"最该先动手的地方"条形展开，`rich_body.dart`渲染加粗），报告头/还清路径三里程碑/未来压力（面积柱状切换+图例+点月展开）/排行"其余N笔"/类型构成占比/如果只做一件事/导出+计算口径说明全部逐字对齐；各sheet文案字段对齐（AI横幅两种态、KPI网格、详情补"实付日期"列、编辑表单、通知设置、Premium、模拟器、AI欢迎区、多策略、我的页）；左滑手势用`flutter/lib/ui/shared/swipe_reveal.dart`复刻旧版"露出76px按钮+半程阈值开合"；长按拖拽补上jiggle编辑模式（长按进入抖动+保存退出，`ReorderableListView`用`buildDefaultDragHandles:false`+手动`ReorderableDragStartListener`）。审计中若干"缺X"是语义树导出的假阴性（排序选项/30天内chips/剩余本金列/从第几期开始/联系邮箱/通知权限时机/销这期按钮形式），已在审计文档更正。**剩余**：我的页暗色布局约20%像素差（卡片间距等视觉细节，需肉眼复核）；jiggle"按住450ms不点保存退出"细项；装有微信的Android真机、通知精确闹钟、SAF/分享、OAuth端到端验证——不能宣称阶段8完成。
 
 ## 纯计算函数：`www/js/calc.js` + `test/calc.test.js`
 

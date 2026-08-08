@@ -105,24 +105,27 @@ class SummaryHero extends StatelessWidget {
                       constraints.maxWidth,
                       '已还本金',
                       '¥${calc.fmt(summary['paidPrincipal'])}',
-                    ),
-                    _kpi(
-                      context,
-                      constraints.maxWidth,
-                      '另付利息',
-                      '¥${calc.fmt(summary['paidInterest'])}',
+                      sub: '另付利息 ¥${calc.fmt(summary['paidInterest'])}',
                     ),
                     _kpi(
                       context,
                       constraints.maxWidth,
                       '经常性月供',
                       '¥${calc.fmt(summary['monthly'])}',
+                      sub: '不含一次性还清',
                     ),
                     _kpi(
                       context,
                       constraints.maxWidth,
-                      '在还 / 已结清',
-                      '${summary['active']} / ${summary['settled']}',
+                      '在还笔数',
+                      '${summary['active']}',
+                    ),
+                    _kpi(
+                      context,
+                      constraints.maxWidth,
+                      '已结清',
+                      '${summary['settled']}',
+                      valueColor: const Color(0xFFA5F1DB),
                     ),
                   ],
                 ),
@@ -134,25 +137,39 @@ class SummaryHero extends StatelessWidget {
     );
   }
 
-  Widget _kpi(BuildContext context, double width, String label, String value) {
+  Widget _kpi(
+    BuildContext context,
+    double width,
+    String label,
+    String value, {
+    String? sub,
+    Color? valueColor,
+  }) {
     return SizedBox(
       width: (width - 12) / 2,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
+            value,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: valueColor ?? Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Text(
             label,
             style: Theme.of(
               context,
             ).textTheme.labelSmall?.copyWith(color: Colors.white70),
           ),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
+          if (sub != null)
+            Text(
+              sub,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Colors.white60,
+              ),
             ),
-          ),
         ],
       ),
     );

@@ -44,7 +44,7 @@ class DebtDetailScreen extends ConsumerWidget {
           const SizedBox(height: 24),
           Text('完整还款计划', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
-          Text('含已还期次；蓝色行为当前待还期。', style: Theme.of(context).textTheme.bodySmall),
+          Text('含已还，✓ 为已还', style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 10),
           _PlanTable(debt: debt),
           const SizedBox(height: 24),
@@ -53,14 +53,19 @@ class DebtDetailScreen extends ConsumerWidget {
               MaterialPageRoute(builder: (_) => DebtEditorScreen(debt: debt)),
             ),
             icon: const Icon(Icons.edit_outlined),
-            label: const Text('编辑债务'),
+            label: const Text('编辑'),
           ),
           if (debt.terms > 0) ...[
             const SizedBox(height: 10),
             FilledButton.icon(
               onPressed: () => _pay(context, ref, debt),
               icon: const Icon(Icons.check_circle_outline),
-              label: Text(debt.oneTime == true ? '一次性结清' : '销这一期'),
+            label: Text(debt.oneTime == true ? '一次性结清' : '销这期'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton(
+              onPressed: () => _openPrepay(context, debt),
+              child: const Text('提前还款模拟'),
             ),
             const SizedBox(height: 10),
             OutlinedButton(
@@ -69,18 +74,13 @@ class DebtDetailScreen extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 10),
-          OutlinedButton(
-            onPressed: () => _openPrepay(context, debt),
-            child: const Text('提前还款模拟'),
-          ),
-          if (debt.terms > 0) ...[
-            const SizedBox(height: 10),
-            TextButton(
-              onPressed: () => _settle(context, ref, debt),
-              style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
-              child: const Text('提前结清'),
+          TextButton(
+            onPressed: () => _settle(context, ref, debt),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
             ),
-          ],
+            child: const Text('提前结清'),
+          ),
         ],
       ),
     );
@@ -153,7 +153,7 @@ class _DetailsGrid extends StatelessWidget {
     final values = <(String, String)>[
       ('借款金额', debt.original == null ? '—' : '¥${calc.fmt(debt.original!)}'),
       ('剩余待还', '¥${calc.fmt(debt.balance)}'),
-      ('年化利率（推算）', debt.rate == 0 ? '无息' : '${debt.rate.toStringAsFixed(2)}%'),
+      ('年化利率(推算)', debt.rate == 0 ? '无息' : '${debt.rate.toStringAsFixed(2)}%'),
       (debt.oneTime == true ? '应还金额' : '下期月供', '¥${calc.fmt(debt.monthly)}'),
       ('下个还款日', debt.nextDate ?? '—'),
       ('借款日', debt.opened ?? '—'),
@@ -204,6 +204,7 @@ class _PlanTable extends StatelessWidget {
         columns: const [
           DataColumn(label: Text('期次')),
           DataColumn(label: Text('日期')),
+          DataColumn(label: Text('实付日期')),
           DataColumn(label: Text('金额')),
           DataColumn(label: Text('本金')),
           DataColumn(label: Text('利息/费')),
@@ -228,10 +229,11 @@ class _PlanTable extends StatelessWidget {
                 cells: [
                   DataCell(Text(row.settleRow == true ? '✓ 结清' : '${row.paid ? '✓ ' : ''}${i + 1}/$originalTerms')),
                   DataCell(Text(row.date)),
-                  DataCell(Text('¥${calc.money(row.amount)}$note')),
-                  DataCell(Text('¥${calc.money(row.principal)}')),
-                  DataCell(Text(row.settleRow == true && row.interest < 0 ? '减免¥${calc.money(-row.interest)}' : '¥${calc.money(row.interest)}')),
-                  DataCell(Text('¥${calc.fmt(remaining < 0 ? 0 : remaining)}')),
+                  DataCell(Text(row.paidAt ?? '—')),
+                  DataCell(Text('${calc.money(row.amount)}$note')),
+                  DataCell(Text(calc.money(row.principal))),
+                  DataCell(Text(row.settleRow == true && row.interest < 0 ? '减免${calc.money(-row.interest)}' : calc.money(row.interest))),
+                  DataCell(Text(calc.fmt(remaining < 0 ? 0 : remaining))),
                 ],
               );
             }(),
@@ -328,11 +330,18 @@ class _PrepaySheetState extends State<_PrepaySheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('提前还款模拟', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 6),
+          Text(
+            '模拟提前多还一笔钱，看看能省多少利息、提前多久还清（按当前月供、推算年化利率测算，实际以银行/平台真实计算为准）。',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(height: 1.6),
+          ),
           const SizedBox(height: 14),
           SegmentedButton<String>(
             segments: const [
-              ButtonSegment(value: 'once', label: Text('单次提前还')),
-              ButtonSegment(value: 'recurring', label: Text('每月额外还')),
+              ButtonSegment(value: 'once', label: Text('单次多还')),
+              ButtonSegment(value: 'recurring', label: Text('每期多还')),
             ],
             selected: {_mode},
             onSelectionChanged: (v) => setState(() => _mode = v.first),
@@ -347,7 +356,7 @@ class _PrepaySheetState extends State<_PrepaySheet> {
           TextField(
             controller: _extra,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(labelText: _mode == 'once' ? '额外还款金额' : '每月额外还款金额', prefixText: '¥ ', border: const OutlineInputBorder()),
+            decoration: InputDecoration(labelText: '多还金额 ¥ *', border: const OutlineInputBorder()),
           ),
           const SizedBox(height: 12),
           FilledButton(onPressed: _calculate, child: const Text('开始测算')),

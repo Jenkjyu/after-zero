@@ -47,6 +47,7 @@ dependencies:
   excel: ^4.0.6
   share_plus: ^12.0.2
   flutter_pdfview: ^1.4.5
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -74,6 +75,7 @@ flutter:
 
   assets:
     - assets/fonts/NotoSansSC-wght.ttf
+    - assets/legal/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

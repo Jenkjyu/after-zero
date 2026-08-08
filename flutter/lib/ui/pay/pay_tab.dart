@@ -9,6 +9,7 @@ import 'package:after_zero/ui/debts/payment_sheet.dart';
 
 import 'pay_items.dart';
 import 'notify_screen.dart';
+import '../shared/swipe_reveal.dart';
 
 class PayTab extends ConsumerStatefulWidget {
   const PayTab({super.key});
@@ -19,6 +20,7 @@ class PayTab extends ConsumerStatefulWidget {
 class _PayTabState extends ConsumerState<PayTab> {
   String _filter = 'next';
   int? _customDays;
+  String? _openSwipeId;
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +62,9 @@ class _PayTabState extends ConsumerState<PayTab> {
               items: visible,
               label: payFilterLabel(_filter, _customDays),
               onPay: _pay,
+              openSwipeId: _openSwipeId,
+              onOpenChanged: (id) =>
+                  setState(() => _openSwipeId = _openSwipeId == id ? null : id),
             ),
           ],
         ],
@@ -137,7 +142,23 @@ class _PayHero extends StatelessWidget {
           Text('最近还款日', style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: Text('${first.dueDate.month}月${first.dueDate.day}日 · ${calc.relLabel(first.daysFromToday)}', style: Theme.of(context).textTheme.titleLarge)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${first.dueDate.month}月${first.dueDate.day}日',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  Text(
+                    calc.relLabel(first.daysFromToday),
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Text('¥${calc.fmt(total)}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
           ]),
           const SizedBox(height: 5),
@@ -209,7 +230,15 @@ class _PayList extends StatelessWidget {
   final List<PayItem> items;
   final String label;
   final Future<void> Function(PayItem) onPay;
-  const _PayList({required this.items, required this.label, required this.onPay});
+  final String? openSwipeId;
+  final ValueChanged<String?> onOpenChanged;
+  const _PayList({
+    required this.items,
+    required this.label,
+    required this.onPay,
+    required this.openSwipeId,
+    required this.onOpenChanged,
+  });
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) return const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('该分类下暂无待还款项')));
@@ -217,15 +246,15 @@ class _PayList extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(padding: const EdgeInsets.fromLTRB(8, 0, 8, 6), child: Text('$label · ${items.length} 期 · ¥${calc.fmt(total)}', style: Theme.of(context).textTheme.titleSmall)),
       for (final item in items)
-        Dismissible(
+        SwipeReveal(
           key: ValueKey('pay-${item.debt.id}-${item.planIndex}'),
-          direction: DismissDirection.endToStart,
-          background: const SizedBox.expand(),
-          secondaryBackground: Container(margin: const EdgeInsets.symmetric(vertical: 5), alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 24), decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, borderRadius: BorderRadius.circular(18)), child: const Text('销这期', style: TextStyle(color: Colors.white))),
-          confirmDismiss: (_) async {
-            await onPay(item);
-            return false;
-          },
+          open: openSwipeId == '${item.debt.id}-${item.planIndex}',
+          onOpenChanged: (open) =>
+              onOpenChanged(open ? '${item.debt.id}-${item.planIndex}' : null),
+          actionLabel: '销这期',
+          actionColor: Theme.of(context).colorScheme.primary,
+          onAction: () => onPay(item),
+          borderRadius: 18,
           child: _PayRow(item: item, onPay: () => onPay(item)),
         ),
     ]);
@@ -251,7 +280,7 @@ class _PayRow extends StatelessWidget {
         onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DebtDetailScreen(debtId: item.debt.id))),
         leading: Container(width: 48, alignment: Alignment.center, decoration: BoxDecoration(color: color.withValues(alpha: .14), borderRadius: BorderRadius.circular(12)), child: Column(mainAxisSize: MainAxisSize.min, children: [Text('${item.dueDate.month}/${item.dueDate.day}', style: TextStyle(color: color, fontWeight: FontWeight.w800)), Text(calc.relLabel(item.daysFromToday), style: TextStyle(fontSize: 10, color: color))])),
         title: Text(item.debt.name),
-        subtitle: Text(item.isNextUnpaid ? '可销这期' : '请先销更早的未还期次'),
+        subtitle: const SizedBox.shrink(),
         trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [Text('¥${calc.fmt(item.amount)}', style: const TextStyle(fontWeight: FontWeight.w700)), TextButton(onPressed: () => onPay(), child: const Text('销这期'))]),
       ),
     );

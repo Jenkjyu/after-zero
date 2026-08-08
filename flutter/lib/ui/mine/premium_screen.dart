@@ -45,7 +45,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Text('云备份、AI 债务助手与多策略规划'),
+                  const Text('解锁云备份、AI 债务助手与更多功能'),
                 ],
               ),
             ),
@@ -54,17 +54,22 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
           const _Feature(
             icon: Icons.cloud_outlined,
             title: '云备份',
-            subtitle: '手动创建多份云端记录，每条都能单独恢复',
+            subtitle: '手动创建云端备份，每条记录都能单独恢复，换手机也能找回数据',
           ),
           const _Feature(
-            icon: Icons.psychology_outlined,
-            title: 'AI 债务助手',
-            subtitle: '分析优先还款顺序，并支持围绕自己的数据继续追问',
+            icon: Icons.auto_graph_outlined,
+            title: 'AI 债务分析报告',
+            subtitle: '雪球法 / 雪崩法分析，告诉你优先还哪笔最省钱',
+          ),
+          const _Feature(
+            icon: Icons.chat_outlined,
+            title: 'AI 智能问答',
+            subtitle: '针对你自己的债务数据直接提问，随问随答',
           ),
           const _Feature(
             icon: Icons.compare_arrows,
             title: '多策略对比规划',
-            subtitle: '雪球法、雪崩法和自定义顺序并排比较',
+            subtitle: '雪球法/雪崩法/自定义顺序并排对比，哪种最省利息一眼看出',
           ),
           const SizedBox(height: 14),
           Card(
@@ -128,7 +133,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
             ],
           ),
           Text(
-            '目前尚未接入真实支付；正式开通后以应用商店或届时接入的支付渠道为准。',
+            '。目前应用内价格为占位展示，尚未开通真实支付渠道；正式开通后，扣款、续订与取消方式将以届时接入的支付渠道为准。',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall,
           ),

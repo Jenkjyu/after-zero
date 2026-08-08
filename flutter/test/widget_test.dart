@@ -102,7 +102,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('gen-first')), '2026-09-15');
     await tester.tap(find.text('按等额本息生成计划'));
     await tester.pumpAndSettle();
-    expect(find.text('第 1 期'), findsOneWidget);
+    expect(find.text('第1期'), findsOneWidget);
 
     await tester.drag(find.byType(ListView), const Offset(0, -1000));
     await tester.pumpAndSettle();

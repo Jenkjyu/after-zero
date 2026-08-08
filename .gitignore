@@ -3,6 +3,9 @@ node_modules/
 *.log
 cloudbase/cloudbaserc.json
 PROGRESS.md
+# 本机专属：项目skill与调试日志（logs/里可能含请求密钥，绝不能进git）
+.agents/
+logs/
 # react/ 是 Vite 构建产物，源码在 react/src/ 里(该进git)；产物由 npm run build:react
 # 生成到这里，跟 android/app/src/main/assets/public/ 是同一类"可重新生成的东西不进git"。
 www/js/react-debts/

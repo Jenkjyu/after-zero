@@ -44,18 +44,27 @@ class _StrategyCompareScreenState extends ConsumerState<StrategyCompareScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 36),
         children: [
+          Text(
+            '该按什么顺序还？',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
           const Card(
             child: Padding(
               padding: EdgeInsets.all(16),
               child: Text(
-                '对比雪球法（先还余额最小）、雪崩法（先还利率最高）和自定义顺序。一笔还完后，它的月供会自动滚去加速下一笔。',
+                '对比雪球法（先还余额最小的，见效快、容易坚持）、雪崩法（先还利率最高的，总利息最省）和你自己排的顺序——一笔还完，它的月供会自动滚去加速下一笔（雪球效应）。',
               ),
             ),
           ),
           if (active.length < 2)
             const Padding(
               padding: EdgeInsets.all(20),
-              child: Text('至少要有 2 笔在还债务，才有还款顺序可比。'),
+              child: Text(
+                "至少要有 2 笔在还债务才有'顺序'可比——你现在只有 1 笔在还债务。",
+              ),
             )
           else ...[
             TextField(
@@ -64,10 +73,15 @@ class _StrategyCompareScreenState extends ConsumerState<StrategyCompareScreen> {
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
-              decoration: const InputDecoration(labelText: '每月额外投入 ¥（不填按 0 算）'),
+              decoration: const InputDecoration(
+                labelText: '每月额外投入 ¥（不分给哪笔，整体滚给排在最前的那笔，不填按 0 算）',
+              ),
             ),
             const SizedBox(height: 16),
-            Text('自定义顺序', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              '自定义顺序（上下移动排列，越靠前越优先集中火力还）',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 6),
             for (var i = 0; i < _customOrder!.length; i++)
               _OrderRow(

@@ -36,6 +36,13 @@ class _NotifyScreenState extends ConsumerState<NotifyScreen> {
             icon: const Icon(Icons.notifications_active_outlined),
             label: const Text('发送测试通知（10秒后）'),
           ),
+          const SizedBox(height: 8),
+          Text(
+            '用来验证手机能不能收到，不用等真实还款日；如果测试通知也收不到，大概率是系统电池优化/自启动限制拦了它，去系统设置里把本App加入白名单',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(height: 1.6),
+          ),
           const SizedBox(height: 20),
           Text(
             '提醒规则（对所有在还债务统一生效）',
@@ -64,14 +71,16 @@ class _NotifyScreenState extends ConsumerState<NotifyScreen> {
           const SizedBox(height: 20),
           Text('添加新提醒', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          DropdownButtonFormField<int>(
-            initialValue: _offset,
-            decoration: const InputDecoration(labelText: '提前时间'),
-            items: [
+          Wrap(
+            spacing: 8,
+            children: [
               for (var i = 0; i <= 3; i++)
-                DropdownMenuItem(value: i, child: Text(_offsetLabel(i))),
+                ChoiceChip(
+                  label: Text(_offsetLabel(i)),
+                  selected: _offset == i,
+                  onSelected: (_) => setState(() => _offset = i),
+                ),
             ],
-            onChanged: (value) => setState(() => _offset = value ?? 0),
           ),
           const SizedBox(height: 10),
           ListTile(

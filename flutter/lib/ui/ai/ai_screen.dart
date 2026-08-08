@@ -385,7 +385,11 @@ class _AiScreenState extends ConsumerState<AiScreen> {
             child: SizedBox(
               height: MediaQuery.sizeOf(context).height * .65,
               child: history.isEmpty
-                  ? const Center(child: Text('还没有历史对话'))
+                  ? const Center(
+                      child: Text(
+                        '还没有历史对话——问过一次之后会出现在这里',
+                      ),
+                    )
                   : ListView.builder(
                       itemCount: history.length,
                       itemBuilder: (context, index) {
@@ -498,19 +502,27 @@ class _Welcome extends StatelessWidget {
         children: [
           const Icon(Icons.auto_awesome, size: 54),
           const SizedBox(height: 12),
-          Text('今天想先解决什么？', style: Theme.of(context).textTheme.titleLarge),
+          Text('有什么想聊的？', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 6),
+          Text(
+            '我能看到你当前的在还债务，可以帮你排优先级、测算利息，或者直接问我一个具体问题。',
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(height: 1.6),
+          ),
           const SizedBox(height: 14),
           ActionChip(
             label: const Text('生成分析报告'),
             onPressed: () => onPrompt('生成分析报告', true),
           ),
           ActionChip(
-            label: const Text('我应该优先还哪一笔？'),
-            onPressed: () => onPrompt('我应该优先还哪一笔？', false),
+            label: const Text('我该先还哪一笔？'),
+            onPressed: () => onPrompt('我该先还哪一笔？', false),
           ),
           ActionChip(
-            label: const Text('怎么降低未来三个月的还款压力？'),
-            onPressed: () => onPrompt('怎么降低未来三个月的还款压力？', false),
+            label: const Text('怎样最快还清所有债务？'),
+            onPressed: () => onPrompt('怎样最快还清所有债务？', false),
           ),
         ],
       ),

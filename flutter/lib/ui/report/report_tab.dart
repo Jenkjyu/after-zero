@@ -7,12 +7,15 @@ import 'package:after_zero/calc/calc.dart' as calc;
 import 'package:after_zero/data/models.dart';
 import 'package:after_zero/data/providers.dart';
 import 'package:after_zero/export/report_export_service.dart';
+import 'package:after_zero/report/findings.dart';
+import 'package:after_zero/report/rich_body.dart';
 import 'package:after_zero/ui/mine/premium_screen.dart';
 
 import 'strategy_compare_screen.dart';
 
-/// “统计”页是报告，而不是重复债务页顶部 KPI：先给当前判断，再展示还清路径、未来压力、
-/// 余额集中度和类型构成。所有数字都只读 calc.dart 的既有报告函数。
+/// “统计”页是报告：先给当前判断（报告头）→ 三件值得注意的事 + 最该先动手的地方
+/// （findings.dart 规则引擎）→ 多策略对比入口 → 还清路径 → 未来压力 → 余额排行 →
+/// 类型构成 → 如果只做一件事 + 导出 + 计算口径说明。与旧版 react/src/report 逐段对齐。
 class ReportTab extends ConsumerWidget {
   const ReportTab({super.key});
 
@@ -29,9 +32,14 @@ class ReportTab extends ConsumerWidget {
     }
     final months = calc.pressureWindowMonths(maps);
     final pressure = calc.computeUpcomingPressure(maps, months);
-    final monthly = calc.computeMonthlyRepayment(maps);
     final payoff = data['payoffDate'] as String?;
     final monthsLeft = _monthsUntil(payoff);
+    final findings = buildFindings(
+      toDebtRows(active),
+      data,
+      pressure,
+    );
+    final lead = findings.where((finding) => finding.actionable).firstOrNull;
     return Scaffold(
       appBar: AppBar(title: const Text('统计')),
       body: ListView(
@@ -39,119 +47,28 @@ class ReportTab extends ConsumerWidget {
         children: [
           _ReportHead(data: data, summary: summary, monthsLeft: monthsLeft),
           const SizedBox(height: 26),
-          _InsightSection(active: active, pressure: pressure),
+          _InsightSection(findings: findings),
+          if (findings.isNotEmpty)
+            _ActionBox(lead: findings.where((f) => f.actionable).firstOrNull),
           if (active.length >= 2) ...[
-            const SizedBox(height: 18),
-            _StrategyCta(premium: premium),
+            const SizedBox(height: 26),
+            const _StrategyCtaSection(),
           ],
           const SizedBox(height: 26),
           _JourneyCard(data: data, summary: summary, monthsLeft: monthsLeft),
           const SizedBox(height: 26),
           _PressureCard(pressure: pressure),
           const SizedBox(height: 26),
-          _MonthlyRepaymentCard(months: monthly),
-          const SizedBox(height: 26),
           _RankCard(active: active),
           const SizedBox(height: 26),
           _TypeCard(data: data),
-          const SizedBox(height: 24),
-          _ExportCard(premium: premium),
+          const SizedBox(height: 26),
+          _OutroCard(lead: lead, premium: premium),
+          const SizedBox(height: 8),
+          const _NoteToggle(),
         ],
       ),
     );
-  }
-}
-
-class _StrategyCta extends StatelessWidget {
-  final Premium premium;
-  const _StrategyCta({required this.premium});
-  @override
-  Widget build(BuildContext context) => Card(
-    color: Theme.of(context).colorScheme.primaryContainer,
-    child: ListTile(
-      leading: const Icon(Icons.compare_arrows),
-      title: const Text('多策略对比规划'),
-      subtitle: const Text('雪球法、雪崩法和自定义顺序，看看哪种最省利息'),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => premium.hasPremium
-              ? const StrategyCompareScreen()
-              : const PremiumScreen(),
-        ),
-      ),
-    ),
-  );
-}
-
-class _ExportCard extends ConsumerWidget {
-  final Premium premium;
-  const _ExportCard({required this.premium});
-  @override
-  Widget build(BuildContext context, WidgetRef ref) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('导出报告', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _export(context, ref, 'Excel'),
-                  icon: const Icon(Icons.table_chart_outlined),
-                  label: const Text('Excel'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _export(context, ref, 'PDF'),
-                  icon: const Icon(Icons.picture_as_pdf_outlined),
-                  label: const Text('PDF'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
-  );
-
-  Future<void> _export(BuildContext context, WidgetRef ref, String kind) async {
-    if (!premium.hasPremium) {
-      Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => const PremiumScreen()));
-      return;
-    }
-    try {
-      final debts = ref.read(debtsProvider);
-      final exporter = ref.read(reportExportServiceProvider);
-      final saver = ref.read(systemFileSaverProvider);
-      final stamp = exportDateStamp();
-      final bytes = kind == 'Excel'
-          ? exporter.buildExcel(debts)
-          : await exporter.buildPdf(debts);
-      final saved = await saver.saveBytes(
-        bytes: bytes,
-        filename: 'AfterZero统计报表$stamp.${kind == 'Excel' ? 'xlsx' : 'pdf'}',
-        mimeType: kind == 'Excel' ? reportExcelMime : reportPdfMime,
-      );
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(saved ? '$kind 已保存 ✓' : '已取消保存')),
-        );
-      }
-    } catch (error) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('$kind 导出失败：$error')));
-      }
-    }
   }
 }
 
@@ -188,12 +105,12 @@ class _ReportEmpty extends StatelessWidget {
           Text(
             (summary['settled'] as int) > 0
                 ? '已经结清 ${summary['settled']} 笔，累计还掉本金 ¥${calc.fmt(summary['paidPrincipal'])}。'
-                : '新增一笔债务后，这里会生成一份完整的分析报告。',
+                : '还没有记录任何债务。到"首页"新增一笔之后，这里会生成一份完整的分析报告。',
             textAlign: TextAlign.center,
           ),
           if ((summary['settled'] as int) > 0) ...[
             const SizedBox(height: 18),
-            _ExportCard(premium: premium),
+            _ExportRow(premium: premium),
           ],
         ],
       ),
@@ -212,25 +129,45 @@ class _ReportHead extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    final total = data['totalBalance'] as num;
+    final total = (data['totalBalance'] as num).toDouble();
     final date = data['payoffDate'] as String?;
+    final timeline = (data['timeline'] as List<dynamic>?) ?? const [];
+    final falling = date != null && total > 0;
+    final settled = (summary['settled'] as int?) ?? 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '债务体检 · ${calc.fmtDate(calc.today0())}',
+          '债务体检 · ${timeline.isEmpty ? '' : (timeline.first as Map)['date']}',
           style: Theme.of(context).textTheme.labelLarge,
         ),
         const SizedBox(height: 5),
-        Text(
-          date == null ? '当前负债概况' : '你的负债正在稳定下降',
+        Text.rich(
+          TextSpan(
+            children: falling
+                ? const [
+                    TextSpan(text: '你的负债正在'),
+                    TextSpan(
+                      text: '稳定下降',
+                      style: TextStyle(fontStyle: FontStyle.italic),
+                    ),
+                  ]
+                : const [TextSpan(text: '当前负债概况')],
+          ),
           style: Theme.of(
             context,
           ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 8),
-        Text(
-          '目前还欠 ¥${calc.fmt(total)}，分布在 ${summary['active']} 笔债务里；已还本金 ¥${calc.fmt(summary['paidPrincipal'])}，已走完 ${summary['pct']}%。${date == null ? ' 当前没有可推算的还清日期。' : ' 按当前计划，每月约还 ¥${calc.fmt(summary['monthly'])}，${monthsLeft ?? 0} 个月后（$date）归零。'}',
+        RichBody(
+          '目前还欠 **¥${calc.fmt(total)}**，分布在 **${summary['active']}** 笔债务里'
+          '${settled > 0 ? '（另有 **$settled** 笔已结清）' : ''}。 '
+          '已经还掉本金 **¥${calc.fmt(summary['paidPrincipal'])}**，走完了全程的 '
+          '**${summary['pct']}%**。'
+          '${date != null
+              ? ' 按现在的还款计划，每月要还 **¥${calc.fmt(summary['monthly'])}**，'
+                    '${monthsLeft != null ? '**$monthsLeft** 个月后' : ''}（$date）这个数字会归零。'
+              : ' 当前没有未还的还款计划，算不出还清日期。'}',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.55),
         ),
       ],
@@ -238,55 +175,266 @@ class _ReportHead extends StatelessWidget {
   }
 }
 
+const _cnNum = ['', '一', '两', '三'];
+
+Color _toneFg(BuildContext context, FindingTone tone) {
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  return switch (tone) {
+    FindingTone.risk => dark ? const Color(0xFFEE7B7B) : const Color(0xFFBE3A3A),
+    FindingTone.warn => dark ? const Color(0xFFD69A3C) : const Color(0xFFA66A0A),
+    FindingTone.info || FindingTone.good => dark
+        ? const Color(0xFF6FA8D6)
+        : const Color(0xFF2E5F8A),
+  };
+}
+
+Color _toneBg(BuildContext context, FindingTone tone) {
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  return switch (tone) {
+    FindingTone.risk => dark ? const Color(0xFF402F31) : const Color(0xFFF9E8E8),
+    FindingTone.warn => dark ? const Color(0xFF3A3225) : const Color(0xFFFAF0D9),
+    FindingTone.info || FindingTone.good => dark
+        ? const Color(0xFF29353E)
+        : const Color(0xFFE1EBF4),
+  };
+}
+
+IconData _findingIcon(Finding finding) => switch (finding.id) {
+  'concentration' => Icons.paid_outlined,
+  'highrate' => Icons.error_outline,
+  'peak' => Icons.show_chart,
+  _ => Icons.check_circle_outline,
+};
+
 class _InsightSection extends StatelessWidget {
-  final List<Debt> active;
-  final Map<String, dynamic> pressure;
-  const _InsightSection({required this.active, required this.pressure});
+  final List<Finding> findings;
+  const _InsightSection({required this.findings});
   @override
   Widget build(BuildContext context) {
-    final high = active.where((debt) => debt.rate >= 18).toList()
-      ..sort((a, b) => b.rate.compareTo(a.rate));
-    final peak = pressure['peak'] as Map<String, dynamic>?;
-    final overdue = pressure['overdue'] as Map<String, dynamic>;
-    final insights = <(IconData, String, String)>[
-      if (high.isNotEmpty)
-        (
-          Icons.local_fire_department_outlined,
-          '高息债务优先处理',
-          '${high.first.name} 的推算年化为 ${high.first.rate.toStringAsFixed(2)}%，是当前最高的一笔。',
-        ),
-      if ((overdue['count'] as int) > 0)
-        (
-          Icons.warning_amber_rounded,
-          '有 ${overdue['count']} 期已逾期',
-          '逾期金额 ¥${calc.fmt(overdue['amount'])}，建议先处理已错过的款项。',
-        ),
-      if (peak != null)
-        (
-          Icons.trending_up,
-          '压力最高的月份',
-          '${peak['month']} 预计需还 ¥${calc.fmt(peak['total'])}，提前安排现金流。',
-        ),
-    ];
+    if (findings.isEmpty) return const SizedBox.shrink();
+    final top3 = findings.take(3).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('这段时间发生了什么', style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: 4),
         Text(
-          '${insights.length}件值得注意的事',
+          '${top3.length < _cnNum.length ? _cnNum[top3.length] : top3.length}件值得注意的事',
           style: Theme.of(context).textTheme.titleLarge,
         ),
-        const SizedBox(height: 10),
-        for (final insight in insights)
-          Card(
-            child: ListTile(
-              leading: Icon(insight.$1),
-              title: Text(insight.$2),
-              subtitle: Text(insight.$3),
+        const SizedBox(height: 12),
+        for (final finding in top3)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: _toneBg(context, finding.tone),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(
+                    _findingIcon(finding),
+                    size: 16,
+                    color: _toneFg(context, finding.tone),
+                  ),
+                ),
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        finding.title,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      RichBody(
+                        finding.body,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          height: 1.6,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
       ],
+    );
+  }
+}
+
+class _ActionBox extends StatelessWidget {
+  final Finding? lead;
+  const _ActionBox({required this.lead});
+  @override
+  Widget build(BuildContext context) {
+    if (lead == null || lead!.actionTitle == null || lead!.detail == null) {
+      return const SizedBox.shrink();
+    }
+    final detail = lead!.detail!;
+    final fg = _toneFg(context, lead!.tone);
+    final bg = _toneBg(context, lead!.tone);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 22),
+        Text('最该先动手的地方', style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 4),
+        Text(
+          lead!.actionTitle!,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(_findingIcon(lead!), size: 15, color: fg),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      detail.top,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: fg,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 7),
+              RichBody(
+                detail.body,
+                style: const TextStyle(fontSize: 12.5, height: 1.7),
+              ),
+              const SizedBox(height: 10),
+              for (final bar in detail.bars)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 52,
+                        child: Text(
+                          bar.nm,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: Container(
+                            height: 6,
+                            color: Colors.black.withValues(alpha: .10),
+                            alignment: Alignment.centerLeft,
+                            child: FractionallySizedBox(
+                              widthFactor: math.max(.03, bar.pct),
+                              child: Container(
+                                height: 6,
+                                color: fg,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 62,
+                        child: Text(
+                          bar.rt,
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: fg,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (detail.rest != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      detail.rest!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.black.withValues(alpha: .6),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StrategyCtaSection extends StatelessWidget {
+  const _StrategyCtaSection();
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('再往下一步', style: Theme.of(context).textTheme.labelLarge),
+      const SizedBox(height: 4),
+      Text(
+        '该按什么顺序还，能省下最多利息？',
+        style: Theme.of(context).textTheme.titleLarge,
+      ),
+      const SizedBox(height: 12),
+      const _StrategyCta(),
+    ],
+  );
+}
+
+class _StrategyCta extends ConsumerWidget {
+  const _StrategyCta();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final premium = ref.watch(premiumProvider);
+    return Card(
+      color: Theme.of(context).colorScheme.primaryContainer,
+      child: ListTile(
+        leading: const Icon(Icons.compare_arrows),
+        title: const Text('多策略对比规划'),
+        subtitle: const Text('雪球法、雪崩法和自定义顺序，看看哪种最省利息'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => premium.hasPremium
+                ? const StrategyCompareScreen()
+                : const PremiumScreen(),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -306,89 +454,170 @@ class _JourneyCard extends StatefulWidget {
 }
 
 class _JourneyCardState extends State<_JourneyCard> {
-  int? _selected;
+  int? _active;
 
   @override
   Widget build(BuildContext context) {
     final timeline = (widget.data['timeline'] as List<dynamic>)
         .cast<Map<String, dynamic>>();
-    final selected = _selected == null ? null : timeline[_selected!];
+    final total = (widget.data['totalBalance'] as num).toDouble();
+    if (timeline.length < 2 || total <= 0) {
+      return const _SectionCard(
+        eyebrow: '还清这件事进行到哪了',
+        title: '暂无足够数据',
+        child: Text('没有在还债务，或者还款计划里没有未还的期次。'),
+      );
+    }
+    final n = timeline.length;
+    var halfIdx = timeline.indexWhere(
+      (p) => (p['balance'] as num).toDouble() <=
+          (timeline.first['balance'] as num).toDouble() / 2,
+    );
+    if (halfIdx < 0) halfIdx = n ~/ 2;
+    final selected = _active == null ? null : timeline[_active!];
     return _SectionCard(
       eyebrow: '还清这件事进行到哪了',
       title:
           '已经走完 ${widget.summary['pct']}%${widget.monthsLeft == null ? '' : '，还剩 ${widget.monthsLeft} 个月'}',
-      child: timeline.length < 2
-          ? const Text('暂无足够的还款计划数据。')
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (selected != null)
-                  Text(
-                    '${selected['date']} · 剩余 ¥${calc.fmt(selected['balance'])}',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                const SizedBox(height: 4),
-                LayoutBuilder(
-                  builder: (context, constraints) => GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onHorizontalDragStart: (details) => _pick(
-                      details.localPosition.dx,
-                      constraints.maxWidth,
-                      timeline.length,
-                    ),
-                    onHorizontalDragUpdate: (details) => _pick(
-                      details.localPosition.dx,
-                      constraints.maxWidth,
-                      timeline.length,
-                    ),
-                    onTapDown: (details) => _pick(
-                      details.localPosition.dx,
-                      constraints.maxWidth,
-                      timeline.length,
-                    ),
-                    child: SizedBox(
-                      height: 180,
-                      child: CustomPaint(
-                        painter: _TimelinePainter(
-                          timeline,
-                          Theme.of(context).colorScheme.primary,
-                          selectedIndex: _selected,
-                        ),
-                        child: Align(
-                          alignment: Alignment.bottomCenter,
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: Text(
-                              '${timeline.first['date']}  →  ${timeline.last['date']} · 拖动查看',
-                              style: Theme.of(context).textTheme.labelSmall,
-                            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            selected == null
+                ? '按住曲线左右拖，看任意时间点的余额'
+                : '${selected['date']} · 余额 ¥${calc.fmt(selected['balance'])}',
+            style: TextStyle(
+              fontWeight: selected == null ? FontWeight.w400 : FontWeight.w700,
+              color: selected == null
+                  ? Theme.of(context).colorScheme.onSurfaceVariant
+                  : null,
+            ),
+          ),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onHorizontalDragStart: (details) => _pick(
+                  details.localPosition.dx,
+                  width,
+                  n,
+                ),
+                onHorizontalDragUpdate: (details) => _pick(
+                  details.localPosition.dx,
+                  width,
+                  n,
+                ),
+                onHorizontalDragEnd: (_) => setState(() => _active = null),
+                onTapDown: (details) => _pick(
+                  details.localPosition.dx,
+                  width,
+                  n,
+                ),
+                child: SizedBox(
+                  height: 180,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: _TimelinePainter(
+                            timeline,
+                            Theme.of(context).colorScheme.primary,
                           ),
                         ),
                       ),
-                    ),
+                      ..._milestoneNodes(
+                        context,
+                        timeline,
+                        halfIdx,
+                        width,
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              );
+            },
+          ),
+        ],
+      ),
     );
+  }
+
+  List<Widget> _milestoneNodes(
+    BuildContext context,
+    List<Map<String, dynamic>> timeline,
+    int halfIdx,
+    double width,
+  ) {
+    final n = timeline.length;
+    final t0 =
+        (calc.parseDate(timeline.first['date'] as String) ??
+                DateTime.fromMillisecondsSinceEpoch(0))
+            .millisecondsSinceEpoch;
+    final tEnd =
+        (calc.parseDate(timeline.last['date'] as String) ??
+                DateTime.fromMillisecondsSinceEpoch(0))
+            .millisecondsSinceEpoch;
+    final span = tEnd - t0;
+    double xFor(int i) => span > 0
+        ? ((calc.parseDate(timeline[i]['date'] as String) ??
+                      DateTime.fromMillisecondsSinceEpoch(0))
+                  .millisecondsSinceEpoch -
+              t0) /
+              span *
+              width
+        : width * i / (n - 1);
+    final nice = calc.niceCeil((timeline.first['balance'] as num).toDouble());
+    final top = nice > 0 ? nice : 1.0;
+    double yFor(num balance) => (1 - balance.toDouble() / top) * 100;
+    final nodes = [
+      (i: 0, label: '今天', align: CrossAxisAlignment.start),
+      (i: halfIdx, label: '还掉一半', align: CrossAxisAlignment.center),
+      (i: n - 1, label: '归零', align: CrossAxisAlignment.end),
+    ];
+    return [
+      for (final node in nodes)
+        Positioned(
+          left: node.align == CrossAxisAlignment.start
+              ? 0
+              : node.align == CrossAxisAlignment.center
+              ? xFor(node.i) - 60
+              : null,
+          right: node.align == CrossAxisAlignment.end ? 0 : null,
+          top: node.align == CrossAxisAlignment.center
+              ? yFor((timeline[node.i]['balance'] as num)) + 18
+              : math.max(0, yFor((timeline[node.i]['balance'] as num)) - 52),
+          width: node.align == CrossAxisAlignment.center ? 120 : null,
+          child: Text(
+            '${node.label} ${(timeline[node.i]['date'] as String).substring(0, 7)}\n¥${calc.fmt(timeline[node.i]['balance'])}',
+            textAlign: node.align == CrossAxisAlignment.center
+                ? TextAlign.center
+                : node.align == CrossAxisAlignment.end
+                ? TextAlign.right
+                : TextAlign.left,
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+        ),
+    ];
   }
 
   void _pick(double x, double width, int length) {
     final index = ((x / width).clamp(0, 1) * (length - 1)).round();
-    if (index != _selected) setState(() => _selected = index);
+    if (index != _active) setState(() => _active = index);
   }
 }
 
 class _TimelinePainter extends CustomPainter {
   final List<Map<String, dynamic>> points;
   final Color color;
-  final int? selectedIndex;
-  const _TimelinePainter(this.points, this.color, {this.selectedIndex});
+  const _TimelinePainter(this.points, this.color);
   @override
   void paint(Canvas canvas, Size size) {
     final maxBalance = (points.first['balance'] as num).toDouble();
     if (maxBalance <= 0 || points.length < 2) return;
-    final path = Path();
+    final line = Path();
+    final area = Path();
     for (var i = 0; i < points.length; i++) {
       final x = size.width * i / (points.length - 1);
       final y =
@@ -396,13 +625,25 @@ class _TimelinePainter extends CustomPainter {
           (1 - (points[i]['balance'] as num).toDouble() / maxBalance) *
               (size.height - 54);
       if (i == 0) {
-        path.moveTo(x, y);
+        line.moveTo(x, y);
+        area.moveTo(x, size.height - 36);
+        area.lineTo(x, y);
       } else {
-        path.lineTo(x, y);
+        line.lineTo(x, y);
+        area.lineTo(x, y);
       }
     }
+    area
+      ..lineTo(size.width, size.height - 36)
+      ..close();
     canvas.drawPath(
-      path,
+      area,
+      Paint()
+        ..color = color.withValues(alpha: .10)
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawPath(
+      line,
       Paint()
         ..color = color
         ..style = PaintingStyle.stroke
@@ -415,29 +656,11 @@ class _TimelinePainter extends CustomPainter {
       4,
       Paint()..color = color,
     );
-    if (selectedIndex != null) {
-      final i = selectedIndex!.clamp(0, points.length - 1);
-      final x = size.width * i / (points.length - 1);
-      final y =
-          18 +
-          (1 - (points[i]['balance'] as num).toDouble() / maxBalance) *
-              (size.height - 54);
-      canvas.drawLine(
-        Offset(x, 10),
-        Offset(x, size.height - 28),
-        Paint()
-          ..color = color.withValues(alpha: .35)
-          ..strokeWidth = 1,
-      );
-      canvas.drawCircle(Offset(x, y), 6, Paint()..color = color);
-    }
   }
 
   @override
   bool shouldRepaint(covariant _TimelinePainter old) =>
-      old.points != points ||
-      old.color != color ||
-      old.selectedIndex != selectedIndex;
+      old.points != points || old.color != color;
 }
 
 class _PressureCard extends StatefulWidget {
@@ -449,6 +672,7 @@ class _PressureCard extends StatefulWidget {
 }
 
 class _PressureCardState extends State<_PressureCard> {
+  bool _area = false;
   int? _selected;
 
   @override
@@ -461,120 +685,225 @@ class _PressureCardState extends State<_PressureCard> {
       1,
       (value, month) => math.max(value, month['total'] as num),
     );
+    final totalAhead = widget.pressure['totalAhead'] as num;
+    final monthlyAvg = widget.pressure['monthlyAvg'] as num;
     return _SectionCard(
-      eyebrow: '未来还款压力',
-      title:
-          '未来 ${months.length} 个月共 ¥${calc.fmt(widget.pressure['totalAhead'])}',
+      eyebrow: '接下来哪个月最难',
+      title: '未来还款压力',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if ((overdue['count'] as int) > 0)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                '已逾期 ${overdue['count']} 期 · ¥${calc.fmt(overdue['amount'])}',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                  fontWeight: FontWeight.w700,
-                ),
+          Text(
+            '未来 ${months.length} 个月一共要还 ¥${calc.fmt(totalAhead)}，'
+            '平均每月 ¥${calc.fmt(monthlyAvg)}。'
+            '${(overdue['count'] as int) > 0 ? '另有 ${overdue['count']} 期已逾期（¥${calc.fmt(overdue['amount'])}），未计入下方。' : ''}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.55),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _ToggleChip(
+                label: '面积',
+                selected: _area,
+                onTap: () => setState(() => _area = true),
               ),
-            ),
+              const SizedBox(width: 8),
+              _ToggleChip(
+                label: '柱状',
+                selected: !_area,
+                onTap: () => setState(() => _area = false),
+              ),
+              const Spacer(),
+              const _LegendDot(color: Color(0xFF6FBE9E), label: '本金'),
+              const SizedBox(width: 12),
+              const _LegendDot(color: Color(0xFF2E5F8A), label: '利息'),
+            ],
+          ),
+          const SizedBox(height: 14),
           SizedBox(
-            height: 132,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                for (var i = 0; i < months.length; i++)
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => setState(() => _selected = i),
-                        child: Tooltip(
-                          message:
-                              '${months[i]['month']} · ¥${calc.fmt(months[i]['total'])}',
-                          child: Align(
-                            alignment: Alignment.bottomCenter,
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 160),
-                              height:
-                                  104 *
-                                  (months[i]['total'] as num).toDouble() /
-                                  maxValue,
-                              decoration: BoxDecoration(
-                                color: _selected == i
-                                    ? Theme.of(context).colorScheme.tertiary
-                                    : Theme.of(context).colorScheme.primary,
-                                borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(3),
-                                ),
+            height: 150,
+            child: _area
+                ? CustomPaint(
+                    size: Size.infinite,
+                    painter: _PressureAreaPainter(
+                      months,
+                      maxValue.toDouble(),
+                      Theme.of(context).colorScheme.primary,
+                    ),
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      for (var i = 0; i < months.length; i++)
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 2),
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () =>
+                                  setState(() => _selected = i == _selected ? null : i),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 160),
+                                    height:
+                                        110 *
+                                        (months[i]['total'] as num).toDouble() /
+                                        maxValue,
+                                    decoration: BoxDecoration(
+                                      color: _selected == i
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.tertiary
+                                          : Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                      borderRadius: const BorderRadius.vertical(
+                                        top: Radius.circular(3),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${int.parse((months[i]['month'] as String).substring(5, 7))}',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelSmall,
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
+                    ],
                   ),
-              ],
-            ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
           Text(
-            selected == null
-                ? '${months.first['month']} 至 ${months.last['month']} · 点柱形查看金额'
-                : '${selected['month']} · ¥${calc.fmt(selected['total'])}',
+            '点任意一个月看它要还哪些债务，再点一次收起',
             style: Theme.of(context).textTheme.labelSmall,
           ),
+          if (selected != null && !_area) ...[
+            const SizedBox(height: 10),
+            for (final item
+                in ((selected['items'] as List<dynamic>?) ?? const [])
+                    .cast<Map<String, dynamic>>())
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(item['name'] as String? ?? ''),
+                    ),
+                    Text('¥${calc.fmt(item['amount'])}'),
+                  ],
+                ),
+              ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _MonthlyRepaymentCard extends StatelessWidget {
-  final List<Map<String, dynamic>> months;
-  const _MonthlyRepaymentCard({required this.months});
+class _ToggleChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _ToggleChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
   @override
   Widget build(BuildContext context) {
-    if (months.isEmpty) return const SizedBox.shrink();
-    final take = months.length > 6 ? months.sublist(months.length - 6) : months;
-    return _SectionCard(
-      eyebrow: '月还款统计',
-      title: '最近 ${take.length} 个月',
-      child: Column(
-        children: [for (final month in take) _MonthLine(month: month)],
-      ),
-    );
-  }
-}
-
-class _MonthLine extends StatelessWidget {
-  final Map<String, dynamic> month;
-  const _MonthLine({required this.month});
-  @override
-  Widget build(BuildContext context) {
-    final actual = month['actual'] as num;
-    final scheduled = month['scheduled'] as num;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          SizedBox(width: 58, child: Text(month['month'] as String)),
-          Expanded(
-            child: LinearProgressIndicator(
-              value: (actual + scheduled) == 0
-                  ? 0
-                  : actual / (actual + scheduled),
-              minHeight: 7,
-            ),
+    final accent = Theme.of(context).colorScheme.primary;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? accent.withValues(alpha: .14) : null,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? accent : Theme.of(context).colorScheme.outline,
           ),
-          const SizedBox(width: 10),
-          Text('¥${calc.fmt(actual + scheduled)}'),
-        ],
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: selected ? accent : Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
       ),
     );
   }
+}
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+  const _LegendDot({required this.color, required this.label});
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 4),
+      Text(label, style: Theme.of(context).textTheme.labelSmall),
+    ],
+  );
+}
+
+class _PressureAreaPainter extends CustomPainter {
+  final List<Map<String, dynamic>> months;
+  final double maxValue;
+  final Color color;
+  const _PressureAreaPainter(this.months, this.maxValue, this.color);
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (months.isEmpty || maxValue <= 0) return;
+    final path = Path();
+    for (var i = 0; i < months.length; i++) {
+      final x = size.width * i / (months.length - 1);
+      final y = size.height * (1 - (months[i]['total'] as num).toDouble() / maxValue);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    final area = Path.from(path)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(
+      area,
+      Paint()
+        ..color = color.withValues(alpha: .18)
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.4
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _PressureAreaPainter old) =>
+      old.months != months || old.maxValue != maxValue || old.color != color;
 }
 
 class _RankCard extends StatelessWidget {
@@ -594,6 +923,7 @@ class _RankCard extends StatelessWidget {
         break;
       }
     }
+    final rest = debts.skip(shown.length).toList();
     final max = debts.first.balance;
     return _SectionCard(
       eyebrow: '钱主要压在哪几笔',
@@ -603,6 +933,17 @@ class _RankCard extends StatelessWidget {
         children: [
           for (var i = 0; i < shown.length; i++)
             _RankLine(index: i + 1, debt: shown[i], max: max),
+          if (rest.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '其余 ${rest.length} 笔 · ¥${calc.fmt(rest.fold<num>(0, (s, d) => s + d.balance))}',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -678,10 +1019,14 @@ class _TypeCardState extends State<_TypeCard> {
   Widget build(BuildContext context) {
     final types = (widget.data['typeList'] as List<dynamic>)
         .cast<Map<String, dynamic>>();
-    final total = widget.data['totalBalance'] as num;
+    final total = (widget.data['totalBalance'] as num).toDouble();
+    final top = types.isEmpty ? null : types.first;
+    final topShare = total > 0 && top != null
+        ? ((top['value'] as num) / total * 100).round()
+        : 0;
     return _SectionCard(
-      eyebrow: '债务类型构成',
-      title: '余额按借款类型分布',
+      eyebrow: '这些债务是什么类型',
+      title: top == null ? '暂无类型数据' : '${top['name']}占了 $topShare%',
       child: Column(
         children: [
           if (types.isNotEmpty)
@@ -694,7 +1039,7 @@ class _TypeCardState extends State<_TypeCard> {
                 child: CustomPaint(
                   painter: _TypePiePainter(
                     types,
-                    total.toDouble(),
+                    total,
                     _rotation,
                     _typeColors(context),
                   ),
@@ -702,7 +1047,7 @@ class _TypeCardState extends State<_TypeCard> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('总余额'),
+                        const Text('总负债'),
                         Text(
                           '¥${calc.fmt(total)}',
                           style: const TextStyle(fontWeight: FontWeight.w800),
@@ -736,15 +1081,12 @@ class _TypeCardState extends State<_TypeCard> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Expanded(
-                    child: LinearProgressIndicator(
-                      value: total == 0
-                          ? 0
-                          : (types[i]['value'] as num) / total,
-                      minHeight: 8,
-                    ),
+                  const Spacer(),
+                  Text(
+                    '${total == 0 ? 0 : ((types[i]['value'] as num) / total * 100).round()}%',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Text('¥${calc.fmt(types[i]['value'])}'),
                 ],
               ),
@@ -797,6 +1139,158 @@ class _TypePiePainter extends CustomPainter {
       oldDelegate.types != types ||
       oldDelegate.total != total ||
       oldDelegate.rotation != rotation;
+}
+
+class _OutroCard extends StatelessWidget {
+  final Finding? lead;
+  final Premium premium;
+  const _OutroCard({required this.lead, required this.premium});
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('如果只做一件事', style: Theme.of(context).textTheme.labelLarge),
+      const SizedBox(height: 4),
+      Text(
+        lead != null && lead!.actionTitle != null
+            ? '${lead!.actionTitle}。'
+            : '保持现在的还款节奏。',
+        style: Theme.of(context).textTheme.titleLarge,
+      ),
+      const SizedBox(height: 12),
+      _ExportRow(premium: premium),
+    ],
+  );
+}
+
+class _ExportRow extends ConsumerWidget {
+  final Premium premium;
+  const _ExportRow({required this.premium});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('导出这份报告', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _export(context, ref, 'Excel'),
+                  icon: const Icon(Icons.table_chart_outlined),
+                  label: const Text('Excel'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _export(context, ref, 'PDF'),
+                  icon: const Icon(Icons.picture_as_pdf_outlined),
+                  label: const Text('PDF'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Future<void> _export(BuildContext context, WidgetRef ref, String kind) async {
+    if (!premium.hasPremium) {
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const PremiumScreen()));
+      return;
+    }
+    try {
+      final debts = ref.read(debtsProvider);
+      final exporter = ref.read(reportExportServiceProvider);
+      final saver = ref.read(systemFileSaverProvider);
+      final stamp = exportDateStamp();
+      final bytes = kind == 'Excel'
+          ? exporter.buildExcel(debts)
+          : await exporter.buildPdf(debts);
+      final saved = await saver.saveBytes(
+        bytes: bytes,
+        filename: 'AfterZero统计报表$stamp.${kind == 'Excel' ? 'xlsx' : 'pdf'}',
+        mimeType: kind == 'Excel' ? reportExcelMime : reportPdfMime,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(saved ? '$kind 已保存 ✓' : '已取消保存')),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$kind 导出失败：$error')));
+      }
+    }
+  }
+}
+
+class _NoteToggle extends StatefulWidget {
+  const _NoteToggle();
+  @override
+  State<_NoteToggle> createState() => _NoteToggleState();
+}
+
+class _NoteToggleState extends State<_NoteToggle> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      InkWell(
+        onTap: () => setState(() => _open = !_open),
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '计算口径说明',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                _open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                size: 16,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ],
+          ),
+        ),
+      ),
+      if (_open)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: RichBody(
+            '在还总负债 = 各未结清债务「未还本金」之和（只算本金，不含未来的利息/手续费）。\n'
+            '已还本金 = 全部债务（**含已结清**）已标记为「已还」期次的本金之和；另付利息 = 这些期次对应的利息/手续费之和。\n'
+            '经常性月供 = 各未结清债务下一期应还金额之和（不含标记为「一次性还清」的借款）。\n'
+            '归零进度 = 已还本金 ÷（已还本金 + 在还总负债），只按本金计算。\n'
+            '预计还清日期 = 按现有还款计划里最晚的未还期次推算，**是预测不是承诺**，没有把提前还款算进去。\n'
+            '「提前结清」会问你实际付了多少钱，并把剩余期次合并成一条结清记录：剩余本金计入已还本金，实付超出剩余本金的部分计入另付利息（协商减免则记为负数）。未来那些期原本的利息不会被算成你付过——提前结清本来就免掉了它们。\n'
+            '利率由每笔债务的还款计划反推（IRR）；剩余待付利息按现有计划算到还清为止，手动录入且没拆分本金/利息的债务会低估。',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(height: 1.7),
+          ),
+        ),
+    ],
+  );
 }
 
 class _SectionCard extends StatelessWidget {
