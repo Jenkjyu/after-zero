@@ -176,7 +176,7 @@ describe("保存校验", () => {
     expect(window.__azBridge.setDebt).not.toHaveBeenCalled();
   });
 
-  // amount(金额)和principal+interest(本金+利息)是两条独立填写的轴——见CLAUDE.md"⚠️已知的
+  // amount(金额)和principal+interest(本金+利息)是两条独立填写的轴——见AGENTS.md"⚠️已知的
   // 数据模型缺口"第⑤条。逐行编辑本金/利息会自动联动重算金额(PlanRows.tsx的handlePrincipal/
   // handleInterest)，但直接改"金额"输入框不会反过来联动本金/利息，这是唯一能把两者改到
   // 互相对不上的路径，所以下面这条校验专门堵这条路径。

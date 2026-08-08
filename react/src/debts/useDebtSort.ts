@@ -1,7 +1,7 @@
 // 排序方式(含"自定义")的所有权这次迁移整体挪到React——现有代码里没有其它tab读debtSort
 // (还款日用dueBucket分组，统计不依赖它)，所以直接读写localStorage["debt-manager-sort-v1"]，
 // 不需要经过vanilla的setDebtSort/DEBT_SORTS。vanilla侧对应的debtSort/setDebtSort/SORT_KEY
-// 已随本次迁移删除，不留一份不再被使用的死代码。见CLAUDE.md"React 迁移"一节。
+// 已随本次迁移删除，不留一份不再被使用的死代码。见AGENTS.md"React 迁移"一节。
 import { useCallback, useState } from "react";
 import type { Debt, SortKey } from "../types";
 

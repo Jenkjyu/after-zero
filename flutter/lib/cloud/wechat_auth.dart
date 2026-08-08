@@ -1,5 +1,5 @@
 // 微信OAuth——用fluwx替代现有Capacitor版本的WeChatLoginPlugin.java手写原生插件（fluwx是
-// Flutter生态里微信SDK的事实标准，见CLAUDE.md"Flutter重写"阶段3小节的调研结论）。
+// Flutter生态里微信SDK的事实标准，见AGENTS.md"Flutter重写"阶段3小节的调研结论）。
 //
 // ⚠️这一层的行为本质上没法在没有真实设备+真实微信App的情况下完整验证——跟现有Capacitor
 // 版本"必须真机验证微信登录"是同一条限制（微信官方要求走"移动应用"OAuth，拉起手机上的
@@ -33,7 +33,7 @@ class WeChatAuth {
   WeChatAuth([Fluwx? fluwx]) : _fluwx = fluwx ?? Fluwx();
 
   /// App启动时调一次——对应vanilla微信SDK的注册步骤。[appId]不是秘密（跟AppSecret不同，
-  /// AppSecret只存在云函数环境变量里，绝不出现在客户端代码里，见CLAUDE.md"原生插件：
+  /// AppSecret只存在云函数环境变量里，绝不出现在客户端代码里，见AGENTS.md"原生插件：
   /// WeChatLogin"一节）。
   Future<bool> register({required String appId}) =>
       _fluwx.registerApi(appId: appId);

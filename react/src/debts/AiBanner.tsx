@@ -1,5 +1,5 @@
 // AI banner："灵动胶囊"入口，未开通Premium时发光效果全部关掉、图标降级成静态灰色——
-// 见CLAUDE.md"在还债务主页视觉改版"一节。这里只是把renderAIBanner()的判断逻辑搬过来，
+// 见AGENTS.md"在还债务主页视觉改版"一节。这里只是把renderAIBanner()的判断逻辑搬过来，
 // 图标/描边扫光/呼吸光晕全部是既有CSS(.ai-banner/.is-ai/.wand等)驱动，不需要新写样式。
 import type { Premium } from "../types";
 

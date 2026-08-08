@@ -1,6 +1,6 @@
 // 阶段3（云端接入层）测试——CloudBaseClient的HTTP请求/响应处理用http包自带的testing.dart
 // MockClient打桩，不依赖真实网络/真实CloudBase环境（真实端到端的"登录+调云函数"验证见
-// CLAUDE.md"Flutter重写"阶段3小节——那部分只能靠真机走一遍真实微信登录来确认，这里测的是
+// AGENTS.md"Flutter重写"阶段3小节——那部分只能靠真机走一遍真实微信登录来确认，这里测的是
 // 客户端代码本身的请求构造/响应解析/错误处理逻辑对不对）。
 import 'dart:convert';
 
@@ -18,7 +18,7 @@ import 'package:after_zero/cloud/cloudbase_session.dart';
 import 'package:after_zero/data/providers.dart'
     show accountProvider, sharedPreferencesProvider;
 
-/// 摘自真实HTTP网关请求得到的响应形状（见CLAUDE.md阶段3小节的实测记录），不是瞎编的字段名。
+/// 摘自真实HTTP网关请求得到的响应形状（见AGENTS.md阶段3小节的实测记录），不是瞎编的字段名。
 Map<String, dynamic> fakeSignInJson({String scope = 'anonymous'}) => {
   'token_type': 'Bearer',
   'access_token': 'fake-access-token',

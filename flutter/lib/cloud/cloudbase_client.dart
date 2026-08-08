@@ -1,5 +1,5 @@
 // CloudBase HTTP网关客户端——阶段3的核心，替代现有Capacitor版本用的CloudBase JS SDK。
-// 官方Flutter SDK不能用（见CLAUDE.md），这里直接对接CloudBase文档确认过的HTTP API：
+// 官方Flutter SDK不能用（见AGENTS.md），这里直接对接CloudBase文档确认过的HTTP API：
 //   POST /auth/v1/signin/anonymously  匿名登录
 //   POST /auth/v1/signin/custom       用wxLogin云函数换到的票据登录
 //   POST /v1/functions/{name}         调云函数，带 Authorization: Bearer {access_token}

@@ -1,5 +1,5 @@
 // "升级 Premium"入口卡——文案/class逻辑原样复刻自vanilla已删除的renderPremiumEntryCard()
-// （www/index.html曾经的实现，见CLAUDE.md"React 迁移"一节"我的"tab那部分）。无门禁，
+// （www/index.html曾经的实现，见AGENTS.md"React 迁移"一节"我的"tab那部分）。无门禁，
 // 点击直接进#premiumScreen，未开通/已开通都能进（已开通显示的是会员详情）。
 import type { Premium } from "../types";
 import { openPremiumScreen } from "../shared/state";

@@ -2,7 +2,7 @@
 
 这个文件给 Codex 看，记录这个项目非显而易见的技术细节和雷区。给人看的项目介绍在 `README.md`。
 
-> **单一事实来源（2026-08-09）**：本文件由原 `CLAUDE.md` 与 `AGENTS.md` 合并而成，`CLAUDE.md` 已删除。此后只维护本文件，提交也只针对本文件；任何 agent（Codex / Claude Code 等）都以本文件为准。合并时内容取更全版本（阶段4/5 采用原 CLAUDE.md 的详细版），skill 路径统一为实际存在的 `.agents/skills/`。
+> **单一事实来源（2026-08-09）**：本文件由原 `CLAUDE.md` 与 `AGENTS.md` 合并而成，`CLAUDE.md` 已删除；`.claude/skills/` 副本也已删除（用户决定不再使用 Claude Code），项目 skill 以 `.agents/skills/` 为唯一来源并入库维护。此后只维护本文件与 `.agents/skills/`，提交也只针对它们；任何 agent 都以本文件为准。合并时内容取更全版本（阶段4/5 采用原 CLAUDE.md 的详细版）。
 
 **如果项目根目录下有 `PROGRESS.md`，先看那个文件。** 那是不进git、按时间记录"哪天做了什么、现在卡在哪一步"的进度日志（这份AGENTS.md记的是相对稳定的技术细节，不记当前进度）——不是每个clone/checkout都会有这个文件（它是gitignored、因机器而异的本地文件），没有的话说明是全新环境，忽略这条即可。
 

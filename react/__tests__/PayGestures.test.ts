@@ -1,5 +1,5 @@
 // 只测滑块开合的DOM效果——跟debts那套gestures.test.ts一样，真实touch事件序列依赖jsdom
-// 不完整支持的TouchEvent，且这个手势历史上也要求"必须真机验证"(见CLAUDE.md"还款提醒页"
+// 不完整支持的TouchEvent，且这个手势历史上也要求"必须真机验证"(见AGENTS.md"还款提醒页"
 // 一节)，这里只覆盖不依赖真实触摸序列、可以直接调用验证的部分。
 import { describe, expect, it } from "vitest";
 import { closePaySwipe, openPaySwipeTo, PAY_REVEAL } from "../src/pay/gestures";

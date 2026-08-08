@@ -1,4 +1,4 @@
-// 新增/编辑债务表单——CLAUDE.md里明确标注的"全项目最复杂的一块UI"(公式生成器、批量设置
+// 新增/编辑债务表单——AGENTS.md里明确标注的"全项目最复杂的一块UI"(公式生成器、批量设置
 // 还款日、oneTimeStash状态机)，detailSheet那轮迁移(第五步)时用户特意把它留到独立的一轮
 // (第六步)做。挂载点跟detailSheet共用同一个常驻React入口(#react-sheets-root，见App.tsx)，
 // 不新开Vite entry。
@@ -105,7 +105,7 @@ export function EditSheet() {
   // 顺移到i这个下标，debts[editIndex]会读到一个"存在、但是别的债务"的对象，条件判断成
   // false，sheet不会关闭，还会继续显示已经被删掉的那条债务的过期数据。当时用了
   // editedDebtRef(一个存对象引用的useRef)+debts.includes(ref)去打补丁；现在债务有了真正的
-  // id字段(见CLAUDE.md"债务对象加了真正的id字段"一节)，直接按id查找是否还在数组里就是
+  // id字段(见AGENTS.md"债务对象加了真正的id字段"一节)，直接按id查找是否还在数组里就是
   // 结构上正确、不需要额外workaround的写法，editedDebtRef已删除。
   useEffect(() => {
     if (editId !== null && editId !== NEW_DEBT_ID && !debts.some((x) => x.id === editId)) {
@@ -196,7 +196,7 @@ export function EditSheet() {
       if (r.principal === 0 && r.interest === 0) { window.__azBridge.toast("第 " + (k + 1) + " 期的本金和利息不能同时为0"); return; }
       // amount(这期要付多少钱)和principal+interest(这钱由什么构成)是两条独立填写的轴——
       // 逐行编辑本金/利息时PlanRows.tsx会自动联动重算amount，但直接改"金额"输入框不会反过来
-      // 联动本金/利息，两者能各自改到互相对不上。见CLAUDE.md"⚠️已知的数据模型缺口"第⑤条。
+      // 联动本金/利息，两者能各自改到互相对不上。见AGENTS.md"⚠️已知的数据模型缺口"第⑤条。
       // 容差0.015（1.5分钱）不是随手挑的——genPlan()的amort分支在n=1(整贷整还)这种边界情况下，
       // principal/interest/amount三个值各自独立r2()四舍五入，真实存在1分钱的量化误差(实测
       // 遍历amort/equalfee/interestfirst共10万+组合验证过，最大偏差恰好0.01，从未超过)，

@@ -6,7 +6,7 @@
 // 再插手改，但用户明确要求不要在React里另建一套确认弹窗UI(以后弹窗要优化时不想同步改两处)——
 // 改成await window.__azBridge.confirmAsync(...)，继续复用同一个#modalScrim单例，只有一份
 // 弹窗实现。opts.month有值时：确认返回选中的月份字符串、取消返回null；没有opts.month时：
-// 确认返回true、取消返回false。见CLAUDE.md"React 迁移"一节"第六步"。
+// 确认返回true、取消返回false。见AGENTS.md"React 迁移"一节"第六步"。
 import { useState } from "react";
 import type { PlanRow } from "../types";
 

@@ -1,6 +1,6 @@
 // 债务详情窗——原样照抄vanilla openDetail()拼#dInfo那段HTML的逻辑，改成JSX(esc()不需要了，
 // JSX文本插值天然转义，同"统计"tab当年的道理)。这是"React 迁移"第一次把sheet的实际内容
-// (不只是容器)搬进React，也是第一个不属于任何tab、常驻挂载的React入口——见CLAUDE.md
+// (不只是容器)搬进React，也是第一个不属于任何tab、常驻挂载的React入口——见AGENTS.md
 // "React 迁移"一节detailSheet那部分的完整背景。
 //
 // 打开/关闭这个sheet不再经过window.__azBridge——openDetailSheet(id)/closeDetailSheet()是纯
@@ -46,7 +46,7 @@ export function DetailSheet() {
   // 变化的自动重渲染实现，不需要vanilla显式回调关闭。这个前提依赖shared/state.ts的
   // useDebts()在payInstallment/settleFull这类"原地mutate debts元素、不整体重新赋值"的
   // 操作后依然能正确触发重渲染——这是真实踩过的坑，修法和踩坑细节见useDebts()自己的注释。
-  // 按id(不是下标)查找这笔债务是否还在——对splice导致的下标顺移天然免疫，见CLAUDE.md
+  // 按id(不是下标)查找这笔债务是否还在——对splice导致的下标顺移天然免疫，见AGENTS.md
   // "债务对象加了真正的id字段"一节。故意不写[debts, openId]依赖数组、改成每次渲染后都跑：
   // 这个判断很便宜，没有明显开销，不依赖"debts引用一定会变"这个前提也能正确工作，属于双重保险。
   useEffect(() => {

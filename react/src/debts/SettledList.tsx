@@ -1,5 +1,5 @@
 // 已结清列表——纯展示+"恢复"按钮，没有手势，原样搬自renderDebts()末尾那段。
-// 日期文字用中性灰(--text-faint)不是蓝色，见CLAUDE.md"在还债务主页视觉改版"一节。
+// 日期文字用中性灰(--text-faint)不是蓝色，见AGENTS.md"在还债务主页视觉改版"一节。
 import type { Debt } from "../types";
 
 export interface SettledListProps {

@@ -8,7 +8,7 @@ import { cleanup } from "@testing-library/react";
 // 类型交给 react/src/calcGlobals.d.ts 里的环境声明。
 import * as calc from "../../www/js/calc.js";
 
-// 组件代码里调用的是window.recompute(d)/window.fmt(n)这类显式写法(见CLAUDE.md"React 迁移"
+// 组件代码里调用的是window.recompute(d)/window.fmt(n)这类显式写法(见AGENTS.md"React 迁移"
 // 一节"为什么显式window.xxx调用"那条)，测试里要用真实的calc.js实现(不是另外手写一份mock，
 // 那样容易跟真实实现的行为悄悄分叉)，把它的导出对象整个挂到window上，跟浏览器里
 // <script src="js/calc.js">的效果等价。

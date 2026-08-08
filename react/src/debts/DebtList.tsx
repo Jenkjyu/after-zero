@@ -4,7 +4,7 @@
 //
 // 不渲染自己的<section>包壳——语义分区的<section id="view-debts">留在vanilla那边
 // (React只挂载在它内部的一个子div上)，这里直接是Fragment，跟vanilla原来"header/topSummary/
-// view-debts被折叠进同一个.view.active容器"这条简化决定保持一致(见CLAUDE.md"React 迁移"一节)。
+// view-debts被折叠进同一个.view.active容器"这条简化决定保持一致(见AGENTS.md"React 迁移"一节)。
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Debt, SortKey } from "../types";
 import { DEBT_SORTS, useDebtSort } from "./useDebtSort";

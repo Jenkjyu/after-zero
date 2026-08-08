@@ -71,7 +71,7 @@ interface GenPanelProps {
 export function GenPanel({ fields, onPatch, onGenerate, kindSheetOpen, onKindSheetOpen, onKindSheetClose }: GenPanelProps) {
   // 首期还款日不支持29/30/31号(不是每个月都有，会导致还款日在不同月份间漂移)——跟批量设置
   // 还款日共用同一条isBadRepeatDay()限制，但表格里逐行手动填的日期不受此限制(见BatchBlock.tsx
-  // 顶部注释和CLAUDE.md"新增/编辑债务表单"一节)。
+  // 顶部注释和AGENTS.md"新增/编辑债务表单"一节)。
   function handleFirstChange(v: string) {
     const d = window.parseDate(v);
     if (d && window.isBadRepeatDay(d.getDate())) {
@@ -85,7 +85,7 @@ export function GenPanel({ fields, onPatch, onGenerate, kindSheetOpen, onKindShe
   // 这几个字段故意不用HTML5原生required——它们跟顶层的#debtForm共用一个<form>，如果停留在
   // "公式生成"这个tab时点"保存"，原生表单校验会连带拦下主表单的提交，安卓WebView又不会像
   // 桌面浏览器那样弹校验提示气泡，拦下之后就是彻底的"点了保存没反应"。校验改成这里手动做、
-  // 用toast提示。见CLAUDE.md"新增/编辑债务表单"一节那条⚠️。
+  // 用toast提示。见AGENTS.md"新增/编辑债务表单"一节那条⚠️。
   function handleGenerate() {
     const first = fields.first;
     if (!first) { window.__azBridge.toast("首期还款日必填"); return; }

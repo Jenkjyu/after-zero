@@ -29,7 +29,7 @@ export interface PickerSheetProps<T extends string> {
   onPick(v: T): void;
   onClose(): void;
   // 只有这个选择器嵌在另一个.sheet/.subpage内部、需要把z-index一起提高盖过外层容器时才需要
-  // 传——参照CLAUDE.md"第十一步"里aiHistorySheet那条"sheet挂在subpage下面必须手动提z-index"
+  // 传——参照AGENTS.md"第十一步"里aiHistorySheet那条"sheet挂在subpage下面必须手动提z-index"
   // 的先例，同时打在.scrim和.sheet两个元素上(两者默认z-index分别是30/31，只提sheet不提
   // scrim的话，遮罩层还是会被z-index更高的外层容器盖住)。
   stackClassName?: string;

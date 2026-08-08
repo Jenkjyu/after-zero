@@ -141,7 +141,7 @@ function parseAiBlocks(text: string): AiBlock[] {
 }
 
 // 只处理**加粗**这一种行内样式，其余文字交给JSX天然转义(不需要vanilla aiRender()里手动
-// esc()那一步——见CLAUDE.md"统计"一节"JSX的文本插值天然转义"那条既有结论)。
+// esc()那一步——见AGENTS.md"统计"一节"JSX的文本插值天然转义"那条既有结论)。
 function renderInline(text: string, keyPrefix: string): ReactNode[] {
   return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => {
     const m = /^\*\*([^*]+)\*\*$/.exec(part);

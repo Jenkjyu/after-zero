@@ -1,6 +1,6 @@
 // After Zero —— 纯计算函数（不碰DOM/localStorage），从 www/index.html 里抽出来的第一批。
 // 跟 index.html 主脚本共享全局作用域：普通 <script src>，不是 ES module 的 import/export
-// （项目"单文件无构建步骤"的既有原则，见 CLAUDE.md/PROGRESS.md 2026-07-24 六续的三步走计划）。
+// （项目"单文件无构建步骤"的既有原则，见 AGENTS.md/PROGRESS.md 2026-07-24 六续的三步走计划）。
 // index.html 里必须在主 <script> 之前引入这个文件，主脚本内部不再重复声明同名函数，
 // 靠普通的JS作用域链找到这里的全局函数。
 //
@@ -454,7 +454,7 @@ function detectMatchingSort(activeInOrder, sorts) {
 
 // 29/30/31号不是每个月都有——批量设置还款日/公式生成的首期还款日投射的是"每月同一天"
 // 的重复规律，选这三天会导致还款日在不同月份间漂移，两个入口都靠这个判断拦截。
-// 还款计划表格里逐行手动填的具体日期不受这条限制(那是记录真实数据，见 CLAUDE.md)。
+// 还款计划表格里逐行手动填的具体日期不受这条限制(那是记录真实数据，见 AGENTS.md)。
 function isBadRepeatDay(day) { return day >= 29 && day <= 31; }
 // 通知设置面板"提前N天"规则的展示文案。
 function offsetLabel(n) { return n === 0 ? "当天到期" : "提前" + n + "天"; }
@@ -637,7 +637,7 @@ function computeUpcomingPressure(debts, monthsAhead, today) {
       // 不能还按整期的原始金额算，否则会虚高。利息优先分摊跟recompute()同一套算法，
       // amt用rowRemaining()(=amount-paidAmount)而不是重新拿pr+it相加——保留"amount是
       // 独立填写的一条轴"这个既有假设，不跟"amount应该等于principal+interest"这条(另一个
-      // 已知缺口⑤，读CLAUDE.md)绑在一起。
+      // 已知缺口⑤，读AGENTS.md)绑在一起。
       if (r.paidAmount) {
         var pSplit = splitPaidInterestFirst(pr, it, +r.paidAmount || 0);
         pr = r2(pr - pSplit.principal); it = r2(it - pSplit.interest);
@@ -693,7 +693,7 @@ function pressureWindowMonths(debts, today) {
 // ===== 还款提醒调度（纯计算部分） =====
 // syncNotifications()真正调用LocalNotifications插件(getPending/cancel/schedule)的部分留在
 // index.html——那是impure的原生插件调用。"该给哪些期次排哪些提醒"这一步是纯计算，可以单测，
-// 搬到这里。这是CLAUDE.md"已知的数据模型缺口①"的修复：早期syncNotifications只读d.nextDate
+// 搬到这里。这是AGENTS.md"已知的数据模型缺口①"的修复：早期syncNotifications只读d.nextDate
 // (每笔债务的下一期)，靠打开App触发renderAll()重排才能滚动到下一期——两个月不开App，后面
 // 几期的提醒全部收不到，而"还款提醒"这个功能恰恰是给不常开App的人设计的。
 // 现在改成一次性把"未来windowMonths个月内"全部未还期次都排上，不再依赖"重新打开App"这个动作。

@@ -95,7 +95,7 @@ export interface DebtSummary {
   pct: number;
 }
 
-// 还款提醒设置——全局共享、对所有在还债务统一生效，不按债务单独配置(见CLAUDE.md
+// 还款提醒设置——全局共享、对所有在还债务统一生效，不按债务单独配置(见AGENTS.md
 // "还款提醒页"一节)。offsetDays只允许0|1|2|3(当天到期~提前3天)。
 export interface NotifySettings {
   enabled: boolean;
@@ -190,7 +190,7 @@ export interface BackupRecord {
   totalSizeBytes: number;
 }
 
-// vanilla主IIFE暴露出来的桥接对象——见 www/index.html 里 window.__azBridge 的定义和CLAUDE.md
+// vanilla主IIFE暴露出来的桥接对象——见 www/index.html 里 window.__azBridge 的定义和AGENTS.md
 // "React 迁移"一节。只包含已迁移的React页面实际需要调用的这几个，其余(saveForm/公式生成器
 // 等)继续留在vanilla私有作用域里，后续阶段迁移到别的页面时才按需加进来。
 export interface AzBridge {
@@ -199,8 +199,8 @@ export interface AzBridge {
   getAccount(): Account | null;
   // openDetail/openEdit都已删除——detailSheet/editSheet迁移React后，"打开详情窗/编辑表单"
   // 变成纯React侧状态(shared/state.ts的openDetailSheet/closeDetailSheet/openEditSheet/
-  // closeEditSheet)，不再经过这个桥接对象，见 react/src/sheets/ 和 CLAUDE.md"React 迁移"一节。
-  // 这几个都按id(不是下标)寻址——见CLAUDE.md"债务对象加了真正的id字段"一节。
+  // closeEditSheet)，不再经过这个桥接对象，见 react/src/sheets/ 和 AGENTS.md"React 迁移"一节。
+  // 这几个都按id(不是下标)寻址——见AGENTS.md"债务对象加了真正的id字段"一节。
   payInstallment(id: string): void;
   unsettle(id: string): void;
   commitReorder(newOrder: Debt[]): void;
@@ -239,7 +239,7 @@ export interface AzBridge {
   // deleteDebt是原样暴露的既有vanilla函数(自带ask()确认+splice+saveAll+renderAll)。toast是
   // #flash单例的简单passthrough。confirmAsync是vanilla共享确认弹窗ask()的Promise外壳——
   // 带输入控件时(month日期月份/date日期/amount金额，三者互斥)确认返回输入框的字符串值、
-  // 取消返回null；不带输入控件时确认返回true、取消返回false。特意复用这一份弹窗UI而不是在React里另建一套，见CLAUDE.md"React 迁移"
+  // 取消返回null；不带输入控件时确认返回true、取消返回false。特意复用这一份弹窗UI而不是在React里另建一套，见AGENTS.md"React 迁移"
   // 一节"第六步"。
   setDebt(id: string | null, obj: Omit<Debt, "id">): void;
   deleteDebt(id: string): void;
@@ -324,7 +324,7 @@ export interface AiSummary {
 
 // 排序方式(含"custom")的类型，跟 www/index.html 原来的 DEBT_SORTS 键名保持一致，
 // 用来在React这边重建同一份排序函数映射(debtSort的所有权这次迁移整体挪到React，
-// 不再经过vanilla的setDebtSort/DEBT_SORTS，见CLAUDE.md"React 迁移"一节)。
+// 不再经过vanilla的setDebtSort/DEBT_SORTS，见AGENTS.md"React 迁移"一节)。
 export type SortKey =
   | "rate-desc" | "rate-asc"
   | "orig-desc" | "orig-asc"

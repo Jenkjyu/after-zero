@@ -41,4 +41,4 @@ description: This skill should be used when working on the cloud backup feature 
 
 ## 桌面浏览器测试的边界
 
-伪造`ACCOUNT_KEY`localStorage跳过登录门的老技巧，对云备份**不适用**——那只是隐藏`#loginGate`，从没跑通`signInWithCustomTicket()`，`ensureCbAuthReady()`用`if (account) return`判断"是否已登录"（见CLAUDE.md的auth修复说明），伪造account会让它误判已登录、跳过`signInAnonymously()`兜底，连匿名会话都没有。真正的ticket只能来自真实微信OAuth的`code`，云备份的真实端到端往返必须真机验证。
+伪造`ACCOUNT_KEY`localStorage跳过登录门的老技巧，对云备份**不适用**——那只是隐藏`#loginGate`，从没跑通`signInWithCustomTicket()`，`ensureCbAuthReady()`用`if (account) return`判断"是否已登录"（见AGENTS.md的auth修复说明），伪造account会让它误判已登录、跳过`signInAnonymously()`兜底，连匿名会话都没有。真正的ticket只能来自真实微信OAuth的`code`，云备份的真实端到端往返必须真机验证。

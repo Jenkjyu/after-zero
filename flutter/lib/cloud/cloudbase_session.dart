@@ -2,7 +2,7 @@
 /// 的返回值。这不是JS SDK那种"调一个方法就有内部会话管理"的东西——CloudBase没有能用的官方
 /// Flutter SDK（`cloudbase_core`等包5年没更新、不兼容Dart 3），这一层是手写的，直接对接
 /// CloudBase的HTTP网关（`https://{envId}.api.tcloudbasegateway.com`），细节见
-/// `CLAUDE.md`"Flutter重写"一节阶段3小节。
+/// `AGENTS.md`"Flutter重写"一节阶段3小节。
 class CloudBaseSession {
   final String accessToken;
   final String? refreshToken;

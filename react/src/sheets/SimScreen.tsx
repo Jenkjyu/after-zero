@@ -63,7 +63,7 @@ export function SimScreen() {
 
   // 债务在模拟器开着的时候消失(删除/结清后被恢复流程覆盖等)——自动关闭，跟DetailSheet.tsx/
   // EditSheet.tsx同一个模式，按id(不是下标)判断是否还在。这个screen以前没有这层保护，是这次
-  // 引入债务id字段后顺手补上的一个小修复，见CLAUDE.md"债务对象加了真正的id字段"一节。
+  // 引入债务id字段后顺手补上的一个小修复，见AGENTS.md"债务对象加了真正的id字段"一节。
   useEffect(() => {
     if (openId !== null && !debts.some((x) => x.id === openId)) {
       closeSimScreen();

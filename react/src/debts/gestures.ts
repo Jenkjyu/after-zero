@@ -1,7 +1,7 @@
 // 长按拖拽排序 + 左滑露出"销这期"——原样照抄自 www/index.html 的
 // beginDrag/applyDragFrame/autoScrollTick/finishDrag/closeDebtSwipe/openDebtSwipeTo/
 // debtSwipeSettle/onCardTouchStart/onCardPointerDown，不借这次迁移"用更React的方式重写"。
-// 见 CLAUDE.md "React 迁移"一节："手势代码原样照抄，不重新设计"这条决定的理由。
+// 见 AGENTS.md "React 迁移"一节："手势代码原样照抄，不重新设计"这条决定的理由。
 //
 // ⚠️ 关键：这里全部用原生 addEventListener + {passive:false}，不用JSX的onTouchMove——
 // React的合成触摸事件默认是passive的，合成onTouchMove里调用preventDefault()不会真正

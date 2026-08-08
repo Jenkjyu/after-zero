@@ -3,7 +3,7 @@
 // 有类型提示。calc.js本身不需要、也不应该改成TS/ESM——它继续是index.html那套"经典script、全局
 // 作用域共享"的既有约定的一部分，这里只是"从React这一侧看过去，这些全局函数长什么样"的说明。
 //
-// 只声明已迁移的React页面实际会调用的几个，不是calc.js全部39个——够用即可，见CLAUDE.md
+// 只声明已迁移的React页面实际会调用的几个，不是calc.js全部39个——够用即可，见AGENTS.md
 // "React 迁移"一节。
 import type { AiConversation, Debt, DebtSummary, GenSpec, MonthlyRepayment, PlanRow, Premium, ReportData, SortKey, UpcomingPressure } from "./types";
 

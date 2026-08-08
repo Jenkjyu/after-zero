@@ -149,7 +149,7 @@ scrub 交互。触摸走 Touch Events + `{passive:false}`，且先判方向（�
 ```
 
 也就是"每张图一个色相"这个目标只做到一半——蓝和紫在正常视觉下就已经很接近，红绿色盲
-下基本是同一个颜色。这正是 `CLAUDE.md` 里记过的那条教训（"只验色 vs 背景会漏掉相邻
+下基本是同一个颜色。这正是 `AGENTS.md` 里记过的那条教训（"只验色 vs 背景会漏掉相邻
 那一对"）的再次复现，只是这次相邻的两个色分处不同图表，更容易被忽略。三套原型都没有
 沿用这个组合。
 
@@ -252,4 +252,4 @@ Playwright headless，390×844，浅深两套主题各跑一遍：
 ## 没有修改的文件
 
 `www/**`（含 `index.html`、`js/calc.js`）、`react/**`、`android/**`、`cloudbase/**`、
-`test/**`、`package.json`、`react/vite.config.ts`、`CLAUDE.md` —— 全部只读引用，零改动。
+`test/**`、`package.json`、`react/vite.config.ts`、`AGENTS.md` —— 全部只读引用，零改动。

@@ -1,6 +1,6 @@
 // 导出菜单——Excel / PDF 二选一。门禁逻辑原样保留自 vanilla
 // reportExportXlsxBtn/reportExportPdfBtn 的 click 监听器；导出逻辑本身继续 100% vanilla
-// (exportReportXlsx/exportReportPdf 零 DOM 依赖，只读 debts 造 Blob，见 CLAUDE.md"统计"一节)，
+// (exportReportXlsx/exportReportPdf 零 DOM 依赖，只读 debts 造 Blob，见 AGENTS.md"统计"一节)，
 // 这里只是通过 __azBridge 触发。
 //
 // ⚠️触发器从"⋮ 三点图标"换成了具名按钮，位置从 hero 右上角挪到页尾的结语块里。

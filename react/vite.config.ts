@@ -24,7 +24,7 @@ export default defineConfig(({ command }) => ({
     lib: {
       // 四个tab+一个常驻共享sheet入口，各自产出debts.js/pay.js/report.js/mine.js/sheets.js，
       // index.html里各配一个<script type="module">。sheets.js挂的#react-sheets-root不属于
-      // 任何tab，是DetailSheet(以及以后EditSheet迁移进来后)常驻的地方，见CLAUDE.md
+      // 任何tab，是DetailSheet(以及以后EditSheet迁移进来后)常驻的地方，见AGENTS.md
       // "React 迁移"一节。inlineDynamicImports只支持单入口，多入口后必须去掉——Rollup对ES
       // 格式的多入口构建会自动把react/react-dom这类公共依赖拆成共享chunk，各入口各自
       // import它，不会各自打包一份重复的react/react-dom。

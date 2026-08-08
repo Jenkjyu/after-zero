@@ -1,11 +1,11 @@
 // 还款日卡片左滑露出"销这期"(2026-07-29从"标记已还"改名——同一个动作在债务页/详情窗都叫
 // "销这期"，同义不同名会让人以为是两回事)——原样照抄自 www/index.html 的
 // initPaySwipe/closePaySwipe/openPaySwipeTo/paySwipeSettle，不借这次迁移"用更React的方式
-// 重写"(同一条决定见CLAUDE.md"在还债务自定义排序"/"React 迁移"两节"手势代码原样照抄"的原则)。
+// 重写"(同一条决定见AGENTS.md"在还债务自定义排序"/"React 迁移"两节"手势代码原样照抄"的原则)。
 //
 // 跟"在还债务"的 debts/gestures.ts 不是同一份代码拆出来的——这里只有滑动，没有长按拖拽排序，
 // 是独立的、更简单的一套状态机。vanilla历史上pay的滑动手势其实是更早、更原始的实现，
-// debts当年是照抄这份定的模式，不是反过来（见CLAUDE.md"还款提醒页"一节），所以这次移植
+// debts当年是照抄这份定的模式，不是反过来（见AGENTS.md"还款提醒页"一节），所以这次移植
 // 直接从vanilla的initPaySwipe搬，不去debts/gestures.ts里找可复用的部分。
 //
 // ⚠️同样必须用原生Touch Events + {passive:false}，不能用JSX的onTouchMove——React合成触摸

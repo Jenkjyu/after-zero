@@ -63,7 +63,7 @@ describe("Rank", () => {
     expect(bars[1].style.background).toContain("--calm");
   });
 
-  it("每行都写着利率数字——颜色不是唯一编码（红↔琥珀那套三档色相分不开，见 CLAUDE.md）", () => {
+  it("每行都写着利率数字——颜色不是唯一编码（红↔琥珀那套三档色相分不开，见 AGENTS.md）", () => {
     render(<Rank rows={rows([5000, 5000], [28, 6])} totalBalance={10000} />);
     expect(document.querySelector(".rank-amt .r")!.textContent).toBe("28.00%");
   });

@@ -36,7 +36,7 @@
 // "press-and-hold-release"，不是"点一下永久定住"。
 //
 // ⚠️实现②时踩到一个真实的React+命令式DOM冲突（这个项目在DocsScreen.tsx也踩过一次，
-// 见CLAUDE.md"档案库PDF预览"一节）：第一版`.jread`的内容一半交给JSX（`{active?...:...}`
+// 见AGENTS.md"档案库PDF预览"一节）：第一版`.jread`的内容一半交给JSX（`{active?...:...}`
 // 条件渲染占位文字/读数），一半在拖拽期间被`read.innerHTML=...`直接替换——一旦某次
 // touchmove把子节点整个换掉（React并不知情），下次因为state变化（比如松手setScrubbed
 // (false)）触发的重渲染，React想把它记忆中的旧子节点挪回占位文字时，那些子节点早已经

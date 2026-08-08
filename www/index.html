@@ -277,7 +277,7 @@
   .option-item svg { width: 17px; height: 17px; flex: none; }
   /* 公式生成器"计息方式"选择器嵌在#editSheet(.sheet，z-index:31)内部，它自己弹出的这个
      选择抽屉必须盖过外层的#editSheet，不能用.scrim/.sheet的默认z-index(30/31)——跟
-     CLAUDE.md"第十一步"里aiHistorySheet那条"sheet挂在subpage下面必须手动提z-index"
+     AGENTS.md"第十一步"里aiHistorySheet那条"sheet挂在subpage下面必须手动提z-index"
      是同一个坑，只是这次是sheet嵌在sheet里面。 */
   .gen-kind-stack { z-index: 32; }
   .sort-controls { display: flex; align-items: center; gap: 6px; }
@@ -722,7 +722,7 @@
   /* 多策略对比规划(StrategyCompareScreen)——统计tab"最该先动手的地方"下面的入口。
      外层用现成的.sec(跟FindingList/ActionBox同一套section节奏)，这里只补按钮自己的样式。 */
   .strategy-cta .btn { width: 100%; margin-top: 10px; }
-  /* 自定义顺序：上下移动按钮，不做真正的拖拽——见CLAUDE.md"多策略对比规划"一节，
+  /* 自定义顺序：上下移动按钮，不做真正的拖拽——见AGENTS.md"多策略对比规划"一节，
      这个决定是权衡过的：这批列表通常<15项，按钮比touch drag更可靠、也不需要重新
      实现一套手势状态机(那套代码本来就是为"在还债务"tab的jiggle模式+swipe写的，
      跟这里"纯排序、没有swipe"的需求不匹配，硬套反而更容易出错)。 */
@@ -1316,7 +1316,7 @@
        react/src/debts/App.tsx，构建产物是下面script标签引入的js/react-debts/debts.js
        (Vite多入口构建，debts/pay/report三个tab各自一个入口，各自产出同名js文件，
        共享一个自动拆分出来的react/react-dom chunk)，两者的契约(window.__azBridge/
-       az:state-changed等事件)见CLAUDE.md"React 迁移"一节。 -->
+       az:state-changed等事件)见AGENTS.md"React 迁移"一节。 -->
   <section class="view active" id="view-debts">
     <div id="react-debts-root"></div>
   </section>
@@ -1340,7 +1340,7 @@
   <!-- #importFileInput原来在#view-data里面，那个section折叠成React挂载点后，这个隐藏的
        文件选择器搬到这里独立存在——它的change监听器(主脚本里)完全没变，React只是通过
        window.__azBridge.triggerImportFilePicker()间接点它，跟#uploadInput那种游离在
-       具体卡片外的隐藏文件输入是同一类处理，见CLAUDE.md"React 迁移"一节"我的"tab部分。 -->
+       具体卡片外的隐藏文件输入是同一类处理，见AGENTS.md"React 迁移"一节"我的"tab部分。 -->
   <input type="file" id="importFileInput" accept=".json,application/json" style="display:none">
 </div>
 
@@ -1428,7 +1428,7 @@
      (react/src/sheets/DetailSheet.tsx、react/src/sheets/EditSheet.tsx)——这是第一个不属于任何
      tab、常驻挂载的React入口，被"在还债务"/"还款日"两棵独立React树共同触发打开(见shared/state.ts
      的openDetailSheet/closeDetailSheet/openEditSheet/closeEditSheet，不再经过window.__azBridge)。
-     详见CLAUDE.md"React 迁移"一节。 -->
+     详见AGENTS.md"React 迁移"一节。 -->
 <div id="react-sheets-root"></div>
 
 <!-- #scrimNotify/#notifySheet已经整体搬进React(第八步)——见react/src/sheets/NotifySheet.tsx。 -->
@@ -1488,7 +1488,7 @@
      type="module"脚本天然延迟到文档解析完、且晚于它之前所有阻塞性classic script执行完才运行，
      所以不需要手动保证"下面这几个React入口跑的时候window.__azBridge/calc.js全局函数都已就绪"这件事——
      calc.js和下面的主<script>(定义window.__azBridge)都是阻塞性classic script，必然先跑完。
-     详见CLAUDE.md"React 迁移"一节。 -->
+     详见AGENTS.md"React 迁移"一节。 -->
 <script type="module" src="js/react-debts/debts.js"></script>
 <script type="module" src="js/react-debts/pay.js"></script>
 <script type="module" src="js/react-debts/report.js"></script>
@@ -1584,7 +1584,7 @@
     window.dispatchEvent(new CustomEvent("az:state-changed"));
   }
   // 开发/测试期间模拟"已订阅"效果用——App还没上应用商店，接不了真实支付，没有别的
-  // 办法能走通购买流程。跟CLAUDE.md记录的"手写localStorage模拟登录"是同一类调试
+  // 办法能走通购买流程。跟AGENTS.md记录的"手写localStorage模拟登录"是同一类调试
   // 手法，区别是这个函数会立即重渲染当前页面上三处订阅相关UI，不需要手动刷新页面。
   // 用法（桌面浏览器或真机WebView的devtools console里执行）：
   //   window.__debugPremium("premium")   // 模拟已开通 Premium
@@ -1600,7 +1600,7 @@
   debts.forEach(normalize);
   // editIndex/editingPlan/oneTimeStash/planMode(手动添加/公式生成二选一)这几个模块变量已经
   // 删除——#editSheet的实际内容整体搬进了React(react/src/sheets/EditSheet.tsx等)，这些状态
-  // 现在是React组件自己的useState，见CLAUDE.md"React 迁移"一节"第六步"。docSel同理(第九步，
+  // 现在是React组件自己的useState，见AGENTS.md"React 迁移"一节"第六步"。docSel同理(第九步，
   // react/src/sheets/DocsScreen.tsx的selectedId)。
 
   // background scroll lock while any sheet/modal is open (counted, since the confirm modal can stack on top of the edit sheet)
@@ -1687,7 +1687,7 @@
   // renderSummary()/renderAIBanner()/renderDebts() + 整套长按拖拽排序(jiggleMode/dragCtx/
   // beginDrag/applyDragFrame/autoScrollTick/finishDrag等)/左滑露出"销这期"(DEBT_REVEAL/
   // debtSwipeOpen/closeDebtSwipe/openDebtSwipeTo/debtSwipeSettle)已经整体搬进React
-  // (react/src/debts/，见CLAUDE.md"React 迁移"一节)。commitReorder依然留在这里
+  // (react/src/debts/，见AGENTS.md"React 迁移"一节)。commitReorder依然留在这里
   // (下面紧接着)，因为它属于"React通过window.__azBridge调用的vanilla函数"这一类，
   // 不是纯展示逻辑。
   // 稳定分区重建debts数组：原本"在还"的槽位依次填入新顺序，"已结清"的槽位原样不动。
@@ -1712,7 +1712,7 @@
   // (renderSummary/renderAIBanner/renderDebts/renderPay/renderReportScreen)的调用
   // 全部换成派发一个通用事件——React那边(shared/state.ts的useSyncExternalStore)监听
   // 这个事件、重新读取window.__azBridge.getDebts()等状态、自己重渲染。这是vanilla↔React
-  // 之间唯一的"数据变了"通知机制，详见CLAUDE.md"React 迁移"一节。
+  // 之间唯一的"数据变了"通知机制，详见AGENTS.md"React 迁移"一节。
   function renderAll() { debts.forEach(recompute); window.dispatchEvent(new CustomEvent("az:state-changed")); syncNotifications(); }
 
   // 通知调度：每次都是"全清再重排"——这个App里没有别的功能用本地通知，全量重算最简单可靠，
@@ -1744,7 +1744,7 @@
 
   // kv()/openDetail(i)/closeDetail()已删除——详情窗内容+开关状态整个搬进了
   // react/src/sheets/DetailSheet.tsx，逻辑原样复刻(kv()对应组件里的同名JSX辅助函数)。
-  // 见CLAUDE.md"React 迁移"一节。
+  // 见AGENTS.md"React 迁移"一节。
 
   // 顶部横杠拖拽：下拖超过阈值关闭，resizable=true 时上拖可把窗口拉高（用于查看详情）
   function initGripDrag(sheet, grip, closeFn, resizable) {
@@ -1875,7 +1875,7 @@
   // batchApply点击handler/saveForm——这一整块(#editSheet的实际内容：表单字段/公式生成器/
   // 批量设置/oneTimeStash状态机)已经整体搬进React(react/src/sheets/EditSheet.tsx、
   // GenPanel.tsx、PlanRows.tsx、BatchBlock.tsx)，逻辑原样复刻，vanilla这边只留setDebt(i,obj)
-  // 这一个narrow的写入函数(定义在deleteDebt旁边)。见CLAUDE.md"React 迁移"一节"第六步"。
+  // 这一个narrow的写入函数(定义在deleteDebt旁边)。见AGENTS.md"React 迁移"一节"第六步"。
 
   // 还款提醒通知设置面板。规则全局共享(不按债务区分)，跟着每笔债务当下的nextDate
   // 自动滚动到下一期(syncNotifications里体现)。#notifySheet本身整体搬进React了(第八步，
@@ -1931,7 +1931,7 @@
   }
 
   // #editSheet的实际内容(表单/公式生成器/批量设置/oneTimeStash状态机)已经整体搬进React
-  // (react/src/sheets/EditSheet.tsx等，见CLAUDE.md"React 迁移"一节)，vanilla这边只保留
+  // (react/src/sheets/EditSheet.tsx等，见AGENTS.md"React 迁移"一节)，vanilla这边只保留
   // setDebt(id,obj)这一个narrow的写入函数——id非空时按id查到原来的下标覆盖(沿用原
   // saveForm()的做法，合并old.id/old.settled/old.settledDate，不让"编辑一条已结清的债务"
   // 意外把它变回在还状态)，id为null是新增(push，赋一个新生成的id)。故意不在这里顺带调用
@@ -1978,7 +1978,7 @@
 
   // 账号登录：微信登录(移动应用OAuth) + 腾讯云开发(CloudBase)自定义登录。
   // 登录现在是全局强制的——account为空时#loginGate会盖住整个App（含tabbar），
-  // 四个标签页不再能离线/不登录使用，详见CLAUDE.md。
+  // 四个标签页不再能离线/不登录使用，详见AGENTS.md。
   var CLOUDBASE_ENV_ID = "after-zero-d7gub5p5f09c8cc2d";
   var _cbApp = null;
   function cbApp() { if (!_cbApp) _cbApp = cloudbase.init({ env: CLOUDBASE_ENV_ID }); return _cbApp; }
@@ -2727,7 +2727,7 @@
   window.__handleBackButton = function () {
     // 抖动编辑模式(jiggleMode)现在是React状态(react/src/debts/DebtList.tsx)，vanilla这边
     // 看不到——React挂载时会把这个判断以window.__azDebtsBack的形式注册回来，同一个"最上层
-    // 先关"优先级链，只是判断逻辑物理上不在这个文件里了。详见CLAUDE.md"React 迁移"一节。
+    // 先关"优先级链，只是判断逻辑物理上不在这个文件里了。详见AGENTS.md"React 迁移"一节。
     if (window.__azDebtsBack && window.__azDebtsBack()) return true;
     if ($("modalScrim").classList.contains("open")) { closeModal(); return true; }
     // termsScreen/premiumScreen/accountScreen同理已经是React状态(react/src/sheets/
@@ -2834,7 +2834,7 @@
 
   // React迁移桥接："在还债务"页(react/src/debts/)整体由React接管，这里只暴露它实际需要
   // 调用的这几个vanilla函数/状态读取器——其余(saveForm/公式生成器等)继续保持private，
-  // 后续阶段迁移到别的页面时才按需加进来。详见CLAUDE.md"React 迁移"一节。
+  // 后续阶段迁移到别的页面时才按需加进来。详见AGENTS.md"React 迁移"一节。
   window.__azBridge = {
     getDebts: function () { return debts; }, // 每次调用现读，debts会在commitReorder/
     // applyBackupData/导入JSON三处被整体重新赋值，不是原地mutate，函数包一层才能

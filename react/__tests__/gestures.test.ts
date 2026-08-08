@@ -1,5 +1,5 @@
 // 长按拖拽排序/左滑这套状态机的核心几何/提交逻辑——真正的touch事件序列(手指按下/移动/松开)
-// 依赖jsdom不完整支持的TouchEvent，且这套代码历史上一直是"必须真机验证"的(见CLAUDE.md
+// 依赖jsdom不完整支持的TouchEvent，且这套代码历史上一直是"必须真机验证"的(见AGENTS.md
 // "在还债务自定义排序"一节)，这里只测试不依赖真实触摸序列、可以直接调用验证的部分：
 // 滑块开合的DOM效果、拖拽提交(finishDrag)按DOM顺序正确读出新排列并调用回调。
 import { describe, expect, it, vi } from "vitest";

@@ -5,7 +5,7 @@
 // 保留这份抽象是因为它依然是"连续序列图怎么读精确值"的标准答案，以后再加同类图表直接复用。
 //
 // ⚠️必须用原生Touch Events + {passive:false}，不能用JSX的onTouchMove——React合成触摸事件
-// 默认passive，preventDefault()不会真正阻止原生滚动，这是这个项目反复踩过的坑（见CLAUDE.md
+// 默认passive，preventDefault()不会真正阻止原生滚动，这是这个项目反复踩过的坑（见AGENTS.md
 // "手势代码：原样移植，不重新设计"一节）。
 //
 // ⚠️2026-08-01改过一轮（第一次）：早期版本touchstart落在图表内就直接判定成scrub、不看

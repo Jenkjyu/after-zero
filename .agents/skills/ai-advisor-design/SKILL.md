@@ -31,7 +31,7 @@ description: This skill should be used when working on the AI debt advisor featu
 
 `#aiHistorySheet`是从`#aiScreen`（`.subpage`，z-index 35）内部打开的sheet（`.sheet`默认z-index 31），必须手动提到36才不会被`#aiScreen`盖住——这是这个项目第一次出现"从subpage内部打开sheet"的场景，以后同类场景记得同样手动提升（但别超过`.login-gate`的40）。返回键链里这个sheet的判断要排在`aiScreen`判断之前。
 
-**⚠️`#aiHistorySheet`当年漏包了`.sheet-scroll`这层内层滚动容器**（见CLAUDE.md"`.sheet`的滚动必须在内层"一节），2026-08-04补上——历史对话条数多起来滚动时，深色模式圆角处会露白边，跟`DetailSheet`/`EditSheet`/`NotifySheet`/`SortSheet`当年踩的是同一个坑，只是这个sheet是在那条规则定下来之后才另外新写的，没人工核对到。
+**⚠️`#aiHistorySheet`当年漏包了`.sheet-scroll`这层内层滚动容器**（见AGENTS.md"`.sheet`的滚动必须在内层"一节），2026-08-04补上——历史对话条数多起来滚动时，深色模式圆角处会露白边，跟`DetailSheet`/`EditSheet`/`NotifySheet`/`SortSheet`当年踩的是同一个坑，只是这个sheet是在那条规则定下来之后才另外新写的，没人工核对到。
 
 ## 2026-08：追问建议芯片 + 失败重试 + 富文本渲染 + "思考中N秒" + 假流式打字动画
 
@@ -45,7 +45,7 @@ description: This skill should be used when working on the AI debt advisor featu
 
 **"思考中N秒"**：`runAdvisor()`里用`window.setInterval`（1秒一次）+`Date.now()-startedAt`算经过秒数，`thinkingSeconds>0`时才在"思考中"后面追加` Ns`，避免请求还没到1秒时显得多余。这个interval的写法（进度算在闭包变量里、`setState`只接收算好的值）后来被"假流式"那部分抄了过去，见下面那条踩过的坑。
 
-**假流式打字动画（`startReveal`）**：回复其实是`callAiAdvisor()`一次性整段拿到手的（这套调用链是`cbApp().callFunction()`，见CLAUDE.md本节"真实生成报告/追问往返"那条——非流式，客户端必须等模型把整段生成完才有任何内容返回，这条链路目前做不到真正的逐token流式；`revealState`只是在拿到完整文本之后，客户端自己按小段(`REVEAL_CHUNK=3`字符/`REVEAL_INTERVAL_MS=16ms`)"回放"打出来，制造观感上的逐字效果，不改变实际等待时间）。`message.content`从一开始就是完整正文，`revealState.shown`只影响这次渲染截取多少个字符，不影响持久化。`prefers-reduced-motion`时`startReveal()`直接不启动动画，跟`castWand()`共用同一条媒体查询判断。追问建议芯片、聊天记录自动滚动到底部都会等打字动画播完（`lastIsRevealing`这个派生量），不会在文字还没打完时抢先出现/半途卡住。
+**假流式打字动画（`startReveal`）**：回复其实是`callAiAdvisor()`一次性整段拿到手的（这套调用链是`cbApp().callFunction()`，见AGENTS.md本节"真实生成报告/追问往返"那条——非流式，客户端必须等模型把整段生成完才有任何内容返回，这条链路目前做不到真正的逐token流式；`revealState`只是在拿到完整文本之后，客户端自己按小段(`REVEAL_CHUNK=3`字符/`REVEAL_INTERVAL_MS=16ms`)"回放"打出来，制造观感上的逐字效果，不改变实际等待时间）。`message.content`从一开始就是完整正文，`revealState.shown`只影响这次渲染截取多少个字符，不影响持久化。`prefers-reduced-motion`时`startReveal()`直接不启动动画，跟`castWand()`共用同一条媒体查询判断。追问建议芯片、聊天记录自动滚动到底部都会等打字动画播完（`lastIsRevealing`这个派生量），不会在文字还没打完时抢先出现/半途卡住。
 
 **⚠️踩了一个真实的React bug，测试当场抓到、装机验证前就发现了**：`startReveal()`第一版在`setRevealState(prev => {...})`这个**函数式updater内部**调用了`window.clearInterval(timer)`——updater函数必须是纯函数，**React可能会不止调用一次**（用来做一致性检查/重放），这一多调用直接让"判断到点了就清掉定时器"这个副作用执行了不止一次也不管用，interval实际上永远没被真正清掉，表现为`shown`卡在一个小数值来回震荡、动画永远播不完整段文字（写`AiScreen.test.tsx`里"回复到达后不是一次性整段出现"这条用例、配合`vi.useFakeTimers()`把500ms虚拟时间一次性推进时，立刻复现：连续打印`prev`发现是`0,3,6,null,3,6,null,3,6,null...`不断循环，而不是`0,3,6,null`后停住）。**修法**：把"打到第几个字"这个进度改成用闭包里的普通变量`shown`记（不再依赖`setRevealState`的函数式updater去算下一个值），`window.clearInterval`只在**外层的interval回调本体**里调用（那里是安全的副作用位置，不是传给`setState`的那个函数），`setRevealState`永远只接收一个算好的普通对象/`null`——这跟`runAdvisor()`里"思考中N秒"那个定时器的写法（`Date.now()`算经过时间存在闭包变量里，不是从`setState`的`prev`推导）是同一个模式，早改过一次、这次踩坑之后统一成同一套。**教训：`setState(prev => ...)`这个函数只应该是纯计算，任何副作用(定时器/网络请求/DOM操作)都不能放在里面——哪怕看起来只是"顺手判断一下要不要清定时器"这么小的一步，这条规则在这个项目里是第一次真正踩坑，以后写任何"定时器+setState"组合，进度值算在闭包变量或ref里，`setState`调用本身保持零副作用。**
 

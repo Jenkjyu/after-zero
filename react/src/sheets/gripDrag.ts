@@ -1,4 +1,4 @@
-// 详情窗顶部横杠拖拽——原样照抄vanilla的initGripDrag(www/index.html，见CLAUDE.md"React 迁移"
+// 详情窗顶部横杠拖拽——原样照抄vanilla的initGripDrag(www/index.html，见AGENTS.md"React 迁移"
 // 一节detailSheet那部分)，只是从"闭包变量+DOM查询"改成"显式state对象+传入ref"，方便单测
 // (不依赖真实PointerEvent序列，用普通DOM元素+手造PointerEvent即可)。下拖超过阈值关闭；
 // resizable=true(只有detailSheet用)时上拖可以把窗口拉高，用来多看几行还款计划表格。

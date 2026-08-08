@@ -1,5 +1,5 @@
 // 测useSyncExternalStore桥接本身：window.__azBridge变了之后，只有真的派发了az:state-changed
-// 事件，React才会重新读取——这是CLAUDE.md"React 迁移"一节里"renderAll()是唯一的通知渠道"
+// 事件，React才会重新读取——这是AGENTS.md"React 迁移"一节里"renderAll()是唯一的通知渠道"
 // 这条设计的核心断言，值得单独测，不能只靠组件测试间接覆盖。
 //
 // useDebts()的断言用toEqual不用toBe：getDebtsSnapshot()返回的是浅拷贝(见shared/state.ts

@@ -2,7 +2,7 @@
 //
 // ⚠️必须用原生 Touch Events + {passive:false}，不能用 JSX 的 onTouchMove——React 合成
 // 触摸事件默认 passive，preventDefault() 不会真正阻止原生滚动，这是这个项目反复踩过的坑
-// （见 CLAUDE.md"手势代码：原样移植，不重新设计"一节）。
+// （见 AGENTS.md"手势代码：原样移植，不重新设计"一节）。
 //
 // ⚠️2026-08-01改过一轮：早期版本touchstart落在饼上就直接接管、不看方向，导致上下滑页面
 // 路过饼图时会被拦截("干涉，影响手感"，真机反馈)。现在跟chartScrub.ts同一套8px阈值方向

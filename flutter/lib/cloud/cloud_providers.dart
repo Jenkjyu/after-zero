@@ -26,7 +26,7 @@ final deviceIdProvider = Provider<String>((ref) {
   return id;
 });
 
-/// CloudBase环境ID——固定值，不是配置项(这个App目前只有一个环境，见CLAUDE.md
+/// CloudBase环境ID——固定值，不是配置项(这个App目前只有一个环境，见AGENTS.md
 /// "原生插件：WeChatLogin"一节)。
 const cloudBaseEnvId = 'after-zero-d7gub5p5f09c8cc2d';
 
