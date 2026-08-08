@@ -52,3 +52,60 @@ jobs:
 
       - name: 单元/组件测试
         run: flutter test
+
+  # 死规则门禁：Flutter重写期间禁止修改旧版代码（见AGENTS.md"硬性铁律"第7条）。
+  # 只有当提交信息含 flutter/重写/rewrite 关键词、且改动触及受保护旧版文件时判红；
+  # 用户明确批准的旧版改动（含阶段9切换）需在提交信息里带 `legacy-ok` 标记绕过。
+  legacy-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 检查重写相关提交是否污染旧版文件
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            CHANGED=$(git diff --name-only HEAD^1 HEAD || true)
+            MSGS="${{ github.event.pull_request.title }}"
+          else
+            BEFORE="${{ github.event.before }}"
+            SHA="${{ github.sha }}"
+            if [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+              CHANGED=$(git diff --name-only "$BEFORE".."$SHA" || true)
+              MSGS=$(git log --format=%s "$BEFORE".."$SHA" || true)
+            else
+              CHANGED=$(git diff-tree --no-commit-id --name-only -r "$SHA" || true)
+              MSGS=$(git log -1 --format=%s "$SHA" || true)
+            fi
+          fi
+          # 用户明确批准的旧版改动标记（含阶段9切换），放行
+          if printf '%s' "$MSGS" | grep -qi 'legacy-ok'; then
+            echo "检测到 legacy-ok 标记，跳过旧版文件检查"
+            exit 0
+          fi
+          # 只拦截"重写相关"提交：提交信息含 flutter/重写/rewrite
+          if ! printf '%s' "$MSGS" | grep -qiE 'flutter|重写|rewrite'; then
+            echo "非重写相关提交，不检查"
+            exit 0
+          fi
+          VIOLATIONS=()
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              www/*) if [[ "$f" != www/js/react-debts/* ]]; then VIOLATIONS+=("$f"); fi ;;
+              react/*) VIOLATIONS+=("$f") ;;
+              android/*) if [[ "$f" != android/app/src/main/assets/* ]]; then VIOLATIONS+=("$f"); fi ;;
+              cloudbase/*) VIOLATIONS+=("$f") ;;
+              capacitor.config.json|package.json|package-lock.json) VIOLATIONS+=("$f") ;;
+            esac
+          done <<< "$CHANGED"
+          if [ ${#VIOLATIONS[@]} -gt 0 ]; then
+            echo "::error::Flutter 重写相关提交触碰了受保护的旧版文件（见 AGENTS.md 硬性铁律第7条）："
+            printf '::error::  %s\n' "${VIOLATIONS[@]}"
+            echo "如需对旧版做用户批准的改动，请在提交信息中加入 legacy-ok 标记。"
+            exit 1
+          fi
+          echo "未发现旧版污染"

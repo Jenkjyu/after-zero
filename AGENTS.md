@@ -1184,3 +1184,9 @@ localStorage.setItem("after-zero-account-v1", JSON.stringify({openid:"test",nick
 4. **release签名密钥已经生成（因为微信登录要求提交release签名SHA1去微信开放平台注册），但目前还没有任何正式发布用过它。** 文件位置/构建命令/`signingConfigs.release`的生效条件见`release-keystore` skill。**这个keystore一旦真正拿去发布过一个版本，丢了 = 以后再也没法用同一个身份更新这个app，需要跟`localStorage`那条铁律同等严重地对待——离线、异地备份好。**
 5. **License 是 PolyForm Noncommercial 1.0.0，不是MIT/ISC这类常见的宽松协议，是刻意选的。** 开发者规划未来要在这个app上加付费功能，选这个协议是为了禁止别人白嫖代码去做商业竞品（发到应用商店卖钱、内置广告等）；别人依然可以自由fork/学习/个人非商业使用。改动licensing相关内容（`LICENSE`文件、`package.json`里的`license`字段、README里的License说明）前要确认这个前提没变。
 6. **`AndroidManifest.xml` 里的 `INTERNET` 权限当初是为未来付费功能预留的，现在已经真正用上了**——`www/index.html` 里的微信登录功能会加载CloudBase CDN脚本、调用腾讯云开发的云函数，是这个app第一次真正发出网络请求（`WeChatLogin`原生插件本身走的是Intent/AIDL跟微信App通信，不占用这条权限）。这条权限不要删。
+7. **Flutter 重写期间，禁止修改旧版代码（默认拒绝，例外必须用户明确批准）。** 旧版是"只读基准"，重写期间只允许**读**它、**运行它做对照验证**；任何对旧版的修改——包括改逻辑、改文案、改样式，甚至改注释、改拼写——一律先停下来问用户，**默认拒绝**，用户明确批准后才允许。
+   **受保护的旧版源码与配置**：`www/`、`react/`、根目录 `android/`（Capacitor 工程）、`cloudbase/`（云函数）、`capacitor.config.json`、`package.json`/`package-lock.json`（旧版构建配置）。
+   **明确排除（不算"改旧版"）**：生成物目录 `node_modules/`、`www/js/react-debts/`、`android/app/src/main/assets/public/`、`flutter/build/`——由各自构建流程产出，可重新生成，`npx cap sync android`、`npm run build:react` 这类重新生成操作允许执行；本机非项目文件 `logs/`、`PROGRESS.md`（均为 gitignored 本机文件）。
+   **重写工作的合法写入范围**：`flutter/`（新代码）、`README.md`、`AGENTS.md`、`docs/`（审计/交接文档）、`.agents/skills/`（skill 文档）。
+   **例外**：阶段9"删除旧版、flutter/ 转正"是计划内动作，由用户明确下达后执行，不算违反；用户临时要求修旧版某个 bug 也算批准，但只准修被点名的那一处。
+   **执行辅助（CI 门禁）**：`.github/workflows/ci.yml` 的 `legacy-guard` job 会检查——提交信息含 `flutter`/`重写`/`rewrite` 关键词、且改动触及上述受保护文件时判红；用户批准的旧版改动在提交信息里加 `legacy-ok` 标记绕过。
