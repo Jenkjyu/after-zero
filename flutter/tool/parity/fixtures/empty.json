@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "legacy": {
+    "localStorage": {}
+  },
+  "flutter": {
+    "sharedPreferences": {}
+  },
+  "artifacts": {
+    "archives": [],
+    "network_profile": "offline_by_default",
+    "native_profile": "no_permissions_by_default"
+  }
+}

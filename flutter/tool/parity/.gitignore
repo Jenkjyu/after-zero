@@ -1,0 +1,5 @@
+__pycache__/
+artifacts/
+private-evidence/
+*.preseed.localStorage.json
+*.preseed.preferences.backup.json

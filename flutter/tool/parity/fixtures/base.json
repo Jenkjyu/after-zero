@@ -1,0 +1,409 @@
+{
+  "schema_version": 1,
+  "legacy": {
+    "localStorage": {
+      "debt-manager-v5": [
+        {
+          "id": "parity-amort-001",
+          "name": "星河消费贷",
+          "funder": "合成银行",
+          "type": "消费贷",
+          "opened": "2026-06-15",
+          "notes": "仅用于自动对齐测试，不含真实个人数据。",
+          "plan": [
+            {
+              "date": "2026-07-10",
+              "amount": 2100,
+              "principal": 2000,
+              "interest": 100,
+              "paid": true,
+              "paidAt": "2026-07-09",
+              "paidAmount": 2100
+            },
+            {
+              "date": "2026-08-10",
+              "amount": 2080,
+              "principal": 2000,
+              "interest": 80,
+              "paid": false,
+              "paidAmount": 800
+            },
+            {
+              "date": "2026-09-10",
+              "amount": 2060,
+              "principal": 2000,
+              "interest": 60,
+              "paid": false
+            },
+            {
+              "date": "2026-10-10",
+              "amount": 2040,
+              "principal": 2000,
+              "interest": 40,
+              "paid": false
+            },
+            {
+              "date": "2026-11-10",
+              "amount": 2020,
+              "principal": 2000,
+              "interest": 20,
+              "paid": false
+            }
+          ],
+          "gen": {
+            "kind": "equalprincipal",
+            "first": "2026-07-10",
+            "P": 10000,
+            "rate": 12,
+            "n": 5
+          },
+          "original": 10000,
+          "balance": 8000,
+          "paidPrincipal": 2000,
+          "paidInterest": 100,
+          "totalTerms": 5,
+          "paidTerms": 1,
+          "terms": 4,
+          "monthly": 2050,
+          "nextDate": "2026-08-10",
+          "rate": 12
+        },
+        {
+          "id": "parity-onetime-002",
+          "name": "朋友免息借款（一次性）",
+          "funder": "合成联系人",
+          "type": "私人借款",
+          "opened": "2026-08-01",
+          "oneTime": true,
+          "plan": [
+            {
+              "date": "2026-08-17",
+              "amount": 500,
+              "principal": 500,
+              "interest": 0,
+              "paid": false
+            }
+          ],
+          "gen": {
+            "kind": "custom",
+            "first": "2026-08-17",
+            "n": 1
+          },
+          "original": 500,
+          "balance": 500,
+          "paidPrincipal": 0,
+          "paidInterest": 0,
+          "totalTerms": 1,
+          "paidTerms": 0,
+          "terms": 1,
+          "monthly": 500,
+          "nextDate": "2026-08-17",
+          "rate": 0
+        },
+        {
+          "id": "parity-settled-003",
+          "name": "已结清样本",
+          "funder": "合成机构",
+          "type": "信用卡",
+          "opened": "2026-01-01",
+          "settled": true,
+          "settledDate": "7/20",
+          "plan": [
+            {
+              "date": "2026-02-20",
+              "amount": 1020,
+              "principal": 1000,
+              "interest": 20,
+              "paid": true,
+              "paidAt": "2026-02-20",
+              "paidAmount": 1020
+            }
+          ],
+          "original": 1000,
+          "balance": 0,
+          "paidPrincipal": 1000,
+          "paidInterest": 20,
+          "totalTerms": 1,
+          "paidTerms": 1,
+          "terms": 0,
+          "monthly": 0,
+          "nextDate": null,
+          "rate": 24
+        }
+      ],
+      "debt-manager-docs-v5": [
+        {
+          "id": "doc:parity-readme",
+          "file": "parity-readme.md",
+          "title": "合成档案说明",
+          "content": "# 合成档案\n\n这是一份只用于对齐测试的 Markdown 文档。",
+          "createdAt": 1786323600000
+        }
+      ],
+      "debt-manager-sort-v1": "custom",
+      "after-zero-account-v1": {
+        "openid": "parity-openid-not-real",
+        "nickname": "对齐测试用户",
+        "avatarUrl": "",
+        "loggedInAt": 1786323600000
+      },
+      "after-zero-notify-v1": {
+        "enabled": true,
+        "rules": [
+          {
+            "offsetDays": 0,
+            "time": "09:00"
+          },
+          {
+            "offsetDays": 1,
+            "time": "20:30"
+          }
+        ]
+      },
+      "after-zero-premium-v1": {
+        "premium": {
+          "method": "redeemed",
+          "at": "2026-08-01T00:00:00.000Z"
+        }
+      },
+      "after-zero-ai-usage-v1": {
+        "month": "2026-08",
+        "used": 7,
+        "limit": 50
+      },
+      "after-zero-ai-chatlog-v1": [
+        {
+          "id": "parity-conversation-001",
+          "title": "我应该先还哪一笔？",
+          "isReport": false,
+          "updatedAt": 1786323600000,
+          "messages": [
+            {
+              "role": "user",
+              "content": "我应该先还哪一笔？"
+            },
+            {
+              "role": "assistant",
+              "content": "先比较利率与余额，再决定雪崩法或雪球法。"
+            }
+          ]
+        }
+      ],
+      "after-zero-ai-limit-notice-v1": "1",
+      "after-zero-simulate-v1": {
+        "mode": "once",
+        "extra": 1000
+      },
+      "after-zero-backup-meta-v1": {
+        "lastBackupAt": 1786323600000
+      }
+    }
+  },
+  "flutter": {
+    "sharedPreferences": {
+      "debt-manager-v5": [
+        {
+          "id": "parity-amort-001",
+          "name": "星河消费贷",
+          "funder": "合成银行",
+          "type": "消费贷",
+          "opened": "2026-06-15",
+          "notes": "仅用于自动对齐测试，不含真实个人数据。",
+          "plan": [
+            {
+              "date": "2026-07-10",
+              "amount": 2100,
+              "principal": 2000,
+              "interest": 100,
+              "paid": true,
+              "paidAt": "2026-07-09",
+              "paidAmount": 2100
+            },
+            {
+              "date": "2026-08-10",
+              "amount": 2080,
+              "principal": 2000,
+              "interest": 80,
+              "paid": false,
+              "paidAmount": 800
+            },
+            {
+              "date": "2026-09-10",
+              "amount": 2060,
+              "principal": 2000,
+              "interest": 60,
+              "paid": false
+            },
+            {
+              "date": "2026-10-10",
+              "amount": 2040,
+              "principal": 2000,
+              "interest": 40,
+              "paid": false
+            },
+            {
+              "date": "2026-11-10",
+              "amount": 2020,
+              "principal": 2000,
+              "interest": 20,
+              "paid": false
+            }
+          ],
+          "gen": {
+            "kind": "equalprincipal",
+            "first": "2026-07-10",
+            "P": 10000,
+            "rate": 12,
+            "n": 5
+          },
+          "original": 10000,
+          "balance": 8000,
+          "paidPrincipal": 2000,
+          "paidInterest": 100,
+          "totalTerms": 5,
+          "paidTerms": 1,
+          "terms": 4,
+          "monthly": 2050,
+          "nextDate": "2026-08-10",
+          "rate": 12
+        },
+        {
+          "id": "parity-onetime-002",
+          "name": "朋友免息借款（一次性）",
+          "funder": "合成联系人",
+          "type": "私人借款",
+          "opened": "2026-08-01",
+          "oneTime": true,
+          "plan": [
+            {
+              "date": "2026-08-17",
+              "amount": 500,
+              "principal": 500,
+              "interest": 0,
+              "paid": false
+            }
+          ],
+          "gen": {
+            "kind": "custom",
+            "first": "2026-08-17",
+            "n": 1
+          },
+          "original": 500,
+          "balance": 500,
+          "paidPrincipal": 0,
+          "paidInterest": 0,
+          "totalTerms": 1,
+          "paidTerms": 0,
+          "terms": 1,
+          "monthly": 500,
+          "nextDate": "2026-08-17",
+          "rate": 0
+        },
+        {
+          "id": "parity-settled-003",
+          "name": "已结清样本",
+          "funder": "合成机构",
+          "type": "信用卡",
+          "opened": "2026-01-01",
+          "settled": true,
+          "settledDate": "7/20",
+          "plan": [
+            {
+              "date": "2026-02-20",
+              "amount": 1020,
+              "principal": 1000,
+              "interest": 20,
+              "paid": true,
+              "paidAt": "2026-02-20",
+              "paidAmount": 1020
+            }
+          ],
+          "original": 1000,
+          "balance": 0,
+          "paidPrincipal": 1000,
+          "paidInterest": 20,
+          "totalTerms": 1,
+          "paidTerms": 1,
+          "terms": 0,
+          "monthly": 0,
+          "nextDate": null,
+          "rate": 24
+        }
+      ],
+      "debt-manager-docs-v5": [
+        {
+          "id": "doc:parity-readme",
+          "file": "parity-readme.md",
+          "title": "合成档案说明",
+          "content": "# 合成档案\n\n这是一份只用于对齐测试的 Markdown 文档。",
+          "createdAt": 1786323600000
+        }
+      ],
+      "debt-manager-sort-v1": "custom",
+      "after-zero-account-v1": {
+        "openid": "parity-openid-not-real",
+        "nickname": "对齐测试用户",
+        "avatarUrl": "",
+        "loggedInAt": 1786323600000
+      },
+      "after-zero-notify-v1": {
+        "enabled": true,
+        "rules": [
+          {
+            "offsetDays": 0,
+            "time": "09:00"
+          },
+          {
+            "offsetDays": 1,
+            "time": "20:30"
+          }
+        ]
+      },
+      "after-zero-premium-v1": {
+        "premium": {
+          "method": "redeemed",
+          "at": "2026-08-01T00:00:00.000Z"
+        }
+      },
+      "after-zero-ai-usage-v1": {
+        "month": "2026-08",
+        "used": 7,
+        "limit": 50
+      },
+      "after-zero-ai-chatlog-v1": [
+        {
+          "id": "parity-conversation-001",
+          "title": "我应该先还哪一笔？",
+          "isReport": false,
+          "updatedAt": 1786323600000,
+          "messages": [
+            {
+              "role": "user",
+              "content": "我应该先还哪一笔？"
+            },
+            {
+              "role": "assistant",
+              "content": "先比较利率与余额，再决定雪崩法或雪球法。"
+            }
+          ]
+        }
+      ],
+      "after-zero-backup-v1": {
+        "lastBackupAt": 1786323600000
+      },
+      "after-zero-archive-files-v1": [],
+      "after-zero-device-id-v1": "parity-device-not-real",
+      "after-zero-cloudbase-session-v1": {
+        "accessToken": "parity-token-not-real",
+        "refreshToken": "parity-refresh-not-real",
+        "expiresAt": "2100-01-01T00:00:00.000Z",
+        "anonymous": false
+      }
+    }
+  },
+  "artifacts": {
+    "archives": [],
+    "network_profile": "offline_by_default",
+    "native_profile": "no_permissions_by_default"
+  }
+}

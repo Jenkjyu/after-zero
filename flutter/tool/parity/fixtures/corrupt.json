@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "legacy": {
+    "localStorage": {
+      "debt-manager-v5": "{truncated",
+      "debt-manager-docs-v5": "not-json",
+      "after-zero-account-v1": "[]",
+      "after-zero-premium-v1": "null",
+      "after-zero-notify-v1": "{\"enabled\":\"yes\"}"
+    }
+  },
+  "flutter": {
+    "sharedPreferences": {
+      "debt-manager-v5": "{truncated",
+      "debt-manager-docs-v5": "not-json",
+      "after-zero-account-v1": "[]",
+      "after-zero-premium-v1": "null",
+      "after-zero-notify-v1": "{\"enabled\":\"yes\"}"
+    }
+  },
+  "artifacts": {
+    "archives": [],
+    "network_profile": "offline_by_default",
+    "native_profile": "no_permissions_by_default"
+  }
+}
