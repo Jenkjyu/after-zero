@@ -9,6 +9,7 @@ inspection and consumption by non-Python runners.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import hashlib
 import json
 import re
@@ -21,47 +22,32 @@ REPO_ROOT = SCRIPT_DIR.parents[2]
 BASELINE_COMMIT = "6fa1712dcdb2ba6e617810dffa8bbe38193140aa"
 
 
-def source(path: str, anchor: str) -> dict[str, str]:
-    """Return an exact source anchor while retaining the authored search hint.
+def _anchored_source(path: str, anchor: str, **metadata: str) -> dict[str, Any]:
+    lines = (REPO_ROOT / path).read_text(encoding="utf-8", errors="replace").splitlines()
+    line_index = next(
+        (index for index, line in enumerate(lines) if anchor in line),
+        None,
+    )
+    if line_index is None:
+        raise ValueError(f"anchor not found in {path}: {anchor!r}")
+    context = "\n".join(lines[max(0, line_index - 2) : line_index + 3])
+    return {
+        "path": path,
+        "anchor": anchor,
+        "line": line_index + 1,
+        "context_sha256": hashlib.sha256(context.encode("utf-8")).hexdigest(),
+        **metadata,
+    }
 
-    Catalog entries are intentionally compact and some hints describe a symbol
-    rather than copying its exact declaration.  Resolve those hints to the most
-    relevant real source line at generation time; never emit a made-up anchor.
-    The requested hint remains in JSON for reviewers.
-    """
+
+def source(path: str, anchor: str) -> dict[str, Any]:
+    """Return an exact anchored line; fuzzy or file-fallback lookup is forbidden."""
 
     target = REPO_ROOT / path
     text = target.read_text(encoding="utf-8", errors="replace")
     if anchor in text:
-        return {"path": path, "anchor": anchor}
-    tokens: list[str] = []
-    for token in re.findall(r"[A-Za-z0-9_]+|[\u3400-\u9fff]{2,}", anchor):
-        if re.fullmatch(r"[\u3400-\u9fff]+", token):
-            tokens.extend(token[index : index + 2] for index in range(max(1, len(token) - 1)))
-            continue
-        words = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", token).replace("_", " ").split()
-        tokens.extend(word.lower() for word in words if len(word) >= 2)
-    candidates: list[tuple[int, int, str]] = []
-    for line_no, line in enumerate(text.splitlines(), start=1):
-        stripped = line.strip()
-        if not stripped:
-            continue
-        lowered = stripped.lower()
-        score = sum(1 for token in tokens if token in lowered)
-        if score:
-            candidates.append((score, -len(stripped), stripped))
-    if candidates:
-        resolved = max(candidates)[2]
-        return {"path": path, "anchor": resolved, "requested_anchor": anchor}
-    resolved = next((line.strip() for line in text.splitlines() if line.strip()), None)
-    if resolved is None:
-        raise ValueError(f"empty source file: {path}")
-    return {
-        "path": path,
-        "anchor": resolved,
-        "requested_anchor": anchor,
-        "anchor_resolution": "file_fallback",
-    }
+        return _anchored_source(path, anchor)
+    raise ValueError(f"exact anchor not found in {path}: {anchor!r}")
 
 
 ENTRIES: list[dict[str, Any]] = []
@@ -84,6 +70,7 @@ def add_entry(
     legacy_behavior: str | None = None,
     flutter_behavior: str | None = None,
     resolution: str | None = None,
+    coverage_role: str = "semantic_contract",
 ) -> None:
     evidence = evidence_for(scenarios)
     if kind == "ui_interaction_contract" and "interaction" not in evidence:
@@ -102,6 +89,7 @@ def add_entry(
         "evidence": evidence,
         "acceptance": [acceptance],
         "notes": [notes],
+        "coverage_role": coverage_role,
     }
     if status in {
         "difference",
@@ -230,7 +218,7 @@ add_entry(
     scenarios=["SC-CALC-01", "SC-CALC-02"],
     selectors=["legacy.file_sha:www/js/calc.js@*", "flutter.dart_source:flutter/lib/calc/calc.dart"],
     legacy=[source("www/js/calc.js", "function r2(x)")],
-    flutter=[source("flutter/lib/calc/calc.dart", "num _num(dynamic value)")],
+    flutter=[source("flutter/lib/calc/calc.dart", "num _num(dynamic x) {")],
     notes="合法业务域可能一致，但百分百对齐还必须覆盖 bool、非法数值、NaN/Infinity 和 mutation。",
     legacy_behavior="广泛使用 Number(x)||0、JSON clone 与 JavaScript 浮点特殊值语义。",
     flutter_behavior="_num 对 bool/非法字符串回退 0，jsonEncode 对特殊值的失败形态不同。",
@@ -322,6 +310,7 @@ add_entry(
     flutter=[source("flutter/tool/parity/parity_tool.py", "def discover_sources")],
     notes="逐文件 SHA 使同名函数的内容改动也会触发门禁；旧版始终只读。",
     acceptance="当前旧版清单与冻结快照逐身份一致，且 git diff 不包含任何受保护路径。",
+    coverage_role="drift_guard",
 )
 
 add_entry(
@@ -339,25 +328,172 @@ add_entry(
         "flutter.native_source:*", "flutter.method_channel:*",
         "parity.tool_sha:*", "parity.fixture_sha:*",
     ],
-    legacy=[source("www/index.html", "<!doctype html>")],
+    legacy=[source("www/index.html", '<meta charset="UTF-8">')],
     flutter=[source("flutter/lib/main.dart", "runApp")],
     notes="新增文件、UI 文案、手势回调、依赖或测试都会要求显式刷新与重新映射。",
     acceptance="源码扫描零未分类 observation，生成清单可重复且 CI 校验不漂移。",
+    coverage_role="drift_guard",
+)
+
+BRIDGE_MAPPINGS: dict[str, tuple[str, str, list[str]]] = {
+    "addNotifyRule": ("flutter/lib/data/providers.dart", "void addRule", ["SC-NOTIFY-02"]),
+    "buildAiSummary": ("flutter/lib/cloud/ai_advisor.dart", "Map<String, dynamic> buildAiSummary", ["SC-AI-03"]),
+    "callAiAdvisor": ("flutter/lib/cloud/ai_advisor.dart", "Future<AiAdvisorReply> send", ["SC-AI-01"]),
+    "commitReorder": ("flutter/lib/data/providers.dart", "void commitActiveReorder", ["SC-SORT-01"]),
+    "confirmAsync": ("flutter/lib/ui/account/account_screen.dart", "Future<bool> _confirm", ["SC-UI-DETAIL-EDIT"]),
+    "createBackup": ("flutter/lib/cloud/backup_service.dart", "Future<void> create", ["SC-BACKUP-01"]),
+    "deleteAccount": ("flutter/lib/ui/account/account_screen.dart", "Future<void> _accountActions", ["SC-ACCOUNT-01"]),
+    "deleteArchiveFile": ("flutter/lib/data/archive_repository.dart", "Future<void> delete", ["SC-ARCHIVE-01"]),
+    "deleteBackup": ("flutter/lib/cloud/backup_service.dart", "Future<void> delete", ["SC-BACKUP-01"]),
+    "deleteDebt": ("flutter/lib/data/providers.dart", "void deleteDebt", ["SC-DEBT-02"]),
+    "deleteNotifyRule": ("flutter/lib/data/providers.dart", "void deleteRule", ["SC-NOTIFY-02"]),
+    "downloadArchiveFile": ("flutter/lib/native/system_file_saver.dart", "Future<bool> saveFile", ["SC-FILE-01"]),
+    "downloadBackupFile": ("flutter/lib/export/report_export_service.dart", "class LocalBackupService", ["SC-EXPORT-01"]),
+    "exportReportPdf": ("flutter/lib/export/report_export_service.dart", "Future<Uint8List> buildPdf", ["SC-EXPORT-02"]),
+    "exportReportXlsx": ("flutter/lib/export/report_export_service.dart", "Uint8List buildExcel", ["SC-EXPORT-01"]),
+    "getAccount": ("flutter/lib/data/providers.dart", "final accountProvider", ["SC-ACCOUNT-01"]),
+    "getBackupMeta": ("flutter/lib/data/local_store.dart", "int readLastBackupAt", ["SC-BACKUP-01"]),
+    "getDebts": ("flutter/lib/data/providers.dart", "final debtsProvider", ["SC-DATA-01"]),
+    "getFiles": ("flutter/lib/data/providers.dart", "final archiveRepositoryProvider", ["SC-ARCHIVE-01"]),
+    "getNotify": ("flutter/lib/data/providers.dart", "final notifyProvider", ["SC-NOTIFY-02"]),
+    "getPremium": ("flutter/lib/data/providers.dart", "final premiumProvider", ["SC-ACCOUNT-01"]),
+    "listBackups": ("flutter/lib/cloud/backup_service.dart", "Future<List<BackupRecord>> list", ["SC-BACKUP-01"]),
+    "payInstallment": ("flutter/lib/data/debt_ops.dart", "PaymentResult? recordPayment", ["SC-DEBT-01"]),
+    "redeemCode": ("flutter/lib/ui/mine/premium_screen.dart", "void _redeem", ["SC-ACCOUNT-01"]),
+    "renderAll": ("flutter/lib/data/providers.dart", "class DebtsNotifier", ["SC-LIFE-01"]),
+    "resetLocalData": ("flutter/lib/ui/account/account_screen.dart", "Future<void> _clearLocal", ["SC-RESET-01"]),
+    "restoreBackup": ("flutter/lib/cloud/backup_service.dart", "Future<RestoredBackup> restore", ["SC-BACKUP-02"]),
+    "saveAll": ("flutter/lib/data/providers.dart", "void _persist", ["SC-DATA-03"]),
+    "sendTestNotification": ("flutter/lib/notifications/reminder_scheduler.dart", "Future<void> scheduleTestNotification", ["SC-NOTIFY-02"]),
+    "setDebt": ("flutter/lib/data/providers.dart", "void setDebt", ["SC-DEBT-02"]),
+    "setNotifyEnabled": ("flutter/lib/data/providers.dart", "void setEnabled", ["SC-NOTIFY-02"]),
+    "settleFull": ("flutter/lib/data/debt_ops.dart", "Debt? applySettle", ["SC-DEBT-01"]),
+    "shareArchiveFile": ("flutter/lib/native/system_file_saver.dart", "Future<void> shareFile", ["SC-FILE-01"]),
+    "toast": ("flutter/lib/ui/debts/debt_editor.dart", "ScaffoldMessenger.of(context)", ["SC-UI-DETAIL-EDIT"]),
+    "triggerImportFilePicker": ("flutter/lib/ui/mine/mine_tab.dart", "FilePicker.platform.pickFiles", ["SC-DATA-02"]),
+    "unsettle": ("flutter/lib/data/debt_ops.dart", "Debt undoSettle", ["SC-DEBT-01"]),
+    "uploadArchiveFile": ("flutter/lib/ui/mine/archive_screen.dart", "FilePicker.platform.pickFiles", ["SC-ARCHIVE-01"]),
+    "waiveInstallment": ("flutter/lib/data/debt_ops.dart", "Debt? waivePeriod", ["SC-DEBT-01"]),
+    "wxLogout": ("flutter/lib/cloud/cloud_auth_controller.dart", "Future<void> logout", ["SC-AUTH-01"]),
+}
+
+for bridge_index, (bridge_name, mapping) in enumerate(BRIDGE_MAPPINGS.items(), start=1):
+    flutter_path, flutter_anchor, bridge_scenarios = mapping
+    add_entry(
+        f"INV-BRG-{bridge_index:03d}",
+        "Bridge 与架构映射",
+        "api_surface",
+        f"旧 AzBridge.{bridge_name} 能力入口映射",
+        priority="P0",
+        status="mapped_unverified",
+        scenarios=["SC-SOURCE-01", *bridge_scenarios],
+        selectors=[f"legacy.bridge:{bridge_name}"],
+        legacy=[source("www/index.html", f"{bridge_name}:")],
+        flutter=[source(flutter_path, flutter_anchor)],
+        notes="Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。",
+        acceptance=f"AzBridge.{bridge_name} 的前置状态、动作、副作用和持久化结果均有双端证据。",
+    )
+
+
+def surface_selectors(*, legacy: list[str], flutter: list[str]) -> list[str]:
+    candidate_selectors: list[str] = []
+    for path_glob in legacy:
+        candidate_selectors.extend(
+            [
+                f"legacy.react_source:{path_glob}",
+                f"legacy.react_event:{path_glob}#*",
+                f"legacy.ui_text:{path_glob}#*",
+            ]
+        )
+    for path_glob in flutter:
+        candidate_selectors.extend(
+            [
+                f"flutter.dart_source:{path_glob}",
+                f"flutter.event:{path_glob}#*",
+                f"flutter.navigation:{path_glob}#*",
+                f"flutter.ui_text:{path_glob}#*",
+            ]
+        )
+    inventory_path = SCRIPT_DIR / "source_inventory.json"
+    if not inventory_path.is_file():
+        return candidate_selectors
+    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    refs = [item["ref"] for item in inventory.get("observations", [])]
+    return [
+        selector
+        for selector in candidate_selectors
+        if any(fnmatch.fnmatchcase(ref, selector) for ref in refs)
+    ]
+
+
+for surface_id, title, legacy_globs, flutter_globs, legacy_source, flutter_source, scenario in [
+    ("DEBT", "债务生命周期界面与手势源码面", ["react/src/debts/*", "react/src/sheets/DetailSheet.tsx", "react/src/sheets/EditSheet.tsx", "react/src/sheets/GenPanel.tsx", "react/src/sheets/PlanRows.tsx", "react/src/sheets/BatchBlock.tsx", "react/src/sheets/SimScreen.tsx"], ["flutter/lib/ui/debts/*"], ("react/src/debts/App.tsx", "export function App()"), ("flutter/lib/ui/debts/debts_tab.dart", "class DebtsTab"), "SC-UI-DETAIL-EDIT"),
+    ("PAY", "还款日与通知界面源码面", ["react/src/pay/*", "react/src/sheets/NotifySheet.tsx"], ["flutter/lib/ui/pay/*"], ("react/src/pay/App.tsx", "export function App()"), ("flutter/lib/ui/pay/pay_tab.dart", "class PayTab"), "SC-UI-PAY-NOTIFY"),
+    ("REPORT", "统计、图表与策略界面源码面", ["react/src/report/*", "react/src/sheets/StrategyCompareScreen.tsx"], ["flutter/lib/ui/report/*", "flutter/lib/report/*"], ("react/src/report/App.tsx", "export function App()"), ("flutter/lib/ui/report/report_tab.dart", "class ReportTab"), "SC-UI-REPORT"),
+    ("MINE", "我的、Premium 与法律界面源码面", ["react/src/mine/*", "react/src/sheets/AccountScreen.tsx", "react/src/sheets/PremiumScreen.tsx", "react/src/sheets/AboutScreen.tsx", "react/src/sheets/PrivacyScreen.tsx", "react/src/sheets/AgreementScreen.tsx", "react/src/sheets/TermsScreen.tsx"], ["flutter/lib/ui/mine/*", "flutter/lib/ui/account/*"], ("react/src/mine/App.tsx", "export function App()"), ("flutter/lib/ui/mine/mine_tab.dart", "class MineTab"), "SC-UI-MINE"),
+    ("ARCHIVE", "档案与备份界面源码面", ["react/src/sheets/DocsScreen.tsx", "react/src/sheets/BackupScreen.tsx"], ["flutter/lib/ui/mine/archive_screen.dart", "flutter/lib/ui/mine/backup_screen.dart"], ("react/src/sheets/DocsScreen.tsx", "export function DocsScreen()"), ("flutter/lib/ui/mine/archive_screen.dart", "class ArchiveScreen"), "SC-UI-ARCH-BACKUP"),
+    ("AI", "AI 助手界面与状态机源码面", ["react/src/sheets/AiScreen.tsx", "react/src/sheets/AiLimitModal.tsx"], ["flutter/lib/ui/ai/*"], ("react/src/sheets/AiScreen.tsx", "export function AiScreen()"), ("flutter/lib/ui/ai/ai_screen.dart", "class AiScreen"), "SC-UI-AI"),
+    ("SHARED", "共享状态、弹层与应用壳源码面", ["react/src/shared/*", "react/src/sheets/App.tsx", "react/src/sheets/StrategyChart.tsx", "react/src/sheets/gripDrag.ts", "react/src/sheets/main.tsx", "react/src/sheets/useSettleCelebration.ts", "react/src/types.ts"], ["flutter/lib/ui/app_shell.dart", "flutter/lib/ui/shared/*", "flutter/lib/ui/theme.dart", "flutter/lib/main.dart"], ("react/src/shared/state.ts", "export function useDebts"), ("flutter/lib/ui/app_shell.dart", "class AppShell"), "SC-VISUAL-ALL"),
+]:
+    add_entry(
+        f"INV-SURFACE-{surface_id}",
+        "基准与完整性",
+        "semantic_source_surface",
+        title,
+        priority="P0",
+        status="mapped_unverified",
+        scenarios=[scenario, "SC-SOURCE-01"],
+        selectors=surface_selectors(legacy=legacy_globs, flutter=flutter_globs),
+        legacy=[source(*legacy_source)],
+        flutter=[source(*flutter_source)],
+        notes="路径范围是显式业务域分类，不是全仓兜底；新增目录或跨域源码不会被本项自动吞掉。",
+        acceptance="该业务域内每个可见文本、事件和导航入口均由更细矩阵项或场景 checkpoint 取证。",
+    )
+
+add_entry(
+    "INV-SURFACE-LEGACY-RUNTIME",
+    "基准与完整性",
+    "semantic_source_surface",
+    "旧版宿主运行时函数、DOM、事件与动画源码面",
+    priority="P0",
+    status="mapped_unverified",
+    scenarios=["SC-SOURCE-01", "SC-LIFE-01", "SC-VISUAL-ALL"],
+    selectors=[
+        "legacy.index_function:*",
+        "legacy.index_event:www/index.html#*",
+        "legacy.dom_id:*",
+        "legacy.keyframes:*",
+        "legacy.ui_text:www/index.html#*",
+    ],
+    legacy=[source("www/index.html", "window.__azBridge =")],
+    flutter=[source("flutter/lib/main.dart", "Future<void> main()")],
+    notes="旧版单文件宿主按运行时职责分类；bridge、storage、cloud/native 能力仍必须各自逐项映射，不能依赖本项。",
+    acceptance="宿主函数、DOM 入口、事件和动画均在对应场景中有动作或可见 checkpoint。",
 )
 
 add_entry(
-    "INV-BRG-001",
-    "Bridge 与架构映射",
-    "api_surface",
-    "旧 AzBridge 39 个能力入口映射",
+    "INV-SURFACE-SERVICES",
+    "基准与完整性",
+    "semantic_source_surface",
+    "Flutter 数据、云端、导出、通知与原生服务源码面",
     priority="P0",
     status="mapped_unverified",
     scenarios=["SC-SOURCE-01", "SC-LIFE-01"],
-    selectors=["legacy.bridge:*"],
+    selectors=surface_selectors(
+        legacy=[],
+        flutter=[
+            "flutter/lib/data/*",
+            "flutter/lib/cloud/*",
+            "flutter/lib/export/*",
+            "flutter/lib/notifications/*",
+            "flutter/lib/native/*",
+            "flutter/lib/calc/calc.dart",
+        ],
+    ),
     legacy=[source("www/index.html", "window.__azBridge =")],
     flutter=[source("flutter/lib/data/providers.dart", "class DebtsNotifier")],
-    notes="Flutter 不保留统一 JS bridge；39 个能力分散到 provider/service/UI，能力存在不代表细节一致。",
-    acceptance="39/39 入口均反查到至少一个 Flutter 动作和运行场景，且每个前后状态有证据。",
+    notes="服务层路径显式列举；用户可观察契约继续由 calc、storage、bridge、cloud/native 细项负责。",
+    acceptance="所有服务入口均能反查到至少一个语义矩阵项和执行场景。",
 )
 
 
@@ -507,8 +643,8 @@ semantic_entry(
 semantic_entry(
     "INV-DATA-005", "数据与持久化", "v6 uploads addedAt 形状",
     scenario=["SC-DATA-02", "SC-EXPORT-01"], legacy_path="www/index.html",
-    legacy_anchor="addedAt: new Date", flutter_path="flutter/lib/export/report_export_service.dart",
-    flutter_anchor="createdAt", priority="P1", notes="同为 version 6 但时间字段类型不一致。",
+    legacy_anchor="addedAt: it.addedAt", flutter_path="flutter/lib/export/report_export_service.dart",
+    flutter_anchor="'addedAt': file.createdAt", priority="P1", notes="同为 version 6 但时间字段类型不一致。",
     legacy_behavior="uploads[].addedAt 写 M/D 字符串。",
     flutter_behavior="导出 epoch integer。",
     resolution="以旧版 v6 schema 为准恢复字段名与类型，并做双向导入。",
@@ -521,7 +657,7 @@ add_entry(
     priority="P0", status="mapped_unverified", scenarios=["SC-DEBT-01"],
     selectors=["legacy.file_sha:www/js/calc.js@*", "flutter.dart_source:flutter/lib/data/debt_ops.dart"],
     legacy=[source("www/js/calc.js", "function recordPayment")],
-    flutter=[source("flutter/lib/data/debt_ops.dart", "Debt recordDebtPayment")],
+    flutter=[source("flutter/lib/data/debt_ops.dart", "PaymentResult? recordPayment")],
     notes="UI 已复用 calc 桥接，但完整前后状态、partial ledger 与异常输入仍需 differential evidence。",
 )
 add_entry(
@@ -529,7 +665,7 @@ add_entry(
     priority="P0", status="mapped_unverified", scenarios=["SC-SORT-01", "SC-DEBT-02"],
     selectors=["legacy.file_sha:www/index.html@*", "flutter.dart_source:flutter/lib/data/providers.dart"],
     legacy=[source("www/index.html", "function commitReorder")],
-    flutter=[source("flutter/lib/data/providers.dart", "void reorderActive")],
+    flutter=[source("flutter/lib/data/providers.dart", "void commitActiveReorder")],
     notes="排序 tie、非法 index、恢复预设及杀进程落盘均要覆盖。",
 )
 semantic_entry(
@@ -553,7 +689,7 @@ semantic_entry(
     "INV-ACT-005", "债务业务动作", "provider 数据 invariant",
     scenario=["SC-DEBT-01", "SC-DATA-01"], legacy_path="www/index.html",
     legacy_anchor="recompute(obj)", flutter_path="flutter/lib/data/providers.dart",
-    flutter_anchor="void setDebt(Debt debt)", priority="P1",
+    flutter_anchor="void setDebt(String? id, Debt debt)", priority="P1",
     notes="当前 UI 多数先 recompute，但 provider API 本身允许写入失真的派生字段。",
     legacy_behavior="setDebt/全量 render 在写入和展示前重算派生字段。",
     flutter_behavior="setDebt/replaceAll 信任调用方已经重算。",
@@ -561,8 +697,8 @@ semantic_entry(
 )
 semantic_entry(
     "INV-ACT-006", "账户与隐私", "服务器注销后的本地数据保留",
-    scenario="SC-ACCOUNT-01", legacy_path="www/index.html", legacy_anchor="async function deleteAccount",
-    flutter_path="flutter/lib/ui/account/account_screen.dart", flutter_anchor="await _clearLocal",
+    scenario="SC-ACCOUNT-01", legacy_path="www/index.html", legacy_anchor="function deleteAccount()",
+    flutter_path="flutter/lib/ui/account/account_screen.dart", flutter_anchor=".callFunction('deleteAccount')",
     priority="P0", notes="Flutter 当前会在服务器注销成功后额外删除用户全部本地债务与档案。",
     legacy_behavior="删除服务器账户并退出，只清 account，会保留本地业务数据。",
     flutter_behavior="成功后调用 _clearLocal，清 SharedPreferences、档案、AI 与债务。",
@@ -572,7 +708,7 @@ add_entry(
     "INV-ACT-007", "账户与隐私", "state_transition", "仅重置本地数据",
     priority="P0", status="mapped_unverified", scenarios=["SC-RESET-01"],
     selectors=["legacy.file_sha:www/index.html@*", "flutter.file_sha:flutter/lib/ui/account/account_screen.dart@*"],
-    legacy=[source("www/index.html", "async function resetLocalData")],
+    legacy=[source("www/index.html", "function resetLocalData()")],
     flutter=[source("flutter/lib/ui/account/account_screen.dart", "Future<void> _clearLocal")],
     notes="最终语义接近，但 Flutter 新增 session/device/archive key 后必须核对完整清理集合。",
 )
@@ -607,8 +743,8 @@ semantic_entry(
 semantic_entry(
     "INV-ACT-011", "提前还款模拟", "期次约束与结果内容",
     scenario="SC-UI-DETAIL-EDIT", legacy_path="react/src/sheets/SimScreen.tsx",
-    legacy_anchor="Math.min(d.terms", flutter_path="flutter/lib/ui/debts/debt_detail.dart",
-    flutter_anchor="startPeriod < 1", priority="P1", notes="超出剩余期数时行为和信息展示均不一致。",
+    legacy_anchor="Math.min(maxPeriod, Math.round(+atPeriod)", flutter_path="flutter/lib/ui/debts/debt_detail.dart",
+    flutter_anchor="period == null || period < 1", priority="P1", notes="超出剩余期数时行为和信息展示均不一致。",
     legacy_behavior="期次 clamp 到 1..terms，展示月供、利率、起始期与额外金额。",
     flutter_behavior="只校验 >=1，结果字段更少。",
     resolution="复刻范围限制、持久化与结果字段后做相同输入对拍。",
@@ -657,7 +793,7 @@ for cloud_id, function_name, anchor, title, scenario in [
 semantic_entry(
     "INV-CLD-010", "云端与认证", "非匿名会话静默续期",
     scenario="SC-SESSION-01", legacy_path="www/index.html", legacy_anchor='persistence: "local"',
-    flutter_path="flutter/lib/cloud/cloud_providers.dart", flutter_anchor="expired formal sessions",
+    flutter_path="flutter/lib/cloud/cloud_providers.dart", flutter_anchor="if (stored != null && !stored.isExpired) {",
     status="missing_in_flutter", priority="P0", notes="正式会话约 2 小时后要求重登，破坏持续使用。",
     legacy_behavior="CloudBase JS SDK local persistence 自动恢复/续期。",
     flutter_behavior="过期正式 session 被视为无会话，refreshToken 未使用。",
@@ -666,7 +802,7 @@ semantic_entry(
 semantic_entry(
     "INV-CLD-011", "云端与认证", "前台驻留跨过 session expiry",
     scenario="SC-SESSION-01", legacy_path="www/index.html", legacy_anchor="ensureCbAuthReady",
-    flutter_path="flutter/lib/cloud/cloudbase_client.dart", flutter_anchor="Future<Map<String, dynamic>> callFunction",
+    flutter_path="flutter/lib/cloud/cloudbase_client.dart", flutter_anchor="Future<dynamic> callFunction(",
     priority="P0", notes="客户端可继续携带已过期 Bearer token 发请求。",
     legacy_behavior="SDK 在调用路径管理会话有效性。",
     flutter_behavior="callFunction 只检查 session 非空，不检查 expiresAt。",
@@ -675,7 +811,7 @@ semantic_entry(
 semantic_entry(
     "INV-CLD-012", "云备份", "备份文件上传并发模型",
     scenario="SC-BACKUP-02", legacy_path="www/index.html", legacy_anchor="Promise.all",
-    flutter_path="flutter/lib/cloud/backup_service.dart", flutter_anchor="for (final file in files)",
+    flutter_path="flutter/lib/cloud/backup_service.dart", flutter_anchor="for (final item in archive.readMetadata()) {",
     priority="P2", notes="功能目标相同，但耗时、失败顺序和多文件体验可观察。",
     legacy_behavior="多个档案文件并行上传。",
     flutter_behavior="逐文件串行上传。",
@@ -692,8 +828,8 @@ semantic_entry(
 )
 semantic_entry(
     "INV-CLD-014", "云备份", "云恢复失败原子性与顺序",
-    scenario="SC-BACKUP-02", legacy_path="www/index.html", legacy_anchor="async function applyBackupData",
-    flutter_path="flutter/lib/cloud/backup_service.dart", flutter_anchor="Future<void> restoreBackup",
+    scenario="SC-BACKUP-02", legacy_path="www/index.html", legacy_anchor="function applyBackupData(data)",
+    flutter_path="flutter/lib/cloud/backup_service.dart", flutter_anchor="Future<RestoredBackup> restore(String id) async",
     priority="P0", notes="下载中途失败会留下完全不同的本地状态。",
     legacy_behavior="先覆盖业务数据，再逐文件下载并吞单文件错误。",
     flutter_behavior="先清空并下载档案；任一失败不应用业务数据，却可能留下半档案。",
@@ -719,7 +855,7 @@ add_entry(
     "INV-CLD-017", "AI 顾问", "shared_legacy_gap", "AI quota 并发竞态",
     priority="P1", status="mapped_unverified", scenarios=["SC-AI-03", "SC-LIFE-01"],
     selectors=["legacy.cloud_function:aiAdvisor"],
-    legacy=[source("cloudbase/functions/aiAdvisor/index.js", "async function checkQuota")],
+    legacy=[source("cloudbase/functions/aiAdvisor/index.js", "async function readUsage(openid, month)")],
     flutter=[source("flutter/lib/cloud/ai_advisor.dart", "class AiAdvisorService")],
     notes="同一云函数先读后写，双端并发请求都可能越过额度；留作共有风险，不误报迁移差异。",
 )
@@ -754,8 +890,8 @@ semantic_entry(
 )
 semantic_entry(
     "INV-NOT-004", "通知", "测试通知前权限请求",
-    scenario="SC-NOTIFY-02", legacy_path="www/index.html", legacy_anchor="async function sendTestNotification",
-    flutter_path="flutter/lib/ui/pay/notify_screen.dart", flutter_anchor="sendTestNotification",
+    scenario="SC-NOTIFY-02", legacy_path="www/index.html", legacy_anchor="function sendTestNotification()",
+    flutter_path="flutter/lib/ui/pay/notify_screen.dart", flutter_anchor="Future<void> _sendTest() async",
     status="missing_in_flutter", priority="P0", notes="首次点击测试时 Flutter 可能直接失败或无反馈。",
     legacy_behavior="显式检查并申请通知权限后才发送测试。",
     flutter_behavior="直接调用 scheduler，没有对应权限流程。",
@@ -781,7 +917,7 @@ semantic_entry(
 )
 semantic_entry(
     "INV-NOT-007", "通知", "exact alarm 请求与降级",
-    scenario="SC-NOTIFY-02", legacy_path="www/index.html", legacy_anchor="LocalNotifications.schedule",
+    scenario="SC-NOTIFY-02", legacy_path="www/index.html", legacy_anchor="return LN.schedule({ notifications: [{",
     flutter_path="flutter/lib/notifications/reminder_scheduler.dart", flutter_anchor="requestExactAlarmsPermission",
     status="flutter_extra", priority="P1", notes="平台适配可以不同，但用户可观察权限流程和提醒精度须批准。",
     legacy_behavior="Capacitor 路径没有显式 exact-alarm UI。",
@@ -790,7 +926,7 @@ semantic_entry(
 )
 semantic_entry(
     "INV-NOT-008", "通知", "exact alarm 授权冷启动恢复",
-    scenario="SC-NOTIFY-03", legacy_path="www/index.html", legacy_anchor="LocalNotifications.schedule",
+    scenario="SC-NOTIFY-03", legacy_path="www/index.html", legacy_anchor="return LN.schedule({ notifications: [{",
     flutter_path="flutter/lib/notifications/reminder_scheduler.dart", flutter_anchor="_exactAlarmGranted",
     priority="P0", notes="系统已授权但进程重启后内存标记回 false。",
     legacy_behavior="由平台插件按系统实际能力调度。",
@@ -808,7 +944,7 @@ semantic_entry(
 )
 semantic_entry(
     "INV-NOT-010", "通知", "reschedule 异步错误处理",
-    scenario="SC-NOTIFY-03", legacy_path="www/index.html", legacy_anchor="catch(console.error)",
+    scenario="SC-NOTIFY-03", legacy_path="www/index.html", legacy_anchor='console.error("syncNotifications failed", e)',
     flutter_path="flutter/lib/data/providers.dart", flutter_anchor="unawaited(", priority="P1",
     notes="原生插件失败可能成为未处理异步错误且 UI 仍显示成功。",
     legacy_behavior="syncNotifications promise 至少捕获并记录错误。",
@@ -845,7 +981,7 @@ add_entry(
 semantic_entry(
     "INV-NAT-004", "微信登录", "OAuth state 随机性与回调校验",
     scenario="SC-AUTH-02", legacy_path="android/app/src/main/java/io/github/jenkjyu/afterzero/WeChatLoginPlugin.java",
-    legacy_anchor="expectedState", flutter_path="flutter/lib/cloud/wechat_auth.dart",
+    legacy_anchor="boolean stateOk = pendingState != null && pendingState.equals(state);", flutter_path="flutter/lib/cloud/wechat_auth.dart",
     flutter_anchor="NormalAuth", priority="P0", notes="固定/未校验 state 是 OAuth 安全与串话风险。",
     legacy_behavior="每次生成随机 state，并拒绝 callback state 不匹配。",
     flutter_behavior="使用插件默认 state，收到响应后不比较。",
@@ -871,8 +1007,8 @@ semantic_entry(
 )
 semantic_entry(
     "INV-NAT-007", "原生文件能力", "iOS 分享面板保存取消语义",
-    scenario="SC-FILE-01", legacy_path="www/index.html", legacy_anchor="SaveFile.save",
-    flutter_path="flutter/lib/native/system_file_saver.dart", flutter_anchor="Share.shareXFiles",
+    scenario="SC-FILE-01", legacy_path="www/index.html", legacy_anchor="function saveToDeviceDownloads(blob, filename, mime)",
+    flutter_path="flutter/lib/native/system_file_saver.dart", flutter_anchor="await SharePlus.instance.share(",
     status="blocked_external", priority="P2", notes="用户已决定当前阶段暂缓 iOS；不得把未验证写成完成。",
     legacy_behavior="旧版没有 iOS target。",
     flutter_behavior="iOS 用 share sheet，但当前返回后统一 true，不能区分取消。",
@@ -886,7 +1022,7 @@ add_entry(
     priority="P0", status="mapped_unverified", scenarios=["SC-EXPORT-02"],
     selectors=["legacy.file_sha:www/index.html@*", "flutter.dart_source:flutter/lib/export/report_export_service.dart"],
     legacy=[source("www/index.html", "function exportReportXlsx")],
-    flutter=[source("flutter/lib/export/report_export_service.dart", "Future<Uint8List> buildXlsx")],
+    flutter=[source("flutter/lib/export/report_export_service.dart", "Uint8List buildExcel")],
     notes="表名大体映射；必须逐 cell、类型、空值、顺序和格式比较。",
 )
 semantic_entry(
@@ -921,7 +1057,7 @@ add_entry(
     priority="P1", status="mapped_unverified", scenarios=["SC-EXPORT-01", "SC-EXPORT-02"],
     selectors=["legacy.file_sha:www/index.html@*", "flutter.dart_source:flutter/lib/export/report_export_service.dart"],
     legacy=[source("www/index.html", "AfterZero统计报表")],
-    flutter=[source("flutter/lib/export/report_export_service.dart", "AfterZero统计报表")],
+    flutter=[source("flutter/lib/export/report_export_service.dart", "'After Zero · 债务统计报告'")],
     notes="需固定日期验证 YYMMDD、MIME、SAF 默认文件名及取消反馈。",
 )
 
@@ -938,8 +1074,8 @@ semantic_entry(
 )
 semantic_entry(
     "INV-AI-002", "AI 顾问", "按错误消息保存 RetryCtx",
-    scenario="SC-AI-02", legacy_path="react/src/sheets/AiScreen.tsx", legacy_anchor="type RetryCtx",
-    flutter_path="flutter/lib/ui/ai/ai_screen.dart", flutter_anchor="_retry",
+    scenario="SC-AI-02", legacy_path="react/src/sheets/AiScreen.tsx", legacy_anchor="interface RetryCtx {",
+    flutter_path="flutter/lib/ui/ai/ai_screen.dart", flutter_anchor="_RetryContext? _retry;",
     status="missing_in_flutter", priority="P0", notes="旧错误后继续提问会让历史错误失去可重试上下文。",
     legacy_behavior="每条失败消息按 msgIndex 持有自己的原始请求上下文。",
     flutter_behavior="只有一组全局 _retry/_errorIndex。",
@@ -957,7 +1093,7 @@ semantic_entry(
 semantic_entry(
     "INV-AI-004", "AI 顾问", "删除当前历史会话后清空当前画面",
     scenario="SC-AI-02", legacy_path="react/src/sheets/AiScreen.tsx", legacy_anchor="setCurrentConvId(null)",
-    flutter_path="flutter/lib/ui/ai/ai_screen.dart", flutter_anchor="aiHistoryProvider.notifier).delete",
+    flutter_path="flutter/lib/ui/ai/ai_screen.dart", flutter_anchor=".delete(item.id)",
     status="missing_in_flutter", priority="P0", notes="下一次成功请求会把已删除会话原 id 复活。",
     legacy_behavior="删除当前记录同步清 current id/messages。",
     flutter_behavior="只删 provider 列表，当前 widget state 仍保留会话。",
@@ -966,7 +1102,7 @@ semantic_entry(
 semantic_entry(
     "INV-AI-005", "AI 顾问", "追问建议 marker 列表兼容",
     scenario="SC-AI-01", legacy_path="react/src/sheets/AiScreen.tsx", legacy_anchor="splitSuggestions",
-    flutter_path="flutter/lib/cloud/ai_advisor.dart", flutter_anchor="splitSuggestions",
+    flutter_path="flutter/lib/cloud/ai_advisor.dart", flutter_anchor="splitAiSuggestions(String text)",
     priority="P1", notes="模型不保证只用 '- '，宽容解析是旧版设计。",
     legacy_behavior="接受 -、*、• 和普通非空行，最多三条。",
     flutter_behavior="只接受严格 '- '。",
@@ -984,7 +1120,7 @@ semantic_entry(
 semantic_entry(
     "INV-AI-007", "AI 顾问", "复制到外部 AI 的任务指令",
     scenario="SC-AI-01", legacy_path="react/src/sheets/AiScreen.tsx", legacy_anchor="buildCopyPrompt",
-    flutter_path="flutter/lib/ui/ai/ai_screen.dart", flutter_anchor="复制完整分析提示词",
+    flutter_path="flutter/lib/ui/ai/ai_screen.dart", flutter_anchor="复制完整提示词",
     priority="P0", notes="数据全量不代表任务语义一致。",
     legacy_behavior="明确要求雪球/雪崩比较、节省利息数字和可执行顺序。",
     flutter_behavior="只有通用债务分析指令。",
@@ -1044,19 +1180,19 @@ ui_entry(
 )
 ui_entry(
     "SYS.WECHAT_OAUTH", "全局系统界面", "微信 OAuth 可见流程",
-    scenario="SC-UI-LOGIN", legacy_path="www/index.html", legacy_anchor="正在跳转到微信",
-    flutter_path="flutter/lib/ui/account/login_gate.dart", flutter_anchor="_login",
+    scenario="SC-UI-LOGIN", legacy_path="www/index.html", legacy_anchor="正在跳转微信授权…",
+    flutter_path="flutter/lib/ui/account/login_gate.dart", flutter_anchor="Future<void> _login() async",
     old="显式检查插件/安装、toast 跳转、取消与失败分支", new="不先检查安装，busy/error 内联显示", priority="P0",
 )
 ui_entry(
     "SYS.TAB_BAR", "全局系统界面", "四 Tab 导航与状态收口",
-    scenario="SC-VISUAL-ALL", legacy_path="www/index.html", legacy_anchor="function switchTab",
+    scenario="SC-VISUAL-ALL", legacy_path="www/index.html", legacy_anchor='document.querySelectorAll(".tabbar button").forEach(function (b) {',
     flutter_path="flutter/lib/ui/app_shell.dart", flutter_anchor="class AppShell",
     old="切换滚顶、关闭 swipe/jiggle、图标 bounce", new="IndexedStack 保留滚动和局部手势状态", priority="P0",
 )
 ui_entry(
     "SYS.BACK_DISPATCH", "全局系统界面", "Android 系统返回优先链",
-    scenario="SC-LIFE-01", legacy_path="www/index.html", legacy_anchor="function closeTopLayer",
+    scenario="SC-LIFE-01", legacy_path="www/index.html", legacy_anchor="window.__handleBackButton = function () {",
     flutter_path="flutter/lib/ui/app_shell.dart", flutter_anchor="class AppShell",
     old="AI history→子页→sheet→jiggle 的显式最上层优先链", new="主要依赖 Navigator，无根级 PopScope，局部模式可残留", priority="P0",
 )
@@ -1069,7 +1205,7 @@ ui_entry(
 ui_entry(
     "SYS.CONFIRM_HOST", "全局系统界面", "统一确认/输入弹窗宿主",
     scenario="SC-VISUAL-ALL", legacy_path="www/index.html", legacy_anchor="function askAsync",
-    flutter_path="flutter/lib/ui/debts/payment_sheet.dart", flutter_anchor="showPaymentSheet",
+    flutter_path="flutter/lib/ui/debts/payment_sheet.dart", flutter_anchor="return await showDialog<num>(",
     old="单一 modal 支持第三动作、month/date/amount 与统一关闭", new="多套 AlertDialog，样式、按钮、输入和关闭不一致", priority="P1",
 )
 ui_entry(
@@ -1092,19 +1228,19 @@ ui_entry(
 )
 ui_entry(
     "SYS.TEXT_SELECTION_CONTEXT_MENU", "全局系统界面", "文本选择与长按菜单",
-    scenario="SC-VISUAL-ALL", legacy_path="www/index.html", legacy_anchor="user-select:none",
+    scenario="SC-VISUAL-ALL", legacy_path="www/index.html", legacy_anchor=".pie-wrap { position: relative; touch-action: pan-y; user-select: none; }",
     flutter_path="flutter/lib/ui/ai/ai_screen.dart", flutter_anchor="SelectableText",
     old="全局禁选与 context menu，仅输入框例外", new="AI、法律、档案多处可选择并出现系统长按菜单", priority="P1",
 )
 ui_entry(
     "SYS.HAPTICS", "全局系统界面", "长按与重排触感反馈",
     scenario="SC-UI-DEBT", legacy_path="android/app/src/main/java/io/github/jenkjyu/afterzero/MainActivity.java",
-    legacy_anchor="HAPTIC_FEEDBACK_ENABLED", flutter_path="flutter/lib/ui/debts/debts_tab.dart",
+    legacy_anchor="bridge.getWebView().setHapticFeedbackEnabled(false);", flutter_path="flutter/lib/ui/debts/debts_tab.dart",
     flutter_anchor="ReorderableDragStartListener", old="WebView 原生层显式关闭触感", new="Framework 长按/重排可能产生平台触感，未显式抑制", priority="P1",
 )
 ui_entry(
     "SYS.RESPONSIVE_SAFE_AREA", "全局系统界面", "Safe Area 与 560px 最大宽",
-    scenario="SC-VISUAL-ALL", legacy_path="www/index.html", legacy_anchor="max-width:560px",
+    scenario="SC-VISUAL-ALL", legacy_path="www/index.html", legacy_anchor="max-width: 560px; margin: 0 auto; width: 100%; }",
     flutter_path="flutter/lib/ui/app_shell.dart", flutter_anchor="SafeArea",
     old="主内容、subpage、sheet 在宽屏最大 560px 居中", new="主 tab 没有统一 560px 约束，平板/横屏会铺满", priority="P0",
 )
@@ -1112,13 +1248,13 @@ ui_entry(
     "SYS.OVERSCROLL", "全局系统界面", "列表 overscroll/stretch",
     scenario="SC-VISUAL-ALL", legacy_path="android/app/src/main/java/io/github/jenkjyu/afterzero/MainActivity.java",
     legacy_anchor="OVER_SCROLL_NEVER", flutter_path="flutter/lib/ui/app_shell.dart",
-    flutter_anchor="MaterialApp", old="CSS+WebView 双层禁用 stretch", new="没有自定义 ScrollBehavior/OverscrollIndicator", status="missing_in_flutter", priority="P1",
+    flutter_anchor="class AppShell", old="CSS+WebView 双层禁用 stretch", new="没有自定义 ScrollBehavior/OverscrollIndicator", status="missing_in_flutter", priority="P1",
 )
 add_entry(
     "SYS.COLOR_SCHEME", "全局系统界面", "theme_tokens", "明暗主题基础色板",
     priority="P0", status="mapped_unverified", scenarios=["SC-VISUAL-ALL"],
     selectors=["legacy.css_token:*", "flutter.color_literal:*"],
-    legacy=[source("www/index.html", "--bg:")], flutter=[source("flutter/lib/ui/theme.dart", "class AppPalette")],
+    legacy=[source("www/index.html", "--bg:")], flutter=[source("flutter/lib/ui/theme.dart", "ThemeData buildAppTheme")],
     notes="基础 token 已映射；Material 派生色与每个组件状态仍需像素验收。",
 )
 ui_entry(
@@ -1142,7 +1278,7 @@ ui_entry(
 ui_entry(
     "SYS.SHARE_SHEET", "全局系统界面", "分享面板能力检测与取消",
     scenario="SC-FILE-01", legacy_path="www/index.html", legacy_anchor="navigator.share",
-    flutter_path="flutter/lib/ui/mine/archive_screen.dart", flutter_anchor="Share.shareXFiles",
+    flutter_path="flutter/lib/ui/mine/archive_screen.dart", flutter_anchor="if (action == 'share') {",
     old="先检查能力，取消不报错并有 fallback", new="异常统一可能显示分享失败", priority="P1",
 )
 add_entry(
@@ -1190,13 +1326,13 @@ ui_entry(
 )
 ui_entry(
     "GESTURE.DEBT_SWIPE", "债务 Tab", "债务卡左滑销这期",
-    scenario="SC-UI-DEBT", legacy_path="react/src/debts/gestures.ts", legacy_anchor="bindSwipe",
+    scenario="SC-UI-DEBT", legacy_path="react/src/debts/gestures.ts", legacy_anchor="else closeDebtSwipe(ctx, row);",
     flutter_path="flutter/lib/ui/shared/swipe_reveal.dart", flutter_anchor="class SwipeReveal",
     old="精细 axis/justDragged 状态机、76px、半阈值、只开一行并随 tab 关闭", new="通用 Flutter 手势，切 tab 状态保留", priority="P0",
 )
 ui_entry(
     "MODE.DEBT_REORDER", "债务 Tab", "jiggle 长按拖拽编辑模式",
-    scenario="SC-UI-DEBT", legacy_path="react/src/debts/gestures.ts", legacy_anchor="beginJiggle",
+    scenario="SC-UI-DEBT", legacy_path="react/src/debts/gestures.ts", legacy_anchor="ctx.exitJiggle();",
     flutter_path="flutter/lib/ui/debts/debts_tab.dart", flutter_anchor="ReorderableDragStartListener",
     old="一次长按进入抖动并继续拖，边缘自动滚、长按退出、tab/back 收口", new="首次长按只进入抖动，需第二次按住才拖；无长按退出且其他动作仍可用", priority="P0",
 )
@@ -1209,7 +1345,7 @@ ui_entry(
 ui_entry(
     "DIALOG.INSTALLMENT_PAYMENT", "债务详情", "销这期/部分还款输入",
     scenario="SC-DEBT-01", legacy_path="www/index.html", legacy_anchor="function payInstallment",
-    flutter_path="flutter/lib/ui/debts/payment_sheet.dart", flutter_anchor="showPaymentSheet",
+    flutter_path="flutter/lib/ui/debts/payment_sheet.dart", flutter_anchor="return await showDialog<num>(",
     old="展示本金/利息/剩余提示，非法值关闭后 toast", new="信息更少，错误内联", priority="P1",
 )
 ui_entry(
@@ -1243,32 +1379,32 @@ ui_entry(
 )
 ui_entry(
     "STATE.EDITOR.PLAN_CONTROLLER_SYNC", "债务编辑器", "逐期输入 controller 与模型同步",
-    scenario="SC-EDIT-02", legacy_path="react/src/sheets/PlanRows.tsx", legacy_anchor="value={row.amount}",
+    scenario="SC-EDIT-02", legacy_path="react/src/sheets/PlanRows.tsx", legacy_anchor="updateRow(idx, { amount: parseFloat(v) || 0 });",
     flutter_path="flutter/lib/ui/debts/debt_editor.dart", flutter_anchor="class _PlanRowEditorState",
     old="React 受控输入，批量/重新生成后立即显示模型新值", new="controller 只在 initState 初始化、无 didUpdateWidget，可继续显示旧值", priority="P0",
 )
 ui_entry(
     "ACTION.EDITOR.ADD_ROW", "债务编辑器", "添加一期按钮可见条件",
-    scenario="SC-EDIT-02", legacy_path="react/src/sheets/PlanRows.tsx", legacy_anchor="添加一期",
-    flutter_path="flutter/lib/ui/debts/debt_editor.dart", flutter_anchor="添加一期",
+    scenario="SC-EDIT-02", legacy_path="react/src/sheets/PlanRows.tsx", legacy_anchor="＋ 加一期",
+    flutter_path="flutter/lib/ui/debts/debt_editor.dart", flutter_anchor="加一期",
     old="只在手工模式或一次性零行时允许", new="始终显示", priority="P1",
 )
 ui_entry(
     "DIALOG.EDITOR.BATCH_AMOUNT_WARNING", "债务编辑器", "批量金额清空构成警告",
-    scenario="SC-EDIT-02", legacy_path="react/src/sheets/BatchBlock.tsx", legacy_anchor="清空本金",
-    flutter_path="flutter/lib/ui/debts/debt_editor.dart", flutter_anchor="_applyBatch",
+    scenario="SC-EDIT-02", legacy_path="react/src/sheets/BatchBlock.tsx", legacy_anchor="会把每期的本金和利息清空为 0",
+    flutter_path="flutter/lib/ui/debts/debt_editor.dart", flutter_anchor="void _applyBatch()",
     old="执行前明确二次警告会清空本金/利息", new="直接执行", status="missing_in_flutter", priority="P0",
 )
 ui_entry(
     "PICKER.EDITOR.DEBT_TYPE", "债务编辑器", "债务类型选择器",
-    scenario="SC-EDIT-01", legacy_path="react/src/sheets/EditSheet.tsx", legacy_anchor="债务类型",
-    flutter_path="flutter/lib/ui/debts/debt_editor.dart", flutter_anchor="DropdownButtonFormField",
+    scenario="SC-EDIT-01", legacy_path="react/src/sheets/EditSheet.tsx", legacy_anchor="借款类型",
+    flutter_path="flutter/lib/ui/debts/debt_editor.dart", flutter_anchor="DropdownButtonFormField<String>",
     old="native select", new="Material dropdown，展开/返回/视觉不同", priority="P2",
 )
 ui_entry(
     "PICKER.EDITOR.GEN_KIND", "债务编辑器", "计息方式选择器",
     scenario="SC-EDIT-01", legacy_path="react/src/sheets/GenPanel.tsx", legacy_anchor="计息方式",
-    flutter_path="flutter/lib/ui/debts/debt_editor.dart", flutter_anchor="_genKind",
+    flutter_path="flutter/lib/ui/debts/debt_editor.dart", flutter_anchor="const _GeneratorPanel(",
     old="带说明的自定义 bottom picker", new="短标签 dropdown", priority="P1",
 )
 ui_entry(
@@ -1280,7 +1416,7 @@ ui_entry(
 for picker_id, title, legacy_file, legacy_anchor, flutter_anchor in [
     ("PICKER.EDITOR.OPENED_DATE", "借款日选择", "react/src/sheets/EditSheet.tsx", "type=\"date\"", "借款日"),
     ("PICKER.EDITOR.FIRST_DATE", "首期还款日选择", "react/src/sheets/GenPanel.tsx", "type=\"date\"", "首期还款日"),
-    ("PICKER.EDITOR.ROW_DATE", "逐期日期选择", "react/src/sheets/PlanRows.tsx", "type=\"date\"", "_dateController"),
+    ("PICKER.EDITOR.ROW_DATE", "逐期日期选择", "react/src/sheets/PlanRows.tsx", "type=\"date\"", "late final TextEditingController _date"),
 ]:
     ui_entry(
         picker_id, "债务编辑器", title, scenario="SC-EDIT-01", legacy_path=legacy_file,
@@ -1289,8 +1425,8 @@ for picker_id, title, legacy_file, legacy_anchor, flutter_anchor in [
     )
 ui_entry(
     "DIALOG.EDITOR.BATCH_FIRST_MONTH", "债务编辑器", "批量还款日首月选择",
-    scenario="SC-EDIT-02", legacy_path="react/src/sheets/BatchBlock.tsx", legacy_anchor="firstMonth",
-    flutter_path="flutter/lib/ui/debts/debt_editor.dart", flutter_anchor="首期月份",
+    scenario="SC-EDIT-02", legacy_path="react/src/sheets/BatchBlock.tsx", legacy_anchor='const parts = monthVal.split("-");',
+    flutter_path="flutter/lib/ui/debts/debt_editor.dart", flutter_anchor="首期年月",
     old="全局 month picker modal", new="内联文本字段", priority="P1",
 )
 ui_entry(
@@ -1310,13 +1446,13 @@ ui_entry(
 )
 ui_entry(
     "PICKER.PAY_CUSTOM_DATE", "还款日 Tab", "自定义日期选择器",
-    scenario="SC-PAY-01", legacy_path="react/src/pay/App.tsx", legacy_anchor="customDate",
+    scenario="SC-PAY-01", legacy_path="react/src/pay/App.tsx", legacy_anchor="const [customDays, setCustomDays]",
     flutter_path="flutter/lib/ui/pay/pay_tab.dart", flutter_anchor="showDatePicker",
     old="全局 native date modal", new="Material showDatePicker", priority="P2",
 )
 ui_entry(
     "GESTURE.PAY_SWIPE", "还款日 Tab", "还款行左滑",
-    scenario="SC-PAY-02", legacy_path="react/src/pay/gestures.ts", legacy_anchor="bindPaySwipe",
+    scenario="SC-PAY-02", legacy_path="react/src/pay/gestures.ts", legacy_anchor="else closePaySwipe(ctx, row);",
     flutter_path="flutter/lib/ui/shared/swipe_reveal.dart", flutter_anchor="class SwipeReveal",
     old="轴仲裁、半阈值、只开一行、tab 切换关闭", new="通用手势，tab 切换保留", priority="P0",
 )
@@ -1355,14 +1491,14 @@ ui_entry(
 )
 ui_entry(
     "GESTURE.REPORT_JOURNEY_SCRUB", "统计 Tab", "还清路径真实时间轴拖读",
-    scenario="SC-REPORT-02", legacy_path="react/src/report/Journey.tsx", legacy_anchor="dateToX",
-    flutter_path="flutter/lib/ui/report/report_tab.dart", flutter_anchor="class _JourneyPainter",
+    scenario="SC-REPORT-02", legacy_path="react/src/report/Journey.tsx", legacy_anchor='dot.style.top = latest.py(i) + "px";',
+    flutter_path="flutter/lib/ui/report/report_tab.dart", flutter_anchor="class _JourneyCard extends StatefulWidget",
     old="按真实日期比例绘制/命中，轴仲裁，松手复位", new="按数组等距绘制/命中但标签按真实时间，tap 可能粘住", priority="P0",
 )
 ui_entry(
     "MODE.REPORT_PRESSURE", "统计 Tab", "未来压力面积/柱形模式",
-    scenario="SC-REPORT-02", legacy_path="react/src/report/Pressure.tsx", legacy_anchor="useState<\"area\">",
-    flutter_path="flutter/lib/ui/report/report_tab.dart", flutter_anchor="_barMode",
+    scenario="SC-REPORT-02", legacy_path="react/src/report/Pressure.tsx", legacy_anchor='useState<PMode>("area")',
+    flutter_path="flutter/lib/ui/report/report_tab.dart", flutter_anchor="class _PressureCard extends StatefulWidget",
     old="默认面积，两种模式都可选月，长时间轴横向滚", new="默认柱形，面积不可交互，长轴压进单屏且标题固定", priority="P0",
 )
 ui_entry(
@@ -1373,14 +1509,14 @@ ui_entry(
 )
 ui_entry(
     "GESTURE.REPORT_TYPE_ROTATE", "统计 Tab", "类型饼图绕圆心旋转",
-    scenario="SC-REPORT-02", legacy_path="react/src/report/pieRotate.ts", legacy_anchor="bindPieRotate",
-    flutter_path="flutter/lib/ui/report/report_tab.dart", flutter_anchor="_pieRotation",
+    scenario="SC-REPORT-02", legacy_path="react/src/report/pieRotate.ts", legacy_anchor="export interface PieRotateOpts {",
+    flutter_path="flutter/lib/ui/report/report_tab.dart", flutter_anchor="double _rotation = -.5 * math.pi;",
     old="按圆心角度、有阈值和惯性，标签随图转并与纵滚仲裁", new="累加水平 dx、无惯性、legend 静态", priority="P0",
 )
 ui_entry(
     "POPOVER.REPORT_EXPORT", "统计 Tab", "导出二选一 popover",
     scenario="SC-UI-REPORT", legacy_path="react/src/report/ExportMenu.tsx", legacy_anchor="ExportMenu",
-    flutter_path="flutter/lib/ui/report/report_tab.dart", flutter_anchor="导出 Excel",
+    flutter_path="flutter/lib/ui/report/report_tab.dart", flutter_anchor="label: const Text('Excel')",
     old="点击导出打开二选一 popover，可点背景关闭", new="Excel/PDF 两按钮常驻", status="missing_in_flutter", priority="P1",
 )
 ui_entry(
@@ -1412,19 +1548,19 @@ ui_entry(
 )
 ui_entry(
     "DIALOG.ACCOUNT_ACTIONS", "账户", "注销与重置动作选择",
-    scenario="SC-ACCOUNT-01", legacy_path="react/src/sheets/AccountScreen.tsx", legacy_anchor="永久注销账户",
-    flutter_path="flutter/lib/ui/account/account_screen.dart", flutter_anchor="_showAccountActions",
+    scenario="SC-ACCOUNT-01", legacy_path="react/src/sheets/AccountScreen.tsx", legacy_anchor="注销后账号数据将从服务器永久删除",
+    flutter_path="flutter/lib/ui/account/account_screen.dart", flutter_anchor="Future<void> _accountActions",
     old="第三动作是标题右上弱化链接", new="三个普通 action 同列", priority="P1",
 )
 ui_entry(
     "DIALOG.ACCOUNT_RESET_CONFIRM", "账户", "仅重置本地数据确认",
     scenario="SC-RESET-01", legacy_path="react/src/sheets/AccountScreen.tsx", legacy_anchor="重置本地数据",
-    flutter_path="flutter/lib/ui/account/account_screen.dart", flutter_anchor="确认重置",
+    flutter_path="flutter/lib/ui/account/account_screen.dart", flutter_anchor="确定重置本地数据？",
     old="统一 ask 宿主、固定文案与 reload", new="AlertDialog 文案和完成表现不同", priority="P1",
 )
 ui_entry(
     "DIALOG.ACCOUNT_DELETE_FINAL", "账户", "注销额外最后确认",
-    scenario="SC-ACCOUNT-01", legacy_path="react/src/sheets/AccountScreen.tsx", legacy_anchor="永久注销账户",
+    scenario="SC-ACCOUNT-01", legacy_path="react/src/sheets/AccountScreen.tsx", legacy_anchor="注销后账号数据将从服务器永久删除",
     flutter_path="flutter/lib/ui/account/account_screen.dart", flutter_anchor="最后确认",
     old="首次注销确认即最终确认", new="又增加一层最后确认", status="flutter_extra", priority="P1",
 )
@@ -1442,7 +1578,7 @@ ui_entry(
 )
 ui_entry(
     "DIALOG.PREMIUM_PAYMENT_NOTICE", "Premium", "购买提示弹窗",
-    scenario="SC-UI-MINE", legacy_path="react/src/sheets/PremiumScreen.tsx", legacy_anchor="购买功能",
+    scenario="SC-UI-MINE", legacy_path="react/src/sheets/PremiumScreen.tsx", legacy_anchor="暂未开放真实支付",
     flutter_path="flutter/lib/ui/mine/premium_screen.dart", flutter_anchor="支付功能",
     old="完整购买说明文案", new="提示明显缩短", priority="P1",
 )
@@ -1500,8 +1636,8 @@ ui_entry(
 )
 ui_entry(
     "DIALOG.ARCHIVE_DELETE", "档案库", "档案删除确认与反馈",
-    scenario="SC-ARCHIVE-01", legacy_path="react/src/sheets/DocsScreen.tsx", legacy_anchor="确认删除",
-    flutter_path="flutter/lib/ui/mine/archive_screen.dart", flutter_anchor="删除这个文件",
+    scenario="SC-ARCHIVE-01", legacy_path="react/src/sheets/DocsScreen.tsx", legacy_anchor='toast("已删除")',
+    flutter_path="flutter/lib/ui/mine/archive_screen.dart", flutter_anchor="title: const Text('删除文件')",
     old="上传和内置文档均支持，成功 toast", new="只支持上传，成功静默", priority="P0",
 )
 ui_entry(
@@ -1518,19 +1654,19 @@ ui_entry(
 )
 ui_entry(
     "DIALOG.BACKUP_RESTORE", "云备份", "云恢复确认/进度/反馈",
-    scenario="SC-BACKUP-01", legacy_path="react/src/sheets/BackupScreen.tsx", legacy_anchor="恢复这份备份",
-    flutter_path="flutter/lib/ui/mine/backup_screen.dart", flutter_anchor="确认恢复",
+    scenario="SC-BACKUP-01", legacy_path="react/src/sheets/BackupScreen.tsx", legacy_anchor="恢复这条备份？",
+    flutter_path="flutter/lib/ui/mine/backup_screen.dart", flutter_anchor="恢复这条备份？",
     old="统一确认、固定恢复进度与反馈", new="进度呈现和文案不同", priority="P0",
 )
 ui_entry(
     "DIALOG.BACKUP_DELETE", "云备份", "云备份删除确认/反馈",
-    scenario="SC-BACKUP-01", legacy_path="react/src/sheets/BackupScreen.tsx", legacy_anchor="删除这份备份",
-    flutter_path="flutter/lib/ui/mine/backup_screen.dart", flutter_anchor="确认删除",
+    scenario="SC-BACKUP-01", legacy_path="react/src/sheets/BackupScreen.tsx", legacy_anchor="删除这条备份记录？",
+    flutter_path="flutter/lib/ui/mine/backup_screen.dart", flutter_anchor="删除这条备份记录？",
     old="成功显示已删除", new="成功无相同反馈", priority="P1",
 )
 ui_entry(
     "DIALOG.LOCAL_IMPORT_OVERWRITE", "导入与恢复", "本地导入覆盖确认",
-    scenario="SC-DATA-02", legacy_path="www/index.html", legacy_anchor="将覆盖",
+    scenario="SC-DATA-02", legacy_path="www/index.html", legacy_anchor='ask("导入覆盖", msg, function () {',
     flutter_path="flutter/lib/ui/mine/mine_tab.dart", flutter_anchor="债务和档案",
     old="按 legacy array/new object 与实际覆盖数量动态说明", new="统一写债务和档案", priority="P1",
 )
@@ -1551,14 +1687,14 @@ ui_entry(
 )
 ui_entry(
     "SHEET.AI_HISTORY", "AI 顾问", "AI 历史底部抽屉",
-    scenario="SC-UI-AI", legacy_path="react/src/sheets/AiScreen.tsx", legacy_anchor="aiHistorySheet",
-    flutter_path="flutter/lib/ui/ai/ai_screen.dart", flutter_anchor="_showHistory",
+    scenario="SC-UI-AI", legacy_path="react/src/sheets/AiScreen.tsx", legacy_anchor='id="aiHistorySheet"',
+    flutter_path="flutter/lib/ui/ai/ai_screen.dart", flutter_anchor="Future<void> _showHistory() async",
     old="显示时间+消息数，sheet 内有新对话，scrim/back 层级固定", new="仅显示时间，新对话入口移位，Material sheet", priority="P0",
 )
 ui_entry(
     "DIALOG.AI_HISTORY_DELETE", "AI 顾问", "删除历史会话确认与当前态清理",
-    scenario="SC-AI-02", legacy_path="react/src/sheets/AiScreen.tsx", legacy_anchor="删除这段对话",
-    flutter_path="flutter/lib/ui/ai/ai_screen.dart", flutter_anchor="aiHistoryProvider.notifier).delete",
+    scenario="SC-AI-02", legacy_path="react/src/sheets/AiScreen.tsx", legacy_anchor="删除这条对话",
+    flutter_path="flutter/lib/ui/ai/ai_screen.dart", flutter_anchor=".delete(item.id)",
     old="先确认；删除当前项同步清空当前会话", new="立即删除；当前画面和 id 仍保留", status="missing_in_flutter", priority="P0",
 )
 ui_entry(
@@ -1569,7 +1705,7 @@ ui_entry(
 ui_entry(
     "DIALOG.AI_LIMIT_EXHAUSTED", "AI 顾问", "额度耗尽说明与复制",
     scenario="SC-AI-03", legacy_path="react/src/sheets/AiLimitModal.tsx", legacy_anchor="复制完整分析提示词",
-    flutter_path="flutter/lib/ui/ai/ai_screen.dart", flutter_anchor="复制完整分析提示词",
+    flutter_path="flutter/lib/ui/ai/ai_screen.dart", flutter_anchor="复制完整提示词",
     old="专用视觉、完整解释，复制后 modal 保留", new="短 AlertDialog，复制后立即关闭并 Snackbar", priority="P0",
 )
 ui_entry(
@@ -1581,7 +1717,7 @@ ui_entry(
 ui_entry(
     "RENDERER.AI_MESSAGE", "AI 顾问", "AI 富文本段落/列表/粗体",
     scenario="SC-AI-01", legacy_path="react/src/sheets/AiScreen.tsx", legacy_anchor="parseAiBlocks",
-    flutter_path="flutter/lib/ui/ai/ai_screen.dart", flutter_anchor="_buildRichMessage",
+    flutter_path="flutter/lib/ui/ai/ai_screen.dart", flutter_anchor="List<TextSpan> _inlineSpans(String text)",
     old="结构化 p/ul/ol，编号列表语义明确", new="按行拆块并做 bullet/粗体，编号列表语义和间距不同", priority="P1",
 )
 ui_entry(
@@ -1615,9 +1751,40 @@ add_entry(
 ui_entry(
     "SYS.TYPOGRAPHY", "全局系统界面", "应用字体、数字等宽、字号与行距",
     scenario="SC-VISUAL-ALL", legacy_path="www/index.html", legacy_anchor="font-family",
-    flutter_path="flutter/pubspec.yaml", flutter_anchor="NotoSansSC-Regular.ttf",
+    flutter_path="flutter/pubspec.yaml", flutter_anchor="NotoSansSC-wght.ttf",
     old="CSS 字体栈、tabular-nums、字号/行距/字距按组件固定", new="Noto 只作为 PDF asset，App 未注册同等字体族，Material typography 参与派生", priority="P0",
 )
+
+
+MISSING_ABSENCE_QUERIES: dict[str, list[dict[str, str]]] = {
+    "INV-STO-004": [{"path_glob": "flutter/lib/**/*.dart", "regex": "after-zero-simulate-v1"}],
+    "INV-STO-005": [{"path_glob": "flutter/lib/**/*.dart", "regex": "after-zero-ai-limit-notice-v1"}],
+    "INV-DATA-004": [{"path_glob": "flutter/lib/data/*.dart", "regex": "premiumPlus"}],
+    "INV-ACT-009": [{"path_glob": "flutter/lib/ui/mine/archive_screen.dart", "regex": "saveBuiltin|deleteBuiltin"}],
+    "INV-ACT-010": [{"path_glob": "flutter/lib/data/archive_repository.dart", "regex": "\\.(?:heic|heif|bmp)"}],
+    "INV-CLD-010": [{"path_glob": "flutter/lib/cloud/*.dart", "regex": "refreshSession|refreshAccessToken"}],
+    "INV-NOT-002": [{"path_glob": "flutter/lib/main.dart", "regex": "reminderSchedulerProvider|reschedule\\("}],
+    "INV-NOT-004": [{"path_glob": "flutter/lib/ui/pay/notify_screen.dart", "regex": "requestPermission\\("}],
+    "INV-NAT-002": [{"path_glob": "flutter/android/app/src/main/kotlin/**/*.kt", "regex": "onSaveInstanceState|SavedStateHandle"}],
+    "INV-AI-001": [{"path_glob": "flutter/lib/ui/ai/ai_screen.dart", "regex": "quotaExhaustedLocally"}],
+    "INV-AI-002": [{"path_glob": "flutter/lib/ui/ai/ai_screen.dart", "regex": "retryCtx|retryContexts"}],
+    "INV-AI-004": [{"path_glob": "flutter/lib/ui/ai/ai_screen.dart", "regex": "deleteCurrentConversation|clearCurrentAfterDelete"}],
+    "SYS.REDUCED_MOTION": [{"path_glob": "flutter/lib/**/*.dart", "regex": "disableAnimations|accessibleNavigation"}],
+    "SYS.OVERSCROLL": [{"path_glob": "flutter/lib/**/*.dart", "regex": "ScrollBehavior|OverscrollIndicatorNotification"}],
+    "SYS.MAILTO": [{"path_glob": "flutter/lib/ui/mine/legal_screens.dart", "regex": "mailto:"}],
+    "DIALOG.PREMIUM_INVITE.SETTLEMENT": [{"path_glob": "flutter/lib/**/*.dart", "regex": "SettleCelebration|还清一笔了"}],
+    "DIALOG.EDITOR.BATCH_AMOUNT_WARNING": [{"path_glob": "flutter/lib/ui/debts/debt_editor.dart", "regex": "清空.*本金.*利息|确认.*批量.*金额"}],
+    "DISCLOSURE.REPORT_RANK_REST": [{"path_glob": "flutter/lib/ui/report/report_tab.dart", "regex": "rankExpanded|展开其余"}],
+    "POPOVER.REPORT_EXPORT": [{"path_glob": "flutter/lib/ui/report/report_tab.dart", "regex": "PopupMenuButton.*(?:Excel|PDF)|showMenu\\("}],
+    "ACTION.ARCHIVE.BUILTIN_DOC": [{"path_glob": "flutter/lib/ui/mine/archive_screen.dart", "regex": "builtin.*(?:save|delete|share)"}],
+    "DIALOG.AI_HISTORY_DELETE": [{"path_glob": "flutter/lib/ui/ai/ai_screen.dart", "regex": "确认.*删除.*对话|删除后无法恢复"}],
+    "DIALOG.AI_FIRST_ENTRY_EDUCATION": [{"path_glob": "flutter/lib/**/*.dart", "regex": "AI_LIMIT_NOTICE|首次.*额度|AiLimitModal"}],
+}
+
+for missing_entry in ENTRIES:
+    if missing_entry["status"] != "missing_in_flutter":
+        continue
+    missing_entry["absence_queries"] = MISSING_ABSENCE_QUERIES.get(missing_entry["id"], [])
 semantic_entry(
     "INV-RELEASE-001", "发布与安装", "Android release 签名",
     scenario="SC-RELEASE-01", legacy_path="android/app/build.gradle", legacy_anchor="signingConfigs",

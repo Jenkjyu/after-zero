@@ -740,8 +740,16 @@ def _require(condition: bool, errors: list[str], message: str) -> None:
 def _validate_source_anchor(source: dict[str, Any], owner: str, errors: list[str]) -> None:
     path_value = source.get("path")
     anchor = source.get("anchor")
+    line = source.get("line")
+    context_sha = source.get("context_sha256")
     _require(isinstance(path_value, str) and bool(path_value), errors, f"{owner}: source path missing")
     _require(isinstance(anchor, str) and bool(anchor), errors, f"{owner}: source anchor missing")
+    _require(isinstance(line, int) and line > 0, errors, f"{owner}: source line missing")
+    _require(
+        isinstance(context_sha, str) and bool(re.fullmatch(r"[0-9a-f]{64}", context_sha)),
+        errors,
+        f"{owner}: source context_sha256 invalid",
+    )
     if not isinstance(path_value, str) or not isinstance(anchor, str):
         return
     target = REPO_ROOT / path_value
@@ -749,6 +757,22 @@ def _validate_source_anchor(source: dict[str, Any], owner: str, errors: list[str
     if target.is_file():
         text = target.read_text(encoding="utf-8", errors="replace")
         _require(anchor in text, errors, f"{owner}: anchor not found in {path_value}: {anchor!r}")
+        lines = text.splitlines()
+        if isinstance(line, int):
+            _require(line <= len(lines), errors, f"{owner}: source line out of range in {path_value}")
+            if line <= len(lines):
+                _require(
+                    anchor in lines[line - 1],
+                    errors,
+                    f"{owner}: anchor is not on recorded line {path_value}:{line}",
+                )
+                context = "\n".join(lines[max(0, line - 3) : line + 2])
+                actual_sha = hashlib.sha256(context.encode("utf-8")).hexdigest()
+                _require(
+                    actual_sha == context_sha,
+                    errors,
+                    f"{owner}: source context hash mismatch at {path_value}:{line}",
+                )
 
 
 def validate_files(
@@ -898,11 +922,17 @@ def validate_files(
             "evidence",
             "acceptance",
             "notes",
+            "coverage_role",
         ]:
             _require(field in entry, errors, f"{owner}: missing {field}")
         _require(entry.get("status") in ALLOWED_STATUSES, errors, f"{owner}: invalid status {entry.get('status')!r}")
         _require(entry.get("status") != "unverified", errors, f"{owner}: raw unverified status is not allowed after 8.1 classification")
         _require(entry.get("priority") in {"P0", "P1", "P2", "P3"}, errors, f"{owner}: invalid priority")
+        _require(
+            entry.get("coverage_role") in {"semantic_contract", "drift_guard"},
+            errors,
+            f"{owner}: invalid coverage_role",
+        )
         _require(
             isinstance(entry.get("acceptance"), list) and bool(entry.get("acceptance")),
             errors,
@@ -916,6 +946,39 @@ def validate_files(
         if entry.get("status") in DIFFERENCE_STATUSES:
             for field in ["legacy_behavior", "flutter_behavior", "resolution"]:
                 _require(bool(entry.get(field)), errors, f"{owner}: {field} required for difference status")
+        if entry.get("status") == "missing_in_flutter":
+            absence_queries = entry.get("absence_queries")
+            _require(
+                isinstance(absence_queries, list) and bool(absence_queries),
+                errors,
+                f"{owner}: missing_in_flutter requires absence_queries",
+            )
+            if isinstance(absence_queries, list):
+                for query_index, query in enumerate(absence_queries):
+                    query_owner = f"{owner}.absence_queries[{query_index}]"
+                    _require(isinstance(query, dict), errors, f"{query_owner}: must be an object")
+                    if not isinstance(query, dict):
+                        continue
+                    path_glob = query.get("path_glob")
+                    pattern = query.get("regex")
+                    _require(isinstance(path_glob, str) and bool(path_glob), errors, f"{query_owner}: path_glob missing")
+                    _require(isinstance(pattern, str) and bool(pattern), errors, f"{query_owner}: regex missing")
+                    if not isinstance(path_glob, str) or not isinstance(pattern, str):
+                        continue
+                    targets = sorted(REPO_ROOT.glob(path_glob))
+                    _require(bool(targets), errors, f"{query_owner}: path_glob matched no files")
+                    try:
+                        regex = re.compile(pattern, re.IGNORECASE)
+                    except re.error as error:
+                        errors.append(f"{query_owner}: invalid regex: {error}")
+                        continue
+                    matches = [
+                        path.relative_to(REPO_ROOT).as_posix()
+                        for path in targets
+                        if path.is_file()
+                        and regex.search(path.read_text(encoding="utf-8", errors="replace"))
+                    ]
+                    _require(not matches, errors, f"{query_owner}: absence query matched {matches}")
         for side in ["legacy_sources", "flutter_sources"]:
             sources = entry.get(side)
             _require(isinstance(sources, list), errors, f"{owner}: {side} must be a list")
@@ -1111,6 +1174,115 @@ def validate_files(
             f"{scenario_id}: invalid execution_status",
         )
 
+    scenario_by_id = {
+        scenario["id"]: scenario
+        for scenario in scenarios
+        if isinstance(scenario, dict) and isinstance(scenario.get("id"), str)
+    }
+    pair_required_kinds = {
+        "artifact",
+        "geometry",
+        "interaction",
+        "native",
+        "network",
+        "screenshot",
+        "semantics",
+        "state_before_after",
+        "storage",
+        "text",
+    }
+    for entry in verified_entries:
+        owner = entry["id"]
+        refs_for_entry = entry.get("evidence_refs", [])
+        covered_kinds: set[str] = set()
+        paired_sides: dict[tuple[str, str, str], set[str]] = {}
+        for index, evidence_ref in enumerate(refs_for_entry):
+            ref_owner = f"{owner}.evidence_refs[{index}]"
+            _require(isinstance(evidence_ref, dict), errors, f"{ref_owner}: must be an object")
+            if not isinstance(evidence_ref, dict):
+                continue
+            for field in [
+                "path",
+                "sha256",
+                "scenario_id",
+                "fixture_id",
+                "kind",
+                "side",
+                "comparator",
+                "comparator_pass",
+                "content_sha256",
+            ]:
+                _require(field in evidence_ref, errors, f"{ref_owner}: missing {field}")
+            path_value = evidence_ref.get("path")
+            sha = evidence_ref.get("sha256")
+            content_sha = evidence_ref.get("content_sha256")
+            scenario_id = evidence_ref.get("scenario_id")
+            fixture_id = evidence_ref.get("fixture_id")
+            kind = evidence_ref.get("kind")
+            side = evidence_ref.get("side")
+            _require(
+                isinstance(sha, str) and bool(re.fullmatch(r"[0-9a-f]{64}", sha)),
+                errors,
+                f"{ref_owner}: invalid sha256",
+            )
+            _require(
+                isinstance(content_sha, str) and bool(re.fullmatch(r"[0-9a-f]{64}", content_sha)),
+                errors,
+                f"{ref_owner}: invalid content_sha256",
+            )
+            _require(side in {"legacy", "flutter", "shared"}, errors, f"{ref_owner}: invalid side")
+            _require(kind in ALLOWED_EVIDENCE, errors, f"{ref_owner}: invalid kind")
+            _require(
+                scenario_id in entry.get("scenario_ids", []),
+                errors,
+                f"{ref_owner}: scenario is not linked to entry",
+            )
+            linked_scenario = scenario_by_id.get(scenario_id, {})
+            _require(
+                fixture_id in linked_scenario.get("fixture_ids", []),
+                errors,
+                f"{ref_owner}: fixture is not linked to scenario",
+            )
+            _require(
+                kind in entry.get("evidence", []),
+                errors,
+                f"{ref_owner}: kind is not required by entry",
+            )
+            _require(
+                isinstance(evidence_ref.get("comparator"), str)
+                and bool(evidence_ref.get("comparator")),
+                errors,
+                f"{ref_owner}: comparator missing",
+            )
+            _require(
+                evidence_ref.get("comparator_pass") is True,
+                errors,
+                f"{ref_owner}: comparator did not pass",
+            )
+            if isinstance(path_value, str):
+                target = REPO_ROOT / path_value
+                _require(target.is_file(), errors, f"{ref_owner}: evidence file missing: {path_value}")
+                if target.is_file() and isinstance(sha, str):
+                    actual_sha = hashlib.sha256(target.read_bytes()).hexdigest()
+                    _require(actual_sha == sha, errors, f"{ref_owner}: evidence file hash mismatch")
+                    _require(actual_sha == content_sha, errors, f"{ref_owner}: content hash mismatch")
+            if isinstance(kind, str):
+                covered_kinds.add(kind)
+            if all(isinstance(value, str) for value in [scenario_id, fixture_id, kind, side]):
+                paired_sides.setdefault((scenario_id, fixture_id, kind), set()).add(side)
+        _require(
+            set(entry.get("evidence", [])) <= covered_kinds,
+            errors,
+            f"{owner}: verified evidence kinds incomplete: {sorted(set(entry.get('evidence', [])) - covered_kinds)}",
+        )
+        for key, sides in paired_sides.items():
+            if key[2] in pair_required_kinds:
+                _require(
+                    {"legacy", "flutter"} <= sides,
+                    errors,
+                    f"{owner}: evidence {key} lacks legacy/flutter pair",
+                )
+
     for entry_id, linked in scenario_links.items():
         for scenario_id in linked:
             _require(scenario_id in scenario_ids, errors, f"{entry_id}: unknown scenario id {scenario_id!r}")
@@ -1161,16 +1333,50 @@ def validate_files(
         observations_by_ref.setdefault(item["ref"], []).append(item)
     refs = sorted(observations_by_ref)
     matched_refs: set[str] = set()
+    semantic_matched_refs: set[str] = set()
     selector_hits: dict[tuple[str, str], int] = {}
     for owner, selector in selectors:
         hits = [ref for ref in refs if fnmatch.fnmatchcase(ref, selector)]
         selector_hits[(owner, selector)] = len(hits)
         matched_refs.update(hits)
+        entry = next((item for item in entries if item.get("id") == owner), {})
+        if entry.get("coverage_role") == "semantic_contract":
+            semantic_matched_refs.update(hits)
         _require(bool(hits), errors, f"{owner}: inventory selector matched nothing: {selector}")
     _require(
         set(refs) <= matched_refs,
         errors,
         f"unclassified source observations: {sorted(set(refs) - matched_refs)}",
+    )
+    semantic_required_categories = {
+        "legacy.bridge",
+        "legacy.calc_export",
+        "legacy.cloud_function",
+        "legacy.dom_id",
+        "legacy.index_event",
+        "legacy.index_function",
+        "legacy.keyframes",
+        "legacy.react_event",
+        "legacy.react_source",
+        "legacy.storage",
+        "legacy.ui_text",
+        "flutter.dart_source",
+        "flutter.event",
+        "flutter.method_channel",
+        "flutter.navigation",
+        "flutter.storage",
+        "flutter.ui_text",
+    }
+    semantic_required_refs = {
+        item["ref"]
+        for item in current["observations"]
+        if item["category"] in semantic_required_categories
+    }
+    _require(
+        semantic_required_refs <= semantic_matched_refs,
+        errors,
+        "source observations covered only by drift guards: "
+        f"{sorted(semantic_required_refs - semantic_matched_refs)}",
     )
 
     if errors:

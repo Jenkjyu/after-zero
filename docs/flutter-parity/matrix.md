@@ -5,14 +5,14 @@
 - 基准提交：`6fa1712dcdb2ba6e617810dffa8bbe38193140aa`
 - 旧版包名：`io.github.jenkjyu.afterzero`
 - Flutter 包名：`io.github.jenkjyu.after_zero`
-- 矩阵项：233
+- 矩阵项：280
 - Case profile：104
 - 可物化 storage seed：11
 - 其余 case spec：93
 - 完整驱动 profile：0
 - 场景：43
 - 场景执行状态：`automated` 1，`specified` 42
-- 状态：`blocked_external` 4，`difference` 107，`flutter_extra` 10，`mapped_unverified` 90，`missing_in_flutter` 22
+- 状态：`blocked_external` 4，`difference` 107，`flutter_extra` 10，`mapped_unverified` 137，`missing_in_flutter` 22
 
 状态只表示当前证据结论；`verified` 必须带证据路径。`difference` 不是遗漏，而是已被完整性系统发现、留给后续业务阶段修复。
 
@@ -43,7 +43,45 @@
 
 | ID | 优先级 | 类型 | 项目 | 状态 | 场景 | 说明 |
 |---|---|---|---|---|---|---|
-| `INV-BRG-001` | `P0` | api_surface | 旧 AzBridge 39 个能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-LIFE-01` | Flutter 不保留统一 JS bridge；39 个能力分散到 provider/service/UI，能力存在不代表细节一致。 |
+| `INV-BRG-001` | `P0` | api_surface | 旧 AzBridge.addNotifyRule 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-NOTIFY-02` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-002` | `P0` | api_surface | 旧 AzBridge.buildAiSummary 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-AI-03` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-003` | `P0` | api_surface | 旧 AzBridge.callAiAdvisor 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-AI-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-004` | `P0` | api_surface | 旧 AzBridge.commitReorder 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-SORT-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-005` | `P0` | api_surface | 旧 AzBridge.confirmAsync 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-UI-DETAIL-EDIT` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-006` | `P0` | api_surface | 旧 AzBridge.createBackup 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-BACKUP-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-007` | `P0` | api_surface | 旧 AzBridge.deleteAccount 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-ACCOUNT-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-008` | `P0` | api_surface | 旧 AzBridge.deleteArchiveFile 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-ARCHIVE-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-009` | `P0` | api_surface | 旧 AzBridge.deleteBackup 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-BACKUP-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-010` | `P0` | api_surface | 旧 AzBridge.deleteDebt 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-DEBT-02` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-011` | `P0` | api_surface | 旧 AzBridge.deleteNotifyRule 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-NOTIFY-02` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-012` | `P0` | api_surface | 旧 AzBridge.downloadArchiveFile 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-FILE-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-013` | `P0` | api_surface | 旧 AzBridge.downloadBackupFile 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-EXPORT-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-014` | `P0` | api_surface | 旧 AzBridge.exportReportPdf 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-EXPORT-02` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-015` | `P0` | api_surface | 旧 AzBridge.exportReportXlsx 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-EXPORT-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-016` | `P0` | api_surface | 旧 AzBridge.getAccount 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-ACCOUNT-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-017` | `P0` | api_surface | 旧 AzBridge.getBackupMeta 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-BACKUP-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-018` | `P0` | api_surface | 旧 AzBridge.getDebts 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-DATA-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-019` | `P0` | api_surface | 旧 AzBridge.getFiles 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-ARCHIVE-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-020` | `P0` | api_surface | 旧 AzBridge.getNotify 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-NOTIFY-02` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-021` | `P0` | api_surface | 旧 AzBridge.getPremium 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-ACCOUNT-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-022` | `P0` | api_surface | 旧 AzBridge.listBackups 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-BACKUP-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-023` | `P0` | api_surface | 旧 AzBridge.payInstallment 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-DEBT-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-024` | `P0` | api_surface | 旧 AzBridge.redeemCode 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-ACCOUNT-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-025` | `P0` | api_surface | 旧 AzBridge.renderAll 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-LIFE-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-026` | `P0` | api_surface | 旧 AzBridge.resetLocalData 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-RESET-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-027` | `P0` | api_surface | 旧 AzBridge.restoreBackup 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-BACKUP-02` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-028` | `P0` | api_surface | 旧 AzBridge.saveAll 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-DATA-03` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-029` | `P0` | api_surface | 旧 AzBridge.sendTestNotification 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-NOTIFY-02` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-030` | `P0` | api_surface | 旧 AzBridge.setDebt 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-DEBT-02` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-031` | `P0` | api_surface | 旧 AzBridge.setNotifyEnabled 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-NOTIFY-02` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-032` | `P0` | api_surface | 旧 AzBridge.settleFull 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-DEBT-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-033` | `P0` | api_surface | 旧 AzBridge.shareArchiveFile 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-FILE-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-034` | `P0` | api_surface | 旧 AzBridge.toast 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-UI-DETAIL-EDIT` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-035` | `P0` | api_surface | 旧 AzBridge.triggerImportFilePicker 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-DATA-02` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-036` | `P0` | api_surface | 旧 AzBridge.unsettle 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-DEBT-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-037` | `P0` | api_surface | 旧 AzBridge.uploadArchiveFile 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-ARCHIVE-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-038` | `P0` | api_surface | 旧 AzBridge.waiveInstallment 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-DEBT-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
+| `INV-BRG-039` | `P0` | api_surface | 旧 AzBridge.wxLogout 能力入口映射 | `mapped_unverified` | `SC-SOURCE-01`, `SC-AUTH-01` | Flutter 不保留统一 JS bridge；本项只证明该入口已逐项反查到对应动作，行为一致性仍由关联场景取证。 |
 
 ## Premium
 
@@ -178,6 +216,15 @@
 |---|---|---|---|---|---|---|
 | `INV-SOURCE-LEGACY` | `P0` | source_inventory | 受保护旧版完整源码、文案、事件与测试清单 | `mapped_unverified` | `SC-SOURCE-01` | 逐文件 SHA 使同名函数的内容改动也会触发门禁；旧版始终只读。 |
 | `INV-SOURCE-FLUTTER` | `P0` | source_inventory | Flutter 源码、文案、事件、依赖、导航与测试清单 | `mapped_unverified` | `SC-SOURCE-01` | 新增文件、UI 文案、手势回调、依赖或测试都会要求显式刷新与重新映射。 |
+| `INV-SURFACE-DEBT` | `P0` | semantic_source_surface | 债务生命周期界面与手势源码面 | `mapped_unverified` | `SC-UI-DETAIL-EDIT`, `SC-SOURCE-01` | 路径范围是显式业务域分类，不是全仓兜底；新增目录或跨域源码不会被本项自动吞掉。 |
+| `INV-SURFACE-PAY` | `P0` | semantic_source_surface | 还款日与通知界面源码面 | `mapped_unverified` | `SC-UI-PAY-NOTIFY`, `SC-SOURCE-01` | 路径范围是显式业务域分类，不是全仓兜底；新增目录或跨域源码不会被本项自动吞掉。 |
+| `INV-SURFACE-REPORT` | `P0` | semantic_source_surface | 统计、图表与策略界面源码面 | `mapped_unverified` | `SC-UI-REPORT`, `SC-SOURCE-01` | 路径范围是显式业务域分类，不是全仓兜底；新增目录或跨域源码不会被本项自动吞掉。 |
+| `INV-SURFACE-MINE` | `P0` | semantic_source_surface | 我的、Premium 与法律界面源码面 | `mapped_unverified` | `SC-UI-MINE`, `SC-SOURCE-01` | 路径范围是显式业务域分类，不是全仓兜底；新增目录或跨域源码不会被本项自动吞掉。 |
+| `INV-SURFACE-ARCHIVE` | `P0` | semantic_source_surface | 档案与备份界面源码面 | `mapped_unverified` | `SC-UI-ARCH-BACKUP`, `SC-SOURCE-01` | 路径范围是显式业务域分类，不是全仓兜底；新增目录或跨域源码不会被本项自动吞掉。 |
+| `INV-SURFACE-AI` | `P0` | semantic_source_surface | AI 助手界面与状态机源码面 | `mapped_unverified` | `SC-UI-AI`, `SC-SOURCE-01` | 路径范围是显式业务域分类，不是全仓兜底；新增目录或跨域源码不会被本项自动吞掉。 |
+| `INV-SURFACE-SHARED` | `P0` | semantic_source_surface | 共享状态、弹层与应用壳源码面 | `mapped_unverified` | `SC-VISUAL-ALL`, `SC-SOURCE-01` | 路径范围是显式业务域分类，不是全仓兜底；新增目录或跨域源码不会被本项自动吞掉。 |
+| `INV-SURFACE-LEGACY-RUNTIME` | `P0` | semantic_source_surface | 旧版宿主运行时函数、DOM、事件与动画源码面 | `mapped_unverified` | `SC-SOURCE-01`, `SC-LIFE-01`, `SC-VISUAL-ALL` | 旧版单文件宿主按运行时职责分类；bridge、storage、cloud/native 能力仍必须各自逐项映射，不能依赖本项。 |
+| `INV-SURFACE-SERVICES` | `P0` | semantic_source_surface | Flutter 数据、云端、导出、通知与原生服务源码面 | `mapped_unverified` | `SC-SOURCE-01`, `SC-LIFE-01` | 服务层路径显式列举；用户可观察契约继续由 calc、storage、bridge、cloud/native 细项负责。 |
 | `INV-DORMANT-INFOTIP` | `P3` | dormant_legacy | 未被调用的 legacy InfoTip | `mapped_unverified` | `SC-SOURCE-01` | 全仓无调用点，不属于运行 surface；保留在静态源码清单中防止未来启用后漏审。 |
 | `INV-DEBUG-PREVIEW` | `P3` | debug_only | Debug preview 登录绕过 | `mapped_unverified` | `SC-RELEASE-01` | 只允许 debug 对齐采集使用；release/profile 必须证明该绕过不可达。 |
 

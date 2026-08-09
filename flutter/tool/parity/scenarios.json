@@ -3494,9 +3494,56 @@
       ],
       "matrix_ids": [
         "INV-BRG-001",
+        "INV-BRG-002",
+        "INV-BRG-003",
+        "INV-BRG-004",
+        "INV-BRG-005",
+        "INV-BRG-006",
+        "INV-BRG-007",
+        "INV-BRG-008",
+        "INV-BRG-009",
+        "INV-BRG-010",
+        "INV-BRG-011",
+        "INV-BRG-012",
+        "INV-BRG-013",
+        "INV-BRG-014",
+        "INV-BRG-015",
+        "INV-BRG-016",
+        "INV-BRG-017",
+        "INV-BRG-018",
+        "INV-BRG-019",
+        "INV-BRG-020",
+        "INV-BRG-021",
+        "INV-BRG-022",
+        "INV-BRG-023",
+        "INV-BRG-024",
+        "INV-BRG-025",
+        "INV-BRG-026",
+        "INV-BRG-027",
+        "INV-BRG-028",
+        "INV-BRG-029",
+        "INV-BRG-030",
+        "INV-BRG-031",
+        "INV-BRG-032",
+        "INV-BRG-033",
+        "INV-BRG-034",
+        "INV-BRG-035",
+        "INV-BRG-036",
+        "INV-BRG-037",
+        "INV-BRG-038",
+        "INV-BRG-039",
         "INV-DORMANT-INFOTIP",
         "INV-SOURCE-FLUTTER",
-        "INV-SOURCE-LEGACY"
+        "INV-SOURCE-LEGACY",
+        "INV-SURFACE-AI",
+        "INV-SURFACE-ARCHIVE",
+        "INV-SURFACE-DEBT",
+        "INV-SURFACE-LEGACY-RUNTIME",
+        "INV-SURFACE-MINE",
+        "INV-SURFACE-PAY",
+        "INV-SURFACE-REPORT",
+        "INV-SURFACE-SERVICES",
+        "INV-SURFACE-SHARED"
       ],
       "preconditions": [
         "旧版与 Flutter 使用同一 materialized fixture、时钟、locale、viewport 与平台 profile。"
@@ -3879,6 +3926,10 @@
         "DIALOG.WAIVE_PERIOD",
         "INV-ACT-001",
         "INV-ACT-005",
+        "INV-BRG-023",
+        "INV-BRG-032",
+        "INV-BRG-036",
+        "INV-BRG-038",
         "INV-DATA-001"
       ],
       "preconditions": [
@@ -3970,7 +4021,9 @@
         "DIALOG.DELETE_DEBT",
         "INV-ACT-002",
         "INV-ACT-003",
-        "INV-ACT-004"
+        "INV-ACT-004",
+        "INV-BRG-010",
+        "INV-BRG-030"
       ],
       "preconditions": [
         "旧版与 Flutter 使用同一 materialized fixture、时钟、locale、viewport 与平台 profile。"
@@ -4264,6 +4317,7 @@
       ],
       "matrix_ids": [
         "INV-ACT-005",
+        "INV-BRG-018",
         "INV-DATA-001",
         "INV-DATA-002",
         "INV-DATA-003",
@@ -4382,6 +4436,7 @@
       "matrix_ids": [
         "DIALOG.LOCAL_IMPORT_OVERWRITE",
         "INV-ACT-008",
+        "INV-BRG-035",
         "INV-DATA-005",
         "INV-STO-007"
       ],
@@ -4467,6 +4522,7 @@
         "FX-S04"
       ],
       "matrix_ids": [
+        "INV-BRG-028",
         "INV-STO-010"
       ],
       "preconditions": [
@@ -4546,7 +4602,8 @@
       ],
       "matrix_ids": [
         "DIALOG.ACCOUNT_RESET_CONFIRM",
-        "INV-ACT-007"
+        "INV-ACT-007",
+        "INV-BRG-026"
       ],
       "preconditions": [
         "旧版与 Flutter 使用同一 materialized fixture、时钟、locale、viewport 与平台 profile。"
@@ -4829,6 +4886,7 @@
       ],
       "matrix_ids": [
         "INV-ACT-002",
+        "INV-BRG-004",
         "INV-STO-002"
       ],
       "preconditions": [
@@ -5112,6 +5170,7 @@
         "FX-E00"
       ],
       "matrix_ids": [
+        "INV-BRG-039",
         "INV-CLD-001",
         "INV-CLD-002",
         "INV-NAT-003"
@@ -5437,6 +5496,10 @@
         "DIALOG.ACCOUNT_ACTIONS",
         "DIALOG.ACCOUNT_DELETE_FINAL",
         "INV-ACT-006",
+        "INV-BRG-007",
+        "INV-BRG-016",
+        "INV-BRG-021",
+        "INV-BRG-024",
         "INV-CLD-008",
         "INV-CLD-016"
       ],
@@ -5550,6 +5613,7 @@
         "INV-AI-005",
         "INV-AI-007",
         "INV-AI-008",
+        "INV-BRG-003",
         "RENDERER.AI_MESSAGE"
       ],
       "preconditions": [
@@ -5761,6 +5825,7 @@
         "DIALOG.AI_FIRST_ENTRY_EDUCATION",
         "DIALOG.AI_LIMIT_EXHAUSTED",
         "INV-AI-001",
+        "INV-BRG-002",
         "INV-CLD-009",
         "INV-CLD-017",
         "INV-DATA-003",
@@ -5864,6 +5929,10 @@
       "matrix_ids": [
         "DIALOG.BACKUP_DELETE",
         "DIALOG.BACKUP_RESTORE",
+        "INV-BRG-006",
+        "INV-BRG-009",
+        "INV-BRG-017",
+        "INV-BRG-022",
         "INV-CLD-003",
         "INV-CLD-004",
         "INV-CLD-005",
@@ -5973,6 +6042,7 @@
         "FX-E08"
       ],
       "matrix_ids": [
+        "INV-BRG-027",
         "INV-CLD-012",
         "INV-CLD-013",
         "INV-CLD-014",
@@ -6235,6 +6305,11 @@
         "FX-PM01"
       ],
       "matrix_ids": [
+        "INV-BRG-001",
+        "INV-BRG-011",
+        "INV-BRG-020",
+        "INV-BRG-029",
+        "INV-BRG-031",
         "INV-NOT-003",
         "INV-NOT-004",
         "INV-NOT-005",
@@ -6458,6 +6533,9 @@
         "DIALOG.ARCHIVE_DELETE",
         "INV-ACT-009",
         "INV-ACT-010",
+        "INV-BRG-008",
+        "INV-BRG-019",
+        "INV-BRG-037",
         "INV-STO-007",
         "MENU.ARCHIVE_ACTIONS",
         "PREVIEW.ARCHIVE.IMAGE",
@@ -6571,6 +6649,8 @@
         "FX-PM04"
       ],
       "matrix_ids": [
+        "INV-BRG-012",
+        "INV-BRG-033",
         "INV-NAT-001",
         "INV-NAT-002",
         "INV-NAT-007",
@@ -6672,6 +6752,8 @@
         "FX-R02"
       ],
       "matrix_ids": [
+        "INV-BRG-013",
+        "INV-BRG-015",
         "INV-DATA-005",
         "INV-EXP-005",
         "SYS.FILE_PICKER.BACKUP"
@@ -6758,6 +6840,7 @@
         "FX-D07"
       ],
       "matrix_ids": [
+        "INV-BRG-014",
         "INV-EXP-001",
         "INV-EXP-002",
         "INV-EXP-003",
@@ -7107,6 +7190,9 @@
       ],
       "matrix_ids": [
         "INV-ACT-011",
+        "INV-BRG-005",
+        "INV-BRG-034",
+        "INV-SURFACE-DEBT",
         "SHEET.DEBT_DETAIL",
         "SHEET.DEBT_EDITOR",
         "SUBPAGE.PREPAY_SIM"
@@ -7230,6 +7316,7 @@
         "FX-V-SWITCH"
       ],
       "matrix_ids": [
+        "INV-SURFACE-PAY",
         "SHEET.NOTIFY_SETTINGS",
         "TAB.PAY"
       ],
@@ -7359,6 +7446,7 @@
         "FX-V-SWITCH"
       ],
       "matrix_ids": [
+        "INV-SURFACE-REPORT",
         "POPOVER.REPORT_EXPORT",
         "TAB.REPORT"
       ],
@@ -7479,6 +7567,7 @@
       "matrix_ids": [
         "DIALOG.PREMIUM_PAYMENT_NOTICE",
         "DISCLOSURE.PREMIUM_REDEEM",
+        "INV-SURFACE-MINE",
         "SUBPAGE.ABOUT",
         "SUBPAGE.ACCOUNT",
         "SUBPAGE.PREMIUM",
@@ -7621,6 +7710,7 @@
         "FX-V-SWITCH"
       ],
       "matrix_ids": [
+        "INV-SURFACE-ARCHIVE",
         "SUBPAGE.ARCHIVE",
         "SUBPAGE.BACKUP"
       ],
@@ -7766,6 +7856,7 @@
       ],
       "matrix_ids": [
         "ACTION.AI.NEW_CONVERSATION",
+        "INV-SURFACE-AI",
         "SHEET.AI_HISTORY",
         "SUBPAGE.AI"
       ],
@@ -7903,6 +7994,8 @@
         "FX-MOTION-REDUCE"
       ],
       "matrix_ids": [
+        "INV-SURFACE-LEGACY-RUNTIME",
+        "INV-SURFACE-SHARED",
         "SYS.COLOR_SCHEME",
         "SYS.CONFIRM_HOST",
         "SYS.KEYBOARD_FOCUS_A11Y",
@@ -8032,7 +8125,7 @@
         "FX-I04"
       ],
       "matrix_ids": [
-        "INV-BRG-001",
+        "INV-BRG-025",
         "INV-CLD-002",
         "INV-CLD-003",
         "INV-CLD-004",
@@ -8043,6 +8136,8 @@
         "INV-CLD-009",
         "INV-CLD-017",
         "INV-NAT-002",
+        "INV-SURFACE-LEGACY-RUNTIME",
+        "INV-SURFACE-SERVICES",
         "SYS.BACK_DISPATCH"
       ],
       "preconditions": [

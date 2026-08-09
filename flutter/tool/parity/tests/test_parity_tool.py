@@ -238,6 +238,89 @@ class DiscoveryTests(unittest.TestCase):
         self.assertTrue(discovered.issubset(tracked))
 
 
+class ManifestIntegrityTests(unittest.TestCase):
+    def test_all_source_anchors_are_exact_line_and_context_hash(self) -> None:
+        manifest = json.loads(parity_tool.DEFAULT_MANIFEST.read_text(encoding="utf-8"))
+        sources = [
+            source
+            for entry in manifest["entries"]
+            for side in ("legacy_sources", "flutter_sources")
+            for source in entry[side]
+        ]
+        self.assertTrue(sources)
+        for source in sources:
+            self.assertNotIn("requested_anchor", source)
+            self.assertNotIn("anchor_resolution", source)
+            self.assertGreater(source["line"], 0)
+            self.assertRegex(source["context_sha256"], r"^[0-9a-f]{64}$")
+
+    def test_context_hash_mutation_is_rejected(self) -> None:
+        manifest = json.loads(parity_tool.DEFAULT_MANIFEST.read_text(encoding="utf-8"))
+        manifest["entries"][0]["legacy_sources"][0]["context_sha256"] = "0" * 64
+        with tempfile.TemporaryDirectory() as directory:
+            manifest_path = Path(directory) / "manifest.json"
+            _write_json(manifest_path, manifest)
+            with self.assertRaisesRegex(ValueError, "source context hash mismatch"):
+                parity_tool.validate_files(manifest_path=manifest_path)
+
+    def test_all_39_bridge_members_have_individual_semantic_contracts(self) -> None:
+        manifest = json.loads(parity_tool.DEFAULT_MANIFEST.read_text(encoding="utf-8"))
+        bridge_entries = [
+            entry
+            for entry in manifest["entries"]
+            if any(selector.startswith("legacy.bridge:") for selector in entry["inventory_selectors"])
+        ]
+        selectors = [
+            selector
+            for entry in bridge_entries
+            for selector in entry["inventory_selectors"]
+            if selector.startswith("legacy.bridge:")
+        ]
+        self.assertEqual(len(bridge_entries), 39)
+        self.assertSetEqual(
+            set(selectors),
+            {f"legacy.bridge:{name}" for name in EXPECTED_LEGACY_BRIDGE},
+        )
+        self.assertNotIn("legacy.bridge:*", selectors)
+        for entry in bridge_entries:
+            self.assertEqual(entry["coverage_role"], "semantic_contract")
+            self.assertTrue(entry["flutter_sources"])
+            self.assertGreaterEqual(len(entry["scenario_ids"]), 2)
+
+    def test_drift_guard_cannot_supply_semantic_bridge_coverage(self) -> None:
+        manifest = json.loads(parity_tool.DEFAULT_MANIFEST.read_text(encoding="utf-8"))
+        target = next(entry for entry in manifest["entries"] if entry["id"] == "INV-BRG-001")
+        target["coverage_role"] = "drift_guard"
+        with tempfile.TemporaryDirectory() as directory:
+            manifest_path = Path(directory) / "manifest.json"
+            _write_json(manifest_path, manifest)
+            with self.assertRaisesRegex(ValueError, "covered only by drift guards"):
+                parity_tool.validate_files(manifest_path=manifest_path)
+
+    def test_verified_status_rejects_unpaired_or_unhashed_evidence(self) -> None:
+        manifest = json.loads(parity_tool.DEFAULT_MANIFEST.read_text(encoding="utf-8"))
+        target = next(entry for entry in manifest["entries"] if entry["id"] == "INV-BRG-001")
+        target["status"] = "verified"
+        target["evidence_refs"] = [
+            {
+                "path": "flutter/tool/parity/README.md",
+                "sha256": "0" * 64,
+                "scenario_id": "SC-SOURCE-01",
+                "fixture_id": "FX-S01",
+                "kind": "source",
+                "side": "legacy",
+                "comparator": "sha256",
+                "comparator_pass": False,
+                "content_sha256": "0" * 64,
+            }
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            manifest_path = Path(directory) / "manifest.json"
+            _write_json(manifest_path, manifest)
+            with self.assertRaisesRegex(ValueError, "comparator did not pass"):
+                parity_tool.validate_files(manifest_path=manifest_path)
+
+
 class FixtureMaterializationTests(unittest.TestCase):
     def test_materializes_recursive_overlay_and_fixture_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
