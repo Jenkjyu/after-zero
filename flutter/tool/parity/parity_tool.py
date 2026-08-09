@@ -570,22 +570,24 @@ def discover_sources() -> list[Observation]:
         pattern=re.compile(r"Color\((0x[0-9A-Fa-f]{8})\)"),
     )
 
-    for native_root, suffixes in [
-        (REPO_ROOT / "flutter" / "android" / "app" / "src" / "main", {".kt", ".java", ".xml"}),
-        (REPO_ROOT / "flutter" / "ios" / "Runner", {".swift", ".m", ".mm", ".plist"}),
-    ]:
-        if not native_root.exists():
-            continue
-        for path in sorted(p for p in native_root.rglob("*") if p.is_file() and p.suffix in suffixes):
-            observations.append(
-                Observation(
-                    "flutter.native_source",
-                    _relative(path),
-                    _relative(path),
-                    1,
-                    path.name,
-                )
+    flutter_native_files = _tracked_files(
+        ["flutter/android/app/src/main", "flutter/ios/Runner"]
+    )
+    native_suffixes = {".kt", ".java", ".xml", ".swift", ".m", ".mm", ".plist"}
+    for path in sorted(
+        item
+        for item in flutter_native_files
+        if item.is_file() and item.suffix in native_suffixes
+    ):
+        observations.append(
+            Observation(
+                "flutter.native_source",
+                _relative(path),
+                _relative(path),
+                1,
+                path.name,
             )
+        )
 
     pubspec = REPO_ROOT / "flutter" / "pubspec.yaml"
     pubspec_text = pubspec.read_text(encoding="utf-8")

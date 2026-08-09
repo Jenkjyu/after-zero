@@ -215,6 +215,28 @@ class DiscoveryTests(unittest.TestCase):
             },
         )
 
+    def test_flutter_native_inventory_contains_only_tracked_sources(self) -> None:
+        tracked = {
+            path.decode("utf-8")
+            for path in subprocess.check_output(
+                [
+                    "git",
+                    "ls-files",
+                    "-z",
+                    "--",
+                    "flutter/android/app/src/main",
+                    "flutter/ios/Runner",
+                ],
+                cwd=parity_tool.REPO_ROOT,
+            ).split(b"\0")
+            if path
+        }
+        discovered = {
+            item.path for item in self._category("flutter.native_source")
+        }
+        self.assertTrue(discovered)
+        self.assertTrue(discovered.issubset(tracked))
+
 
 class FixtureMaterializationTests(unittest.TestCase):
     def test_materializes_recursive_overlay_and_fixture_metadata(self) -> None:

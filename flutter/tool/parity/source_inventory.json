@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "identity_sha256": "dd50e8bb6ebcf44fe75117acf983d2feecc344274c8463ef82214057068010d0",
+  "identity_sha256": "ae044f0af662998840c697d164452a9078210764bebd78e1f585c101f1b54938",
   "counts": {
     "flutter.color_literal": 19,
     "flutter.dart_source": 43,
@@ -8,7 +8,7 @@
     "flutter.event": 121,
     "flutter.file_sha": 140,
     "flutter.method_channel": 1,
-    "flutter.native_source": 14,
+    "flutter.native_source": 12,
     "flutter.navigation": 28,
     "flutter.storage": 12,
     "flutter.test_sha": 9,
@@ -2755,14 +2755,6 @@
     },
     {
       "category": "flutter.native_source",
-      "key": "flutter/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java",
-      "path": "flutter/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java",
-      "line": 1,
-      "anchor": "GeneratedPluginRegistrant.java",
-      "ref": "flutter.native_source:flutter/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java"
-    },
-    {
-      "category": "flutter.native_source",
       "key": "flutter/android/app/src/main/kotlin/io/github/jenkjyu/after_zero/MainActivity.kt",
       "path": "flutter/android/app/src/main/kotlin/io/github/jenkjyu/after_zero/MainActivity.kt",
       "line": 1,
@@ -2832,14 +2824,6 @@
       "line": 1,
       "anchor": "AppDelegate.swift",
       "ref": "flutter.native_source:flutter/ios/Runner/AppDelegate.swift"
-    },
-    {
-      "category": "flutter.native_source",
-      "key": "flutter/ios/Runner/GeneratedPluginRegistrant.m",
-      "path": "flutter/ios/Runner/GeneratedPluginRegistrant.m",
-      "line": 1,
-      "anchor": "GeneratedPluginRegistrant.m",
-      "ref": "flutter.native_source:flutter/ios/Runner/GeneratedPluginRegistrant.m"
     },
     {
       "category": "flutter.native_source",
@@ -26963,11 +26947,11 @@
     },
     {
       "category": "parity.tool_sha",
-      "key": "flutter/tool/parity/parity_tool.py@045ee97c3e30a112e68d4c6a6ee593b9c0465f4222741ba93cd79294f6dcc429",
+      "key": "flutter/tool/parity/parity_tool.py@5fd06064ef5aaca769226dc28e477eca7beae1535af2f710a251c81ee8e43108",
       "path": "flutter/tool/parity/parity_tool.py",
       "line": 1,
       "anchor": "parity_tool.py",
-      "ref": "parity.tool_sha:flutter/tool/parity/parity_tool.py@045ee97c3e30a112e68d4c6a6ee593b9c0465f4222741ba93cd79294f6dcc429"
+      "ref": "parity.tool_sha:flutter/tool/parity/parity_tool.py@5fd06064ef5aaca769226dc28e477eca7beae1535af2f710a251c81ee8e43108"
     },
     {
       "category": "parity.tool_sha",
@@ -26979,11 +26963,11 @@
     },
     {
       "category": "parity.tool_sha",
-      "key": "flutter/tool/parity/tests/test_parity_tool.py@bce91d80c072b5c1c0fb5a9fd76a0304cb7c5dd917f02a9a77b31bc395f382d2",
+      "key": "flutter/tool/parity/tests/test_parity_tool.py@c207baa4b46df0b4107712d9f283ec9fcc343d62c932a8a61229287daf335617",
       "path": "flutter/tool/parity/tests/test_parity_tool.py",
       "line": 1,
       "anchor": "test_parity_tool.py",
-      "ref": "parity.tool_sha:flutter/tool/parity/tests/test_parity_tool.py@bce91d80c072b5c1c0fb5a9fd76a0304cb7c5dd917f02a9a77b31bc395f382d2"
+      "ref": "parity.tool_sha:flutter/tool/parity/tests/test_parity_tool.py@c207baa4b46df0b4107712d9f283ec9fcc343d62c932a8a61229287daf335617"
     }
   ]
 }

@@ -33,7 +33,7 @@
   - `flutter_extra`：10
   - `mapped_unverified`：90
   - `blocked_external`：4
-- `source_inventory.json` 当前有 3369 个 observation，包含：
+- `source_inventory.json` 当前有 3367 个 observation，包含：
   - 57 个旧版 calc export；
   - 39 个旧版 bridge 成员；
   - 11/12 个旧版/Flutter storage key；
@@ -75,6 +75,7 @@
   - legacy seed 前备份、finally 恢复、reload、读回比较后删除备份。
 - `tests/test_parity_tool.py` 当前 13 条测试覆盖 57 calc/39 bridge/存储 key discovery、fixture overlay、case spec 拒绝、JSON/像素 mutant、阈值/裁切绕过、Android 启动/UI dump 重试/storage XML/APK SHA。
 - CI 的 Flutter job 已加入 catalog、validator、renderer、工具单测、Python/Node 语法门禁。
+- 首次 WIP push 的 CI 暴露出 source inventory 曾纳入本机未跟踪的 Flutter `GeneratedPluginRegistrant` 生成物；已改为只枚举 git-tracked 原生源码并增加回归测试。该失败是 8.1 工具问题，不是产品测试失败。
 
 ## 已完成的模拟器实跑证据（最终补丁前）
 
@@ -153,7 +154,7 @@
 - `python3 flutter/tool/parity/catalog.py --check`
 - `python3 flutter/tool/parity/parity_tool.py validate --json`
 - `python3 flutter/tool/parity/parity_tool.py render --check`
-- parity 工具单测 13/13
+- parity 工具单测 14/14
 - `npm test`：116/116
 - `npm run test:react`：44 个文件、354/354
 - `npx tsc --noEmit --project react/tsconfig.json`
