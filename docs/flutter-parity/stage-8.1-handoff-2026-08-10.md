@@ -75,7 +75,7 @@
   - legacy seed 前备份、finally 恢复、reload、读回比较后删除备份。
 - `tests/test_parity_tool.py` 当前 13 条测试覆盖 57 calc/39 bridge/存储 key discovery、fixture overlay、case spec 拒绝、JSON/像素 mutant、阈值/裁切绕过、Android 启动/UI dump 重试/storage XML/APK SHA。
 - CI 的 Flutter job 已加入 catalog、validator、renderer、工具单测、Python/Node 语法门禁。
-- 首次 WIP push 的 CI 暴露出 source inventory 曾纳入本机未跟踪的 Flutter `GeneratedPluginRegistrant` 生成物；已改为只枚举 git-tracked 原生源码并增加回归测试。该失败是 8.1 工具问题，不是产品测试失败。
+- WIP push 的 CI 暴露并已修复两个环境问题：source inventory 曾纳入本机未跟踪的 Flutter `GeneratedPluginRegistrant` 生成物，现只枚举 git-tracked 原生源码并有回归测试；Flutter job 的浅克隆又无法解析冻结基准提交，现为 parity validator 使用完整 git 历史。两次失败都在 parity 门禁阶段，不是产品测试失败。
 
 ## 已完成的模拟器实跑证据（最终补丁前）
 

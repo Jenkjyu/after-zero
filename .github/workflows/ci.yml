@@ -39,6 +39,9 @@ jobs:
         working-directory: flutter
     steps:
       - uses: actions/checkout@v4
+        with:
+          # parity validator 要读取 manifest 中冻结的旧版基准提交及其 tree。
+          fetch-depth: 0
 
       - uses: subosito/flutter-action@v2
         with:
