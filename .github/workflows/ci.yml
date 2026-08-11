@@ -29,52 +29,10 @@ jobs:
       - name: React build (Vite multi-entry)
         run: npm run build:react
 
-  # Flutter重写(flutter/)的CI——跟上面的Capacitor/React部分完全独立，两边互不影响。
-  # 只跑Android能覆盖的部分(analyze+test纯命令行、不需要模拟器)；iOS要macOS runner，
-  # 等flutter/里有实际iOS相关产出后再加，现在加了也测不出什么，纯粹多花CI分钟数。
-  flutter:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: flutter
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          # parity validator 要读取 manifest 中冻结的旧版基准提交及其 tree。
-          fetch-depth: 0
+  # Flutter 重写已停止并封存；常规产品 CI 不运行冻结的 Flutter/parity job。
+  # 只有用户明确批准恢复对应阶段后，才按 flutter-rewrite-parity skill 恢复其 CI。
 
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "pip"
-          cache-dependency-path: flutter/tool/parity/requirements.txt
-
-      - run: flutter pub get
-
-      - name: 安装全量对齐证据工具依赖
-        run: python -m pip install -r tool/parity/requirements.txt
-
-      - name: 阶段8契约矩阵、fixture与源码完整性门禁
-        run: |
-          python tool/parity/catalog.py --check
-          python tool/parity/parity_tool.py validate
-          python tool/parity/parity_tool.py render --check
-          python -m unittest discover -s tool/parity/tests -p 'test_*.py' -v
-          python -m py_compile tool/parity/catalog.py tool/parity/parity_tool.py tool/parity/android_capture.py
-          node --check tool/parity/cdp_capture.mjs
-
-      - name: 静态分析
-        run: flutter analyze
-
-      - name: 单元/组件测试
-        run: flutter test
-
-  # 死规则门禁：Flutter重写期间禁止修改旧版代码（见AGENTS.md"硬性铁律"第7条）。
+  # 封存边界门禁：重写相关提交不得顺带污染当前 Capacitor + React 产品。
   # 只有当提交信息含 flutter/重写/rewrite 关键词、且改动触及受保护旧版文件时判红；
   # 用户明确批准的旧版改动（含阶段9切换）需在提交信息里带 `legacy-ok` 标记绕过。
   legacy-guard:
