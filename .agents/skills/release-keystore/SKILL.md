@@ -5,6 +5,8 @@ description: This skill should be used when building a release APK for this proj
 
 # Release签名 / 构建release包
 
+先用`capacitor-native-runtime` skill完成与本次改动相符的React build、Capacitor sync或原生源码检查；本skill只负责release签名材料和签名构建。
+
 ## 为什么需要release签名
 
 微信登录要求提交App的release签名证书SHA1指纹去微信开放平台注册，debug签名注册不了——这是这个项目第一次真正生成release keystore的直接原因。微信SDK其它硬编码要求见`wechat-login-setup` skill。
@@ -21,18 +23,21 @@ description: This skill should be used when building a release APK for this proj
 默认（debug，不受release签名影响）：
 ```bash
 npm install
+npm run build:react
 npx cap sync android
-cd android && ./gradlew assembleDebug
+cd android
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew assembleDebug
 ```
 产出：`android/app/build/outputs/apk/debug/app-debug.apk`
 
 要测微信登录，或者要做正式发布，必须显式跑release构建（需要这台机器上已经有上面两个keystore文件）：
 ```bash
-cd android && JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew assembleRelease
+cd android
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew assembleRelease
 ```
 产出：`android/app/build/outputs/apk/release/app-release.apk`
 
-`JAVA_HOME`要显式指定是因为macOS+Homebrew装的`openjdk@21`是keg-only、默认不链接到`java`命令（Intel Mac路径是`/usr/local/opt/openjdk@21`）；`JDK`版本必须是21，17编译会报"无效的源发行版：21"。
+`JAVA_HOME`要显式指定是因为macOS+Homebrew装的`openjdk@21`是keg-only、默认不链接到`java`命令（Intel Mac路径是`/usr/local/opt/openjdk@21`）；`JDK`版本必须是21，当前`android/app/capacitor.build.gradle`把Java source/target compatibility设为21。
 
 ## ⚠️丢失后果——跟localStorage键名铁律同等严重
 

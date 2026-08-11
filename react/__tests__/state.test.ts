@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { closeDetailSheet, closeEditSheet, NEW_DEBT_ID, openDetailSheet, openEditSheet, useAccount, useDebts, useDetailSheetId, useEditSheetId, usePremium } from "../src/shared/state";
+import type { Premium } from "../src/types";
 import { makeMockBridge, makeDebt } from "./mockBridge";
 
 describe("useDebts / usePremium / useAccount", () => {
@@ -47,7 +48,8 @@ describe("useDebts / usePremium / useAccount", () => {
     act(() => { window.dispatchEvent(new CustomEvent("az:state-changed")); });
 
     expect(debtsHook.result.current).toEqual(newDebts);
-    expect(premiumHook.result.current).toBe(newPremium);
+    expect(premiumHook.result.current).toEqual(newPremium);
+    expect(premiumHook.result.current).not.toBe(newPremium);
     expect(accountHook.result.current).toBe(newAccount);
   });
 
@@ -65,6 +67,36 @@ describe("useDebts / usePremium / useAccount", () => {
     act(() => { window.dispatchEvent(new CustomEvent("az:state-changed")); });
 
     expect(result.current[0].settled).toBe(true);
+  });
+
+  it("回归测试：premium对象引用不变、原地写入权益后仍会生成新快照并刷新", () => {
+    const premium: Premium = { premium: null };
+    window.__azBridge = makeMockBridge({ premium });
+    const { result } = renderHook(() => usePremium());
+    const before = result.current;
+    expect(before).toEqual({ premium: null });
+    expect(before).not.toBe(premium);
+
+    premium.premium = { method: "redeemed", at: "2026-08-11T00:00:00.000Z" };
+    act(() => { window.dispatchEvent(new CustomEvent("az:state-changed")); });
+
+    expect(result.current).toEqual(premium);
+    expect(result.current).not.toBe(before);
+    expect(result.current).not.toBe(premium);
+    expect(result.current.premium).not.toBe(premium.premium);
+  });
+
+  it("premium值未变化时复用同一快照引用", () => {
+    const premium: Premium = {
+      premium: { method: "onetime", at: "2026-08-11T00:00:00.000Z" },
+    };
+    window.__azBridge = makeMockBridge({ premium });
+    const { result } = renderHook(() => usePremium());
+    const before = result.current;
+
+    act(() => { window.dispatchEvent(new CustomEvent("az:state-changed")); });
+
+    expect(result.current).toBe(before);
   });
 });
 

@@ -1,5 +1,7 @@
 # Flutter 对齐审计（第一轮，2026-08-08）——四个 tab 空态/有数据
 
+> 历史存档：本文记录 2026-08-08～09 的早期审计和修复过程，不是当前差异清单或完成证明。Flutter 重写已于 2026-08-10 停止并封存；当前状态与权威入口见 [`flutter-parity/README.md`](flutter-parity/README.md)。
+
 基准：旧版 Capacitor App（`www/`+`react/`，包名 io.github.jenkjyu.afterzero，模拟器上 CDP 运行）
 对比对象：Flutter 版 debug 预览包（`AFTER_ZERO_PREVIEW=true`，包名 io.github.jenkjyu.after_zero）
 数据：空态 + 同一笔测试债务（测试贷款 10000 元 / 12% 年化 / 5 期等额本息，已还 1 期）

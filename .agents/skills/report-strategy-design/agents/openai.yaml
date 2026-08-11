@@ -1,0 +1,4 @@
+interface:
+  display_name: "Report & Strategy Design"
+  short_description: "维护统计报告、还款策略模拟与 Excel/PDF 导出"
+  default_prompt: "Use $report-strategy-design to modify or audit After Zero reporting and repayment strategy behavior."

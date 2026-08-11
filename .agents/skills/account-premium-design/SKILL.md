@@ -1,0 +1,50 @@
+---
+name: account-premium-design
+description: Use this skill when modifying or debugging After Zero account screens and account lifecycle, logout/reset/delete behavior, Premium state and gates, redemption codes, pricing or purchase placeholders, settle-time Premium invitations, or the duplicated membership agreement in `docs/legal/会员服务协议.md` and `TermsScreen.tsx`.
+---
+
+# 账户与 Premium
+
+以当前代码中的单一 Premium 模型为准。不要恢复 Premium/Premium+、月付/年付或已删除的促销历史。
+
+## 代码归属
+
+- React 页面与入口：`react/src/mine/**`、`AccountScreen.tsx`、`PremiumScreen.tsx`、`TermsScreen.tsx`、`useSettleCelebration.ts`。
+- React 只负责展示、确认和 screen 状态；登录会话、localStorage、CloudBase 调用、兑换写入、退出/注销/重置仍由 `www/index.html` 经 `window.__azBridge` 执行。
+- `hasPremium(premium)` / `premiumLabel(premium)` 的权威实现位于 `www/js/calc.js`。
+- 微信登录接线加载 `wechat-login-setup`；`deleteAccount` 云函数部署加载 `cloudbase-deploy`；React 外部状态和返回链加载 `react-bridge-architecture`。
+
+## 账户生命周期
+
+- 登录是全局强制门禁。`ACCOUNT_KEY = "after-zero-account-v1"` 保存本地展示资料，但 CloudBase 自定义登录会话才是云函数身份来源。
+- “退出登录”清 `ACCOUNT_KEY`、调用 CloudBase `signOut()`、恢复登录门；不删除本地债务、档案或服务器账户。
+- “重置本地数据”是注销确认框的第三条路径，另做一次确认后执行 `localStorage.clear()`、删除 IndexedDB `debtManagerFiles` 并 reload；它不调用云函数、不删除账户或云备份。
+- “注销账户”调用 `deleteAccount`。服务端只信任 `app.auth().getUserInfo().customUserId`，先删除该用户全部 `backups` 文档和 Storage 文件，再删除 `users` 文档；客户端成功后清本地账户并退出 CloudBase 会话。
+- 不把客户端传入的 openid 当身份，也不要把重置本地数据和注销账户合并成一个动作。
+
+## Premium 当前模型
+
+- `PREMIUM_KEY = "after-zero-premium-v1"`，形状为 `{ premium: { method: "onetime" | "redeemed", at: ISO } | null }`。
+- `hasPremium()` 只判断 `premium.premium` 是否存在，不按 `method` 分权益。加载时把旧 `premiumPlus` 兼容迁成 `redeemed` 后删除旧字段。
+- 当前只有一个 Premium 等级和一张 ¥15 买断价卡。真实支付尚未接入；“开通 Premium”只显示占位说明，不能描述成可完成真实购买。
+- 当前可实际写入资格的最小调试入口是硬编码兑换码 `0000 → premium`；它不是生产兑换核销系统。`__debugPremium("premium"|"none")` 只用于开发测试。
+- 当前代码中的门禁包括 AI 助手、云备份、报告 Excel/PDF 导出和 `StrategyCta` 的多策略对比入口。图表查看、档案库、本地 JSON 备份导入导出和提前还款模拟没有 Premium 门禁。
+- `StrategyCompareScreen` 和云备份执行函数本身没有第二层 Premium 校验，当前依赖入口门禁；调整权益时先全仓搜索 `hasPremium(`、`openPremiumScreen` 和 Premium 页权益文案。
+
+## 付费邀请
+
+- `useSettleCelebration` 常驻挂在 sheets 根，只根据 debts 变化判断“刚结清”，不绑定具体还款入口。
+- 首次挂载把已有结清债务当基线，不弹；非会员债务从未结清变为结清时复用 `confirmAsync` 邀请查看 Premium。
+- 撤销结清会把 id 移出基线，重新结清可以再次触发；会员不触发。
+
+## 法律副本与已知边界
+
+- 购买方式、价格状态、权益或退款事实变化时，同时核对 `docs/legal/会员服务协议.md` 与 `react/src/sheets/TermsScreen.tsx`。前者是源稿，后者是 App 内硬编码副本，不能只改一处。
+- 当前协议必须继续如实说明：仅买断、价格为占位、未接真实支付、兑换资格不涉及退款；正式支付接入时必须重写相关条款。
+- `usePremium()` 已用稳定fingerprint快照兼容原地mutation和整体替换，具体模式归 `react-bridge-architecture`。Premium数据形状增加会影响展示或门禁的新字段时，要同步更新snapshot fingerprint/clone与回归测试。
+
+## 验证
+
+- 修改账户/Premium React 时运行 `npm run test:react`，重点覆盖 `AccountScreen`、`PremiumScreen`、`PremiumEntryCard`、`DataCards`、`AiBanner`、`TermsScreen`、`useSettleCelebration` 以及受影响门禁测试。
+- 修改 `hasPremium`、迁移或兑换逻辑时同时运行 `npm test`，并核对 `PREMIUM_KEY` 兼容读取、事件派发和 bridge 契约。
+- 注销、真实 CloudBase 身份、备份联动删除和微信会话只能在已认证环境做端到端验证；不要用伪造 `ACCOUNT_KEY` 代替。

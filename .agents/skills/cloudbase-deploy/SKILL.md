@@ -42,7 +42,7 @@ npx --yes -p @cloudbase/cli tcb fn deploy <函数名> --force
 
 | 函数 | 作用 | envVariables |
 |---|---|---|
-| `wxLogin` | 微信登录换票据 | `TCB_CUSTOM_LOGIN_*` 三个 |
+| `wxLogin` | 微信登录换票据 | `WX_APPID`、`WX_APPSECRET`、`TCB_CUSTOM_LOGIN_*` 三个 |
 | `deleteAccount` | 注销账户，联动清理云备份 | 无 |
 | `backupCreate`/`backupList`/`backupRestore`/`backupDelete`/`backupUploadFile` | 云备份 | 无 |
 | `aiAdvisor` | AI债务助手，调CloudBase内置大模型 | 无 |

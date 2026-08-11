@@ -1,36 +1,43 @@
 ---
 name: edit-sheet-design
-description: This skill should be used when working on the new/edit debt form (`#editSheet`, `react/src/sheets/EditSheet.tsx`/`GenPanel.tsx`/`PlanRows.tsx`/`BatchBlock.tsx`), or debugging genPlan() rounding/negative-principal issues in calc.js.
+description: Use this skill when modifying or debugging After Zero's new/edit debt form (`EditSheet.tsx`, `GenPanel.tsx`, `PlanRows.tsx`, `BatchBlock.tsx`), one-time-plan state, formula generation UI, batch editing, plan-row validation, or edit-sheet picker/back behavior.
 ---
 
-# 新增/编辑债务表单（`#editSheet`）设计细节
+# 新增/编辑债务表单
 
-全项目最复杂的一块UI——公式生成器、批量设置还款日、`oneTimeStash`状态机。
+把 `plan` 当作债务数据源头。涉及生成、APR、金额容差或账本字段的数值语义时同时加载 `debt-domain`，不要在表单组件复制计算算法。
 
-## 表单状态管理
+## 所有权与保存
 
-- **"一次性还清"复选框靠`oneTimeStash`暂存被隐藏的期数，不能只是视觉隐藏**——早期只是把第2期起从界面`slice(0,1)`隐藏、底层数组没删，导致"一次性¥X"和"借款金额"对不上。`syncOneTimeUI()`勾选时把第2期起真正挪到`oneTimeStash`（不丢弃），取消时放回`editingPlan`。`oneTimeStash`每次`openEdit()`都要清空，不能跨债务残留。
-- **"手动添加"/"公式生成"是二选一分段切换器（`planMode`）**，不是两套入口同时堆页面上；公式生成完自动切回"手动添加"方便逐行微调。
-- **`#gFirstField`（首期还款日）只有一份DOM，靠JS在切换计息方式时物理搬家**（`appendChild`），不是四份独立字段——4种计息方式互斥显示，同一个DOM节点没法同时"属于"两个区块。以后调整这个字段布局，记住是"移动"不是"复制"。
-- **"还款日（几号）"(`f-day`)从还款计划第1期日期自动推出**（`updateFDayFromPlan()`），`readonly`不可手填——因为`d.day`这个持久化字段过去完全没人读，让它跟真实计划保持一致比允许手填更有意义（`d.day`字段本身已删除，见`debt-model-history` skill）。
+- `EditSheet.tsx` 拥有表单字段、`editingPlan`、`oneTimeStash`、`planMode`、生成器字段和计息方式 picker 状态。
+- `openEditSheet(id)` / `closeEditSheet()` 是 React 共享 UI 状态；保存和删除通过 bridge 的 `setDebt` / `deleteDebt` 修改 vanilla debts。
+- 用永久 debt id 查找编辑目标和检测删除，不用数组下标或对象引用。
+- 保存时至少要求名称、借款日和一期计划；每行金额/本金/利息非负，本金和利息不能同时为 0，且 `amount` 与 `principal + interest` 偏差不得超过 0.015。
+- `original`、`balance`、`rate`、`monthly` 等派生字段只给占位，交给 `setDebt()` 内的 `recompute()`。
 
-## 批量设置 + 日期限制
+## 一次性与手动编辑
 
-- **批量设置还款日选"几号"后弹"首期哪年哪月"确认框**——`ask()`新增可选`opts.month`参数（`<input type="month">`），不传就是原来纯文字确认框。
-- **批量设置的"几号"和公式生成的"首期还款日"不允许选29/30/31号，但计划表格里逐行手填的日期不受限**——前两者是投射"每月同一天"的重复规律，29-31号在有些月份不存在会导致还款日漂移；表格里每行是记录真实数据，现实中贷款完全可能就是30号到期。两个入口定位不同，限制也该不同。
+- 勾选“一次性还清”时把第 2 期起从 `editingPlan` 移入 `oneTimeStash`；取消时原样放回。每次打开表单都从目标 debt 重建两者，不能跨债务残留。
+- 一次性模式强制回到手动模式，只展示唯一一期；公式生成完成后也回到手动模式，允许逐行微调。
+- 修改本金或利息时联动重算金额；直接改金额不反推本金/利息，保存时仍受 0.015 一致性校验。
+- 手动勾“已还”只编辑历史标记，不写 `paidAt`；取消已还时清 `paidAt` 和 `paidAmount`。真实还款盖章必须走 `recordPayment`、`waivePeriod` 或 `applySettle`。
 
-## ⚠️隐藏字段不能用HTML5原生`required`（通用规则）
+## 五种生成方式
 
-跟主表单共用同一个`<form>`、靠`display:none`切换显隐的子面板（比如公式生成tab）里的字段，**不能带原生`required`属性**——即使字段所在的tab当前不可见，只要它是空的，点"保存"就会被浏览器原生表单校验拦截，`saveForm()`根本不会被调用。**安卓WebView不会像桌面浏览器那样弹校验提示气泡**，表现就是"点保存彻底没反应"，不关窗不报错，非常难排查。修法：去掉`required`（星号保留），校验挪到对应按钮自己的点击事件里手动`toast()`。**以后任何"跟主表单共享、但靠display:none切换显隐的子面板"新增字段，一律不用原生`required`。**
+- 保持 `amort`、`equalprincipal`、`equalfee`、`interestfirst`、`custom` 五种 `GenSpec.kind`；统一调用 `window.genPlan(spec)`。
+- `custom` 只生成指定期数的空白行；其它四种字段分组以 `react/src/types.ts` 的 `GenSpec` 为准。
+- React 版 `#gFirstField` 通过各分支条件渲染绑定同一个 `fields.first`，不再使用旧 vanilla 的 `appendChild` 物理搬 DOM 技巧。
+- 计息方式使用 `PickerSheet`，其开关提升到 `EditSheet`，使硬件返回先关 picker、再关编辑 sheet。布局、sheet 和返回层级问题加载 `capacitor-ui-system` 与 `react-bridge-architecture`。
 
-## 计息方式选择器 + 等额本金
+## 日期、批量与表单校验
 
-计息方式选择器是底部抽屉（`PickerSheet.tsx`泛型组件，`SortSheet.tsx`也是它的封装），不是原生`<select>`（安卓WebView弹系统全屏列表+长按选中文字）。新增第5种计息方式`equalprincipal`（等额本金，每期本金固定`P/n`、利息按剩余本金实时算），跟`amort`共享`genPlan()`里的`P`/`rate`/`n`字段。"等本等费"不用"信用卡"前缀——核实过这是标准行业术语，不是信用卡专属。
+- 公式生成的首期日期和批量“每月几号”只允许 1～28 日；逐行日期记录真实计划，可使用 29/30/31 日。
+- 批量日期先收集“几号”，再用共享 `confirmAsync({month})` 收集首期年月，后续逐月铺开。
+- 批量本金/利息会联动金额；批量直接设金额会先确认并把本金、利息清零，用户必须重新补齐后才能通过保存校验。
+- 与主 `<form>` 共存但会隐藏的生成器字段不要使用原生 `required`；在“生成计划”按钮中手动校验并 toast。顶层始终可见的名称和借款日可以保留 `required`。
+- “还款日（几号）”只读并从计划第 1 期日期派生；Debt 不持久化独立 `day` 字段。
 
-## `genPlan()`四舍五入/负数bug（穷举扫描挖出的两个真实bug，已修）
+## 验证
 
-1. **免息/极低息场景本金累加误差**：`genPlan()`原来非最后一期的本金`pr`用未四舍五入的浮点数去减running balance，`rate`趋近0时每期`pr`趋近同一个数，四舍五入偏差朝同一方向反复叠加（`P=500,rate=0,n=9`本金合计变成500.03）。这个App有"私人借款"债务类型，免息借款是真实场景，不是刁钵边界。修法：`amort`/`equalprincipal`/`interestfirst`三个分支统一改成"非最后一期本金先`r2()`四舍五入、再用四舍五入后的值减running balance"。
-
-2. **长期限+高利率场景本金变负数**：修复①还不够——期数特别多时反复叠加的四舍五入偏差会累积到超过剩余本金，导致某一期本金/金额变成负数（`P=100,rate=36%,n=210`即可触发，30年期完全合理的私人借款/网贷）。修法：加一层钳制，每期本金都不能超过当前剩余本金，超过就这一期直接收掉全部剩余提前结清（`amount`重算成本金+利息）。**⚠️`equalprincipal`的最后一期必须保留"强制=剩余本金"这个特例、不能被钳制盖过**——`P/n`向下舍入时最后一期真实剩余可能比钳制值还大，走`Math.min`会把零头丢掉。
-
-**方法论教训**：①穷举扫描（5万~70万+组合）比手算/单个例子可靠，两个bug都是单测能过、穷举才暴露；②"改小一点应该没问题"是错觉——同一类偏差在更极端场景会以更严重的形式（负数而不是几分钱误差）冒出来，必须重新扫一遍才能确认；③修一个bug时自己引入了另一个（给`equalprincipal`加钳制时误伤了向下舍入的零头），是靠反向构造"应该走另一条分支"的例子才抓到的。
+- 修改表单组件运行 `npm run test:react` 的 `EditSheet` 集成测试，覆盖新增/回填、oneTime stash、五种生成、批量操作、0.015 校验、删除后关闭和 picker 返回顺序。
+- 修改 `genPlan`、`impliedAPR` 或 `recompute` 时运行 `npm test`，并按 `debt-domain` 的边界补纯函数回归；不要把旧修复过程继续堆进本 skill。

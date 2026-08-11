@@ -49,8 +49,29 @@ export function useDebts(): Debt[] {
   return useSyncExternalStore(subscribeDebts, getDebtsSnapshot);
 }
 
+// premium既会被applyRedeemTier()原地写premium.premium，也会在调试切换/备份恢复时整体
+// 重新赋值。直接把bridge对象交给useSyncExternalStore会漏掉前一种变化；每次无条件clone又会
+// 让React认为snapshot持续变化、陷入无限重渲染。按实际权益字段做fingerprint，只有值变化时
+// 才生成新快照，同时把内层对象也clone出来，避免缓存继续被vanilla原地修改。
+let premiumCache: Premium | null = null;
+let premiumFingerprint = "";
+function getPremiumSnapshot(): Premium {
+  const source = window.__azBridge.getPremium();
+  const fp = source.premium
+    ? source.premium.method + "|" + source.premium.at
+    : "none";
+  if (!premiumCache || fp !== premiumFingerprint) {
+    premiumFingerprint = fp;
+    premiumCache = {
+      premium: source.premium
+        ? { method: source.premium.method, at: source.premium.at }
+        : null,
+    };
+  }
+  return premiumCache;
+}
 export function usePremium(): Premium {
-  return useSyncExternalStore(subscribe, () => window.__azBridge.getPremium());
+  return useSyncExternalStore(subscribe, getPremiumSnapshot);
 }
 
 // 头像/昵称来自登录态account，跟debts/premium是完全独立的一份数据，但同样通过
@@ -394,4 +415,3 @@ export function closeStrategyScreen() {
 export function useStrategyScreenOpen(): boolean {
   return useSyncExternalStore(subscribeStrategyScreen, () => strategyScreenOpen);
 }
-

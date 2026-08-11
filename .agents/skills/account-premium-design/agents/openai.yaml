@@ -1,0 +1,4 @@
+interface:
+  display_name: "Account & Premium Design"
+  short_description: "维护账户生命周期、Premium 权益与会员法律副本"
+  default_prompt: "Use $account-premium-design to modify or audit After Zero account and Premium behavior."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "React Bridge Architecture"
+  short_description: "React 与 vanilla 状态、桥接和构建边界"
+  default_prompt: "Use $react-bridge-architecture to implement this After Zero React/vanilla boundary change safely."

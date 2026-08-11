@@ -1,8 +1,10 @@
 # Flutter 全量对齐证据工具
 
+> 封存状态（2026-08-10）：这套工具随 Flutter 重写一并停止，当前只保留为 WIP 存档。未经用户在当前任务中重新明确授权，不得运行恢复流程、刷新证据或修改 parity 工具。封存停点与文档入口见 `docs/flutter-parity/README.md`。
+
 这套工具服务于阶段 8 的唯一目标：Flutter 重写与受保护旧版在 UI、文案、排版、交互、手势、计算、持久化、网络和原生行为上完全一致。
 
-阶段权威计划见 `docs/flutter-parity/stage-8-plan.md`；当前 WIP 状态与未完成硬阻塞见 `docs/flutter-parity/stage-8.1-handoff-2026-08-10.md`。当前阶段仍是 8.1 进行中，不能从本工具的绿色静态校验推导产品已经对齐。
+历史执行计划见 `docs/flutter-parity/stage-8-plan.md`；停止前的 WIP 交接见 `docs/flutter-parity/stage-8.1-handoff-2026-08-10.md`。阶段 8.1 未完成，不能从本工具的绿色静态校验推导产品已经对齐。
 
 旧版运行表现和旧版源码共同构成 oracle。历史审计文档、178 条 Flutter 测试以及“功能已经存在”都不能单独证明对齐。
 

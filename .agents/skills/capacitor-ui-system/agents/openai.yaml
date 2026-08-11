@@ -1,0 +1,4 @@
+interface:
+  display_name: "Capacitor UI System"
+  short_description: "维护主题、层级、弹层、手势与 WebView 视觉约束"
+  default_prompt: "Use $capacitor-ui-system to implement and verify this Capacitor UI interaction consistently."

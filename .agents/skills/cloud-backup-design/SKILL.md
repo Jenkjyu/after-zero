@@ -1,44 +1,40 @@
 ---
 name: cloud-backup-design
-description: This skill should be used when working on the cloud backup feature (`react/src/sheets/BackupScreen.tsx`, `cloudbase/functions/backupCreate|backupList|backupRestore|backupDelete|backupUploadFile`), or debugging backup quota/collection/permission issues.
+description: Use this skill when modifying or debugging After Zero's manual cloud backup UI, bridge, `backups` collection, Storage files, quotas, restore/delete ownership checks, account-deletion cleanup, or the five `backupCreate|backupList|backupRestore|backupDelete|backupUploadFile` cloud functions.
 ---
 
-# 云备份（Premium）设计细节
+# 云备份
 
-**产品模型是"完全手动、每次创建一条独立备份记录"，不是自动同步**——第一版做的是自动同步/单一文档覆盖，用户自己用下来发现担心手滑/多设备冲突，推翻重做成现在这套。整个App只保留"云备份"这个说法，不再提"云同步"。
+维护“手动创建多条独立记录”模型。不要恢复自动同步、单文档覆盖或冲突检测。
 
-"我的"页入口打开`#backupScreen`：上次备份时间+"创建备份"按钮（新建一条记录，不覆盖已有）+备份记录列表（各带"恢复"/"删除"，均有二次确认）。**没有任何自动触发的推送/拉取**，一切靠用户手动点。
+## 边界与数据流
 
-## 架构：全部走云函数代理，不做客户端直传云存储
+- `react/src/sheets/BackupScreen.tsx` 负责页面、列表状态和二次确认；CloudBase 认证与五个函数调用保留在 `www/index.html` bridge。
+- “我的”页用 Premium 门禁打开页面；权益归 `account-premium-design`。云函数本身不做 Premium 校验。
+- 每次打开页面实时调用 `backupList`；本地 `BACKUP_KEY = "after-zero-backup-meta-v1"` 只保存 `{lastBackupAt}`，不缓存云端记录。
+- 创建时从 IndexedDB 读取档案文件，逐个调用 `backupUploadFile`，再把成功文件元数据连同 `debts/docs/notify/premium` 一次性交给 `backupCreate` 新增文档。
+- 恢复是整体覆盖：替换 debts/docs/notify/premium，先清空本机上传文件库，再按临时 URL 铺回文件，最后重新加载并派发状态变化；不要做字段级合并。
 
-复用`deleteAccount`"身份来自服务端已认证会话，不信任客户端参数"的原则。代价：文件走base64体积膨胀~33%，单文件上限`BACKUP_MAX_FILE_BYTES`（8MB），超过的文件打包时跳过（不参与这次备份，仍可走本地JSON导出兜底）。
+## 配额与五个云函数
 
-## 配额（写在`backupCreate`云函数里，不是客户端校验）
+- 客户端单文件上限是 8 MB；超限文件被跳过，不参与该次云备份。不要把它误写成整次备份必然失败。
+- `backupCreate` 每用户最多保留 20 条记录、总大小最多 300 MB。写入新记录后按时间从最老开始删除超额记录及其 Storage 文件；单条内容本身超过 300 MB 时拒绝。
+- `backupUploadFile` 只做代理上传，不写数据库；云路径按已认证用户、客户端生成的临时 backup id 和 file id 组织。
+- `backupList` 只投影列表轻量字段并按创建时间倒序返回，不带完整 debts/docs/premium。
+- `backupRestore` 和 `backupDelete` 必须先取文档并验证 `record.openid === customUserId`；记录 id 不是访问凭证。恢复时再把 fileID 换成临时 URL。
+- `backupDelete` 对不存在记录幂等成功，并删除记录关联 Storage 文件。
 
-最多保留20条备份记录、总大小上限300MB——单文件已封顶8MB，20条留够历史版本，300MB对个人使用绰绰有余同时给存储成本设硬顶。每次成功写入新记录后按创建时间正序查全部记录，超过配额从最老的开始删（连带删Storage文件）。单次备份内容自己超过300MB直接拒绝写入，不会"删了半天把自己删了"。**`MAX_BACKUPS`/`MAX_TOTAL_BYTES`是`backupCreate/index.js`顶部的常量**，调整额度直接改这两个数重新部署。
+## 身份、权限与注销
 
-## 5个云函数
+- 五个函数只信任 `app.auth().getUserInfo().customUserId`，不接受客户端 openid 作为身份。
+- `backups` 是“一用户多文档”：openid 是普通字段，用 `.where()` 查询；集合需在控制台创建为 ADMINONLY，Storage 也保持私有。
+- 函数调用依赖持久化的微信自定义登录会话。`ensureCbAuthReady()` 只在本地没有 account 时尝试匿名垫底，不能把已登录用户降级成匿名。
+- `deleteAccount` 必须先删除用户全部备份文档和 Storage 文件，再删 `users` 文档。账户语义归 `account-premium-design`。
+- 部署、集合、环境权限或 `@cloudbase/node-sdk` 问题加载 `cloudbase-deploy`。
 
-- `backupUploadFile`：纯Storage上传代理，不碰数据库，客户端传完所有文件拿到`fileID`后自己组装成`files`数组交给`backupCreate`。
-- `backupCreate`：`db.collection("backups").add(...)`写入**一条新文档**（不是覆盖），负责配额清理。
-- `backupList`：查这个用户名下所有记录，`.field()`投影只取轻量字段，不带完整`debts`/`docs`，完整数据留到"恢复"才取。
-- `backupRestore`：取出记录后**显式核对`record.openid === customUserId`**——`backupId`本身不是私密凭证，必须服务端二次确认归属。核对通过后对每个`fileID`换临时直链。
-- `backupDelete`：同样先核对归属，再删Storage文件+文档。
+## 已知边界与验证
 
-这5个函数不需要碰"权限控制"具名例外——安全默认值`auth.loginType != 'ANONYMOUS' && auth != null`正好是它们需要的门槛。
-
-## `backups`集合寻址：一个用户多个文档，不是`doc(openid)`一对一
-
-因为一个用户可以有多条备份记录，用`openid`作普通字段配合`.where()`查。集合要手动去控制台建（CLI查不存在的集合会静默返回`[]`，骗不出真相），权限选无权限[ADMINONLY]。Storage存储桶权限也要去控制台确认设成最严格的私有选项（跟云函数"权限控制"是完全独立的配置面板）。
-
-## 客户端恢复逻辑
-
-`applyBackupData()`先`upClear()`清空本机档案库文件，再按备份记录的`files`清单重新铺回来——"恢复"语义是整体覆盖，不先清空会导致本机新文件和恢复回来的文件混在一起。`debts`/`docs`/`notify`/`premium`直接整体替换，不做字段级合并。本地只留极简的`BACKUP_KEY`存`{lastBackupAt}`（旧版`lastPushedAt`/`pushDirty`这类冲突检测字段已整体删除，手动模型下不存在"谁更新"的比较需求）。
-
-## 注销账户联动清理
-
-`deleteAccount`云函数删`users`文档前，先查出该用户名下**全部**备份记录逐条删除（Storage文件+文档）——不这样做会在注销后留下孤儿文件，是隐私缺口。
-
-## 桌面浏览器测试的边界
-
-伪造`ACCOUNT_KEY`localStorage跳过登录门的老技巧，对云备份**不适用**——那只是隐藏`#loginGate`，从没跑通`signInWithCustomTicket()`，`ensureCbAuthReady()`用`if (account) return`判断"是否已登录"（见AGENTS.md的auth修复说明），伪造account会让它误判已登录、跳过`signInAnonymously()`兜底，连匿名会话都没有。真正的ticket只能来自真实微信OAuth的`code`，云备份的真实端到端往返必须真机验证。
+- 客户端文件先以 base64 经云函数上传，体积会膨胀；不要描述成客户端直传 Storage。
+- 文件上传发生在 `backupCreate` 前；后续创建失败时，当前实现没有回收本轮已上传但尚未入记录的文件。修改失败补偿时需同时设计 Storage 清理，不要只改 UI。
+- 伪造 `ACCOUNT_KEY` 只能隐藏登录门，不能建立 CloudBase 自定义会话；真实创建/列表/恢复/删除必须在真机或等价已认证环境验证。
+- 修改 React 页面运行 `npm run test:react` 的 `BackupScreen` 测试；修改云函数逐一核对未登录、归属拒绝、轻量列表、配额清理、文件删除和整体恢复。

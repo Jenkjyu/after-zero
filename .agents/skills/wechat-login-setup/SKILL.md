@@ -7,6 +7,8 @@ description: This skill should be used when debugging or configuring the WeChat 
 
 原生App拉起微信App走OAuth授权（不是网页扫码），必须用微信官方Android SDK（`com.tencent.mm.opensdk`），不能纯JS实现。这几个坑全部是一次性的环境/配置问题，不是代码逻辑问题，但极其隐蔽。
 
+先用`capacitor-native-runtime` skill确认手写Java、manifest、插件注册与build/sync边界；本skill只补微信SDK和CloudBase自定义登录的专项约束。部署`wxLogin`时另用`cloudbase-deploy`，处理release签名/SHA1时另用`release-keystore`。
+
 ## SDK硬编码写死、不能改的地方
 
 - 回调Activity必须叫`wxapi.WXEntryActivity`，包路径必须是`<applicationId>.wxapi.WXEntryActivity`（这个项目是`io.github.jenkjyu.afterzero.wxapi.WXEntryActivity`）——微信SDK自己去找这个类的硬编码路径，改名字/挪包会导致回调收不到。
