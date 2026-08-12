@@ -6,10 +6,10 @@
 
 ## 当前控制状态
 
-- 当前步骤：步骤 1“iOS 工具链与可运行的 Capacitor 原生壳”
+- 当前步骤：步骤 2“本地优先模式与云功能登录门”
 - 当前状态：等待用户检查
-- 上一步：步骤 0 已批准
-- 下一步骤：步骤 2“本地优先模式与云功能登录门”
+- 上一步：步骤 1 已批准
+- 下一步骤：步骤 3“Apple 登录与统一内部账户端到端闭环”
 - 下一步骤授权：未授权，严禁开始
 - Git 操作：未暂存、未提交、未推送；未经用户改变指令，后续各步也不得执行这些操作
 - Flutter：继续停止并封存；本计划只处理根 Capacitor + React 主线
@@ -59,7 +59,7 @@
 
 ## 当前停点与恢复动作
 
-步骤 1 已达到验收门槛并停止等待用户检查。步骤 2“本地优先模式与云功能登录门”仍未授权；当前 iOS 冷启动继续显示原有微信登录门，这是本步骤刻意保留的产品行为。用户若批准步骤 1，也不得自动进入步骤 2，必须再次明确指示开始。
+步骤 2 已达到验收门槛并停止等待用户检查。用户若检查通过，步骤 2 才可标为“已批准”；步骤 3“Apple 登录与统一内部账户端到端闭环”仍未授权，必须再次明确指示开始。当前仅有 Android 微信原生登录；iOS Apple、微信、身份绑定和内部 `userId` 都还没有实现。
 
 ## 步骤 1 本轮变更
 
@@ -92,3 +92,26 @@
 - 用户确认当前依赖均支持 SPM 后要求卸载 CocoaPods。已执行 `brew uninstall cocoapods`；Homebrew 同时移除仅由它使用的 Ruby 4.0.6 和 libyaml 0.2.5。
 - 计划和 README 已修正为 SPM-first：不预装 CocoaPods，需要只支持 Pod 的实际依赖时再安装。
 - Android 通知频道只在 `Capacitor.getPlatform() === "android"` 时创建。iOS 不再收到自己不支持的 `createChannel` 命令，冷启动控制台不再出现 `UNIMPLEMENTED`。
+
+## 步骤 2 本轮变更
+
+- `www/index.html` 将 `#loginGate` 从启动强制门改为按需、可取消的云功能登录表面：未登录首屏直接显示空白本地账本；AI、云备份或账户页主动登录时才说明对应云端用途。取消、失败和硬件返回都会关闭提示并保留原页面。
+- AI 与云备份在 React 入口调用 `requestCloudLogin(purpose)`，已登录时直接进入；未登录取消后不打开受保护 screen。`callAiAdvisor()`、备份列表/创建/恢复/删除与注销执行层也独立拒绝无账户调用，不会为本地模式建立匿名 CloudBase 会话或发出受保护请求。
+- 保留 `after-zero-account-v1` 和全部既有持久化键；旧微信账户继续按既有形状读取。账户展示明确区分“本地使用 / 微信登录 / 未来 Apple 登录或统一账号形状”，但未添加不可用的 Apple 入口，也未实现步骤 3 的 `userId`、Apple token 或云函数改造。
+- 账户生命周期重新表述：退出只结束云会话；注销只删除云账号和云备份、保留本机数据；重置本地数据是独立二次确认操作，不删除云账号或云备份。登录、退出或注销都不会自动上传、下载、同步、合并或覆盖本地账本。
+- 同步用户服务协议、隐私政策及 App 内副本；README、AGENTS 和 React bridge/account/AI/备份/微信专项 skills 已改为本地优先与执行层 fail-closed 规则。
+
+## 步骤 2 验证证据
+
+- React：`npm run test:react` 45 个文件、361/361 通过；新增本地模式、AI/云备份按需登录取消、账户三态及重置/注销分离的覆盖。
+- 类型与构建：`npx tsc --noEmit --project react/tsconfig.json`、`npm run build:react` 通过；`npm test` 116/116 通过。
+- 浏览器运行时：以无账户状态实际加载 Web 宿主，首屏直接显示空本地账本；启用测试 Premium 后，AI 与云备份均打开含明确用途的登录提示，点击“继续本地使用”后提示消失、受保护 screen 不打开、原 tab 保持可用；浏览器控制台无 error。
+- 原生：`npx cap sync android`、`npx cap sync ios` 通过；JDK 21 `:app:assembleDebug` 通过；iPhone 17 Pro / iOS 26.5 无签名 Debug `xcodebuild`、安装和冷启动通过（bundle id `io.github.jenkjyu.afterzero`）。
+- 此步未修改 CloudBase 函数或权限，故不部署云函数；真实微信 OAuth 仍必须以登记签名的 Android release 包验证，iOS 微信登录属于步骤 4，Apple 登录属于步骤 3。
+- `git diff --check` 通过；未暂存、未提交、未推送；未修改 Flutter 或直接编辑生成 Web assets。
+
+## 明确留给后续步骤的范围
+
+- 步骤 3：Apple 登录、provider-neutral 内部 `userId`、旧微信账户兼容映射和相关云函数部署/真机验证。
+- 步骤 4：iOS 微信 SDK、身份绑定与两个既有云账号合并。
+- 步骤 5～10：iOS 文件、完整通知、UI 适配、StoreKit、签名合规和上架。当前按需登录表面不代表 iOS 已支持任一原生登录方式。

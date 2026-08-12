@@ -44,6 +44,7 @@ export function makeMockBridge(overrides?: {
       Promise.resolve(opts && opts.month !== undefined ? opts.month || "2026-08" : true)
     ),
     wxLogout: vi.fn(),
+    requestCloudLogin: vi.fn(() => Promise.resolve(true)),
     deleteAccount: vi.fn(() => Promise.resolve(true)),
     redeemCode: vi.fn(() => null),
     resetLocalData: vi.fn(),

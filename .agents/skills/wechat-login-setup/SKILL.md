@@ -21,6 +21,8 @@ description: This skill should be used when debugging or configuring the WeChat 
 
 2. **CloudBase JS SDK（至少2.28.6这个版本）有个内部bug**：`auth._getCredentials()`内部先读`t.scope`再判断`t`是否为`null`，全新设备/App从没建立过任何登录态时`t`就是`null`，直接抛`TypeError: Cannot read properties of null (reading 'scope')`，会连带搞挂`callFunction()`。规避方法：真正走自定义票据登录流程之前，先调一次`auth.signInAnonymously()`（失败就忽略，不阻塞主流程）垫底写入一份本地凭证，绕开这个先用后判的bug。
 
+   这个匿名垫底只能存在于用户主动发起的微信登录换票据流程。App的“本地使用”不是CloudBase匿名账号；AI、云备份、注销等受保护执行层必须在没有本地account时直接拒绝，不能调用`signInAnonymously()`。
+
 3. **CloudBase控制台"身份认证→登录方式"里，"匿名登录"必须单独开启**，不开的话第2条的`signInAnonymously()`会直接被拒（400，报错信息会明确写"当前调用的signInAnonymously()所需的登录方式尚未在云开发控制台启用"）。
 
 4. **`wxLogin`云函数默认的权限规则会拒绝匿名调用者，报`[PERMISSION_DENIED]`**——`wxLogin`恰恰是给"还没真正登录、只靠匿名身份垫底"的客户端换正式登录票据的入口，必须手动给它加权限例外。放开权限的具体做法（"权限控制"是环境共享配置，不要把`*`整条打开）见`cloudbase-deploy` skill。

@@ -11,10 +11,10 @@
 
 ## 进行中的 iOS 扩展计划
 
-- iOS 步骤 1 已完成并等待用户检查；步骤 2 尚未授权。权威计划为 `docs/ios/implementation-plan.md`，准确停点与下一步授权状态为 `docs/ios/handoff.md`。
+- iOS 步骤 2“本地优先模式与云功能登录门”已完成，等待用户检查；步骤 3 尚未授权。权威计划为 `docs/ios/implementation-plan.md`，准确停点与下一步授权状态为 `docs/ios/handoff.md`。
 - 该计划严格逐步执行：每一步必须完成本步的代码、测试、原生/云端验证和相关文档后停止等待用户检查；用户批准后仍不得自动进入下一步，必须再次收到明确开工指令。
 - 计划期间未经用户改变指令不得暂存、提交、推送或创建 PR。新 session 涉及 iOS 计划时，先完整读取交接和当前步骤；没有明确批准只讨论，不实施。
-- 根 `ios/` 已是可编译、可在模拟器冷启动的 Capacitor 8.4.1 Swift Package Manager 原生壳；本地优先登录模式、iOS 登录/文件/通知/购买和上架仍未实现，不能把原生壳误写成可发布 iOS 产品。Flutter 继续封存。
+- 根 `ios/` 已是可编译、可在模拟器冷启动的 Capacitor 8.4.1 Swift Package Manager 原生壳；本地优先登录模式已实现，iOS 登录/文件/通知/购买和上架仍未实现，不能把原生壳误写成可发布 iOS 产品。Flutter 继续封存。
 
 ## 当前产品与架构
 
@@ -45,7 +45,7 @@ After Zero 当前产品主线是 **Capacitor + React**：Android App 是当前�
 1. **持久化键名不可改、不可复用、不可合并。** 当前受保护键为：`debt-manager-v5`、`debt-manager-docs-v5`、`after-zero-account-v1`、`debt-manager-sort-v1`、`after-zero-notify-v1`、`after-zero-premium-v1`、`after-zero-simulate-v1`、`after-zero-backup-meta-v1`、`after-zero-ai-usage-v1`、`after-zero-ai-chatlog-v1`、`after-zero-ai-limit-notice-v1`。需要演进数据形状时做兼容迁移，不能用改 key 的方式清空旧数据。
 2. **新安装必须为空数据。** `SEED` 与 `DOCS_SEED` 保持空值；测试数据只放测试/临时环境。提交前检查真实姓名、金额、日期、openid、token、档案和个人财务描述等隐私内容，不能只搜 seed 常量。
 3. **App 身份与恢复策略不可随意改。** `io.github.jenkjyu.afterzero` 是包名、更新、微信回调和签名身份；manifest 保持 `android:allowBackup="false"`，否则卸载重装可能恢复旧数据。`INTERNET` 权限已被 CloudBase/微信登录使用，不能删除。
-4. **登录门保持 fail-closed。** `#loginGate` 默认可见，并在 React bundle 前同步判定登录态。CloudBase 调用不得把微信自定义登录会话降级成匿名；登录与认证细节按 `wechat-login-setup` 处理。
+4. **本地优先与云功能 fail-closed。** `#loginGate` 默认隐藏，仅由本地模式进入 AI、云备份或账户主动登录时按需打开；取消后必须回到原页面继续本地使用。AI、云备份、注销等 CloudBase 执行层必须拒绝无 `ACCOUNT_KEY` 的调用，不能以匿名会话绕过；微信换票据流程的匿名垫底例外按 `wechat-login-setup` 处理。
 5. **账本只有一份实现。** 财务变换复用 `www/js/calc.js` 中已测试函数；`plan` 是账本权威，派生字段由 `recompute()` 计算，不在 React、bridge、导出或云端另写一套算法。
 6. **release keystore 是长期身份材料。** 不提交、不移动、不重建替换；一旦正式发布后丢失，将无法用同一身份更新 App。release 构建必须加载 `release-keystore`。
 7. **License 是 PolyForm Noncommercial 1.0.0。** 修改 `LICENSE`、`package.json` license 或 README 许可说明前，必须确认非商业授权前提确实改变。

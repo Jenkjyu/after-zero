@@ -15,7 +15,7 @@ export function AccountHeader({ account }: AccountHeaderProps) {
       <button type="button" className="account-avatar-btn" onClick={openAccountScreen} aria-label="账户">
         <img className="account-avatar-lg" src={account && account.avatarUrl ? account.avatarUrl : undefined} alt="" />
       </button>
-      <div className="account-name-c">{account ? account.nickname || "" : ""}</div>
+      <div className="account-name-c">{account ? account.nickname || "已登录" : "本地使用"}</div>
     </div>
   );
 }

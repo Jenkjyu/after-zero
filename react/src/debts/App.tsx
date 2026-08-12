@@ -12,9 +12,13 @@ export function App() {
   const premium = usePremium();
   const account = useAccount();
 
-  function onAiBannerClick() {
-    if (window.hasPremium(premium)) openAiScreen();
-    else openPremiumScreen();
+  async function onAiBannerClick() {
+    if (!window.hasPremium(premium)) { openPremiumScreen(); return; }
+    if (!account) {
+      const loggedIn = await window.__azBridge.requestCloudLogin("AI 债务助手会把本次问题和债务摘要发送到云端生成回复；登录提示可取消，本地账本不会自动上传。");
+      if (!loggedIn) return;
+    }
+    openAiScreen();
   }
 
   return (

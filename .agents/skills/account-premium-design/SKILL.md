@@ -16,10 +16,11 @@ description: Use this skill when modifying or debugging After Zero account scree
 
 ## 账户生命周期
 
-- 登录是全局强制门禁。`ACCOUNT_KEY = "after-zero-account-v1"` 保存本地展示资料，但 CloudBase 自定义登录会话才是云函数身份来源。
-- “退出登录”清 `ACCOUNT_KEY`、调用 CloudBase `signOut()`、恢复登录门；不删除本地债务、档案或服务器账户。
-- “重置本地数据”是注销确认框的第三条路径，另做一次确认后执行 `localStorage.clear()`、删除 IndexedDB `debtManagerFiles` 并 reload；它不调用云函数、不删除账户或云备份。
-- “注销账户”调用 `deleteAccount`。服务端只信任 `app.auth().getUserInfo().customUserId`，先删除该用户全部 `backups` 文档和 Storage 文件，再删除 `users` 文档；客户端成功后清本地账户并退出 CloudBase 会话。
+- App是本地优先模式：`ACCOUNT_KEY = "after-zero-account-v1"`为空时仍可使用本地债务、还款、统计、档案、通知、导入导出和模拟。该键只保存账户展示资料；CloudBase自定义登录会话才是云函数身份来源。
+- AI、云备份等真实云功能在React入口调用`requestCloudLogin(purpose)`，提示必须说明用途并可取消；bridge执行函数还要独立拒绝无account的调用，不能只依赖按钮门禁。
+- “退出登录”清`ACCOUNT_KEY`并调用CloudBase `signOut()`，随后继续本地使用；不删除本地债务、档案、通知或服务器账户，也不自动上传/恢复。
+- “重置本地数据”是账户页独立操作，二次确认后执行`localStorage.clear()`、删除IndexedDB `debtManagerFiles`并reload；它不调用云函数、不删除账户或云备份。
+- “注销账户”只在已登录状态展示并调用`deleteAccount`。服务端只信任`app.auth().getUserInfo().customUserId`，先删除该用户全部`backups`文档和Storage文件，再删除`users`文档；客户端成功后清账户展示资料并退出CloudBase会话，本机账本继续保留。
 - 不把客户端传入的 openid 当身份，也不要把重置本地数据和注销账户合并成一个动作。
 
 ## Premium 当前模型
@@ -29,7 +30,7 @@ description: Use this skill when modifying or debugging After Zero account scree
 - 当前只有一个 Premium 等级和一张 ¥15 买断价卡。真实支付尚未接入；“开通 Premium”只显示占位说明，不能描述成可完成真实购买。
 - 当前可实际写入资格的最小调试入口是硬编码兑换码 `0000 → premium`；它不是生产兑换核销系统。`__debugPremium("premium"|"none")` 只用于开发测试。
 - 当前代码中的门禁包括 AI 助手、云备份、报告 Excel/PDF 导出和 `StrategyCta` 的多策略对比入口。图表查看、档案库、本地 JSON 备份导入导出和提前还款模拟没有 Premium 门禁。
-- `StrategyCompareScreen` 和云备份执行函数本身没有第二层 Premium 校验，当前依赖入口门禁；调整权益时先全仓搜索 `hasPremium(`、`openPremiumScreen` 和 Premium 页权益文案。
+- `StrategyCompareScreen`和云备份执行函数本身没有第二层Premium校验，当前依赖入口门禁；云备份的登录门不同，执行层必须二次检查account。调整权益时先全仓搜索`hasPremium(`、`openPremiumScreen`和Premium页权益文案。
 
 ## 付费邀请
 

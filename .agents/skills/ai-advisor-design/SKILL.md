@@ -9,7 +9,7 @@ description: Use this skill when modifying or debugging After Zero's AI debt adv
 
 ## 边界与调用链
 
-- AI 是 Premium 功能；门禁与权益文案归 `account-premium-design` skill。
+- AI 是 Premium 且需要云账号的功能；Premium门禁、按需登录提示和权益文案归`account-premium-design` skill。`callAiAdvisor()`执行层必须在构造/发送云请求前拒绝本地模式，不能只依赖首页入口。
 - `AiScreen.tsx` 拥有会话、历史、额度缓存、重试、建议芯片和展示动画；`www/index.html` 的 `buildAiSummary()` / `callAiAdvisor()` 保留认证会话与云函数 bridge。
 - 客户端把完整逐期还款计划和计息方式放进 summary；云函数不读用户数据库中的债务数组。
 - 云函数用 `app.ai().createModel("cloudbase").generateText()`，当前模型是 `hy3`，不需要第三方 API Key 或 envVariables。换模型时只使用 CloudBase 控制台当前已启用的 model id。

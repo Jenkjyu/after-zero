@@ -5,9 +5,7 @@ import { closeAccountScreen, openAccountScreen, useAccountScreenOpen } from "../
 import { makeMockBridge } from "./mockBridge";
 import type { Account } from "../src/types";
 
-afterEach(() => {
-  closeAccountScreen(); // accountScreenOpen是模块级状态，重置避免测试间互相污染
-});
+afterEach(() => { closeAccountScreen(); });
 
 const account: Account = {
   openid: "test-openid",
@@ -23,21 +21,37 @@ describe("AccountScreen", () => {
     expect(container.querySelector("#accountScreen")).not.toHaveClass("open");
   });
 
-  it("打开后渲染头像/昵称/会员/微信绑定", () => {
+  it("旧微信账户显示微信登录、昵称、会员和本地账本状态", () => {
     window.__azBridge = makeMockBridge({ account, premium: { premium: { method: "onetime", at: "2026-01-01" } } });
-    const { container } = render(<AccountScreen />);
-    act(() => { openAccountScreen(); });
-    expect(container.querySelector("#accountScreen")).toHaveClass("open");
-    expect(screen.getByText("测试昵称")).toBeInTheDocument();
-    expect(screen.getByText("Premium 会员")).toBeInTheDocument();
-    expect(screen.getByText("已绑定")).toBeInTheDocument();
-  });
-
-  it("未开通premium时会员行显示普通用户", () => {
-    window.__azBridge = makeMockBridge({ account, premium: { premium: null } });
     render(<AccountScreen />);
     act(() => { openAccountScreen(); });
-    expect(screen.getByText("普通用户")).toBeInTheDocument();
+    expect(screen.getByText("微信登录")).toBeInTheDocument();
+    expect(screen.getByText("测试昵称")).toBeInTheDocument();
+    expect(screen.getByText("Premium 会员")).toBeInTheDocument();
+    expect(screen.getByText("仅存本机")).toBeInTheDocument();
+  });
+
+  it("本地模式明确展示可用范围，提供微信登录且不显示退出/注销", async () => {
+    const bridge = makeMockBridge({ account: null });
+    window.__azBridge = bridge;
+    render(<AccountScreen />);
+    act(() => { openAccountScreen(); });
+    expect(screen.getByText("本地使用")).toBeInTheDocument();
+    expect(screen.getByText(/债务、还款、统计、档案、通知/)).toBeInTheDocument();
+    expect(screen.queryByText("退出登录")).not.toBeInTheDocument();
+    expect(screen.queryByText("注销云端账户")).not.toBeInTheDocument();
+    await act(async () => { fireEvent.click(screen.getByText("微信登录云账号")); });
+    expect(bridge.requestCloudLogin).toHaveBeenCalledWith(expect.stringContaining("不会自动上传"));
+  });
+
+  it.each([
+    [{ ...account, provider: "apple" as const }, "Apple 登录"],
+    [{ ...account, provider: "unified" as const }, "统一账号"],
+  ])("未来账号形状%#可映射为第三态展示", (value, label) => {
+    window.__azBridge = makeMockBridge({ account: value });
+    render(<AccountScreen />);
+    act(() => { openAccountScreen(); });
+    expect(screen.getByText(label)).toBeInTheDocument();
   });
 
   it("点返回箭头关闭", () => {
@@ -45,92 +59,66 @@ describe("AccountScreen", () => {
     const hook = renderHook(() => useAccountScreenOpen());
     render(<AccountScreen />);
     act(() => { openAccountScreen(); });
-    expect(hook.result.current).toBe(true);
     fireEvent.click(screen.getByLabelText("返回"));
     expect(hook.result.current).toBe(false);
   });
 
-  it("退出登录：调用桥接wxLogout+关闭screen，没有确认弹窗", () => {
+  it("退出登录调用桥接并关闭screen，不清本地数据", () => {
     window.__azBridge = makeMockBridge({ account });
     const hook = renderHook(() => useAccountScreenOpen());
     render(<AccountScreen />);
     act(() => { openAccountScreen(); });
     fireEvent.click(screen.getByText("退出登录"));
     expect(window.__azBridge.wxLogout).toHaveBeenCalledTimes(1);
-    expect(window.__azBridge.confirmAsync).not.toHaveBeenCalled();
+    expect(window.__azBridge.resetLocalData).not.toHaveBeenCalled();
     expect(hook.result.current).toBe(false);
   });
 
-  it("注销账户：确认后调用桥接deleteAccount并关闭screen，弹窗带第三个「重置本地数据」选项", async () => {
+  it("重置本地数据有独立二次确认，确认后才执行", async () => {
+    const bridge = makeMockBridge({ account });
+    window.__azBridge = bridge;
+    render(<AccountScreen />);
+    act(() => { openAccountScreen(); });
+    await act(async () => { fireEvent.click(screen.getByText("重置本地数据")); });
+    expect(bridge.confirmAsync).toHaveBeenCalledWith("确定重置本地数据？", expect.stringContaining("云账号和云备份不会被删除"));
+    expect(bridge.resetLocalData).toHaveBeenCalledOnce();
+    expect(bridge.deleteAccount).not.toHaveBeenCalled();
+  });
+
+  it("重置本地数据取消后不执行", async () => {
+    const bridge = makeMockBridge({ account });
+    bridge.confirmAsync = vi.fn(() => Promise.resolve(false));
+    window.__azBridge = bridge;
+    render(<AccountScreen />);
+    act(() => { openAccountScreen(); });
+    await act(async () => { fireEvent.click(screen.getByText("重置本地数据")); });
+    expect(bridge.resetLocalData).not.toHaveBeenCalled();
+  });
+
+  it("注销云端账户确认后调用deleteAccount并关闭，本地重置保持分离", async () => {
     window.__azBridge = makeMockBridge({ account });
     const hook = renderHook(() => useAccountScreenOpen());
     render(<AccountScreen />);
     act(() => { openAccountScreen(); });
-    await act(async () => { fireEvent.click(screen.getByText("注销账户")); });
-    expect(window.__azBridge.confirmAsync).toHaveBeenCalledWith(
-      "注销账户",
-      expect.stringContaining("不可撤销"),
-      expect.objectContaining({ thirdLabel: "重置本地数据" })
-    );
-    expect(window.__azBridge.deleteAccount).toHaveBeenCalledTimes(1);
+    await act(async () => { fireEvent.click(screen.getByText("注销云端账户")); });
+    expect(window.__azBridge.confirmAsync).toHaveBeenCalledWith("注销账户", expect.stringContaining("本地债务、档案和设置会保留"));
+    expect(window.__azBridge.deleteAccount).toHaveBeenCalledOnce();
     expect(window.__azBridge.resetLocalData).not.toHaveBeenCalled();
     expect(hook.result.current).toBe(false);
   });
 
-  it("注销账户：选「重置本地数据」后二次确认同意，才调用resetLocalData，不调用deleteAccount、不关闭screen", async () => {
+  it("注销取消或执行失败时保持screen打开", async () => {
     const bridge = makeMockBridge({ account });
-    const confirmAsync = vi.fn()
-      .mockResolvedValueOnce("third") // 第一层：选"仅重置本地数据"
-      .mockResolvedValueOnce(true);   // 第二层：二次确认同意
-    bridge.confirmAsync = confirmAsync;
-    window.__azBridge = bridge;
-    const hook = renderHook(() => useAccountScreenOpen());
-    render(<AccountScreen />);
-    act(() => { openAccountScreen(); });
-    await act(async () => { fireEvent.click(screen.getByText("注销账户")); });
-    expect(confirmAsync).toHaveBeenCalledTimes(2);
-    expect(confirmAsync.mock.calls[1][0]).toBe("确定重置本地数据？");
-    expect(window.__azBridge.resetLocalData).toHaveBeenCalledTimes(1);
-    expect(window.__azBridge.deleteAccount).not.toHaveBeenCalled();
-    // resetLocalData内部会reload页面，React这边不需要、也没有主动关闭screen
-    expect(hook.result.current).toBe(true);
-  });
-
-  it("注销账户：选「重置本地数据」但二次确认取消，不调用resetLocalData", async () => {
-    const bridge = makeMockBridge({ account });
-    bridge.confirmAsync = vi.fn()
-      .mockResolvedValueOnce("third")
-      .mockResolvedValueOnce(false); // 第二层：二次确认取消
-    window.__azBridge = bridge;
-    const hook = renderHook(() => useAccountScreenOpen());
-    render(<AccountScreen />);
-    act(() => { openAccountScreen(); });
-    await act(async () => { fireEvent.click(screen.getByText("注销账户")); });
-    expect(window.__azBridge.resetLocalData).not.toHaveBeenCalled();
-    expect(window.__azBridge.deleteAccount).not.toHaveBeenCalled();
-    expect(hook.result.current).toBe(true);
-  });
-
-  it("注销账户：取消确认后不调用deleteAccount、不关闭screen", async () => {
-    const bridge = makeMockBridge({ account });
-    bridge.confirmAsync = vi.fn(() => Promise.resolve(false));
-    window.__azBridge = bridge;
-    const hook = renderHook(() => useAccountScreenOpen());
-    render(<AccountScreen />);
-    act(() => { openAccountScreen(); });
-    await act(async () => { fireEvent.click(screen.getByText("注销账户")); });
-    expect(window.__azBridge.deleteAccount).not.toHaveBeenCalled();
-    expect(hook.result.current).toBe(true);
-  });
-
-  it("注销账户：确认但deleteAccount失败(返回false)时不关闭screen", async () => {
-    const bridge = makeMockBridge({ account });
+    bridge.confirmAsync = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     bridge.deleteAccount = vi.fn(() => Promise.resolve(false));
     window.__azBridge = bridge;
     const hook = renderHook(() => useAccountScreenOpen());
     render(<AccountScreen />);
     act(() => { openAccountScreen(); });
-    await act(async () => { fireEvent.click(screen.getByText("注销账户")); });
+    await act(async () => { fireEvent.click(screen.getByText("注销云端账户")); });
+    expect(bridge.deleteAccount).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.click(screen.getByText("注销云端账户")); });
+    expect(bridge.deleteAccount).toHaveBeenCalledOnce();
     expect(hook.result.current).toBe(true);
   });
 

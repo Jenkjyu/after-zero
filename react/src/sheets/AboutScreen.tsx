@@ -67,7 +67,7 @@ export function AboutScreen() {
         </div>
 
         <div className="entry-group">
-          <EntryCard hue="rose" icon={ICON_ACCOUNT} title="账户与登录信息" sub="查看我们从你的微信账号获取的信息" onClick={openAccountScreen} />
+          <EntryCard hue="rose" icon={ICON_ACCOUNT} title="账户与登录信息" sub="查看本地模式或当前云账号状态" onClick={openAccountScreen} />
         </div>
       </div>
     </div>

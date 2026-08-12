@@ -4,7 +4,7 @@
 
 ## 当前产品
 
-当前可用、可发布的产品主线是 **Capacitor + React 的 Android App**，包名为 `io.github.jenkjyu.afterzero`。打开 App 必须先完成微信登录；全新安装默认没有任何债务或档案数据。
+当前可用、可发布的产品主线是 **Capacitor + React 的 Android App**，包名为 `io.github.jenkjyu.afterzero`。全新安装默认没有任何债务或档案数据，可直接在本地使用；仅在主动使用 AI 债务助手、云备份等真实云功能时要求登录。
 
 iOS 已建立同一套 Web 产品的 Capacitor 原生壳，可在 iOS 26.5 模拟器编译和冷启动；登录、文件保存、通知、购买和上架尚未闭环，因此当前不能视为可发布 iOS 产品。
 
@@ -19,11 +19,11 @@ iOS 已建立同一套 Web 产品的 Capacitor 原生壳，可在 iOS 26.5 模�
 
 更细的开发边界、硬规则和按任务加载的知识入口见 [`AGENTS.md`](AGENTS.md) 与 [`.agents/skills/`](.agents/skills/)。
 
-## iOS 扩展（步骤 1 完成，等待检查）
+## iOS 扩展（步骤 2 完成，等待检查）
 
-当前正按“Capacitor + React 双平台”方向实施 iOS 扩展，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 1 已在 iPhone 17 Pro / iOS 26.5 模拟器完成构建、安装和冷启动。
+当前正按“Capacitor + React 双平台”方向实施 iOS 扩展，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 2 已完成本地优先模式与云功能登录门：取消登录仍可继续本地使用，登录不会自动同步本地账本；iPhone 17 Pro / iOS 26.5 模拟器已完成构建、安装和冷启动。
 
-已确认的后续原则是：未登录也可使用本地账本；Apple/微信可绑定为同一云端账号；Android 与 iOS 各自的本地债务不自动同步或合并，仍通过用户主动创建/恢复云备份迁移。这些能力尚未实现。实施严格逐步验收，每一步完成后停止等待用户检查，未经明确批准不进入下一步、不提交代码。权威范围与当前停点见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
+已确认的后续原则是：Apple/微信可绑定为同一云端账号；Android 与 iOS 各自的本地债务不自动同步或合并，仍通过用户主动创建/恢复云备份迁移。Apple 登录、iOS 微信登录、身份绑定/合并、文件、通知、购买和上架尚未实现。实施严格逐步验收，每一步完成后停止等待用户检查，未经明确批准不进入下一步、不提交代码。权威范围与当前停点见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
 
 ## Flutter 重写（已停止并封存）
 

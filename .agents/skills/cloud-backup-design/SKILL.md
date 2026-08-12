@@ -28,7 +28,7 @@ description: Use this skill when modifying or debugging After Zero's manual clou
 
 - 五个函数只信任 `app.auth().getUserInfo().customUserId`，不接受客户端 openid 作为身份。
 - `backups` 是“一用户多文档”：openid 是普通字段，用 `.where()` 查询；集合需在控制台创建为 ADMINONLY，Storage 也保持私有。
-- 函数调用依赖持久化的微信自定义登录会话。`ensureCbAuthReady()` 只在本地没有 account 时尝试匿名垫底，不能把已登录用户降级成匿名。
+- 函数调用依赖持久化的自定义登录会话。`ensureCbAuthReady()`对本地模式直接拒绝，五个备份调用都不得建立匿名会话或发出云请求；匿名垫底只允许发生在微信换取自定义票据的登录流程。
 - `deleteAccount` 必须先删除用户全部备份文档和 Storage 文件，再删 `users` 文档。账户语义归 `account-premium-design`。
 - 部署、集合、环境权限或 `@cloudbase/node-sdk` 问题加载 `cloudbase-deploy`。
 
@@ -36,5 +36,5 @@ description: Use this skill when modifying or debugging After Zero's manual clou
 
 - 客户端文件先以 base64 经云函数上传，体积会膨胀；不要描述成客户端直传 Storage。
 - 文件上传发生在 `backupCreate` 前；后续创建失败时，当前实现没有回收本轮已上传但尚未入记录的文件。修改失败补偿时需同时设计 Storage 清理，不要只改 UI。
-- 伪造 `ACCOUNT_KEY` 只能隐藏登录门，不能建立 CloudBase 自定义会话；真实创建/列表/恢复/删除必须在真机或等价已认证环境验证。
+- 伪造`ACCOUNT_KEY`只能伪装React账户展示，不能建立CloudBase自定义会话；真实创建/列表/恢复/删除必须在真机或等价已认证环境验证。入口提示通过不代表会话可用，服务端仍以`customUserId`为准。
 - 修改 React 页面运行 `npm run test:react` 的 `BackupScreen` 测试；修改云函数逐一核对未登录、归属拒绝、轻量列表、配额清理、文件删除和整体恢复。

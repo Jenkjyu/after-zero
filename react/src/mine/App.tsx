@@ -19,7 +19,7 @@ export function App() {
     <>
       <AccountHeader account={account} />
       <PremiumEntryCard premium={premium} />
-      <DataCards premium={premium} />
+      <DataCards premium={premium} account={account} />
       <div className="entry-group">
         <EntryCard hue="brand" icon={ICON_ABOUT} title="关于我们" sub="版本、协议与联系方式" onClick={openAboutScreen} />
       </div>

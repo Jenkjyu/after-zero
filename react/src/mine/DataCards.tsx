@@ -13,7 +13,7 @@
 // 放一个"打开云备份"按钮），说明文字也过长；现在高度差不多减半，靠彩色徽章可扫视。
 // 四张卡按语义分两组（存储入口 / 数据搬运），组内靠紧、组间留空，用间距表达结构。
 import type { ReactNode } from "react";
-import type { Premium } from "../types";
+import type { Account, Premium } from "../types";
 import { openBackupScreen, openDocsScreen, openPremiumScreen } from "../shared/state";
 
 const ICON_CLOUD = (
@@ -64,13 +64,18 @@ export function EntryCard({ hue, icon, title, sub, onClick }: EntryCardProps) {
 
 export interface DataCardsProps {
   premium: Premium;
+  account: Account | null;
 }
 
-export function DataCards({ premium }: DataCardsProps) {
-  function onBackup() {
+export function DataCards({ premium, account }: DataCardsProps) {
+  async function onBackup() {
     if (!window.hasPremium(premium)) {
       openPremiumScreen();
       return;
+    }
+    if (!account) {
+      const loggedIn = await window.__azBridge.requestCloudLogin("云备份会在你主动创建时把当前债务、档案和设置上传到云端；登录提示可取消，本地数据不会自动同步。");
+      if (!loggedIn) return;
     }
     openBackupScreen();
   }

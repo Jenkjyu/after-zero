@@ -41,7 +41,7 @@ description: Use this skill when modifying After Zero's current Capacitor + Reac
 
 刻意保留的vanilla DOM例外：
 
-- `#loginGate`默认可见，并在React bundle运行前由早期内联脚本同步判定登录态，不能迁移到React。
+- `#loginGate`是vanilla拥有的按需登录表面，默认隐藏；本地模式进入AI/云备份或从账户页主动登录时，React调用`requestCloudLogin(purpose)`打开。它必须可取消并返回原页面，不能恢复成启动强制门，也不能迁移出持有CloudBase/原生插件状态的vanilla边界。
 - `#modalScrim`是全App唯一确认弹窗；React通过`confirmAsync`复用，不另建第二套。
 - `#importFileInput`及其change流程仍由vanilla拥有；React只通过`triggerImportFilePicker`触发。
 - tabbar和全局CSS仍在宿主中；React复用现有class和CSS变量。
@@ -103,7 +103,7 @@ premium既有`premium.premium = ...`原地写，也有`premium = {...}`整体替
 
 1. `MainActivity.java`用`OnBackPressedDispatcher`执行`window.__handleBackButton()`；不要退回`onBackPressed()`。
 2. `www/index.html`按“最上层先关”调用modal或各`window.__az*Back`；没有任何层消费时返回`false`，原生才退出。
-3. React组件在effect里注册自己的`__az*Back: () => boolean`，卸载时删除。组件内部更高层状态（picker、排序sheet、AI历史sheet等）必须先关闭，再关闭外层screen。
+3. React组件在effect里注册自己的`__az*Back: () => boolean`，卸载时删除。组件内部更高层状态（picker、排序sheet、AI历史sheet等）必须先关闭，再关闭外层screen；vanilla的按需登录表面也在返回链中，返回时等同点击“继续本地使用”。
 
 新增或重排surface时同步：
 

@@ -79,7 +79,10 @@ export interface Premium {
 }
 
 export interface Account {
-  openid: string;
+  // 旧微信账户没有provider字段，按wechat兼容读取。Apple/统一账号的真实登录与数据形状
+  // 在iOS步骤3闭环；这里先让账户展示能区分三态，不提供尚不可用的Apple入口。
+  openid?: string;
+  provider?: "wechat" | "apple" | "unified";
   nickname: string;
   avatarUrl: string;
   loggedInAt: number;
@@ -253,12 +256,15 @@ export interface AzBridge {
   // deleteAccount云函数(不信任客户端参数，身份来自已认证会话)；redeemCode(code)查
   // REDEEM_CODES表、命中就写premium并返回tier，没命中返回null让React决定toast文案。
   wxLogout(): void;
+  // 本地模式进入AI/云备份或从账户页主动登录时打开可取消的微信登录表面。登录成功返回true，
+  // 取消/失败返回false；无论结果如何都不上传、恢复或清空本地数据。
+  requestCloudLogin(purpose: string): Promise<boolean>;
   // 返回是否真的注销成功——vanilla内部会自己toast成功/失败文案(保持跟原doDeleteAccount()
   // 一致的用户反馈)，React只需要这个布尔值来决定要不要顺带关闭accountScreen。
   deleteAccount(): Promise<boolean>;
   redeemCode(code: string): string | null;
   // "注销账户"弹窗第三条路径新增：只清本机localStorage+IndexedDB上传文件库、不删服务器
-  // 账户，清完立刻reload()回到#loginGate——没有返回值，页面已经在这个函数内部被刷新掉了。
+  // 账户，清完立刻reload()回到空白本地账本——没有返回值，页面已经在这个函数内部被刷新掉了。
   resetLocalData(): void;
   // 第八步(notifySheet)新增：这几个都要调用@capacitor/local-notifications原生插件
   // (权限检查/申请/调度)，不能重写成纯React。setNotifyEnabled返回最终生效的状态(权限被拒时

@@ -17,6 +17,8 @@ describe("AgreementScreen", () => {
     expect(container.querySelector("#agreementScreen")).toHaveClass("open");
     expect(screen.getByText("用户服务协议")).toBeInTheDocument();
     expect(screen.getByText(/PolyForm Noncommercial/)).toBeInTheDocument();
+    expect(screen.getByText(/无需登录即可使用本地债务/)).toBeInTheDocument();
+    expect(screen.getByText(/登录、退出或注销云账号都不会自动上传/)).toBeInTheDocument();
   });
 
   it("点返回箭头关闭", () => {

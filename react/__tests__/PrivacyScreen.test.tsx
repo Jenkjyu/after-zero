@@ -17,6 +17,8 @@ describe("PrivacyScreen", () => {
     expect(container.querySelector("#privacyScreen")).toHaveClass("open");
     expect(container.querySelector(".subpage-title")).toHaveTextContent("隐私政策");
     expect(screen.getByText("微信开放平台 SDK")).toBeInTheDocument();
+    expect(screen.getByText(/无需账号的本地使用模式/)).toBeInTheDocument();
+    expect(screen.getByText(/登录不会触发本地债务或档案的自动上传/)).toBeInTheDocument();
     expect(screen.getByText(/不满 14 周岁/)).toBeInTheDocument();
   });
 

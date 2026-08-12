@@ -660,14 +660,13 @@
     text-underline-offset: 2px; white-space: nowrap; cursor: pointer; }
   #mThird:active { opacity: .6; }
 
-  /* 登录门默认(纯CSS，不依赖任何JS执行时机)就是display:flex可见的——这是刻意的"fail-closed"设计。
-     以前默认display:none、靠JS抢在CDN脚本网络等待之前把它设成可见，真机上仍然偶发"一闪而过"，
-     根源是"默认可见"这件事本身不该依赖JS能不能跑赢一段网络请求。现在反过来：默认永远可见，
-     只有真正确认登录后才用.authed隐藏它——哪怕JS完全没执行，也不可能露出底下的App内容。 */
-  .login-gate { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: flex; align-items: center; justify-content: center;
+  /* 登录只保护云功能，不再阻断本地账本。这个表面默认隐藏，仅在用户主动进入AI、云备份或
+     账户登录时打开；取消后立即回到原页面继续本地使用。 */
+  .login-gate { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: none; align-items: center; justify-content: center;
     padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); }
-  .login-gate.authed { display: none; }
+  .login-gate.open { display: flex; }
   .login-gate-inner { max-width: 340px; width: 100%; text-align: center; }
+  .gate-purpose { color: var(--text-muted); font-size: 13px; line-height: 1.55; margin: -6px 8px 18px; }
 
   .gate-icon { display: flex; justify-content: center; margin-bottom: 14px; }
   .gate-icon img { width: 108px; height: 108px; object-fit: cover; border-radius: 22px; border: 1px solid var(--border); }
@@ -951,6 +950,7 @@
   .account-detail-row:last-child { border-bottom: none; }
   .account-detail-label { font-size: 13px; color: var(--text-muted); }
   .account-detail-value { font-size: 14px; font-weight: 600; }
+  .account-local-note { margin: 14px 2px 0; color: var(--text-muted); font-size: 13px; line-height: 1.6; }
 
   /* 高级统计报表：横向条形图(债务余额对比)/堆叠条形图(类型占比)/折线图(负债预测走势)，
      全部手写SVG/HTML，不引入图表库——这是项目里第一批图表，之前没有先例可抄。配色套用
@@ -1383,27 +1383,13 @@
         <path class="hw-letter" style="--i:8;--len:1677.7" transform="translate(3258.0,0)" d="M169 15Q156 15 148.5 20.0Q141 25 130 34Q111 54 103.0 72.5Q95 91 98 108Q101 116 100.5 123.5Q100 131 100 131Q95 136 97.0 137.5Q99 139 101 143Q107 143 105 154Q103 162 113.0 189.0Q123 216 138 240Q144 250 156.0 266.5Q168 283 182.5 299.5Q197 316 209 326Q234 347 253.0 357.0Q272 367 294 372Q316 377 324.5 377.0Q333 377 348 361Q371 351 381.5 337.0Q392 323 395 296Q398 266 390.5 227.5Q383 189 343 132Q318 96 297.0 78.5Q276 61 247 44Q226 30 209.0 23.5Q192 17 169 15ZM265 121Q289 148 303.5 172.0Q318 196 331 233Q335 244 336.0 260.5Q337 277 335.5 291.5Q334 306 328 308Q316 315 299.0 312.5Q282 310 262 293Q231 267 208.0 228.5Q185 190 163 141Q148 105 156.5 83.5Q165 62 193.5 68.5Q222 75 265 121Z"/>
       </g>
     </svg>
+    <p class="gate-purpose" id="loginPurpose">登录后可使用需要云端身份的功能；本地账本不会自动上传。</p>
     <div class="data-actions" style="margin:0">
       <button class="btn primary" id="wxLoginBtn"><svg class="btn-ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 0 1 .598.082l1.584.926a.272.272 0 0 0 .14.047c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 0 1-.023-.156.49.49 0 0 1 .201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.837-6.656-6.088V8.89c-.135-.01-.27-.027-.407-.03zm-2.53 3.274c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.97-.982zm4.844 0c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.969-.982z"/></svg>微信登录</button>
+      <button class="btn ghost" id="loginCancelBtn">继续本地使用</button>
     </div>
   </div>
 </div>
-
-<!-- 登录门这里立刻同步决定"是否已登录"，不能等main script——下面几行CDN <script src>
-     没有defer/async，是阻塞解析的，首次冷启动时这几个网络请求可能要花上百毫秒甚至更久。
-     但登录门本身默认(纯CSS)就是可见的(见.login-gate的CSS注释)，这段脚本只负责在确认
-     已登录时尽早加上.authed隐藏它、以及触发手写动画——不再需要"跟CDN脚本抢跑"，
-     哪怕这段脚本本身因为某种原因很晚才跑，最坏结果也只是登录门多显示一会儿，
-     不可能出现底下App内容被提前露出来的情况。 -->
-<script>
-(function () {
-  var authed = false;
-  try { authed = !!JSON.parse(localStorage.getItem("after-zero-account-v1") || "null"); } catch (e) {}
-  var gate = document.getElementById("loginGate");
-  gate.classList.toggle("authed", authed);
-  if (!authed) gate.classList.add("open");
-})();
-</script>
 
 <!-- #accountScreen/#premiumScreen已经整体搬进React(第七步，React迁移收尾)——见
      react/src/sheets/AccountScreen.tsx、PremiumScreen.tsx，挂在#react-sheets-root下面。
@@ -1977,8 +1963,7 @@
   // DOM绑定辅助函数了。
 
   // 账号登录：微信登录(移动应用OAuth) + 腾讯云开发(CloudBase)自定义登录。
-  // 登录现在是全局强制的——account为空时#loginGate会盖住整个App（含tabbar），
-  // 四个标签页不再能离线/不登录使用，详见AGENTS.md。
+  // 本地账本不要求登录；#loginGate只在用户主动进入AI/云备份或从账户页登录时打开。
   var CLOUDBASE_ENV_ID = "after-zero-d7gub5p5f09c8cc2d";
   var _cbApp = null;
   function cbApp() { if (!_cbApp) _cbApp = cloudbase.init({ env: CLOUDBASE_ENV_ID }); return _cbApp; }
@@ -1995,10 +1980,32 @@
     return _cbAuth;
   }
 
-  function renderAccountUI() {
+  var pendingLoginPromise = null, pendingLoginResolve = null;
+  function finishCloudLoginPrompt(ok) {
     var gate = $("loginGate");
-    gate.classList.toggle("authed", !!account);
-    if (!account) gate.classList.add("open");
+    if (gate.classList.contains("open")) { gate.classList.remove("open"); gate.setAttribute("aria-hidden", "true"); unlockScroll(); }
+    var resolve = pendingLoginResolve;
+    pendingLoginPromise = null; pendingLoginResolve = null;
+    if (resolve) resolve(!!ok);
+  }
+  function requestCloudLogin(purpose) {
+    if (account) return Promise.resolve(true);
+    if (pendingLoginPromise) return pendingLoginPromise;
+    $("loginPurpose").textContent = purpose || "登录后可使用需要云端身份的功能；本地账本不会自动上传。";
+    var gate = $("loginGate");
+    gate.setAttribute("aria-hidden", "false");
+    gate.classList.add("open");
+    lockScroll();
+    pendingLoginPromise = new Promise(function (resolve) { pendingLoginResolve = resolve; });
+    return pendingLoginPromise;
+  }
+  function cloudLoginRequired(feature) {
+    var err = new Error((feature || "此云功能") + "需要先登录");
+    err.code = "LOGIN_REQUIRED";
+    return err;
+  }
+
+  function renderAccountUI() {
     // 头像/昵称(在还债务页的#topAvatarImg、"我的"页的头像区)现在都归React渲染(分别是
     // react/src/debts/Header.tsx、react/src/mine/AccountHeader.tsx，都读
     // window.__azBridge.getAccount())，这里不再直接操作那两处DOM节点，改成派发通用
@@ -2022,6 +2029,7 @@
     toast("已退出登录");
   }
   function deleteAccount() {
+    if (!account) { toast("当前未登录"); return Promise.resolve(false); }
     toast("正在注销…");
     return cbApp().callFunction({ name: "deleteAccount" }).then(function (res) {
       var result = res && res.result;
@@ -2041,7 +2049,7 @@
   // 不需要cloud函数调用。localStorage.clear()而不是逐个key移除，效果等同卸载重装，
   // 不会漏清以后新增的localStorage key；UP_DB(见上面"uploaded PDF storage"注释)是
   // IndexedDB另存的上传文件库，localStorage.clear()够不到它，要单独删。reload()让
-  // 页面从头走一遍冷启动逻辑(回到#loginGate)，比手动清理内存里的account/debts等
+  // 页面从头走一遍冷启动逻辑(回到空白本地账本)，比手动清理内存里的account/debts等
   // 模块变量简单可靠。
   function resetLocalData() {
     localStorage.clear();
@@ -2137,6 +2145,7 @@
   // 超额时服务端返回 code:"QUOTA_EXCEEDED"，这里把它挂到Error上，React据此弹额度说明
   // 弹窗而不是当成普通报错。
   function callAiAdvisor(mode, question, history) {
+    if (!account) return Promise.reject(cloudLoginRequired("AI 债务助手"));
     var summary = buildAiSummary(true);
     if (!summary.债务清单.length) return Promise.reject(new Error("没有在还债务，先添加一笔再来分析"));
     return ensureCbAuthReady().then(function () {
@@ -2371,8 +2380,8 @@
 
   var wxAuthListenerBound = false;
   function handleWxAuthResult(data) {
-    if (!data.stateOk) { toast("授权状态校验失败，请重试"); return; }
-    if (data.errCode !== 0 || !data.code) { toast("微信授权已取消或失败"); return; }
+    if (!data.stateOk) { toast("授权状态校验失败，请重试"); finishCloudLoginPrompt(false); return; }
+    if (data.errCode !== 0 || !data.code) { toast("微信授权已取消或失败"); finishCloudLoginPrompt(false); return; }
     toast("登录中…");
     var pendingLoginResult = null;
     var auth = cbAuth();
@@ -2393,8 +2402,10 @@
       account = { openid: pendingLoginResult.openid, nickname: pendingLoginResult.nickname, avatarUrl: pendingLoginResult.avatarUrl, loggedInAt: Date.now() };
       localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
       renderAccountUI();
+      finishCloudLoginPrompt(true);
       toast("登录成功 ✓");
     }).catch(function (err) {
+      finishCloudLoginPrompt(false);
       toast("登录失败：" + ((err && err.message) || "网络错误"));
     });
   }
@@ -2409,28 +2420,13 @@
   // backupUploadFile)，不做客户端直传云存储，复用deleteAccount已经建立的"身份完全来自
   // 服务端已认证会话，不信任客户端参数"这条安全原则。
   var BACKUP_MAX_FILE_BYTES = 8 * 1024 * 1024; // 单文件上限，超过的文件跳过不参与这次备份
-  // 跟handleWxAuthResult同一个坑：CloudBase JS SDK 2.28.6在全新设备/从没建立过任何登录态
-  // 时，内部_getCredentials()对着null读.scope会直接抛TypeError，连带搞挂callFunction()。
-  // 登录流程本身已经用signInAnonymously()垫底绕开了，但云备份这几个函数是独立入口，
-  // 如果CloudBase自己的会话存储因为某种原因是空的(哪怕本机account不是null)，会重新踩中
-  // 同一个bug——所以这里也垫一次，失败忽略，真正有会话时这次调用只是无副作用的重复。
-  var _cbAnonReady = null;
+  // 受保护云功能只接受已有账户。匿名垫底只属于上面的微信换票据流程；不能在AI/备份执行层
+  // 偷偷建立匿名会话，否则UI虽提示登录，bridge仍可能发出未认证云请求。
+  var _cbAuthReady = null;
   function ensureCbAuthReady() {
-    if (!_cbAnonReady) {
-      var auth = cbAuth();
-      // ⚠️关键修复：只在"完全没登录过"(本地连account记录都没有)时才signInAnonymously。
-      // 一旦已经微信登录过(account有值)，CloudBase侧就应当有持久化的自定义登录会话(persistence:'local'
-      // 跨冷启动自动恢复+续期)，此时绝不能再signInAnonymously——那会把"非匿名"会话降级成匿名，
-      // 导致backup这几个云函数命中环境权限规则(要求 auth.loginType != 'ANONYMOUS')被PERMISSION_DENIED
-      // 拒掉。这正是之前"明明登录了、云备份却一直Permission denied"的根因。
-      // signInAnonymously原本只是给全新设备垫底、绕开SDK对null凭证读.scope的崩溃bug，用account这个
-      // 我们自己可靠掌握的信号判断，比去猜SDK内部登录态形状稳妥得多。
-      _cbAnonReady = Promise.resolve().then(function () {
-        if (account) return;
-        return auth.signInAnonymously ? auth.signInAnonymously().catch(function () {}) : null;
-      });
-    }
-    return _cbAnonReady;
+    if (!account) return Promise.reject(cloudLoginRequired("此云功能"));
+    if (!_cbAuthReady) _cbAuthReady = Promise.resolve();
+    return _cbAuthReady;
   }
   // #backupScreen已经整体搬进React(第十步，React迁移收尾)——见react/src/sheets/BackupScreen.tsx。
   // 这几个函数是新的桥接接口，替代原来直接改DOM的createCloudBackup/renderBackupList/
@@ -2478,6 +2474,7 @@
     });
   }
   function listBackups() {
+    if (!account) return Promise.reject(cloudLoginRequired("云备份"));
     return ensureCbAuthReady().then(function () {
       return cbApp().callFunction({ name: "backupList" });
     }).then(function (res) {
@@ -2487,6 +2484,7 @@
     });
   }
   function restoreBackup(id) {
+    if (!account) { toast("请先登录后使用云备份"); return Promise.resolve(false); }
     toast("正在恢复…");
     return ensureCbAuthReady().then(function () {
       return cbApp().callFunction({ name: "backupRestore", data: { backupId: id } });
@@ -2503,6 +2501,7 @@
     });
   }
   function deleteBackup(id) {
+    if (!account) { toast("请先登录后使用云备份"); return Promise.resolve(false); }
     return ensureCbAuthReady().then(function () {
       return cbApp().callFunction({ name: "backupDelete", data: { backupId: id } });
     }).then(function (res) {
@@ -2730,6 +2729,7 @@
     // 先关"优先级链，只是判断逻辑物理上不在这个文件里了。详见AGENTS.md"React 迁移"一节。
     if (window.__azDebtsBack && window.__azDebtsBack()) return true;
     if ($("modalScrim").classList.contains("open")) { closeModal(); return true; }
+    if ($("loginGate").classList.contains("open")) { finishCloudLoginPrompt(false); return true; }
     // termsScreen/premiumScreen/accountScreen同理已经是React状态(react/src/sheets/
     // TermsScreen.tsx、PremiumScreen.tsx、AccountScreen.tsx，第七步)，vanilla看不到，
     // 判断逻辑物理上也不在这个文件里了——跟jiggleMode那条(window.__azDebtsBack)是同一个
@@ -2786,9 +2786,11 @@
     }).then(function () {
       toast("正在跳转微信授权…");
     }).catch(function (err) {
+      finishCloudLoginPrompt(false);
       if (err && err.message) toast(err.message);
     });
   });
+  $("loginCancelBtn").addEventListener("click", function () { finishCloudLoginPrompt(false); });
   // dlBackupBtn/importFileBtn(react/src/mine/DataCards.tsx里的"下载备份文件"/"上传备份文件"
   // 按钮)已经不在vanilla DOM里了，下载逻辑抽成了上面的downloadBackupFile()、通过桥接调用；
   // "上传备份文件"改成下面这个新函数，间接点击还留在vanilla DOM里的#importFileInput。
@@ -2878,6 +2880,7 @@
     // 第七步(accountScreen/premiumScreen)新增：这三个是真实的cloud/native调用或者共享
     // 状态变更，留在vanilla私有作用域里，React只调用不重新实现。
     wxLogout: wxLogout,
+    requestCloudLogin: requestCloudLogin,
     deleteAccount: deleteAccount,
     redeemCode: redeemCode,
     // "注销账户"确认弹窗的第三条路径新增：只清本机storage、不删服务器账户(见定义处的注释)。

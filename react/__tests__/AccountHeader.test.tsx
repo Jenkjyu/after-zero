@@ -24,11 +24,11 @@ describe("AccountHeader", () => {
     expect(screen.getByText("测试昵称")).toBeInTheDocument();
   });
 
-  it("account为null时头像无src、昵称空文本", () => {
+  it("account为null时头像无src、明确显示本地使用", () => {
     window.__azBridge = makeMockBridge();
     render(<AccountHeader account={null} />);
     expect(screen.getByAltText("")).not.toHaveAttribute("src");
-    expect(screen.getByLabelText("账户").textContent).toBe("");
+    expect(screen.getByText("本地使用")).toBeInTheDocument();
   });
 
   it("点头像调用openAccountScreen(纯React状态，不经过__azBridge)", () => {
