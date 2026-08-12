@@ -1,9 +1,9 @@
 ---
 name: capacitor-native-runtime
-description: "Use this skill when modifying or debugging After Zero's current Capacitor Android runtime: files under the root `android/` project, `capacitor.config.json`, custom Java plugins, plugin registration, Android manifests/resources, Local Notifications, SAF file saving, WebView/native boundaries, `npx cap sync android`, stale packaged web assets, or debug APK builds. Also use it for native-only failures such as missing plugins, 0-byte exports, notification delivery problems, or Android hardware-back behavior. Route WeChat SDK setup, release signing, CloudBase deployment, React bridge ownership, and WebView UI details to their dedicated skills as described here."
+description: "Use this skill when modifying or debugging After Zero's Capacitor Android or iOS runtime: root `android/` or `ios/`, `capacitor.config.json`, Java/Swift plugins, plugin registration, manifests/plists/resources, Local Notifications, native file saving, WebView/native boundaries, `npx cap sync android|ios`, stale packaged web assets, debug APKs, or iOS simulator builds. Also use it for native-only failures such as missing plugins, 0-byte exports, notification delivery problems, Android hardware-back behavior, or iOS build/launch failures. Route provider SDK setup, release signing, CloudBase deployment, React bridge ownership, and WebView UI details to their dedicated skills as described here."
 ---
 
-# Capacitor 原生运行时与构建边界
+# Capacitor Android / iOS 原生运行时与构建边界
 
 ## 先判定文件归属
 
@@ -12,12 +12,19 @@ description: "Use this skill when modifying or debugging After Zero's current Ca
 - `capacitor.config.json`：应用身份和 `webDir: "www"`。
 - `react/src/**`：React源码；`npm run build:react`生成gitignored的`www/js/react-debts/**`。
 - `www/**`：Capacitor要打包的Web目录；`npx cap sync android`复制到gitignored的`android/app/src/main/assets/public/**`。
+- `npx cap sync ios`把同一Web目录复制到gitignored的`ios/App/App/public/**`；两个平台的打包资产都不能直接编辑。
 - `android/app/src/main/java/io/github/jenkjyu/afterzero/**`：四个手写Java类，是真正源码，不是sync产物。
 - `android/app/src/main/AndroidManifest.xml`、`android/app/build.gradle`、`android/variables.gradle`和手写资源：受版本控制的Android源码/配置。
 - `android/capacitor.settings.gradle`、`android/app/capacitor.build.gradle`：Capacitor按npm插件生成的文件，文件头已标明`DO NOT EDIT`；改插件依赖后重新sync，不直接维护。
 - `cloudbase/functions/**`：独立服务端部署单元，不进入APK，也不由sync部署；涉及它时加载`cloudbase-deploy` skill。
+- `ios/App/App.xcodeproj`、`AppDelegate.swift`、`Info.plist`、storyboard和asset catalog是iOS受版本控制源码；`ios/App/CapApp-SPM/Package.swift`由Capacitor CLI维护npm插件接线。
+- `ios/App/App/capacitor.config.json`、`config.xml`、`public/`以及Pods/build/DerivedData/xcuserdata由`ios/.gitignore`排除；不直接维护或提交。
 
 不要直接改两层生成物。`npx cap sync android`不会删除手写Java、manifest、`build.gradle`或`res/drawable/ic_stat_notify.xml`，但重新执行`npx cap add android`属于重建平台工程，可能覆盖手改配置，不能当普通sync使用。
+
+根`ios/`已在iOS主线步骤1通过一次`npx cap add ios`建立，Bundle ID为`io.github.jenkjyu.afterzero`、最低iOS 15。后续只运行build/sync，不能重复`cap add ios`重建。当前Capacitor 8工程使用Swift Package Manager；`CapApp-SPM/Package.swift`固定`capacitor-swift-pm` 8.4.1，并接入本地`@capacitor/local-notifications`。
+
+步骤1只证明原生壳可运行：iOS微信/Apple登录、文件保存、完整通知策略、购买和发布签名尚未实现。不要因模拟器能启动就把这些能力写成已支持。
 
 ## 区分手写插件与npm插件
 
@@ -33,6 +40,8 @@ description: "Use this skill when modifying or debugging After Zero's current Ca
 保持`MainActivity.onCreate()`里对`SaveFilePlugin`和`WeChatLoginPlugin`的`registerPlugin()`；这两个类不是npm包，Capacitor不会自动发现。`@capacitor/local-notifications`则是`package.json`里的官方npm插件，由sync生成Gradle接线并通过AAR manifest merge注入权限/receiver；不要在`MainActivity`重复注册，也不要把它的生成依赖手写回两个`capacitor*.gradle`文件。
 
 修改微信原生链、`WXEntryActivity`、CloudBase自定义登录或release包调试时，同时加载`wechat-login-setup`；构建签名包或处理keystore/SHA1时加载`release-keystore`。
+
+iOS当前只有Capacitor模板`AppDelegate.swift`，尚无手写业务插件。以后新增Swift插件时必须维护Xcode target membership/注册方式和JS契约；不要把Android四个Java类机械翻译后一次性塞入iOS。
 
 ## 维护 `MainActivity` 的三条边界
 
@@ -69,6 +78,7 @@ React的`NotifySheet`只拥有UI状态；通知配置持久化、权限和原生
 - 当前刻意不申请`SCHEDULE_EXACT_ALARM`，接受省电策略造成的分钟级延迟；若改成精确提醒，先重新评估权限和系统设置成本。
 - `POST_NOTIFICATIONS`、`RECEIVE_BOOT_COMPLETED`、`WAKE_LOCK`及restore receiver来自Local Notifications AAR的manifest merge；用合并后的manifest验证，不在主manifest机械复制。
 - “发送测试通知”在10秒后触发，用它验证权限→channel→schedule链；桌面浏览器无法验证真实通知。
+- `createChannel`是Android专属API，Web宿主必须先检查`Capacitor.getPlatform() === "android"`；iOS启动不得调用它。iOS pending上限和正式提醒策略在获批的通知步骤中闭环。
 
 排查“前台能收到、划掉最近任务后收不到”时，先记录手机品牌/系统和用户如何关闭App。华为/荣耀已实测会限制后台唤醒，需要在应用启动管理中允许自启动、关联启动和后台活动；先区分厂商电源策略与调度代码问题。
 
@@ -95,11 +105,23 @@ Apple Silicon的JDK路径如上；Intel Homebrew通常是`/usr/local/opt/openjdk
 
 Debug APK输出到`android/app/build/outputs/apk/debug/app-debug.apk`。Release构建、签名文件和SHA1全部交给`release-keystore` skill；微信登录必须用注册过签名的release包真机验证。
 
+iOS基础流程：
+
+```bash
+npm run build:react
+npx cap sync ios
+xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+  -sdk iphonesimulator -destination 'platform=iOS Simulator,id=<device-id>' \
+  CODE_SIGNING_ALLOWED=NO build
+```
+
+使用`xcrun simctl list devices available`选择设备。步骤1基线是Xcode 26.6、iOS 26.5 Runtime、iPhone 17 Pro；本机DerivedData可放临时目录，不进入仓库。真机、Apple能力和App Store签名不能用`CODE_SIGNING_ALLOWED=NO`替代。
+
 ## 验证工作流
 
 1. 先检查`git status --short`，保留用户改动；确认没有直接修改两层Web生成物或`capacitor*.gradle`生成文件。
 2. 改npm插件依赖后运行sync并检查生成Gradle接线；改manifest相关功能后检查合并manifest，而不只看主manifest。
 3. 改Web/bridge时按`react-bridge-architecture`运行React测试、TypeScript、build和sync；改纯计算通知排程时另跑`npm test`。
-4. 改Android源码时用JDK 21运行对应Gradle构建；必要时检查安装后的包名、插件可用性与WebView console。
-5. SAF、微信、系统通知、厂商后台限制、硬件返回和release调试都属于原生验证面，不能用桌面localhost结果替代。
+4. 改Android源码时用JDK 21运行对应Gradle构建；改iOS源码时至少做指定模拟器`xcodebuild`，并按范围安装、冷启动和检查WebView console。
+5. SAF、微信、系统通知、厂商后台限制、硬件返回、iOS原生文件/登录能力和release调试都属于原生验证面，不能用桌面localhost结果替代。
 6. 最后运行`git diff --check`，并确认未把`android/local.properties`、keystore、`keystore.properties`或CloudBase密钥加入版本控制。

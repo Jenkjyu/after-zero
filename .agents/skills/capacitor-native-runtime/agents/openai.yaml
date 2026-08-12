@@ -1,4 +1,4 @@
 interface:
-  display_name: "Capacitor 原生运行时"
-  short_description: "维护 After Zero 的 Android 原生运行时与构建边界"
-  default_prompt: "Use $capacitor-native-runtime to inspect or modify After Zero native runtime safely."
+  display_name: "Capacitor 双平台原生运行时"
+  short_description: "维护 After Zero 的 Android 与 iOS 原生运行时边界"
+  default_prompt: "Use $capacitor-native-runtime to inspect or modify After Zero Android or iOS native runtime safely."

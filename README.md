@@ -1,10 +1,12 @@
 # After Zero
 
-一个记录和规划个人债务的 Android App。名字的寓意，是对债务归零之后生活的期待。
+一个记录和规划个人债务的 App。名字的寓意，是对债务归零之后生活的期待。
 
 ## 当前产品
 
 当前可用、可发布的产品主线是 **Capacitor + React 的 Android App**，包名为 `io.github.jenkjyu.afterzero`。打开 App 必须先完成微信登录；全新安装默认没有任何债务或档案数据。
+
+iOS 已建立同一套 Web 产品的 Capacitor 原生壳，可在 iOS 26.5 模拟器编译和冷启动；登录、文件保存、通知、购买和上架尚未闭环，因此当前不能视为可发布 iOS 产品。
 
 - `react/src/**` 负责“债务”“还款日”“统计”“我的”四个 tab，以及不属于 tab 的 subpage、sheet 和 screen。Vite 使用 `debts`、`pay`、`report`、`mine`、`sheets` 五个入口。
 - `www/index.html` 是唯一 Web 宿主，保留全局 CSS、tabbar、登录门、共享确认框、隐藏导入 input、localStorage/IndexedDB、CloudBase 和原生能力编排；财务计算集中在 `www/js/calc.js`。
@@ -17,6 +19,12 @@
 
 更细的开发边界、硬规则和按任务加载的知识入口见 [`AGENTS.md`](AGENTS.md) 与 [`.agents/skills/`](.agents/skills/)。
 
+## iOS 扩展（步骤 1 完成，等待检查）
+
+当前正按“Capacitor + React 双平台”方向实施 iOS 扩展，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 1 已在 iPhone 17 Pro / iOS 26.5 模拟器完成构建、安装和冷启动。
+
+已确认的后续原则是：未登录也可使用本地账本；Apple/微信可绑定为同一云端账号；Android 与 iOS 各自的本地债务不自动同步或合并，仍通过用户主动创建/恢复云备份迁移。这些能力尚未实现。实施严格逐步验收，每一步完成后停止等待用户检查，未经明确批准不进入下一步、不提交代码。权威范围与当前停点见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
+
 ## Flutter 重写（已停止并封存）
 
 `flutter/` 是一套曾经并行开发的全量重写成果，已于 **2026-08-10** 按用户要求停止并封存。阶段 0～7 已实现；阶段 8 未完成，只留下阶段 8.1 的静态完整性门禁 WIP；Flutter 阶段 9 从未开始。它不是当前产品主线、不是已验收的替代版本，也不能据此宣称 iOS 已支持。
@@ -28,6 +36,7 @@
 - Node.js + npm
 - JDK 21
 - Android SDK command-line tools、`platform-tools`、Android 36 platform 及匹配的 build tools
+- iOS 开发需要完整 Xcode 26+、iOS Simulator Runtime；项目当前只使用 Swift Package Manager，不预装 CocoaPods。以后只有原生依赖明确不支持 SPM 时才按需安装
 
 macOS 可用 Homebrew 安装 Android command-line tools。Homebrew 的 `openjdk@21` 通常是 keg-only；Apple Silicon 构建时可显式设置 `JAVA_HOME=/opt/homebrew/opt/openjdk@21`，Intel Mac 通常使用 `/usr/local/opt/openjdk@21`。
 
@@ -56,6 +65,16 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:assembleDebug --no-daemon 
 
 Debug APK 位于 `android/app/build/outputs/apk/debug/app-debug.apk`。
 
+iOS Web 产物同步与打开工程：
+
+```bash
+npm run build:react
+npx cap sync ios
+npx cap open ios
+```
+
+Xcode 工程为 `ios/App/App.xcodeproj`。模拟器 Debug 构建不需要发布签名；真机、Apple 登录和 App Store 签名在后续步骤配置。
+
 - 只改 `react/src/**`：先 `npm run build:react`；要打进 APK 时再 sync 和构建 Android。
 - 只改 `www/**` 且 React 产物已是最新：可以跳过 React build，但仍需 `npx cap sync android`。
 - 不要直接编辑 `www/js/react-debts/**`、`android/app/src/main/assets/public/**` 或 Capacitor 生成的 Gradle 接线。
@@ -76,17 +95,18 @@ git diff --check
 - `react/`：当前 React + TypeScript 产品界面、共享状态和组件测试。
 - `www/`：Capacitor Web 宿主、持久化/云端/原生编排、纯计算和本地静态库。
 - `android/`：当前 Android 原生工程；同时包含生成接线和必须长期维护的手写源码。
+- `ios/`：可运行的 iOS 原生壳；使用 Swift Package Manager，功能适配尚未完成。
 - `cloudbase/`：微信登录、账户注销、云备份和 AI 顾问云函数。
 - `resources/`：App 图标设计源。
 - `flutter/`：已停止并封存的 Flutter 重写成果，不是当前产品主线。
-- `docs/`：法律文本、Flutter 历史存档和上下文工程计划。
+- `docs/`：法律文本、iOS 主线计划与交接、Flutter 历史存档和上下文工程计划。
 - `.agents/skills/`：按任务加载的项目知识；这是项目 skill 的唯一来源。
 - `AGENTS.md`：每次任务读取的精简常驻控制面。
 
 ## 备注
 
 - 全新安装必须为空数据；测试数据只能存在于测试或临时环境。
-- `io.github.jenkjyu.afterzero` 是 Android 更新、微信回调和签名身份的一部分，不能随意修改。
+- `io.github.jenkjyu.afterzero` 是 Android/iOS 的包身份，也是更新、微信回调和签名配置的一部分，不能随意修改。
 - Release keystore 不提交、不移动、不重建替换。
 
 ## License

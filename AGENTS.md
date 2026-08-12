@@ -9,9 +9,16 @@
 - `.agents/skills/` 是项目 skill 的唯一来源；不维护 `.claude/skills/` 副本。任务命中下方路由时，先完整读取相应 `SKILL.md`，需要时组合多个 skill。
 - 文档与实现冲突时，以用户当前指令和当前代码为准；`PROGRESS.md` 只记录本机当前停点，稳定结论应落在本文件或对应 skill。
 
+## 进行中的 iOS 扩展计划
+
+- iOS 步骤 1 已完成并等待用户检查；步骤 2 尚未授权。权威计划为 `docs/ios/implementation-plan.md`，准确停点与下一步授权状态为 `docs/ios/handoff.md`。
+- 该计划严格逐步执行：每一步必须完成本步的代码、测试、原生/云端验证和相关文档后停止等待用户检查；用户批准后仍不得自动进入下一步，必须再次收到明确开工指令。
+- 计划期间未经用户改变指令不得暂存、提交、推送或创建 PR。新 session 涉及 iOS 计划时，先完整读取交接和当前步骤；没有明确批准只讨论，不实施。
+- 根 `ios/` 已是可编译、可在模拟器冷启动的 Capacitor 8.4.1 Swift Package Manager 原生壳；本地优先登录模式、iOS 登录/文件/通知/购买和上架仍未实现，不能把原生壳误写成可发布 iOS 产品。Flutter 继续封存。
+
 ## 当前产品与架构
 
-After Zero 当前产品主线是 **Capacitor + React 的 Android App**：
+After Zero 当前产品主线是 **Capacitor + React**：Android App 是当前可用、可发布产品；iOS 已建立可运行原生壳，功能适配仍按计划逐步进行。
 
 - `react/src/**`：四个主 tab、subpage、sheet 和 React 侧状态。Vite 使用 `debts`、`pay`、`report`、`mine`、`sheets` 五个入口。
 - `www/index.html`：唯一 Web 宿主，保留全局 CSS、tabbar、登录门、共享确认框、隐藏导入 input、localStorage/IndexedDB、CloudBase、原生插件与文件 I/O 等 impure 编排。
@@ -19,15 +26,17 @@ After Zero 当前产品主线是 **Capacitor + React 的 Android App**：
 - `window.__azBridge`：vanilla 向 React 暴露数据和 impure 操作的窄边界。运行时形状、`react/src/types.ts` 的 `AzBridge`、`react/__tests__/mockBridge.ts` 必须同步。
 - `cloudbase/functions/**`：独立服务端单元，不进入 APK，也不由 Capacitor sync 自动部署。
 - 根 `android/`：当前 Capacitor 原生工程，混合项目维护源码与生成接线；不是可以整体重建后丢弃的目录。
+- 根 `ios/`：Capacitor 8.4.1 iOS 原生工程，最低 iOS 15，通过 `ios/App/CapApp-SPM/Package.swift` 接入 Capacitor 与 Local Notifications；`npx cap add ios` 已执行且不得重复重建。
 
 `flutter/` 是已停止并封存的重写成果。Flutter 阶段 8 未完成，Flutter 阶段 9 从未开始。除非用户在当前任务中明确重新授权，不得修改 Flutter 产品、parity 工具或相关历史文档，不得恢复阶段 8.1、继续 8.2–8.10 或开始 Flutter 阶段 9；普通产品需求只处理当前 Capacitor + React 主线。需要检查或恢复该路线时必须加载 `flutter-rewrite-parity`。
 
 ## 源码与生成物边界
 
 - 修改 `react/src/**` 后先运行 `npm run build:react`，生成 gitignored 的 `www/js/react-debts/**`；不要直接编辑该目录。
-- Web 内容要进入 Android assets 时再运行 `npx cap sync android`。不要直接编辑 `android/app/src/main/assets/public/**`。
+- Web 内容要进入原生 assets 时运行对应的 `npx cap sync android` / `npx cap sync ios`。不要直接编辑 `android/app/src/main/assets/public/**` 或 `ios/App/App/public/**`。
 - `android/capacitor.settings.gradle` 与 `android/app/capacitor.build.gradle` 是生成接线；不要手写修改。
 - 根 Android 工程中需要长期维护的内容包括 `MainActivity`、`SaveFilePlugin`、`WeChatLoginPlugin`、`wxapi/WXEntryActivity`、主 manifest、非生成 Gradle 配置和手写资源。具体边界以 `capacitor-native-runtime` 为准。
+- iOS 长期源码包括 Xcode 工程、`AppDelegate.swift`、`Info.plist`、storyboard、asset catalog 和以后新增的 Swift 插件；`ios/App/App/capacitor.config.json`、`config.xml`、`public/`、Pods/build/DerivedData 和用户签名数据均为生成或本机内容，不提交。
 - `resources/` 是 App 图标设计源；`android/app/src/main/res/mipmap-*` 是生成结果。重新生成图标后要按原生 skill 核对自适应图标 background inset。
 - CloudBase 函数必须单独部署；任何密钥、AppSecret、私钥或环境专属配置只能放受控环境变量/本机忽略文件，不能提交进仓库。
 
@@ -67,6 +76,14 @@ npm run build:react
 # Web 产物需要打进 Android
 npx cap sync android
 
+# Web 产物需要打进 iOS
+npx cap sync ios
+
+# iOS 模拟器构建（设备 id 按本机替换）
+xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+  -sdk iphonesimulator -destination 'platform=iOS Simulator,id=<device-id>' \
+  CODE_SIGNING_ALLOWED=NO build
+
 # debug APK（在 android/ 下）
 JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:assembleDebug --no-daemon --console=plain
 
@@ -89,7 +106,7 @@ Debug APK 位于 `android/app/build/outputs/apk/debug/app-debug.apk`。微信登
 | 账户生命周期、退出/重置/注销、Premium、兑换码、价格/购买占位、结清邀请、会员协议双副本 | `account-premium-design` |
 | AI 助手、`aiAdvisor`、服务端月额度、会话/提示词/模型/重试/历史 | `ai-advisor-design` |
 | 云备份 UI/bridge、`backups`/Storage、配额、恢复/删除归属、五个备份函数 | `cloud-backup-design` |
-| 根 `android/`、Capacitor sync、Java 插件、manifest/resource、本地通知、SAF、WebView/原生边界、debug APK | `capacitor-native-runtime` |
+| 根 `android/` 或 `ios/`、Capacitor sync、Java/Swift 插件、manifest/plist/resource、本地通知、文件保存、WebView/原生边界、debug APK/模拟器构建 | `capacitor-native-runtime` |
 | 微信 SDK、`WXEntryActivity`、`wxLogin`、匿名垫底、自定义登录票据 | `wechat-login-setup`，并按任务叠加原生/部署/签名 skill |
 | CloudBase 函数部署、依赖、`cloudbaserc.json`、环境变量或权限控制 | `cloudbase-deploy` |
 | release APK、keystore、SHA1、`assembleRelease` | `release-keystore`，先按 `capacitor-native-runtime` 确认构建边界 |

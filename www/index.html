@@ -2826,10 +2826,12 @@
   // <input type="file">由DocsScreen.tsx自己渲染+持有ref，onChange直接调用
   // window.__azBridge.uploadArchiveFile(file)(上面新增的函数，逻辑跟原来这段一致)。
 
-  // 通知渠道：安卓8+发通知必须先建channel，插件不会自动建；幂等，每次启动调用无副作用。
+  // 通知渠道：安卓8+发通知必须先建channel，插件不会自动建；iOS没有channel API，不能调用。
+  // 幂等，每次Android启动调用无副作用。
   (function () {
     var LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
-    if (LN) LN.createChannel({ id: "repay", name: "还款提醒", description: "债务还款日提醒", importance: 4 }).catch(function () {});
+    var platform = window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform();
+    if (LN && platform === "android") LN.createChannel({ id: "repay", name: "还款提醒", description: "债务还款日提醒", importance: 4 }).catch(function () {});
   })();
 
   // React迁移桥接："在还债务"页(react/src/debts/)整体由React接管，这里只暴露它实际需要
