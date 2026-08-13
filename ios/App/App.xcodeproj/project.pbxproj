@@ -18,6 +18,8 @@
 		A30000000000000000000001 /* AppleLoginPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000011 /* AppleLoginPlugin.swift */; };
 		A30000000000000000000002 /* AfterZeroBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000012 /* AfterZeroBridgeViewController.swift */; };
 		A50000000000000000000001 /* SaveFilePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50000000000000000000011 /* SaveFilePlugin.swift */; };
+		B41000000000000000000001 /* WeChatLoginPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41000000000000000000011 /* WeChatLoginPlugin.swift */; };
+		B41000000000000000000002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B41000000000000000000012 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +37,8 @@
 		A30000000000000000000012 /* AfterZeroBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AfterZeroBridgeViewController.swift; sourceTree = "<group>"; };
 		A30000000000000000000013 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		A50000000000000000000011 /* SaveFilePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveFilePlugin.swift; sourceTree = "<group>"; };
+		B41000000000000000000011 /* WeChatLoginPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeChatLoginPlugin.swift; sourceTree = "<group>"; };
+		B41000000000000000000012 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = WechatOpenSDK/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -73,6 +77,8 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				A30000000000000000000012 /* AfterZeroBridgeViewController.swift */,
 				A30000000000000000000011 /* AppleLoginPlugin.swift */,
+				B41000000000000000000011 /* WeChatLoginPlugin.swift */,
+				B41000000000000000000012 /* PrivacyInfo.xcprivacy */,
 				A50000000000000000000011 /* SaveFilePlugin.swift */,
 				A30000000000000000000013 /* App.entitlements */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -161,6 +167,7 @@
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
+				B41000000000000000000002 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -175,6 +182,7 @@
 				A30000000000000000000002 /* AfterZeroBridgeViewController.swift in Sources */,
 				A30000000000000000000001 /* AppleLoginPlugin.swift in Sources */,
 				A50000000000000000000001 /* SaveFilePlugin.swift in Sources */,
+				B41000000000000000000001 /* WeChatLoginPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -325,10 +333,13 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				HEADER_SEARCH_PATHS = "$(inherited) $(PROJECT_DIR)/App/WechatOpenSDK";
+				OTHER_LDFLAGS = "$(inherited) -ObjC -all_load -L$(PROJECT_DIR)/App/WechatOpenSDK -lWechatOpenSDK -framework SystemConfiguration -framework Security -framework CoreTelephony -framework CFNetwork -framework CoreGraphics -lz -lsqlite3 -lc++";
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.jenkjyu.afterzero;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/App/App-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -349,9 +360,12 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				HEADER_SEARCH_PATHS = "$(inherited) $(PROJECT_DIR)/App/WechatOpenSDK";
+				OTHER_LDFLAGS = "$(inherited) -ObjC -all_load -L$(PROJECT_DIR)/App/WechatOpenSDK -lWechatOpenSDK -framework SystemConfiguration -framework Security -framework CoreTelephony -framework CFNetwork -framework CoreGraphics -lz -lsqlite3 -lc++";
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.jenkjyu.afterzero;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/App/App-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

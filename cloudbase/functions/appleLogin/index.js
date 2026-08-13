@@ -1,7 +1,7 @@
 const cloudbase = require("@cloudbase/node-sdk");
-const crypto = require("crypto");
 const { sha256Hex, verifyAppleIdentityToken } = require("./verifyAppleToken");
 const { consumeNonceOnce } = require("./replayGuard");
+const { isValidCustomUserId, newAppleUserId, migratedAppleUserId } = require("./userId");
 
 const app = cloudbase.init({ env: cloudbase.SYMBOL_CURRENT_ENV });
 const db = app.database();
@@ -41,10 +41,22 @@ async function resolveAppleAccount(claims, displayName, now) {
     if (existingIdentity && existingIdentity.userId) {
       // 合并事务会把来源账号的 identity 映射迁到目标账号；因此这里始终以映射为准，
       // 不会给已合并的来源 userId 签发新票据。
-      return { userId: existingIdentity.userId, created: false };
+      if (isValidCustomUserId(existingIdentity.userId)) {
+        return { userId: existingIdentity.userId, created: false };
+      }
+
+      // A pre-release build created 34-character `u_` Apple IDs, which
+      // CloudBase refuses when issuing a custom-login ticket. Migrate that
+      // provider mapping deterministically so retries resolve to one account.
+      const legacyUserId = existingIdentity.userId;
+      const userId = migratedAppleUserId(claims.sub);
+      const legacyUser = firstDocument(await transaction.collection("users").doc(legacyUserId).get());
+      if (legacyUser) await transaction.collection("users").doc(legacyUserId).update({ userId });
+      await identityRef.update({ userId, migratedFrom: legacyUserId, migratedAt: now });
+      return { userId, created: false };
     }
 
-    const userId = `u_${crypto.randomBytes(16).toString("hex")}`;
+    const userId = newAppleUserId();
     await transaction.collection("users").doc(userId).set({
       userId,
       providers: ["apple"],

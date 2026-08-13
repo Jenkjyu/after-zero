@@ -24,6 +24,7 @@ import { BatchBlock } from "./BatchBlock";
 export function EditSheet() {
   const editId = useEditSheetId();
   const debts = useDebts();
+  const isOpen = editId !== null;
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const gripRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef(makeGripDragState());
@@ -131,6 +132,19 @@ export function EditSheet() {
     };
   }, [editId]);
 
+  // iOS WKWebView 不会始终把内层 .sheet-scroll 的 overscroll-behavior 当成根滚动链屏障。
+  // 这个表单打开期间显式锁住 html/body，避免滚到边界后继续带动下方主页面。
+  useEffect(() => {
+    if (!isOpen) return;
+    const root = document.documentElement;
+    root.classList.add("az-edit-sheet-open");
+    document.body.classList.add("az-edit-sheet-open");
+    return () => {
+      root.classList.remove("az-edit-sheet-open");
+      document.body.classList.remove("az-edit-sheet-open");
+    };
+  }, [isOpen]);
+
   useEffect(() => {
     const grip = gripRef.current;
     const sheet = sheetRef.current;
@@ -231,7 +245,6 @@ export function EditSheet() {
     window.__azBridge.toast("已保存 ✓");
   }
 
-  const isOpen = editId !== null;
   const firstDate = editingPlan[0] && editingPlan[0].date ? window.parseDate(editingPlan[0].date) : null;
   const fDay = firstDate ? firstDate.getDate() : "";
   const borrow = editingPlan.reduce((s, r) => s + (+r.principal || 0), 0);

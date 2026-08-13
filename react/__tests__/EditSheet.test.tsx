@@ -18,6 +18,21 @@ afterEach(() => {
 });
 
 describe("EditSheet 开关 + 回填", () => {
+  it("打开时锁住根滚动，关闭后解除，避免 iOS sheet 滚动带动主页面", () => {
+    window.__azBridge = makeMockBridge();
+    render(<EditSheet />);
+    expect(document.documentElement).not.toHaveClass("az-edit-sheet-open");
+    expect(document.body).not.toHaveClass("az-edit-sheet-open");
+
+    act(() => { openEditSheet(NEW_DEBT_ID); });
+    expect(document.documentElement).toHaveClass("az-edit-sheet-open");
+    expect(document.body).toHaveClass("az-edit-sheet-open");
+
+    act(() => { closeEditSheet(); });
+    expect(document.documentElement).not.toHaveClass("az-edit-sheet-open");
+    expect(document.body).not.toHaveClass("az-edit-sheet-open");
+  });
+
   it("openEditSheet(NEW_DEBT_ID)新增模式：标题新增债务，字段全空，没有删除按钮", () => {
     window.__azBridge = makeMockBridge();
     render(<EditSheet />);

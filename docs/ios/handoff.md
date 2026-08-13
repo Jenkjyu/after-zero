@@ -7,7 +7,7 @@
 ## 当前控制状态
 
 - 当前步骤：步骤 3“Apple 登录与统一内部账户端到端闭环”、步骤 4“iOS 微信登录、身份绑定与既有云账号合并”、步骤 5“iOS 文件保存、分享与导入导出闭环”、步骤 6“Android/iOS 本地通知双平台闭环”、步骤 7“iOS WebView、布局、键盘与手势全量适配”并行收尾
-- 当前状态：步骤 3 云端部署已完成，等待 iPhone 真机验收；步骤 4 经用户明确授权提前实施，代码基础已完成，等待微信开放平台 iOS 配置审核、官方 iOS SDK 接入与真机验收；步骤 5 文件代码与本机构建完成，等待 iPhone 真机文件验收；步骤 6 通知代码与本地验证完成，等待 iPhone/Android 真机验收；步骤 7 经用户明确例外授权提前实现，基础适配与模拟器验证完成，等待 iPhone 真机验收
+- 当前状态：步骤 3、5、6、7 的 iPhone 集中验收已通过；步骤 3 仍待 Android 旧微信账号回归，步骤 5～7 仍待 Android 对照回归。步骤 4 的微信开放平台审核、官方 iOS SDK、CloudBase 函数/私有集合和 iPhone Apple→微信绑定均已通过；其余账户组合及 Android 旧微信账号回归仍待完成。
 - 上一步：步骤 2 已批准
 - 下一步骤：无；不得进入步骤 8
 - 下一步骤授权：步骤 8 未授权，严禁开始
@@ -34,9 +34,9 @@
 - 本机已安装并选择 Xcode `26.6`（build `17F113`），Xcode 许可已由用户本人接受；已安装 iOS `26.5` Simulator Runtime。
 - CocoaPods 已按用户要求卸载；当前不安装也不使用。iOS 工程只使用 Swift Package Manager，未来只有原生依赖明确不支持 SPM 时才按需安装 CocoaPods。
 - `Package.resolved` 将 `capacitor-swift-pm` 固定为 `8.4.1`。不提交 Pods、DerivedData、构建目录、用户签名数据或同步后的 Web assets。
-- 当前通知计算未来 6 个月：Android 最多提交 450 条，iOS 最多提交 63 条正式提醒并为测试通知保留一个槽位。iOS 配置已启用前台 sound/banner/list，正式/测试通知均不发送 Android 专属字段；仍未真机验收。
-- 当前 Android 有四个手写 Java 类；iOS 已新增 `AppleLoginPlugin.swift`、`SaveFilePlugin.swift` 与 `AfterZeroBridgeViewController.swift`，以后仍按能力逐项实现，不机械复制 Android 四个类。
-- 步骤 3 已建立 provider-neutral 内部 `userId` 与 `identities` 映射：旧微信用户惰性保持 `userId === openid`，Apple 新用户使用随机内部 id。相关 CloudBase 函数已部署，`identities` 与 `appleLoginNonces` 已创建为 ADMINONLY；仍不能把它写成真机验收完成。
+- 当前通知计算未来 6 个月：Android 最多提交 450 条，iOS 最多提交 63 条正式提醒并为测试通知保留一个槽位。iOS 配置已启用前台 sound/banner/list，正式/测试通知均不发送 Android 专属字段；iPhone 真机已验收，Android 仍待回归。
+- 当前 Android 有四个手写 Java 类；iOS 已新增 `AppleLoginPlugin.swift`、`WeChatLoginPlugin.swift`、`SaveFilePlugin.swift` 与 `AfterZeroBridgeViewController.swift`，以后仍按能力逐项实现，不机械复制 Android 四个类。
+- 步骤 3 已建立 provider-neutral 内部 `userId` 与 `identities` 映射：旧微信用户惰性保持 `userId === openid`，Apple 新用户使用随机内部 id。相关 CloudBase 函数已部署，`identities` 与 `appleLoginNonces` 已创建为 ADMINONLY；iPhone Apple 真机闭环已通过，仍不能以此替代 Android 旧微信账号回归。
 - 当前 Premium 是本地状态和买断占位，尚无 StoreKit 或可信服务端购买权益。步骤 8 才会闭环；不能把当前本地 Premium 描述成跨设备账号权益。
 
 ## 步骤 0 本轮变更
@@ -131,19 +131,19 @@
 1. 借用或连接一台 iPhone，使用真实 Apple ID 完成首次登录、冷启动恢复、AI、云备份、退出/重登、注销；再回归旧微信账号及 Android 云功能。
 2. 记录真机证据后，步骤 3 才可改为“等待用户检查”。
 
-## 步骤 4 本轮进展与阻塞
+## 步骤 4 本轮进展与剩余验收
 
 - 用户已明确允许在步骤 3 真机验收前先做步骤 4；这是当时对原逐步顺序的单次授权，后续步骤 5 的独立例外授权见本文末尾。
-- 微信开放平台已有 Android 移动应用 `After Zero`；iPhone Bundle ID 已提交为 `io.github.jenkjyu.afterzero`，Universal Link 已提交为 `https://afterzero.tech/wechat/`，当前处于微信审核中。
+- 微信开放平台 iOS 审核已通过；iPhone Bundle ID 为 `io.github.jenkjyu.afterzero`，Universal Link 为 `https://afterzero.tech/wechat/`。iOS 手动接入官方 OpenSDK 2.0.7 静态库及隐私清单，配置 URL Scheme、Associated Domains、Swift `WeChatLoginPlugin` 和冷启动回调 state 恢复；未引入 CocoaPods 或客户端 AppSecret。
 - 账户页已提供“绑定 Apple / 绑定微信”。绑定时强制当前身份和待绑定身份分别完成真实授权；发生既有账号冲突时才显示明确确认，合并只迁移云备份归属和 AI 月度用量，不触碰本机账本。
-- 新增 `accountBinding` 云函数基础、合并事务和回归测试；合并后来源账号标记 `mergedInto`，AI/备份/注销等受保护函数拒绝旧会话，微信再次登录会换到目标内部 `userId`，避免云数据继续分叉。
-- `npm test` 127/127、React 45 文件 363/363、TypeScript、React build、Android/iOS sync、iOS 无签名模拟器 build、Android debug build 与 `git diff --check` 均通过。
-- 尚未部署步骤 4 新增的 `accountBinding` 函数，也未创建 `accountBindingIntents`、`accountMerges` 集合；必须等微信审核后，接入并验证官方 iOS OpenSDK、Associated Domains/AASA 文件、云端集合/函数，再在 iPhone 真机完成三条验收路径。
+- 新增 `accountBinding` 云函数基础、合并事务和回归测试；合并后来源账号标记 `mergedInto`，AI/备份/注销等受保护函数拒绝旧会话，微信再次登录会换到目标内部 `userId`，避免云数据继续分叉。函数已部署；`accountBindingIntents`、`accountMerges` 已创建并设为 ADMINONLY，空身份调用实测返回 `LOGIN_REQUIRED`。
+- 验证：`npm test` 131/131、React 45 文件 367/367、TypeScript、React build、iOS sync、`git diff --check`、签名 iPhone Debug 构建/安装/启动均通过。用户已在 iPhone 完成 Apple→微信绑定并确认无问题。
+- 剩余：`先微信后绑 Apple`、两个既有云账号的确认合并及合并后备份可见性，和 Android 已注册签名包的旧微信账号/注销回归；不得以当前单条 iPhone 路径代替这些验收。
 
 ## 明确留给后续步骤的范围
 
 - 步骤 3：仅剩 iPhone 真机 Apple 登录及 Android 真实账号回归；仍未验收完成。
-- 步骤 4：等待微信审核后继续 iOS 官方 SDK、Associated Domains/AASA、CloudBase 部署与双端真机验收；仍未验收完成。
+- 步骤 4：补齐其余账户组合、合并后备份可见性与 Android 已注册签名包回归；仍未验收完成。
 - 步骤 6：本地代码和构建已完成，仍待真机通知验收；步骤 7～10：UI 适配、StoreKit、签名合规和上架。当前按需登录表面不代表 iOS 已支持任一原生登录方式。
 
 ## 步骤 5 本轮变更与当前阻塞
@@ -196,3 +196,12 @@
 1. 在至少一台 iPhone 上逐页检查四个 tab、全部 subpage/sheet/modal 的小/大屏、安全区、键盘、动态字体、VoiceOver、浅深色、滚动边界和 PDF 预览。
 2. 以真实触摸完成长按排序、左右滑动/销期、图表 scrub/旋转、sheet grip、嵌套弹层和返回链；同时回归 Android 的浅深色、手势与硬件返回。
 3. 记录上述证据后，步骤 7 才可从“阻塞”改为“等待用户检查”；不得以模拟器代替 iPhone 真机验收，不得进入步骤 8。
+
+## 2026-08-13（续4）：iPhone 集中验收与新增债务滚动修复
+
+- 设备：余莉的 iPhone（iPhone 16 Pro Max，iOS 26.4.1）。步骤 3 Apple 登录首次授权、冷启动保持会话、云备份创建、退出后重登并查看原备份、AI 调用、注销后云备份删除及再次登录均由用户确认通过。本机账本在退出/注销时保持不变。
+- 注销后再次 Apple 登录未重复出现邮箱共享选择是 Apple 的预期行为：删除 After Zero 云账号不会撤销 Apple 对 App 的授权；云端仍以 Apple 稳定 `sub` 识别身份，不以邮箱作为账户主键。
+- 步骤 5：用户确认 iPhone Files 保存、打开和取消路径无问题；当前档案界面只露出下载/删除，虽已存在原生分享能力但未暴露入口，用户确认本轮不以分享验收阻塞。Android SAF 仍未回归。
+- 步骤 6：用户确认 iPhone 通知验收无问题；Android channel、450 条上限和重排仍需独立回归。
+- 步骤 7：用户确认深色模式四主 tab、键盘/表单、债务详情拖拽关闭、长按排序、还款日左滑、统计图表触摸与动态字体等检查无问题。发现“新增债务”内层滚动到边界会带动主页面：原因是 React `EditSheet` 未调用旧 vanilla `lockScroll()`；已在打开期间给 `html/body` 加 `az-edit-sheet-open` 根滚动锁，新增回归测试，React 367/367、TypeScript、React build、iOS sync、签名真机构建/安装均通过，用户复测通过。
+- 下一步仍只有步骤 4 的其余账户组合和各步骤待做的 Android 回归；步骤 8 未授权，禁止开始。未暂存、提交或推送。

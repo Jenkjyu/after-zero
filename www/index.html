@@ -105,6 +105,10 @@
      ⚠️只写CSS不够，原生那边还配了WebView.setOverScrollMode(OVER_SCROLL_NEVER)兜底，
      见MainActivity.java——两层都要有，别只改一处。 */
   html, body { min-height: var(--az-viewport-height); overscroll-behavior-y: none; }
+  /* React 管理的新增/编辑债务 sheet 打开时也要锁住根滚动。
+     .sheet-scroll 的 overscroll-behavior 在 iOS WKWebView 上不足以阻止滚动链传到主页面；
+     旧版 lockScroll() 只由 vanilla 的确认弹窗/登录门调用，因此不能覆盖这个 React sheet。 */
+  html.az-edit-sheet-open, body.az-edit-sheet-open { overflow: hidden; }
   @supports (height: 100dvh) {
     :root { --az-viewport-height: 100dvh; }
   }
@@ -1466,11 +1470,11 @@
 
 <div class="flash" id="flash">已保存 ✓</div>
 
-<!-- 腾讯云开发(CloudBase) JS SDK，CDN引入，不走npm/构建工具，跟整个项目"单文件无构建步骤"的原则保持一致。 -->
-<!-- 内核之外，登录(auth)和云函数(functions)模块必须单独引入，不含在内核里——漏引入auth.js会导致app.auth()不是函数。 -->
-<script src="https://static.cloudbase.net/cloudbase-js-sdk/2.28.6/cloudbase.js"></script>
-<script src="https://static.cloudbase.net/cloudbase-js-sdk/2.28.6/cloudbase.auth.js"></script>
-<script src="https://static.cloudbase.net/cloudbase-js-sdk/2.28.6/cloudbase.functions.js"></script>
+<!-- 腾讯云开发(CloudBase) JS SDK 固定随 App 打包，不能让原生 WebView 的登录链依赖运行时 CDN。
+     内核之外，登录(auth)和云函数(functions)模块必须单独引入，不含在内核里——漏引入auth.js会导致app.auth()不是函数。 -->
+<script src="js/cloudbase.js"></script>
+<script src="js/cloudbase.auth.js"></script>
+<script src="js/cloudbase.functions.js"></script>
 <!-- 高级统计报表导出用：jsPDF导出PDF(window.jspdf.jsPDF)，SheetJS(xlsx)导出真正的.xlsx(window.XLSX)。
      ⚠️ 这两个库本地打包在 www/js/ 下，不走CDN——早期从 cdn.jsdelivr.net / cdn.sheetjs.com 引入，
      在国内移动网络下经常加载失败(不像腾讯的 static.cloudbase.net 稳定)，表现为导出时报"图表库加载失败"。
@@ -2055,7 +2059,13 @@
   // 本地账本不要求登录；#loginGate只在用户主动进入AI/云备份或从账户页登录时打开。
   var CLOUDBASE_ENV_ID = "after-zero-d7gub5p5f09c8cc2d";
   var _cbApp = null;
-  function cbApp() { if (!_cbApp) _cbApp = cloudbase.init({ env: CLOUDBASE_ENV_ID }); return _cbApp; }
+  function cbApp() {
+    if (typeof cloudbase === "undefined" || !cloudbase.init) {
+      throw new Error("CloudBase SDK 未加载，请重启 App 后重试");
+    }
+    if (!_cbApp) _cbApp = cloudbase.init({ env: CLOUDBASE_ENV_ID });
+    return _cbApp;
+  }
   // 统一从这里拿auth实例，并显式要求 persistence:'local'——微信自定义登录的会话必须持久化到
   // localStorage 才能跨App冷启动自动恢复+续期；否则重启后只剩匿名会话，云备份那几个云函数命中
   // "非匿名"权限规则会被 PERMISSION_DENIED 拒掉。app.auth()是单例，第一次调用带上的选项生效，
@@ -2085,7 +2095,7 @@
       ? window.Capacitor.getPlatform()
       : "web";
     $("appleLoginBtn").hidden = platform !== "ios";
-    $("wxLoginBtn").hidden = platform !== "android";
+    $("wxLoginBtn").hidden = platform !== "android" && platform !== "ios";
     var gate = $("loginGate");
     gate.setAttribute("aria-hidden", "false");
     gate.classList.add("open");
@@ -2481,7 +2491,7 @@
     // 匿名登录只用于两种主动登录流程换取自定义票据，不代表本地模式已登录，也不能被
     // AI、备份或注销执行层复用。
     return Promise.resolve(auth.signInAnonymously ? auth.signInAnonymously().catch(function () {}) : null).then(function () {
-      return auth.setCustomSignFunc(function () {
+      return auth.signInWithCustomTicket(function () {
         return cbApp().callFunction({ name: functionName, data: data }).then(function (res) {
           var result = res && res.result;
           if (!result || !result.ok) {
@@ -2493,8 +2503,9 @@
           return result.ticket;
         });
       });
-    }).then(function () {
-      return auth.signInWithCustomTicket();
+    }).then(function (signInResult) {
+      if (signInResult && signInResult.error) throw signInResult.error;
+      return signInResult;
     }).then(function () {
       var resultAccount = pendingLoginResult && pendingLoginResult.account;
       if (!resultAccount && fallbackProvider === "wechat") {
@@ -3009,7 +3020,7 @@
   // React渲染，这些按钮的onClick直接在JSX里写，不再需要在这里查DOM绑监听器。
   $("wxLoginBtn").addEventListener("click", function () {
     var native = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.WeChatLogin;
-    if (!native) { toast("微信登录仅支持安卓App内使用"); return; }
+    if (!native) { toast("微信登录仅支持原生 App 内使用"); return; }
     native.isInstalled().then(function (r) {
       if (!r.installed) { toast("请先安装微信"); return Promise.reject(0); }
       if (!wxAuthListenerBound) { wxAuthListenerBound = true; native.addListener("wechatAuthResult", handleWxAuthResult); }

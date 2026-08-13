@@ -8,6 +8,11 @@ const {
   verifyAppleIdentityToken,
 } = require("../cloudbase/functions/appleLogin/verifyAppleToken");
 const { consumeNonceOnce } = require("../cloudbase/functions/appleLogin/replayGuard");
+const {
+  isValidCustomUserId,
+  newAppleUserId,
+  migratedAppleUserId,
+} = require("../cloudbase/functions/appleLogin/userId");
 
 const clientId = "io.github.jenkjyu.afterzero";
 const nowMs = Date.parse("2026-08-12T10:00:00.000Z");
@@ -99,4 +104,19 @@ test("同一Apple token nonce只能消费一次，重放会被原子事务拒绝
     (error) => error.code === "TOKEN_REPLAYED"
   );
   assert.equal([...documents.values()][0].userId, "u_internal");
+});
+
+test("Apple 内部 userId 满足 CloudBase 自定义登录 4 到 32 位约束", () => {
+  const userId = newAppleUserId();
+  assert.equal(userId.length, 32);
+  assert.equal(isValidCustomUserId(userId), true);
+  assert.equal(isValidCustomUserId(`u_${"a".repeat(32)}`), false);
+});
+
+test("旧版超长 Apple userId 迁移目标稳定且合法", () => {
+  const one = migratedAppleUserId("apple-subject-1");
+  const two = migratedAppleUserId("apple-subject-1");
+  assert.equal(one, two);
+  assert.equal(one.length, 32);
+  assert.equal(isValidCustomUserId(one), true);
 });

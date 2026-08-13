@@ -4,6 +4,7 @@ final class AfterZeroBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(AppleLoginPlugin())
+        bridge?.registerPluginInstance(WeChatLoginPlugin())
         bridge?.registerPluginInstance(SaveFilePlugin())
 
         // App 内的层级返回由各 screen/sheet 的显式返回按钮与 Web 返回链负责；不让 WKWebView
