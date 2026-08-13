@@ -77,6 +77,12 @@ public final class WeChatLoginPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc public func login(_ call: CAPPluginCall) {
+        // 账户绑定由前端内存中的 Promise 防止重复发起。若上一次微信未回调，
+        // 这里清除的只是没有对应前端流程的持久化残留状态。
+        if call.getBool("resetPending") == true {
+            clearPending()
+        }
+
         guard pendingState == nil else {
             call.reject("微信授权正在进行中", "WECHAT_LOGIN_IN_PROGRESS")
             return

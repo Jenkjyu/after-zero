@@ -87,21 +87,17 @@ export function AccountScreen() {
       window.__azBridge.toast(error instanceof Error ? error.message : "头像设置失败");
     }
   }
-  async function onResetLocalData() {
-    const reallyReset = await window.__azBridge.confirmAsync(
-      "确定重置本地数据？",
-      "这会清空这台设备上保存的债务、档案和设置，且无法恢复。云账号和云备份不会被删除。"
-    );
-    if (reallyReset) window.__azBridge.resetLocalData();
-  }
   async function onDeleteAccount() {
     const result = await window.__azBridge.confirmAsync(
       "注销账户",
-      "注销后云端账号及其云备份将从服务器永久删除，此操作不可撤销。为防止重复赠送体验并支持恢复已购权益，系统仅保留不可逆权益标记。当前设备上的本地债务、档案和设置会保留。确定继续注销吗？"
+      "注销后账户及其云备份将从服务器永久删除，此操作不可撤销。本地债务、档案和设置默认保留。\n已购 Premium 不会自动恢复，日后可重新登录后主动恢复购买。",
+      { checkLabel: "同时重置这台设备上的本地数据" }
     );
     if (!result) return;
     const success = await window.__azBridge.deleteAccount();
-    if (success) closeAccountScreen();
+    if (!success) return;
+    closeAccountScreen();
+    if (result === "checked") window.__azBridge.resetLocalData();
   }
 
   return (
@@ -140,8 +136,7 @@ export function AccountScreen() {
         {account && !account.providers.includes("wechat") && <div className="data-actions" style={{ marginTop: 10 }}><button type="button" className="btn ghost" onClick={() => onBind("wechat")}>绑定微信</button></div>}
         {account && <p className="account-local-note">绑定时会分别验证当前账号和待绑定账号；只合并云备份与 AI 用量，不会改变本机账本。</p>}
         {account && <div className="data-actions" style={{ marginTop: 16 }}><button type="button" className="btn ghost" onClick={onLogout}>退出登录</button></div>}
-        <div className="data-actions" style={{ marginTop: 10 }}><button type="button" className="btn ghost" onClick={onResetLocalData}>重置本地数据</button></div>
-        {account && <div className="data-actions" style={{ marginTop: 10 }}><button type="button" className="btn danger" onClick={onDeleteAccount}>注销云端账户</button></div>}
+        {account && <div className="data-actions" style={{ marginTop: 10 }}><button type="button" className="btn danger" onClick={onDeleteAccount}>注销账户</button></div>}
       </div>
     </div>
   );

@@ -251,10 +251,9 @@ export interface AzBridge {
   setDebt(id: string | null, obj: Omit<Debt, "id">): void;
   deleteDebt(id: string): void;
   toast(msg: string): void;
-  // opts.thirdLabel：取消/确认之外的第三条路径(目前只有"注销账户"弹窗的"仅重置本地数据"
-  // 用到)——传了就多显示一个按钮，点击时Promise resolve成字符串字面量"third"，跟月份/日期/
-  // 金额输入值以及true/false都区分得开。不传的话行为跟以前完全一样。
-  confirmAsync(title: string, body: string, opts?: { month?: string; date?: string; dateMin?: string; amount?: number; amountHint?: string; thirdLabel?: string }): Promise<string | boolean | null>;
+  // opts.checkLabel 在确认框内提供默认未勾选的额外本机操作；勾选并确认时返回"checked"。
+  // thirdLabel 仍是取消/确认之外的第三条路径，其他调用不传这些字段时行为保持不变。
+  confirmAsync(title: string, body: string, opts?: { month?: string; date?: string; dateMin?: string; amount?: number; amountHint?: string; thirdLabel?: string; checkLabel?: string }): Promise<string | boolean | null>;
   // 第七步(accountScreen/premiumScreen)新增：这三个都是真实的cloud/native调用或者共享状态
   // 变更，不能重写成纯React——wxLogout()清本地账号态+CloudBase signOut；deleteAccount()调
   // deleteAccount云函数(不信任客户端参数，身份来自已认证会话)；购买、恢复和兑换均由
@@ -272,8 +271,8 @@ export interface AzBridge {
   buyPremium(): Promise<boolean>;
   restorePremium(): Promise<boolean>;
   redeemCode(code: string): Promise<boolean>;
-  // "注销账户"弹窗第三条路径新增：只清本机localStorage+IndexedDB上传文件库、不删服务器
-  // 账户，清完立刻reload()回到空白本地账本——没有返回值，页面已经在这个函数内部被刷新掉了。
+  // 勾选“同时重置本机数据”且云端注销成功后调用：清本机localStorage+IndexedDB上传文件库，
+  // 随即reload()回到空白本地账本。
   resetLocalData(): void;
   // 第八步(notifySheet)新增：这几个都要调用@capacitor/local-notifications原生插件
   // (权限检查/申请/调度)，不能重写成纯React。setNotifyEnabled返回最终生效的状态(权限被拒时

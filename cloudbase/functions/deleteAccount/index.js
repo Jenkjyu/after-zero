@@ -56,7 +56,7 @@ exports.main = async () => {
 
   const identities = db.collection("identities");
   const identityDocs = await identities.where({ userId }).get();
-  // 账户资料、备份和登录映射仍会删除。为落实“不重复赠送体验”且让已购用户恢复购买，
+  // 账户资料、备份和登录映射仍会删除。为落实“不重复赠送体验”且允许用户日后主动恢复购买，
   // 仅保留哈希 identity 对应的最小权益记录，不包含昵称、邮箱、openid 或账本内容。
   const entitlementResult = await db.collection("premiumEntitlements").doc(userId).get();
   const entitlement = entitlementResult && entitlementResult.data || null;

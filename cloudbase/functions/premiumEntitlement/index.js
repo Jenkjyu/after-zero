@@ -48,12 +48,16 @@ function publicAccess(entitlement, now) {
   };
 }
 
+function uniqueStrings(values) {
+  return [...new Set((values || []).filter((value) => typeof value === "string" && value))];
+}
+
 async function getUser(userId) {
   return firstDocument(await db.collection("users").where({ userId }).limit(1).get());
 }
 
 // 首次服务端读取才授予体验期。login 函数会把删除后不可再次赠送的账号标为
-// trialEligible:false；缺省值只兼容这次迁移前已经存在的账号。
+// trialEligible:false；注销前的已购记录不能在登录时自动恢复，必须由用户主动恢复购买。
 async function ensureEntitlement(userId, now) {
   const user = await getUser(userId);
   const result = await db.runTransaction(async (transaction) => {
@@ -61,11 +65,10 @@ async function ensureEntitlement(userId, now) {
     const existing = firstDocument(await ref.get());
     if (existing) return existing;
 
-    const preserved = user && user.preservedPremiumEntitlement;
-    const eligible = !preserved && (!user || user.trialEligible !== false);
+    const eligible = !user || user.trialEligible !== false;
     const entitlement = {
       userId,
-      kind: preserved && preserved.kind === "paid" ? "paid" : (eligible ? "trial" : "expired"),
+      kind: eligible ? "trial" : "expired",
       trialStartedAt: eligible ? now : null,
       trialEndsAt: eligible ? now + TRIAL_MS : null,
       // 一个账号可能在 Apple/微信账户绑定时合并；保留原 token 才能继续核验
@@ -74,14 +77,6 @@ async function ensureEntitlement(userId, now) {
       createdAt: now,
       updatedAt: now,
     };
-    if (preserved && preserved.kind === "paid") {
-      entitlement.source = preserved.source || "appStore";
-      entitlement.transactionId = preserved.transactionId || null;
-      entitlement.originalTransactionId = preserved.originalTransactionId || null;
-      entitlement.purchasedAt = preserved.purchasedAt || null;
-      entitlement.appAccountTokens = Array.isArray(preserved.appAccountTokens) && preserved.appAccountTokens.length
-        ? preserved.appAccountTokens : entitlement.appAccountTokens;
-    }
     await ref.set(entitlement);
     return entitlement;
   });
@@ -106,7 +101,19 @@ function decodePayload(jws) {
   return JSON.parse(Buffer.from(normalized, "base64").toString("utf8"));
 }
 
-async function verifyTransaction(userId, jws, now) {
+async function deletedPurchaseClaimForUser(userId, appAccountToken) {
+  const identities = await db.collection("identities").where({ userId }).get();
+  for (const identity of identities.data || []) {
+    const claim = firstDocument(await db.collection("premiumTrialClaims").doc(identity._id).get());
+    const preserved = claim && claim.preservedPremiumEntitlement;
+    if (preserved && preserved.kind === "paid" && (preserved.appAccountTokens || []).includes(appAccountToken)) {
+      return preserved;
+    }
+  }
+  return null;
+}
+
+async function verifyTransaction(userId, jws, now, allowAccountRecovery) {
   if (typeof jws !== "string" || jws.length < 32) {
     const error = new Error("缺少 Apple 交易凭证");
     error.code = "STOREKIT_TRANSACTION_REQUIRED";
@@ -125,7 +132,12 @@ async function verifyTransaction(userId, jws, now) {
     throw error;
   }
   const transactionToken = decoded.appAccountToken && String(decoded.appAccountToken);
-  if (!transactionToken || !(entitlement.appAccountTokens || []).includes(transactionToken)) {
+  const ownsTransaction = transactionToken && (entitlement.appAccountTokens || []).includes(transactionToken);
+  // 只在用户点了“恢复购买”后，才允许用已删除账户留下的最小购买线索恢复权益。
+  const deletedPurchase = !ownsTransaction && allowAccountRecovery && transactionToken
+    ? await deletedPurchaseClaimForUser(userId, transactionToken)
+    : null;
+  if (!transactionToken || (!ownsTransaction && !deletedPurchase)) {
     const error = new Error("该购买不属于当前 After Zero 账号");
     error.code = "STOREKIT_ACCOUNT_MISMATCH";
     throw error;
@@ -134,7 +146,7 @@ async function verifyTransaction(userId, jws, now) {
   const result = await db.runTransaction(async (transaction) => {
     const transactionRef = transaction.collection("premiumTransactions").doc(transactionId);
     const claimed = firstDocument(await transactionRef.get());
-    if (claimed && claimed.userId && claimed.userId !== userId && !(entitlement.appAccountTokens || []).includes(claimed.appAccountToken)) {
+    if (claimed && claimed.userId && claimed.userId !== userId && !ownsTransaction && !deletedPurchase) {
       const error = new Error("该 Apple 购买已绑定到其他 After Zero 账号");
       error.code = "STOREKIT_TRANSACTION_ALREADY_CLAIMED";
       throw error;
@@ -158,6 +170,7 @@ async function verifyTransaction(userId, jws, now) {
       originalTransactionId: String(decoded.originalTransactionId || decoded.transactionId),
       purchasedAt: decoded.purchaseDate || now,
       updatedAt: now,
+      appAccountTokens: uniqueStrings([...(entitlement.appAccountTokens || []), transactionToken]),
     };
     await transaction.collection("premiumEntitlements").doc(userId).set(next);
     return next;
@@ -196,7 +209,7 @@ exports.main = async (event) => {
     const now = Date.now();
     const action = event && event.action || "status";
     let entitlement;
-    if (action === "verifyTransaction") entitlement = await verifyTransaction(userId, event && event.jws, now);
+    if (action === "verifyTransaction") entitlement = await verifyTransaction(userId, event && event.jws, now, event && event.allowAccountRecovery === true);
     else if (action === "redeem") entitlement = await redeemCode(userId, event && event.code, now);
     else if (action === "status") entitlement = await ensureEntitlement(userId, now);
     else return { ok: false, code: "ACTION_INVALID", error: "未知权益操作" };

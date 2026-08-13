@@ -96,7 +96,7 @@ export function PremiumScreen() {
             </div>
           ) : null}
         </div>
-        <div className="footnote">开通即表示你同意我们的<button type="button" className="terms-link" onClick={openTermsScreen}>《会员服务协议》</button>。¥28 为一次性买断价，不会自动续费；已购买可通过 Apple 恢复购买。</div>
+        <div className="footnote">开通即表示你同意我们的<button type="button" className="terms-link" onClick={openTermsScreen}>《会员服务协议》</button>。¥28 为一次性买断价，不会自动续费；已购买可在 iPhone 通过 Apple 恢复购买，Android 入口将在接入 Google Play 后开放。</div>
       </div>
     </div>
   );

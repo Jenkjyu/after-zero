@@ -3006,3 +3006,13 @@ PDF字体经历了一次有价值的测试拦截：先下载的Noto OTF在`pdf`�
 - 新增 iOS 系统式左缘交互返回：使用原生 `UIScreenEdgePanGestureRecognizer` 驱动 WebView 中最上层全屏 subpage 跟手右移；松手超过 35% 或快速右甩才沿现有 `__handleBackButton()` 返回链关闭，否则回弹。继续关闭 Web 网页历史侧滑；首页、登录门、确认框和底部 sheet 均不响应，避免越过 App 层级或同现有表单/横滑手势冲突。React 45 文件/373 项、TypeScript、React build、Android/iOS sync、`git diff --check`与开发签名 iPhone 构建/安装/启动通过；待用户真机手势验收。未暂存、提交或推送。
 - iOS 26 的底栏改为原生 `UIGlassEffect` 外壳：四个图标按原 Web SVG 的形状重绘，选中时仍只变为原本的实心/强调色，不加任何彩色圆角外框；点击通过 WK 消息桥触发原 Web tab 按钮，继续复用 Premium 门禁、切换逻辑与“我的”实际的 `data` 路由。栏宽比旧版每侧收窄 8pt；打开登录门、全屏 subpage、sheet 或确认框时原生栏隐藏。iOS 25 及以下、Android 和浏览器保留 Web 浮动玻璃降级样式，同样去除选中图标的色块。React 45 文件/373 项、TypeScript、React build、iOS sync、`git diff --check`与开发签名 iPhone 构建、安装、启动通过；待用户目视验收。未暂存、提交或推送。
 - 用户已确认底栏视觉效果；本批包含 Premium 文案与按钮尺寸修正、iOS 左缘交互返回、冷启动品牌开屏、Apple 登录重复认证修复、账户头像与昵称编辑，以及 iOS 26 原生 Liquid Glass 底栏。经用户明确授权，准备提交并推送当前 `main` 分支。
+
+## 2026-08-14（续6）：通知、账户注销恢复与 iOS 全屏返回修正
+
+- 通知页在系统通知未启用时只显示开关；开启后恢复规则、测试通知和完成按钮之间的内容，关闭再开启不改变已添加规则。新增提醒文案统一为“到期当天”；测试通知提示精简为单行的系统通知设置说明。
+- iOS 现在可从屏幕任意位置右滑返回，但只在最上层全屏子页面打开、且没有 sheet、确认框或登录门时接管手势；首页、底部 sheet 与横向卡片手势不受影响。
+- 修复 iOS 微信绑定流程中遗留的“微信授权正在进行中”：仅绑定时会在发起新的授权前清除旧的进行中状态，普通微信登录与回调 state 校验不变。
+- 账户页按钮改为“注销账户”。确认框明确说明账户及云备份会永久删除，本地债务、档案和设置默认保留，并提供默认未勾选的“同时重置这台设备上的本地数据”。删除后已购 Premium 不自动恢复；用户重新登录后可主动点“恢复购买”取回 iPhone 上经 Apple 验证的购买。Android 保留入口并提示需等 Google Play 接入。
+- 服务端删除账户后仅保留基于身份哈希的最小已购凭据；登录不会自动恢复该权益，只有用户主动恢复购买且 Apple 交易验证成功时才重新归属。`appleLogin`、`wxLogin`、`deleteAccount` 与 `premiumEntitlement` 已部署。未对真实账户执行删除验证。
+- 验证：React 45 文件、373 项通过；TypeScript、React build、Android/iOS sync、`git diff --check`通过；本轮多次开发签名 iPhone Debug 构建、安装、启动成功。
+- 视觉密度尝试：曾临时设置 `WKWebView.pageZoom = 1.2`，真机发现它改变有效网页宽度并产生页面可拖动/横向滚动，已立即撤回并重新构建、覆盖安装正常版本。后续 iOS 密度适配必须采用受控的 CSS 尺寸与间距方案，不能使用 `pageZoom`。未暂存、提交或推送。

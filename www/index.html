@@ -622,6 +622,7 @@
     border-radius: 12px; margin-bottom: 7px; font-size: 13.5px; }
   .notify-rule .nr-text { flex: 1; }
   .notify-rule .nr-del { background: none; border: none; color: var(--text-muted); font-size: 12.5px; font-weight: 600; padding: 2px 6px; }
+  .notify-test-note { margin: 6px 2px 0; padding: 0; text-align: left; }
 
   /* plan editor */
   .plan-sum { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
@@ -676,6 +677,8 @@
   .modal .mtitle-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
   .modal .mtitle-row .mtitle { margin-bottom: 0; }
   .modal .mbody { font-size: 13.5px; color: var(--text); white-space: pre-line; margin-bottom: 18px; line-height: 1.55; overflow-wrap: break-word; word-break: break-word; }
+  .modal-check { display: flex; align-items: flex-start; gap: 9px; margin: -4px 0 18px; color: var(--text); font-size: 13px; line-height: 1.45; cursor: pointer; }
+  .modal-check input { width: 17px; height: 17px; margin: 1px 0 0; accent-color: var(--accent); flex: none; }
   #mMonthInput, #mAmountInput, #mDateInput { width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
     border-radius: 9px; padding: 10px 11px; font-size: 15px; font-family: inherit; margin: -8px 0 18px; }
   /* 金额输入框下面那行解释默认值含义的小字(提前结清用："默认¥X = 只还本金、利息为0")。
@@ -1479,6 +1482,7 @@
       <button type="button" id="mThird" style="display:none"></button>
     </div>
     <div class="mbody" id="mBody"></div>
+    <label class="modal-check" id="mCheckWrap" style="display:none"><input type="checkbox" id="mCheck"><span id="mCheckLabel"></span></label>
     <input type="month" id="mMonthInput" style="display:none">
     <input type="date" id="mDateInput" style="display:none">
     <input type="number" inputmode="decimal" step="0.01" min="0" id="mAmountInput" style="display:none">
@@ -1609,7 +1613,7 @@
   function saveNotify() { try { localStorage.setItem(NOTIF_KEY, JSON.stringify(notify)); } catch (e) {} window.dispatchEvent(new CustomEvent("az:state-changed")); }
   // 本机只缓存服务端已经确认的访问窗口；不能把 localStorage 当成购买凭证。
   var premium = loadJSON(PREMIUM_KEY, { premium: null });
-  // iOS 不再相信旧本地开通记录；Android 尚未进入买断迁移，本轮继续保持原行为。
+  // iOS 不再相信旧本地开通记录；Android 尚未接入 Google Play 买断，本轮继续保持原行为。
   if (premium && premium.premium && !premium.premium.offlineUntil && !premium.premium.expiresAt) {
     var initialPlatform = window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform();
     premium = initialPlatform === "ios" ? { premium: null } : { premium: {
@@ -1651,6 +1655,11 @@
     var mt = $("mThird");
     if (opts && opts.thirdLabel) { mt.style.display = ""; mt.textContent = opts.thirdLabel; _onThird = opts.onThird || null; }
     else { mt.style.display = "none"; mt.textContent = ""; _onThird = null; }
+    // opts.checkLabel 仅用于“注销账户”这类确认后还可选择额外本机操作的场景。
+    // 勾选并确认时 askAsync 返回字符串 "checked"；其他现有调用保持原有返回值。
+    var cw = $("mCheckWrap"), check = $("mCheck"), cl = $("mCheckLabel");
+    if (opts && opts.checkLabel) { cw.style.display = "flex"; cl.textContent = opts.checkLabel; check.checked = false; }
+    else { cw.style.display = "none"; cl.textContent = ""; check.checked = false; }
     var mi = $("mMonthInput");
     if (opts && opts.month !== undefined) { mi.style.display = ""; mi.value = opts.month || ""; } else { mi.style.display = "none"; mi.value = ""; }
     // opts.date：日期输入框(还款日页"自定义天数"筛选，点日历图标弹出)。
@@ -1694,6 +1703,7 @@
     $("mMonthInput").style.display = "none";
     $("mDateInput").style.display = "none";
     $("mAmountInput").style.display = "none"; $("mAmountHint").style.display = "none";
+    $("mCheckWrap").style.display = "none"; $("mCheck").checked = false; $("mCheckLabel").textContent = "";
     $("mThird").style.display = "none"; $("mThird").textContent = "";
     unlockScroll();
   }
@@ -1702,6 +1712,7 @@
     if ($("mMonthInput").style.display !== "none") inputVal = $("mMonthInput").value;
     else if ($("mDateInput").style.display !== "none") inputVal = $("mDateInput").value;
     else if ($("mAmountInput").style.display !== "none") inputVal = $("mAmountInput").value;
+    else if ($("mCheckWrap").style.display !== "none" && $("mCheck").checked) inputVal = "checked";
     _confirmed = true; closeModal(); if (f) f(inputVal);
   });
   $("mCancel").addEventListener("click", closeModal);
@@ -2281,9 +2292,9 @@
       finishCloudLoginPrompt(true); toast("兑换成功，已解锁 Premium"); return true;
     }).catch(function (err) { toast("兑换失败：" + ((err && err.message) || "请重试")); return false; });
   }
-  function verifyStoreKitTransaction(result) {
+  function verifyStoreKitTransaction(result, allowAccountRecovery) {
     if (!result || result.status !== "success" || !result.jws) return Promise.resolve(false);
-    return callPremiumEntitlement({ action: "verifyTransaction", jws: result.jws }).then(function (access) {
+    return callPremiumEntitlement({ action: "verifyTransaction", jws: result.jws, allowAccountRecovery: !!allowAccountRecovery }).then(function (access) {
       var native = storeKitPremium();
       if (native && result.transactionId) native.finish({ transactionId: result.transactionId }).catch(function () {});
       if (access.active) finishCloudLoginPrompt(true);
@@ -2305,12 +2316,19 @@
     });
   }
   function restorePremium() {
+    if (!isIosPurchaseRuntime()) { toast("Android 的恢复购买将在接入 Google Play 后开放"); return Promise.resolve(false); }
     if (!account) { requestCloudLogin(); return Promise.resolve(false); }
     var native = storeKitPremium();
-    if (!isIosPurchaseRuntime() || !native) { toast("恢复购买仅在 iPhone App 内可用"); return Promise.resolve(false); }
-    return native.restore({ productId: PREMIUM_PRODUCT_ID }).then(function (result) {
-      if (!result || result.status === "notFound") { toast("未找到可恢复的购买"); return false; }
-      return verifyStoreKitTransaction(result);
+    if (!native) { toast("恢复购买仅在 iPhone App 内可用"); return Promise.resolve(false); }
+    return askAsync(
+      "恢复购买？",
+      "将向 Apple 核验当前 Apple ID 的购买记录，并仅恢复 Premium 权益；此前注销的账户、云备份和本地数据不会恢复。"
+    ).then(function (confirmed) {
+      if (!confirmed) return false;
+      return native.restore({ productId: PREMIUM_PRODUCT_ID }).then(function (result) {
+        if (!result || result.status === "notFound") { toast("未找到可恢复的购买"); return false; }
+        return verifyStoreKitTransaction(result, true);
+      });
     }).catch(function (err) { toast("恢复失败：" + ((err && err.message) || "请重试")); return false; });
   }
 
@@ -2764,7 +2782,9 @@
       if (!wxAuthListenerBound) { wxAuthListenerBound = true; native.addListener("wechatAuthResult", handleWxAuthResult); }
       return new Promise(function (resolve, reject) {
         pendingWeChatCredential = { mode: mode, resolve: resolve, reject: reject };
-        native.login({ mode: mode }).then(function () {
+        // 绑定流程已由 pendingWeChatCredential 防重；允许原生侧清理没有对应
+        // 前端流程的旧授权锁，避免遗漏回调后永久无法再次绑定。
+        native.login({ mode: mode, resetPending: mode !== "login" }).then(function () {
           toast("正在跳转微信授权…");
         }).catch(function (error) {
           pendingWeChatCredential = null;

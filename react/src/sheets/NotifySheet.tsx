@@ -59,32 +59,36 @@ export function NotifySheet() {
             <span>启用通知</span>
             <span className="switch"><input type="checkbox" checked={checked} onChange={onToggle} /><span className="switch-track" /></span>
           </label>
-          <button type="button" className="btn ghost" style={{ width: "100%" }} onClick={() => window.__azBridge.sendTestNotification()}>发送测试通知（10秒后）</button>
-          <div className="footnote" style={{ margin: "6px 2px 0", textAlign: "left" }}>用来验证手机能不能收到，不用等真实还款日；若收不到，先在系统设置允许通知。Android 还可能受电池优化或自启动限制影响。</div>
-          <div className="section-label" style={{ marginTop: 14 }}>提醒规则（对所有在还债务统一生效）</div>
-          <div>
-            {notify.rules.length === 0 ? (
-              <div className="footnote" style={{ margin: "4px 2px 8px", textAlign: "left" }}>还没有提醒规则，添加一条吧</div>
-            ) : (
-              notify.rules.map((r, idx) => (
-                <div className="notify-rule" key={idx}>
-                  <span className="nr-text">{window.offsetLabel(r.offsetDays)} · {r.time}</span>
-                  <button type="button" className="nr-del" onClick={() => window.__azBridge.deleteNotifyRule(idx)}>删除</button>
-                </div>
-              ))
-            )}
-          </div>
-          <div className="section-label" style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--border)" }}>添加新提醒</div>
-          <div className="notify-add">
-            <select value={offsetDays} onChange={(e) => setOffsetDays(Number(e.target.value) as 0 | 1 | 2 | 3)}>
-              <option value={0}>当天到期</option>
-              <option value={1}>提前1天</option>
-              <option value={2}>提前2天</option>
-              <option value={3}>提前3天</option>
-            </select>
-            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-            <button type="button" className="btn ghost" onClick={onAddRule}>添加</button>
-          </div>
+          {checked && (
+            <div className="notify-settings">
+              <button type="button" className="btn ghost" style={{ width: "100%" }} onClick={() => window.__azBridge.sendTestNotification()}>发送测试通知（10秒后）</button>
+              <div className="footnote notify-test-note">若收不到通知，先在系统设置中允许通知。</div>
+              <div className="section-label" style={{ marginTop: 14 }}>提醒规则（对所有在还债务统一生效）</div>
+              <div>
+                {notify.rules.length === 0 ? (
+                  <div className="footnote" style={{ margin: "4px 2px 8px", textAlign: "left" }}>还没有提醒规则，添加一条吧</div>
+                ) : (
+                  notify.rules.map((r, idx) => (
+                    <div className="notify-rule" key={idx}>
+                      <span className="nr-text">{window.offsetLabel(r.offsetDays)} · {r.time}</span>
+                      <button type="button" className="nr-del" onClick={() => window.__azBridge.deleteNotifyRule(idx)}>删除</button>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="section-label" style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--border)" }}>添加新提醒</div>
+              <div className="notify-add">
+                <select value={offsetDays} onChange={(e) => setOffsetDays(Number(e.target.value) as 0 | 1 | 2 | 3)}>
+                  <option value={0}>到期当天</option>
+                  <option value={1}>提前1天</option>
+                  <option value={2}>提前2天</option>
+                  <option value={3}>提前3天</option>
+                </select>
+                <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+                <button type="button" className="btn ghost" onClick={onAddRule}>添加</button>
+              </div>
+            </div>
+          )}
           <div className="sheet-actions" style={{ marginTop: 14 }}>
             <button type="button" className="btn primary" onClick={handleClose}>完成</button>
           </div>

@@ -188,9 +188,11 @@ final class AfterZeroBridgeViewController: CAPBridgeViewController, UIGestureRec
     private let interactiveBackFinishThreshold: CGFloat = 0.35
     private let interactiveBackFlickVelocity: CGFloat = 850
     private let nativeTabMessageName = "afterZeroNativeTab"
+    private let interactiveBackStateMessageName = "afterZeroInteractiveBackState"
     private var nativeTabBar: UIVisualEffectView?
     private var nativeTabButtons: [String: AfterZeroTabIconControl] = [:]
     private var pendingNativeTabID: String?
+    private var interactiveBackIsAvailable = false
 
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
@@ -204,16 +206,17 @@ final class AfterZeroBridgeViewController: CAPBridgeViewController, UIGestureRec
         bridge?.webView?.allowsBackForwardNavigationGestures = false
         bridge?.webView?.scrollView.keyboardDismissMode = .interactive
 
-        // WebView 的网页历史侧滑会绕过 App 的 screen/sheet 返回链；这里仅接收左边缘的
-        // 原生手势，再把跟手进度交给 Web 的最上层 subpage。底部 sheet 不参与，避免和既有
-        // 横向卡片手势或表单交互冲突。
+        // WebView 的网页历史侧滑会绕过 App 的 screen/sheet 返回链；这里用全屏原生右滑，
+        // 把跟手进度交给 Web 的最上层 subpage。Web 会同步当前是否有可返回的全屏页，
+        // 因此首页、底部 sheet、确认框和登录门不会接管手势。
         if let webView = bridge?.webView {
-            let edgePan = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(handleInteractiveBack(_:)))
-            edgePan.edges = .left
-            edgePan.maximumNumberOfTouches = 1
-            edgePan.cancelsTouchesInView = false
-            edgePan.delegate = self
-            webView.addGestureRecognizer(edgePan)
+            installInteractiveBackStateBridge(in: webView)
+
+            let pan = UIPanGestureRecognizer(target: self, action: #selector(handleInteractiveBack(_:)))
+            pan.maximumNumberOfTouches = 1
+            pan.cancelsTouchesInView = true
+            pan.delegate = self
+            webView.addGestureRecognizer(pan)
 
             installNativeTabBarIfSupported(in: webView)
         }
@@ -221,6 +224,14 @@ final class AfterZeroBridgeViewController: CAPBridgeViewController, UIGestureRec
 
     deinit {
         bridge?.webView?.configuration.userContentController.removeScriptMessageHandler(forName: nativeTabMessageName)
+        bridge?.webView?.configuration.userContentController.removeScriptMessageHandler(forName: interactiveBackStateMessageName)
+    }
+
+    private func installInteractiveBackStateBridge(in webView: WKWebView) {
+        let contentController = webView.configuration.userContentController
+        contentController.removeScriptMessageHandler(forName: interactiveBackStateMessageName)
+        contentController.add(self, name: interactiveBackStateMessageName)
+        contentController.addUserScript(WKUserScript(source: interactiveBackStateBridgeScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
     }
 
     private func installNativeTabBarIfSupported(in webView: WKWebView) {
@@ -285,9 +296,17 @@ final class AfterZeroBridgeViewController: CAPBridgeViewController, UIGestureRec
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.name == nativeTabMessageName, let payload = message.body as? [String: Any] else { return }
+        guard let payload = message.body as? [String: Any] else { return }
         DispatchQueue.main.async { [weak self] in
-            self?.handleNativeTabMessage(payload)
+            guard let self else { return }
+            switch message.name {
+            case self.nativeTabMessageName:
+                self.handleNativeTabMessage(payload)
+            case self.interactiveBackStateMessageName:
+                self.interactiveBackIsAvailable = payload["available"] as? Bool ?? false
+            default:
+                break
+            }
         }
     }
 
@@ -379,14 +398,41 @@ final class AfterZeroBridgeViewController: CAPBridgeViewController, UIGestureRec
     })();
     """
 
+    private let interactiveBackStateBridgeScript = """
+    (() => {
+      const handler = window.webkit?.messageHandlers?.afterZeroInteractiveBackState;
+      if (!handler || window.__afterZeroInteractiveBackStateBridgeInstalled) return;
+      window.__afterZeroInteractiveBackStateBridgeInstalled = true;
+
+      let lastAvailable;
+      const sync = () => {
+        // 与 window.__azInteractiveBack.topOpenSubpage() 保持相同门禁：只有无阻断表面时，
+        // 最上层全屏 subpage 才可接管任意位置开始的右滑。
+        const available = !document.querySelector('.sheet.open, #modalScrim.open, #loginGate.open')
+          && Boolean(document.querySelector('.subpage.open'));
+        if (available === lastAvailable) return;
+        lastAvailable = available;
+        handler.postMessage({ available });
+      };
+
+      new MutationObserver(sync).observe(document.body, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class']
+      });
+      sync();
+    })();
+    """
+
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        guard let pan = gestureRecognizer as? UIScreenEdgePanGestureRecognizer,
+        guard interactiveBackIsAvailable,
+              let pan = gestureRecognizer as? UIPanGestureRecognizer,
               let webView = bridge?.webView else { return false }
         let velocity = pan.velocity(in: webView)
         return velocity.x > 0 && velocity.x > abs(velocity.y)
     }
 
-    @objc private func handleInteractiveBack(_ recognizer: UIScreenEdgePanGestureRecognizer) {
+    @objc private func handleInteractiveBack(_ recognizer: UIPanGestureRecognizer) {
         guard let webView = bridge?.webView else { return }
         let progress = min(1, max(0, recognizer.translation(in: webView).x / max(webView.bounds.width, 1)))
 

@@ -121,7 +121,6 @@ exports.main = async (event) => {
       nickname,
       avatarUrl,
       trialEligible: !trialClaim,
-      preservedPremiumEntitlement: trialClaim && trialClaim.preservedPremiumEntitlement || null,
       createdAt: now,
       lastLoginAt: now,
     });

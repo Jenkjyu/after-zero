@@ -26,8 +26,18 @@ describe("NotifySheet", () => {
     expect(window.__azBridge.deleteNotifyRule).toHaveBeenCalledWith(0);
   });
 
+  it("未开启通知时只显示开关和完成，保留规则但隐藏设置内容", () => {
+    window.__azBridge = makeMockBridge({ notify: { enabled: false, rules: [{ offsetDays: 1, time: "08:30" }] } });
+    render(<NotifySheet />);
+    act(() => { openNotifySheet(); });
+    expect(screen.queryByText("发送测试通知（10秒后）")).not.toBeInTheDocument();
+    expect(screen.queryByText(/提前1天 · 08:30/)).not.toBeInTheDocument();
+    expect(screen.queryByText("添加新提醒")).not.toBeInTheDocument();
+    expect(window.__azBridge.deleteNotifyRule).not.toHaveBeenCalled();
+  });
+
   it("空规则列表显示提示文案", () => {
-    window.__azBridge = makeMockBridge({ notify: { enabled: false, rules: [] } });
+    window.__azBridge = makeMockBridge({ notify: { enabled: true, rules: [] } });
     render(<NotifySheet />);
     act(() => { openNotifySheet(); });
     expect(screen.getByText("还没有提醒规则，添加一条吧")).toBeInTheDocument();
@@ -42,26 +52,25 @@ describe("NotifySheet", () => {
   });
 
   it("点发送测试通知调用sendTestNotification", () => {
-    window.__azBridge = makeMockBridge();
+    window.__azBridge = makeMockBridge({ notify: { enabled: true, rules: [] } });
     render(<NotifySheet />);
     act(() => { openNotifySheet(); });
     fireEvent.click(screen.getByText("发送测试通知（10秒后）"));
     expect(window.__azBridge.sendTestNotification).toHaveBeenCalledTimes(1);
   });
 
-  it("测试通知说明覆盖iOS系统通知设置和Android后台限制", () => {
-    window.__azBridge = makeMockBridge();
+  it("测试通知说明只保留系统通知设置提示", () => {
+    window.__azBridge = makeMockBridge({ notify: { enabled: true, rules: [] } });
     render(<NotifySheet />);
     act(() => { openNotifySheet(); });
-    expect(screen.getByText(/先在系统设置允许通知/)).toBeInTheDocument();
-    expect(screen.getByText(/Android 还可能受电池优化或自启动限制影响/)).toBeInTheDocument();
+    expect(screen.getByText("若收不到通知，先在系统设置中允许通知。")).toHaveClass("notify-test-note");
   });
 
   it("添加规则：选中偏移天数+时间后点添加，调用addNotifyRule", () => {
-    window.__azBridge = makeMockBridge();
+    window.__azBridge = makeMockBridge({ notify: { enabled: true, rules: [] } });
     render(<NotifySheet />);
     act(() => { openNotifySheet(); });
-    fireEvent.change(screen.getByDisplayValue("当天到期"), { target: { value: "2" } });
+    fireEvent.change(screen.getByDisplayValue("到期当天"), { target: { value: "2" } });
     fireEvent.change(screen.getByDisplayValue("09:00"), { target: { value: "20:00" } });
     fireEvent.click(screen.getByText("添加"));
     expect(window.__azBridge.addNotifyRule).toHaveBeenCalledWith(2, "20:00");
