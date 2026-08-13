@@ -3022,3 +3022,9 @@ PDF字体经历了一次有价值的测试拦截：先下载的Noto OTF在`pdf`�
 - iOS 容器在启动时只给根元素附加 `ios-ui-density` 标记；网页 viewport 保持原宽度。该标记通过 CSS 提高字体、卡片和纵向间距密度，Android 与浏览器不受影响，避免重用会改变有效宽度并造成横向拖动的 `WKWebView.pageZoom`。
 - `premiumEntitlement` 的 CloudBase 部署改为显式安装函数目录声明的依赖。此前运行时因缺少 `@cloudbase/node-sdk` 在初始化阶段以 `FUNCTIONS_EXECUTE_FAIL` 退出；重新部署后，管理员无用户会话调用已正常返回受控的 `LOGIN_REQUIRED` 业务结果。以后重新部署该函数必须带 `--install-dependency true`，或确保等价配置生效。
 - 验证：主 Web 脚本语法检查、`git diff --check`、iOS web 资源 sync、开发签名真机 Debug 构建、覆盖安装和启动均成功；云函数管理员调用不再发生运行时崩溃。未记录任何测试兑换码细节。
+
+## 2026-08-14（续8）：项目级平台优先级调整
+
+- 用户明确决定：iOS 是产品发布主线；Android 降为仅供内部测试的通道，不承诺 Google Play 发布。
+- 因此，Android 旧微信、SAF、通知与交互回归不再阻塞 iOS 步骤完成、TestFlight 或 App Store；共享代码仍需完成受影响测试、TypeScript、React build 与 iOS 构建验证，Android 原生改动或发放内测包前再做针对性 Android 构建和冒烟。
+- 已同步 `AGENTS.md`、README 与 iOS 计划/交接；本条仅改变项目门禁和文档，不修改产品代码或 Flutter 封存边界。未暂存、提交或推送。

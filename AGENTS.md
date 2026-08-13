@@ -11,14 +11,15 @@
 
 ## 进行中的 iOS 扩展计划
 
-- iOS 步骤 2 已通过检查；步骤 3～7 均已完成本轮 iPhone 验收，仍待对应 Android 回归：步骤 3 的 Apple 登录、会话恢复、AI、云备份、注销/重登已通过；步骤 4 的官方微信 SDK、Apple→微信绑定、CloudBase 账户绑定函数与私有集合已在 iPhone 通过；步骤 5 的 Files 保存/打开/取消已通过（当前 UI 未暴露档案分享入口，用户确认本轮不阻塞）；步骤 6 的 iPhone 通知已通过；步骤 7 的深色页面、键盘、动态字体和核心触摸手势已通过。步骤 4 的其余账户组合与 Android 旧微信账号回归仍未替代；不能据此进入步骤 8。权威计划为 `docs/ios/implementation-plan.md`，准确恢复动作见 `docs/ios/handoff.md`。
+- iOS 步骤 2 已通过检查；步骤 3、5、6、7 均已完成本轮 iPhone 验收，步骤 4 的官方微信 SDK、Apple→微信绑定、CloudBase 账户绑定函数与私有集合也已在 iPhone 通过。步骤 4 的其余 iOS 账户组合与合并后备份可见性仍待完成。Android 旧微信、SAF、通知和交互回归改列为内部测试事项，不再阻塞 iOS 步骤完成、TestFlight 或 App Store 发布。权威计划为 `docs/ios/implementation-plan.md`，准确恢复动作见 `docs/ios/handoff.md`。
 - 该计划严格逐步执行：每一步必须完成本步的代码、测试、原生/云端验证和相关文档后停止等待用户检查；用户批准后仍不得自动进入下一步，必须再次收到明确开工指令。
 - 计划期间未经用户改变指令不得暂存、提交、推送或创建 PR。新 session 涉及 iOS 计划时，先完整读取交接和当前步骤；没有明确批准只讨论，不实施。
-- 根 `ios/` 已是可编译、可在 iPhone 运行的 Capacitor 8.4.1 Swift Package Manager 原生壳；Apple/微信登录、iOS `SaveFile` 与本地通知均已完成本轮 iPhone 验收，但 Android 对照回归、购买和上架仍未完成，不能把原生壳误写成可发布 iOS 产品。Flutter 继续封存。
+- 根 `ios/` 已是可编译、可在 iPhone 运行的 Capacitor 8.4.1 Swift Package Manager 原生壳；Apple/微信登录、iOS `SaveFile` 与本地通知均已完成本轮 iPhone 验收。StoreKit 真机闭环、App Store 配置和上架仍未完成，不能把原生壳误写成可发布 iOS 产品。Flutter 继续封存。
+- **平台优先级（2026-08-14 决策）：iOS 是产品发布主线；Android 仅供内部测试，不进入 Google Play 发布承诺。** Android 实机回归不再作为 iOS 计划、TestFlight 或 App Store 的阻塞门槛；但共享代码仍须完成 React/TypeScript/iOS 构建验证，改动 Android 原生代码或发放 Android 内测包前仍须完成对应 Android 构建与必要冒烟。
 
 ## 当前产品与架构
 
-After Zero 当前产品主线是 **Capacitor + React**：Android App 是当前可用、可发布产品；iOS 已建立可运行原生壳，功能适配仍按计划逐步进行。
+After Zero 当前产品主线是 **Capacitor + React 的 iOS 发布版本**；Android 保留为同代码库的内部测试包，不作为正式发布渠道。iOS 功能适配、StoreKit 验收与 App Store 上架仍按计划逐步进行。
 
 - `react/src/**`：四个主 tab、subpage、sheet 和 React 侧状态。Vite 使用 `debts`、`pay`、`report`、`mine`、`sheets` 五个入口。
 - `www/index.html`：唯一 Web 宿主，保留全局 CSS、tabbar、登录门、共享确认框、隐藏导入 input、localStorage/IndexedDB、CloudBase、原生插件与文件 I/O 等 impure 编排。

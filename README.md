@@ -1,29 +1,31 @@
 # After Zero
 
-一个记录和规划个人债务的 App。名字的寓意，是对债务归零之后生活的期待。
+一个记录和规划个人债务的 App。名字的寓意，是对债务归零之后的期待。
 
 ## 当前产品
 
-当前可用、可发布的产品主线是 **Capacitor + React 的 Android App**，包名为 `io.github.jenkjyu.afterzero`。全新安装默认没有任何债务或档案数据，可直接在本地使用；仅在主动使用 AI 债务助手、云备份等真实云功能时要求登录。
+当前正式发布主线是 **Capacitor + React 的 iOS App**，包名为 `io.github.jenkjyu.afterzero`。Android 保留为内部测试包，暂不作为正式发布渠道。全新安装默认没有任何债务或档案数据，可直接在本地使用；AI 债务助手、云备份，以及 Premium 的购买、恢复购买和兑换等服务端权益操作才要求登录。
 
-iOS 已建立同一套 Web 产品的 Capacitor 原生壳，可在 iOS 26.5 模拟器编译和冷启动；文件保存/分享与本地通知代码已完成本机构建，但登录、文件和通知真机验收、购买和上架尚未闭环，因此当前不能视为可发布 iOS 产品。
+iOS 已建立同一套 Web 产品的 Capacitor 原生壳，并已完成 Apple/微信登录、文件保存、通知和主要交互的 iPhone 验收。StoreKit 真实支付、TestFlight 与 App Store 上架仍未闭环，因此当前不能视为可发布 iOS 产品。
 
 - `react/src/**` 负责“债务”“还款日”“统计”“我的”四个 tab，以及不属于 tab 的 subpage、sheet 和 screen。Vite 使用 `debts`、`pay`、`report`、`mine`、`sheets` 五个入口。
 - `www/index.html` 是唯一 Web 宿主，保留全局 CSS、tabbar、登录门、共享确认框、隐藏导入 input、localStorage/IndexedDB、CloudBase 和原生能力编排；财务计算集中在 `www/js/calc.js`。
 - 根 `android/` 是现行 Capacitor 原生工程，包含手写的 WebView/返回链、SAF 文件保存、微信登录和回调代码；本地提醒使用 Capacitor Local Notifications。
-- `cloudbase/functions/**` 是独立部署的服务端单元，不会随 APK 构建或 `npx cap sync android` 自动部署。
+- `cloudbase/functions/**` 是独立部署的服务端单元，涵盖 Apple/微信登录、账户绑定、Premium 权益、账户注销、云备份和 AI 顾问；不会随原生包构建或 Capacitor sync 自动部署。
 
 “还款日”按期次列出待还项目，支持时间窗口筛选、部分还款、协商减免和按顺序销期。“统计”是一份基于当前账本生成的债务报告，包含结论、还清走势、未来压力、余额排行和类型构成。
 
-当前只有一个 Premium 等级和一张 ¥15 买断价卡，真实支付尚未接入。报告查看、图表、档案库、本地 JSON 备份和提前还款模拟没有 Premium 门禁；AI 债务助手、手动云备份、报告 Excel/PDF 导出和多策略还款对比当前需要 Premium。AI 额度由服务端按北京时间自然月计数，每月最多 50 次。
+当前只有一个 Premium 等级。iOS 登录身份首次经服务端确认后可体验全部功能 7 天；体验结束后为 ¥28 一次性买断，不自动续费。StoreKit 购买、恢复购买和服务端权益验证已经实现，但 App Store 配置与真机支付验收尚未完成，因此不能视为已经对外开通支付。最近一次服务端确认后的 Premium 权益可离线使用 3 天。
+
+iOS 体验结束且未购买时，仍可使用“债务”tab 的本地功能；AI、“还款日”“统计”，以及云备份、档案库、备份文件导入导出入口会引导至 Premium 页面。提前还款模拟仍可用。AI 额度由服务端按北京时间自然月计数，每月最多 50 次。
 
 更细的开发边界、硬规则和按任务加载的知识入口见 [`AGENTS.md`](AGENTS.md) 与 [`.agents/skills/`](.agents/skills/)。
 
-## iOS 扩展（步骤 3 / 4 真机验收阻塞）
+## iOS 发布主线（步骤 8 进行中）
 
-当前正按“Capacitor + React 双平台”方向实施 iOS 扩展，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 2 的本地优先登录门已通过检查；步骤 3 已完成 Apple 登录、内部 `userId`、旧微信兼容和相关云函数的本地代码，并通过双平台构建及 iOS 模拟器冷启动。
+当前以 iOS 为发布主线，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 3～7 的 iPhone 验收已完成；步骤 8 正在完成 StoreKit、恢复购买、服务端权益与 App Store 发布准备。
 
-步骤 3 的 CloudBase 部署、凭据轮换和 Apple 能力配置已完成，仍差 iPhone 真机验收。用户已允许步骤 4、5、6 先行实现：微信开放平台 iOS 配置正在审核，账户绑定/合并仍须接入官方 iOS SDK、部署新增云函数并以真机验收；iOS `SaveFile` 已完成临时文件、系统“另存为”和系统分享面板代码及本机构建；本地通知已完成双平台数量上限、平台字段分流、权限文案与本机构建。步骤 3～6 仍需集中进行真实设备验收。当前发布版本仍不能使用 iOS Apple/微信登录，iOS 也仍不是可发布产品；购买和上架尚未授权。权威范围与恢复动作见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
+Android 的登录、文件、通知和交互回归改为内部测试清单，不再阻塞 iOS 的 TestFlight 或 App Store 发布；共享代码仍保持基础构建验证。当前 iOS 的剩余关键项是 StoreKit 真机购买/恢复等场景、App Store Connect 配置、签名合规和上架材料。权威范围与恢复动作见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
 
 ## Flutter 重写（已停止并封存）
 
@@ -33,12 +35,18 @@ iOS 已建立同一套 Web 产品的 Capacitor 原生壳，可在 iOS 26.5 模�
 
 ## 环境要求
 
-- Node.js + npm
-- JDK 21
-- Android SDK command-line tools、`platform-tools`、Android 36 platform 及匹配的 build tools
-- iOS 开发需要完整 Xcode 26+、iOS Simulator Runtime；项目当前只使用 Swift Package Manager，不预装 CocoaPods。以后只有原生依赖明确不支持 SPM 时才按需安装
+### iOS 发布主线
 
-macOS 可用 Homebrew 安装 Android command-line tools。Homebrew 的 `openjdk@21` 通常是 keg-only；Apple Silicon 构建时可显式设置 `JAVA_HOME=/opt/homebrew/opt/openjdk@21`，Intel Mac 通常使用 `/usr/local/opt/openjdk@21`。
+- Node.js + npm
+- 完整 Xcode 26+ 与 iOS Simulator Runtime
+- 项目使用 Swift Package Manager，不预装 CocoaPods；只有原生依赖明确不支持 SPM 时才按需引入 CocoaPods。
+
+### Android 内测（按需）
+
+- JDK 21
+- Android SDK command-line tools、`platform-tools`、Android 36 platform 及匹配 build tools
+
+macOS 可用 Homebrew 安装 Android command-line tools。Homebrew 的 `openjdk@21` 通常是 keg-only；Apple Silicon 构建时可显式设置 `JAVA_HOME=/opt/homebrew/opt/openjdk@21`，Intel Mac 通常使用 `/usr/local/opt/openjdk@21`。仅构建 iOS 时不需要 Android SDK 或 JDK。
 
 首次安装依赖：
 
@@ -46,7 +54,7 @@ macOS 可用 Homebrew 安装 Android command-line tools。Homebrew 的 `openjdk@
 npm install
 ```
 
-本机还需创建已被 gitignore 的 `android/local.properties`：
+仅在构建 Android 内测包时，才需创建已被 gitignore 的 `android/local.properties`：
 
 ```properties
 sdk.dir=/path/to/your/android-sdk
@@ -54,7 +62,19 @@ sdk.dir=/path/to/your/android-sdk
 
 ## 构建与验证
 
-React 源码进入 Android APK 的完整顺序：
+### iOS 主线构建
+
+```bash
+npm run build:react
+npx cap sync ios
+xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+  -sdk iphonesimulator -destination 'platform=iOS Simulator,id=<device-id>' \
+  CODE_SIGNING_ALLOWED=NO build
+```
+
+也可以用 `npx cap open ios` 打开 Xcode 工程。真实 iPhone 安装、Apple 登录和 StoreKit 验收需要有效开发签名与描述文件；模拟器构建不能替代真机验收。
+
+### Android 内测包（按需）
 
 ```bash
 npm run build:react
@@ -65,19 +85,9 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:assembleDebug --no-daemon 
 
 Debug APK 位于 `android/app/build/outputs/apk/debug/app-debug.apk`。
 
-iOS Web 产物同步与打开工程：
-
-```bash
-npm run build:react
-npx cap sync ios
-npx cap open ios
-```
-
-Xcode 工程为 `ios/App/App.xcodeproj`。模拟器 Debug 构建不需要发布签名；Apple 登录真机验收需要为 App ID 启用相应能力，并使用有效开发签名与描述文件。
-
-- 只改 `react/src/**`：先 `npm run build:react`；要打进 APK 时再 sync 和构建 Android。
-- 只改 `www/**` 且 React 产物已是最新：可以跳过 React build，但仍需 `npx cap sync android`。
-- 不要直接编辑 `www/js/react-debts/**`、`android/app/src/main/assets/public/**` 或 Capacitor 生成的 Gradle 接线。
+- 只改 `react/src/**`：先 `npm run build:react`，再 `npx cap sync ios`；准备 Android 内测包时才额外 sync 和构建 Android。
+- 只改 `www/**` 且 React 产物已是最新：可以跳过 React build，但仍需 `npx cap sync ios`；Android 内测同理按需 sync。
+- 不要直接编辑 `www/js/react-debts/**`、`ios/App/App/public/**`、`android/app/src/main/assets/public/**` 或 Capacitor 生成的原生接线。
 - CloudBase 函数必须单独部署；Apple/微信登录都必须使用真实提供方账号和已正确签名的真机包做端到端验证。
 
 常用检查：
@@ -94,9 +104,9 @@ git diff --check
 
 - `react/`：当前 React + TypeScript 产品界面、共享状态和组件测试。
 - `www/`：Capacitor Web 宿主、持久化/云端/原生编排、纯计算和本地静态库。
-- `android/`：当前 Android 原生工程；同时包含生成接线和必须长期维护的手写源码。
-- `ios/`：可运行的 iOS 原生壳；使用 Swift Package Manager，功能适配尚未完成。
-- `cloudbase/`：Apple/微信登录、账户注销、云备份和 AI 顾问云函数。
+- `android/`：内部测试用 Android 原生工程；同时包含生成接线和必须长期维护的手写源码。
+- `ios/`：正式发布主线的 iOS 原生工程；使用 Swift Package Manager，正完成 StoreKit 与上架收尾。
+- `cloudbase/`：Apple/微信登录、账户绑定、Premium 权益、账户注销、云备份和 AI 顾问云函数。
 - `resources/`：App 图标设计源。
 - `flutter/`：已停止并封存的 Flutter 重写成果，不是当前产品主线。
 - `docs/`：法律文本、iOS 主线计划与交接、Flutter 历史存档和上下文工程计划。
@@ -113,7 +123,7 @@ git diff --check
 
 本项目使用 [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)（完整正式文本见 [`LICENSE`](LICENSE)，以英文原文为准）。
 
-大白话说明（不具有法律效力，仅帮助理解）：
+说明（仅帮助理解）：
 
 - 可以查看、学习、fork 和修改代码，用于个人、非商业目的。
 - 不可以用于商业用途，包括销售、广告变现或作为商业产品/服务的一部分。
