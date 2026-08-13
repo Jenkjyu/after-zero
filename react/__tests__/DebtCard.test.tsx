@@ -36,6 +36,18 @@ describe("DebtCard", () => {
     expect(openDetailSheet).toHaveBeenCalledWith(d.id);
   });
 
+  it("卡面可用键盘 Enter 或 Space 打开详情", () => {
+    window.__azBridge = makeMockBridge();
+    openDetailSheet.mockClear();
+    const d = makeDebt();
+    const { container } = render(<DebtCard d={d} jiggleMode={false} ctx={makeCtx()} />);
+    const front = container.querySelector<HTMLElement>(".debt-front")!;
+    expect(front).toHaveAttribute("role", "button");
+    fireEvent.keyDown(front, { key: "Enter" });
+    fireEvent.keyDown(front, { key: " " });
+    expect(openDetailSheet).toHaveBeenCalledTimes(2);
+  });
+
   it("编辑模式(jiggleMode=true)下点击卡面不打开详情——手势全部让给排序", () => {
     window.__azBridge = makeMockBridge();
     openDetailSheet.mockClear();

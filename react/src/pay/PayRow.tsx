@@ -3,6 +3,7 @@
 // touchstart/pointerdown监听器挂在外层(.pay-row)，transform打在内层(.pay-swipe-row)，
 // 点击目标(.pay)走普通JSX onClick(不需要preventDefault，跟手势的touchmove不是一回事)。
 import { useEffect, useRef } from "react";
+import type { KeyboardEvent } from "react";
 import type { Debt } from "../types";
 import type { PayGestureCtx } from "./gestures";
 import { closePaySwipe, onPayPointerDown, onPayTouchStart } from "./gestures";
@@ -46,6 +47,12 @@ export function PayRow({ d, next, diff, amount, canSettle, ctx }: PayRowProps) {
     openDetailSheet(d.id);
   }
 
+  function onFrontKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    onFrontClick();
+  }
+
   function onSwipeBtnClick() {
     // 非最早未还期：payInstallment永远销最早的那一期，跳期销在数据模型上不成立。
     // 按钮置灰但**保留可点**(不用disabled属性——全局button:disabled有pointer-events:none，
@@ -61,7 +68,7 @@ export function PayRow({ d, next, diff, amount, canSettle, ctx }: PayRowProps) {
   return (
     <div ref={outerRef} className={"pay-row " + window.urgencyTier(diff)}>
       <div ref={swipeRowRef} className="pay-swipe-row">
-        <div className="pay" onClick={onFrontClick}>
+        <div className="pay" role="button" tabIndex={0} aria-label={`查看${d.name}详情`} onClick={onFrontClick} onKeyDown={onFrontKeyDown}>
           <div className="d">
             <div className="day num">{next.getMonth() + 1}/{next.getDate()}</div>
             <div className="rel">{window.relLabel(diff)}</div>

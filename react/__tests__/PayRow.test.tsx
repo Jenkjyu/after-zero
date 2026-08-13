@@ -26,6 +26,18 @@ describe("PayRow", () => {
     expect(openDetailSheet).toHaveBeenCalledWith(d.id);
   });
 
+  it("卡面可用键盘 Enter 或 Space 打开详情", () => {
+    window.__azBridge = makeMockBridge();
+    openDetailSheet.mockClear();
+    const d = makeDebt();
+    const { container } = render(<PayRow d={d} next={new Date(2026, 6, 30)} diff={5} amount={800} canSettle ctx={makeCtx()} />);
+    const front = container.querySelector<HTMLElement>(".pay")!;
+    expect(front).toHaveAttribute("role", "button");
+    fireEvent.keyDown(front, { key: "Enter" });
+    fireEvent.keyDown(front, { key: " " });
+    expect(openDetailSheet).toHaveBeenCalledTimes(2);
+  });
+
   it("点击'销这期'按钮调用__azBridge.payInstallment(d.id)，并收起滑出状态", () => {
     window.__azBridge = makeMockBridge();
     const d = makeDebt();

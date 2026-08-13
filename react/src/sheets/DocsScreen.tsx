@@ -101,9 +101,11 @@ export function DocsScreen() {
         <button className="add-btn" type="button" onClick={onUploadClick}>＋ 上传文件</button>
         <div id="fileList">
           {files.map((it) => (
-            <div key={it.id} className="file-row" aria-current={it.id === selectedId ? "true" : "false"} onClick={() => onRowClick(it.id)}>
-              <span className="file-ic">{iconFor(it)}</span>
-              <span className="file-name"><span className="fl">{it.label}</span><small>{it.name}</small></span>
+            <div key={it.id} className={"file-row" + (it.id === selectedId ? " selected" : "")}>
+              <button type="button" className="file-preview-btn" aria-pressed={it.id === selectedId} onClick={() => onRowClick(it.id)}>
+                <span className="file-ic">{iconFor(it)}</span>
+                <span className="file-name"><span className="fl">{it.label}</span><small>{it.name}</small></span>
+              </button>
               {it.upload || it.content ? (
                 <>
                   <button type="button" className="file-dl file-get" disabled={downloadingId === it.id} onClick={(e) => onDownload(it, e)}>下载</button>

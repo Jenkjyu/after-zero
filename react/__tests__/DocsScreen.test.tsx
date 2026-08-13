@@ -69,20 +69,20 @@ describe("DocsScreen", () => {
     window.__azBridge = makeMockBridge({ files: [docFile] });
     const { container } = render(<DocsScreen />);
     act(() => { openDocsScreen(); });
-    const row = container.querySelector(".file-row")!;
-    expect(row).toHaveAttribute("aria-current", "false");
+    const row = container.querySelector(".file-preview-btn")!;
+    expect(row).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(row);
-    expect(row).toHaveAttribute("aria-current", "true");
+    expect(row).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("预览").parentElement).toBeTruthy();
     fireEvent.click(row);
-    expect(row).toHaveAttribute("aria-current", "false");
+    expect(row).toHaveAttribute("aria-pressed", "false");
   });
 
   it("markdown文档预览走mdToHtml", () => {
     window.__azBridge = makeMockBridge({ files: [docFile] });
     const { container } = render(<DocsScreen />);
     act(() => { openDocsScreen(); });
-    fireEvent.click(container.querySelector(".file-row")!);
+    fireEvent.click(container.querySelector(".file-preview-btn")!);
     expect(container.querySelector("#docContent h2")).toBeTruthy(); // calc.js的mdToHtml：单个#是h2(不是h1)
   });
 
@@ -90,7 +90,7 @@ describe("DocsScreen", () => {
     window.__azBridge = makeMockBridge({ files: [imgFile, otherFile] });
     const { container } = render(<DocsScreen />);
     act(() => { openDocsScreen(); });
-    const rows = container.querySelectorAll(".file-row");
+    const rows = container.querySelectorAll(".file-preview-btn");
     fireEvent.click(rows[0]);
     expect(container.querySelector("#docContent img")).toHaveAttribute("src", "blob:img");
     fireEvent.click(rows[0]); // 取消选中
@@ -109,7 +109,7 @@ describe("DocsScreen", () => {
     window.pdfjsLib = mockPdfjs(2);
     const { container } = render(<DocsScreen />);
     act(() => { openDocsScreen(); });
-    fireEvent.click(container.querySelector(".file-row")!);
+    fireEvent.click(container.querySelector(".file-preview-btn")!);
     expect(screen.getByText("正在加载 PDF…")).toBeInTheDocument();
     await waitFor(() => {
       expect(container.querySelectorAll("#docContent canvas")).toHaveLength(2);
@@ -123,7 +123,7 @@ describe("DocsScreen", () => {
     delete window.pdfjsLib;
     const { container } = render(<DocsScreen />);
     act(() => { openDocsScreen(); });
-    fireEvent.click(container.querySelector(".file-row")!);
+    fireEvent.click(container.querySelector(".file-preview-btn")!);
     await waitFor(() => {
       expect(screen.getByText(/PDF 预览失败/)).toBeInTheDocument();
     });
@@ -137,7 +137,7 @@ describe("DocsScreen", () => {
     window.pdfjsLib = { getDocument: vi.fn(() => ({ promise: Promise.reject(new Error("bad pdf")) })) };
     const { container } = render(<DocsScreen />);
     act(() => { openDocsScreen(); });
-    fireEvent.click(container.querySelector(".file-row")!);
+    fireEvent.click(container.querySelector(".file-preview-btn")!);
     await waitFor(() => {
       expect(screen.getByText(/PDF 预览失败/)).toBeInTheDocument();
     });
@@ -162,7 +162,7 @@ describe("DocsScreen", () => {
     const { container } = render(<DocsScreen />);
     act(() => { openDocsScreen(); });
     fireEvent.click(screen.getByText("下载"));
-    expect(container.querySelector(".file-row")).toHaveAttribute("aria-current", "false");
+    expect(container.querySelector(".file-preview-btn")).toHaveAttribute("aria-pressed", "false");
   });
 
   it("删除：文档标题是删除文档，上传文件标题是删除文件，确认后调用deleteArchiveFile+toast", async () => {
@@ -194,7 +194,7 @@ describe("DocsScreen", () => {
     window.__azBridge = makeMockBridge({ files: [docFile] });
     const { container, rerender } = render(<DocsScreen />);
     act(() => { openDocsScreen(); });
-    fireEvent.click(container.querySelector(".file-row")!);
+    fireEvent.click(container.querySelector(".file-preview-btn")!);
     expect(container.querySelector("#docContent h2")).toBeTruthy();
     window.__azBridge = makeMockBridge({ files: [] });
     rerender(<DocsScreen />);

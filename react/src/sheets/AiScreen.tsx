@@ -573,7 +573,18 @@ export function AiScreen() {
             ) : (
               convos.map((rec) => (
                 <div className="backup-row" style={{ cursor: "pointer" }} key={rec.id}>
-                  <div className="backup-row-main" onClick={() => loadConversation(rec)}>
+                  <div
+                    className="backup-row-main"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`打开历史对话：${rec.title}`}
+                    onClick={() => loadConversation(rec)}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter" && e.key !== " ") return;
+                      e.preventDefault();
+                      loadConversation(rec);
+                    }}
+                  >
                     <div className="backup-row-time">{rec.title}</div>
                     <div className="backup-row-sub">{new Date(rec.updatedAt).toLocaleString()} · {rec.messages.length} 条消息</div>
                   </div>

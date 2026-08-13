@@ -261,7 +261,12 @@ export function EditSheet() {
               </div>
             </div>
             <div className="field two">
-              <div className="field"><label htmlFor="f-opened">借款日 <span className="req">*</span></label><input id="f-opened" type="date" required value={opened} onChange={(e) => setOpened(e.target.value)} /></div>
+              <div className="field">
+                <label htmlFor="f-opened">借款日 <span className="req">*</span></label>
+                <div className="date-input-frame">
+                  <input id="f-opened" type="date" required value={opened} onChange={(e) => setOpened(e.target.value)} />
+                </div>
+              </div>
               <div className="field"><label htmlFor="f-day">还款日（几号）</label><input id="f-day" type="number" min={1} max={31} inputMode="numeric" readOnly className="f-day-auto" value={fDay} /></div>
             </div>
             <label className="checkline"><input type="checkbox" id="f-oneTime" checked={oneTime} onChange={(e) => handleOneTimeChange(e.target.checked)} />一次性还清（不计入经常性月供，销项即结清）</label>

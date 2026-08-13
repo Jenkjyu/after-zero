@@ -34,6 +34,9 @@
        (统计tab专属)，这个新screen不在.viz-root范围内，且"策略身份"跟"债务类型"不是同一件
        事，"一个颜色=一个角色"是这份配色体系的既有原则，故另起3个跟主题块同级的全局token。 */
     --strat-1: #2B6CB8; --strat-2: #C4892F; --strat-3: #068468;
+    /* 默认保留旧 WebView 的 100vh；支持动态视口的 iOS/WKWebView 会在下方切换为 100dvh，
+       键盘展开时 sheet/subpage 才能跟着可视区域缩小，而不是被键盘盖住。 */
+    --az-viewport-height: 100vh;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #0F1319; --surface: #24282F; --surface-2: #2E3239; --border: #3C4047;
@@ -101,7 +104,10 @@
      .ai-thread等)用contain，既不产生自己的拉扯、也不把滚动链传给底下的页面。
      ⚠️只写CSS不够，原生那边还配了WebView.setOverScrollMode(OVER_SCROLL_NEVER)兜底，
      见MainActivity.java——两层都要有，别只改一处。 */
-  html, body { overscroll-behavior-y: none; }
+  html, body { min-height: var(--az-viewport-height); overscroll-behavior-y: none; }
+  @supports (height: 100dvh) {
+    :root { --az-viewport-height: 100dvh; }
+  }
   body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-ui); line-height: 1.5; -webkit-font-smoothing: antialiased;
     -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
   input, textarea { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
@@ -132,7 +138,7 @@
      那两处原来只关outline，现在box-shadow也要一并关掉，不然会意外重新长出一圈环。 */
   :focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
 
-  .app { max-width: 560px; margin: 0 auto; padding: max(18px, env(safe-area-inset-top)) 14px 100px; background: var(--app-grad); min-height: 100vh; }
+  .app { max-width: 560px; margin: 0 auto; padding: max(18px, env(safe-area-inset-top)) 14px max(100px, calc(72px + env(safe-area-inset-bottom))); background: var(--app-grad); min-height: var(--az-viewport-height); }
 
   /* ===== 顶部：手写 wordmark + 头像入口（替代原来的"债务管理"标题） ===== */
   header#topHeader { padding: 4px 3px 4px; display: flex; align-items: center; justify-content: space-between; min-height: 36px; }
@@ -462,7 +468,9 @@
   .file-row { display: flex; align-items: center; gap: 11px; padding: 12px 14px; background: var(--surface);
     border: 1px solid var(--border); border-radius: 18px; margin-bottom: 7px; box-shadow: var(--shadow); width: 100%; text-align: left; color: inherit;
     -webkit-tap-highlight-color: transparent; }
-  .file-row[aria-current="true"] { border-color: var(--accent); }
+  .file-preview-btn { min-width: 0; flex: 1; display: flex; align-items: center; gap: 11px; padding: 0; border: none; background: none; text-align: left; }
+  .file-preview-btn[aria-pressed="true"] { color: var(--accent); }
+  .file-row.selected { border-color: var(--accent); }
   .file-ic { width: 21px; height: 21px; flex: none; color: var(--text-muted); }
   .file-ic svg { width: 100%; height: 100%; display: block; }
   .file-name { flex: 1; font-size: 14px; min-width: 0; }
@@ -517,7 +525,7 @@
      把滚动挪到内层之后，.sheet只剩圆角+overflow:hidden+transform，不再是合成滚动容器，
      这个组合就不成立了。顺带的好处：grip留在滚动区外，拖动条永远在顶部不会被内容滚走。 */
   .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; background: var(--surface); border-radius: 24px 24px 0 0;
-    max-width: 560px; margin: 0 auto; max-height: 94vh; overflow: hidden; transform: translateY(100%);
+    max-width: 560px; margin: 0 auto; max-height: min(94vh, calc(var(--az-viewport-height) - env(safe-area-inset-top))); overflow: hidden; transform: translateY(100%);
     transition: transform .28s cubic-bezier(.2,.7,.3,1); padding: 8px 16px calc(24px + env(safe-area-inset-bottom));
     display: flex; flex-direction: column; }
   /* min-height:0是flex子元素能收缩、让overflow-y:auto真正生效的必要条件(同#aiScreen .ai-thread)。
@@ -528,7 +536,7 @@
      padding:2px这对组合不改变里面表单控件的实际位置/宽度(负margin让盒子往外扩2px、padding把
      content box缩回来2px，两者抵消)，只是让.sheet-scroll自己的裁切边界(padding box)比表单控件
      的边缘多出2px余量，box-shadow那2px就有地方画了。 */
-  .sheet-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: 0 -2px; padding: 0 2px; }
+  .sheet-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding: 12px 2px max(20px, calc(12px + env(safe-area-inset-bottom))); margin: 0 -2px; padding: 0 2px; }
   .sheet.open { transform: translateY(0); }
   @media (prefers-reduced-motion: reduce) { .sheet { transition: none; } }
   .grip { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 8px auto 12px; padding: 10px 24px; background-clip: content-box; box-sizing: content-box; touch-action: none; }
@@ -538,6 +546,11 @@
   .field label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; }
   .field input, .field select, .field textarea { width: 100%; background: var(--surface-2); color: var(--text);
     border: 1px solid var(--border); border-radius: 9px; padding: 10px 11px; font-size: 15px; font-family: inherit; }
+  /* iOS 会在小于 16px 的可编辑控件获得焦点时自动放大页面。只在 WebKit 的触摸实现中
+     提升可编辑控件字号，保留 Android 的紧凑表格几何，同时避免键盘收起后出现缩放残留。 */
+  @supports (-webkit-touch-callout: none) {
+    input:not([type="checkbox"]):not([type="radio"]), textarea, select { font-size: 16px !important; }
+  }
   .field textarea { min-height: 52px; resize: vertical; }
   /* 公式生成器"计息方式"从原生<select>换成button+底部抽屉(GenPanel.tsx，shared/PickerSheet.tsx)
      ——原生select在安卓WebView里弹的是系统全屏列表，是排序方式(.sort-sel)当年换掉select的
@@ -548,8 +561,16 @@
     width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
     border-radius: 9px; padding: 10px 11px; font-size: 15px; font-family: inherit; text-align: left; }
   .field-select-btn svg { width: 15px; height: 15px; color: var(--text-muted); flex: none; }
-  .field.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-  .field.two .field { margin-bottom: 0; }
+  /* iOS 的 input[type=date] 在 16px（防自动缩放所需字号）下会绘制超过网格列宽的原生
+     外观。双列仍保持与上一行相同的 1:1 几何；借款日用等尺寸外框负责边框和裁切，内部
+     date input 只保留原生日期交互，避免为迁就它改坏两列的宽度与对齐。 */
+  .field.two { --two-field-control-height: 44px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-bottom: 12px; }
+  .field.two .field { min-width: 0; margin-bottom: 0; }
+  .field.two input, .field.two select { min-width: 0; height: var(--two-field-control-height); }
+  .date-input-frame { width: 100%; height: var(--two-field-control-height); overflow: hidden; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; }
+  .field .date-input-frame input { display: block; width: 100%; max-width: 100%; height: 100%; margin: 0; border: 0; border-radius: 0; background: transparent; }
+  .date-input-frame:focus-within { box-shadow: 0 0 0 2px var(--accent); }
+  .field .date-input-frame input:focus-visible { box-shadow: none; }
   .req { color: var(--critical); font-weight: 700; }
   /* opacity:.6会连聚焦时的box-shadow描边一起压暗——同一个--accent叠上60%透明度，跟其它
      字段满透明度的深绿描边比会显得发灰、明显是另一种绿。这个字段是只读的(算自editingPlan[0]
@@ -691,7 +712,8 @@
   }
 
   .subpage { position: fixed; inset: 0; z-index: 35; background: var(--bg); transform: translateX(100%);
-    transition: transform .28s cubic-bezier(.2,.7,.3,1); overflow-y: auto; }
+    transition: transform .28s cubic-bezier(.2,.7,.3,1); overflow-y: auto; overscroll-behavior: contain;
+    scroll-padding: 12px 0 max(20px, calc(12px + env(safe-area-inset-bottom))); }
   .subpage.open { transform: translateX(0); }
   @media (prefers-reduced-motion: reduce) { .subpage { transition: none; } }
   .subpage-header { display: flex; align-items: center; gap: 4px; padding: max(14px, env(safe-area-inset-top)) 6px 14px; position: sticky; top: 0;
@@ -700,7 +722,7 @@
   .subpage-back svg { width: 22px; height: 22px; }
   .subpage-title { flex: 1; text-align: center; font-size: 16px; font-weight: 700; }
   .subpage-header-spacer { width: 40px; flex: none; }
-  .subpage-body { padding: 14px; max-width: 560px; margin: 0 auto; }
+  .subpage-body { padding: 14px 14px max(28px, calc(14px + env(safe-area-inset-bottom))); max-width: 560px; margin: 0 auto; }
 
   .premium-hero { text-align: center; padding: 22px 10px 18px; }
   .premium-hero-ic { width: 56px; height: 56px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);

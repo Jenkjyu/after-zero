@@ -3,7 +3,7 @@
 // 原样照抄的状态机，这里只负责: 1) 渲染 2) 用ref把真实DOM节点交给手势函数 3) 点击/滑动
 // 按钮的业务回调(开详情/销这期)桥接回vanilla。
 import { useEffect, useRef } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, KeyboardEvent } from "react";
 import type { Debt } from "../types";
 import type { CardEl, GestureCtx } from "./gestures";
 import { closeDebtSwipe, onCardPointerDown, onCardTouchStart } from "./gestures";
@@ -48,6 +48,12 @@ export function DebtCard({ d, jiggleMode, ctx }: DebtCardProps) {
     openDetailSheet(d.id);
   }
 
+  function onFrontKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    onFrontClick();
+  }
+
   function onSwipeBtnClick() {
     const row = rowRef.current;
     if (row) closeDebtSwipe(ctx, row);
@@ -67,7 +73,7 @@ export function DebtCard({ d, jiggleMode, ctx }: DebtCardProps) {
   return (
     <div ref={cardRef} className={"debt " + sevClass + (jiggleMode ? " jiggle" : "")} style={jiggleStyle}>
       <div ref={rowRef} className="debt-row">
-        <div className="debt-front" onClick={onFrontClick}>
+        <div className="debt-front" role="button" tabIndex={0} aria-label={`查看${d.name}详情`} onClick={onFrontClick} onKeyDown={onFrontKeyDown}>
           <div className="debt-top">
             <div>
               <div className="debt-nm">{d.name}</div>
