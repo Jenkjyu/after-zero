@@ -2975,3 +2975,30 @@ PDF字体经历了一次有价值的测试拦截：先下载的Noto OTF在`pdf`�
 - App Store Connect 已创建非消耗型内购：参考名称 `After Zero Premium`、产品 ID `io.github.jenkjyu.afterzero.premium`、Apple ID `6801229744`；全球 175 个国家或地区销售，中国大陆基准价格为 ¥28；简体中文显示名称为“Premium 会员”，描述为“一次购买，解锁 After Zero 完整功能。”当前状态为“准备提交”，未添加以供审核、未上传图片或审核截图。
 - 付费 App 协议已显示为待补资料；用户已更新法律实体及银行账户，App Store Connect 提示审核期最长 24 小时，期间不能继续修改付费相关资料。欧盟 DSA 交易商合规需由用户本人根据 Apple 指引完成；交易商信息会公开显示在欧盟 App Store 产品页。
 - 待 Apple 解锁后：完成付费协议、税务资料与 DSA 合规；配置生产 `APPLE_APP_STORE_ID`；创建 Sandbox 测试账号并配置 App Store Server Notifications V2；在 iPhone 验收购买、取消、失败、恢复购买、换机及退款/撤销。步骤 8 仍未完成；未暂存、提交或推送。
+
+## 2026-08-14（续2）：步骤 8 Premium 入口规则调整与 iPhone Debug 安装
+
+- 用户指定：登录身份首次确认后的 7 天体验内默认解锁；体验结束且未买断时，保留第一个“债务”tab 的本地功能（AI 除外），点击 AI、第二个“还款日”tab、第三个“统计”tab，以及“我的”里的云备份、档案库、下载备份文件、上传备份文件均跳 Premium 页面；头像仍进入账户页，会员显示“普通用户”。
+- 移除 iOS 冷启动强制登录和体验结束时的购买门。登录门不显示用途说明、¥28、购买、恢复购买或兑换；Premium 页面原有的体验说明、¥28 价卡、购买、恢复购买、兑换及协议入口保留。已购/体验的服务端判定和 StoreKit 实现保持不变。
+- iPhone 真机构建暴露 `StoreKitPremiumPlugin.swift` 的 StoreKit 2 API 编译错误：验证 JWS 应从 `VerificationResult` 读取，缓存 options 需先解包。最小修复后，React build、iOS sync、开发签名真机构建和安装均成功；冷启动命令因手机锁屏被 iOS 拒绝，等待解锁后手动打开。
+- 本轮回归：`npm test` 131/131、`npm run test:react` 45 文件/363 项、TypeScript、`git diff --check` 均通过。未暂存、提交或推送。
+
+## 2026-08-14（续3）：冷启动品牌开屏
+
+- 用户确认：每次完整冷启动均先复用登录门的 App 图标和 After Zero 手写 Logo 作为纯品牌开屏；两个登录入口不显示，Logo 绘制结束后再停留 0.5 秒并自动进入第一个“债务”tab。
+- 实现不发起登录、不改写账户/Premium/本地账本或云端会话；正常动效总时长约 1.87 秒，减少动态效果时为 0.5 秒，开屏期间返回键被消费。
+- 验证：主 Web 内联脚本解析、React 45 文件/370 项、TypeScript、React build、iOS sync 与 `git diff --check` 通过；开发签名 iPhone Debug 已构建、安装并冷启动。未暂存、提交或推送。
+
+## 2026-08-14（续4）：Apple 登录重复认证修复
+
+- 排查确认一次正常点击不会主动请求两次 Apple 授权，但原先没有前端进行中锁；若重复点击，第二个原生调用被拒绝后会关闭登录门。另有“nonce 已消费、后续签发/交付票据失败”会迫使用户重新发起 Apple 授权的恢复缺口。
+- 修复：Apple 按钮在整个流程禁用；Apple 凭证取得后仅自动重试一次云端换票据；同一仍有效、已验签的凭证只可为同一内部账户补发票据，不能用于其他账户。云函数记录无身份信息的失败阶段和耗时。
+- 验证：`npm test` 131/131、React 45 文件/370 项、TypeScript、主 Web 脚本解析、React build、iOS sync、`git diff --check` 通过；`appleLogin` 已部署并以无凭证调用确认新阶段日志（冷启动约532ms、主体约5ms）；开发签名 iPhone Debug 已构建、安装并冷启动。待用户本人完成一次 Apple 密码/Face ID 真机登录验收；未暂存、提交或推送。
+
+## 2026-08-14（续5）：账户头像与昵称编辑
+
+- 用户要求账户页顶部添加可自定义头像，账户信息中的昵称可编辑。已增加默认纯色圆形头像；登录后选择图片会本地缩放至最长边320px、JPEG压缩保存，昵称失焦或按Enter保存，最长24字符。
+- 资料仅写入既有 `after-zero-account-v1` 的本机展示字段：不上传图片、不改变 Apple/微信身份、CloudBase会话、Premium、账本或云端用户资料；按现有退出登录语义清除账户展示资料。
+- 验证：React 45 文件/371 项、TypeScript、React build、Android/iOS sync、主Web脚本解析和`git diff --check`通过；开发签名 iPhone Debug已构建、安装并冷启动。未暂存、提交或推送。
+- 追加：昵称编辑框现按中英文昵称长度自动伸缩，有最小宽度与行内上限；React 371项、TypeScript、build、Android/iOS sync、`git diff --check`通过，iPhone Debug已重新安装并冷启动。未暂存、提交或推送。
+- 根据真机视觉反馈，昵称框改为 `border-box` 尺寸并将文本居中，左右内边距对称，修正短昵称时左侧留白明显更宽的观感；最新 iPhone Debug 已重新构建、安装并冷启动。未暂存、提交或推送。

@@ -202,6 +202,8 @@ export interface AzBridge {
   getDebts(): Debt[];
   getPremium(): Premium;
   getAccount(): Account | null;
+  // 仅更新当前设备的账户展示资料（昵称/头像）；不改变云端身份、登录会话或本地账本。
+  updateAccountProfile(profile: { nickname?: string; avatarUrl?: string }): boolean;
   // openDetail/openEdit都已删除——detailSheet/editSheet迁移React后，"打开详情窗/编辑表单"
   // 变成纯React侧状态(shared/state.ts的openDetailSheet/closeDetailSheet/openEditSheet/
   // closeEditSheet)，不再经过这个桥接对象，见 react/src/sheets/ 和 AGENTS.md"React 迁移"一节。

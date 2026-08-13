@@ -40,11 +40,11 @@ describe("AccountScreen", () => {
     render(<AccountScreen />);
     act(() => { openAccountScreen(); });
     expect(screen.getByText("尚未登录")).toBeInTheDocument();
-    expect(screen.getByText(/完整账本需要登录并验证体验或购买权益/)).toBeInTheDocument();
+    expect(screen.getByText(/登录后可使用云端功能/)).toBeInTheDocument();
     expect(screen.queryByText("退出登录")).not.toBeInTheDocument();
     expect(screen.queryByText("注销云端账户")).not.toBeInTheDocument();
-    await act(async () => { fireEvent.click(screen.getByText("登录并验证权益")); });
-    expect(bridge.requestCloudLogin).toHaveBeenCalledWith(expect.stringContaining("不会自动上传"));
+    await act(async () => { fireEvent.click(screen.getByText("登录")); });
+    expect(bridge.requestCloudLogin).toHaveBeenCalledWith("");
   });
 
   it.each([
@@ -57,13 +57,27 @@ describe("AccountScreen", () => {
     expect(screen.getByText(label)).toBeInTheDocument();
   });
 
-  it("Apple账号展示服务端确认的邮箱且不渲染空头像", () => {
+  it("Apple账号展示服务端确认的邮箱和可自定义的纯色默认头像", () => {
     const apple: Account = { userId: "u_1", provider: "apple", providers: ["apple"], nickname: "Apple 用户", avatarUrl: "", email: "relay@example.com", loggedInAt: 1 };
     window.__azBridge = makeMockBridge({ account: apple });
     const { container } = render(<AccountScreen />);
     act(() => { openAccountScreen(); });
     expect(screen.getByText("relay@example.com")).toBeInTheDocument();
-    expect(container.querySelector(".account-avatar")).toBeNull();
+    expect(container.querySelector(".account-avatar-placeholder")).toBeInTheDocument();
+    expect(screen.getByLabelText("更换头像")).toBeInTheDocument();
+  });
+
+  it("昵称可编辑，失焦后仅经桥接保存本机展示资料", () => {
+    const bridge = makeMockBridge({ account });
+    window.__azBridge = bridge;
+    render(<AccountScreen />);
+    act(() => { openAccountScreen(); });
+    const nickname = screen.getByLabelText("昵称");
+    expect(nickname).toHaveStyle({ width: "6em" });
+    fireEvent.change(nickname, { target: { value: "新的账户昵称" } });
+    expect(nickname).toHaveStyle({ width: "8em" });
+    fireEvent.blur(nickname);
+    expect(bridge.updateAccountProfile).toHaveBeenCalledWith({ nickname: "新的账户昵称" });
   });
 
   it("仅显示尚未绑定的登录方式，并经桥接发起双重授权绑定", async () => {

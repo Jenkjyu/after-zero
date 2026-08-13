@@ -1,6 +1,6 @@
 # After Zero iOS 主线滚动交接
 
-更新时间：2026-08-13
+更新时间：2026-08-14
 
 总计划：[`implementation-plan.md`](implementation-plan.md)
 
@@ -217,3 +217,29 @@
 - 会员协议 Markdown/App 内副本、账户说明、Premium 页面和 bridge/type/mock 已同步为体验、¥28、一次性买断、恢复购买及注销后的最小权益保留语义。
 - 本地验证通过：`npm test` 131/131、`npm run test:react` 45 文件/368 项、TypeScript、React build、iOS sync、主 Web 内联脚本语法与 `git diff --check`。iOS Simulator 无签名 `xcodebuild` 已通过；首次构建因本机 SPM 的 Capacitor Cordova 缓存缺件失败，重新解析已有 SPM 依赖后复验成功。
 - 2026-08-14 已将 `premiumEntitlement` 加入本机受控部署配置并成功部署。仍未完成、不得宣称步骤 8 闭环：① 在 CloudBase 创建 `premiumEntitlements`、`premiumTransactions`、`premiumRedeemCodes`、`premiumTrialClaims` 为 ADMINONLY；② 配置生产环境 `APPLE_APP_STORE_ID`；③ 在 App Store Connect 创建非消耗型商品 `io.github.jenkjyu.afterzero.premium`、中国区价格 ¥28 与 Sandbox 测试账号；④ 配置 App Store Server Notifications V2，完成购买、取消、失败、恢复、换设备、退款/撤销的 iPhone 真机验收；⑤ Android 回归。未暂存、提交或推送。
+
+## 步骤 8：2026-08-14 本轮体验与入口调整
+
+- iOS 不再在冷启动强制打开登录门，也不会因体验结束封锁整 App。登录身份首次服务端确认后的 7 天体验，或服务端已确认且仍在离线窗口内的已购权益，仍可使用所有功能。
+- 体验已结束且没有已购权益时，用户仍可使用第一个“债务”tab 的本地功能；AI 入口、第二个“还款日”tab 和第三个“统计”tab 统一打开 Premium 页面。我的页中“云备份、档案库、下载备份文件、上传备份文件”也统一打开该页面；头像进入账户页不受限制，会员字段显示“普通用户”。
+- 登录门不展示用途说明、¥28 价卡、购买、恢复购买或兑换入口；Premium 页面保留原有体验说明、¥28 价卡、购买、恢复购买、兑换和协议入口。StoreKit/服务端权益实现与 Apple 商店配置保持不变。
+
+## 2026-08-14（续）：冷启动品牌开屏
+
+- 每次完整冷启动先显示既有登录门的 App 图标和 After Zero 手写 Logo，但此界面仅作品牌开屏：不显示 Apple/微信登录入口，也不调用登录、账户或 Premium 权益逻辑。
+- 手写 Logo 完成现有逐字动画后固定再停留 0.5 秒（正常动效共约 1.87 秒；系统“减少动态效果”时停留 0.5 秒），再自动关闭开屏并固定回到第一个“债务”tab；开屏期间硬件返回不关闭它。
+
+## 2026-08-14（续2）：Apple 登录换票据重试
+
+- Apple 登录按钮在原生授权和云端换票据全过程保持单次进行，重复点击不再触发第二条请求或提前关闭登录门。
+- Apple 已签发凭证后，客户端仅对临时云端交付故障自动重试一次，不重新打开 Apple 认证面板；服务端仍校验签名、issuer、audience、有效期和 raw nonce，同一份未过期凭证只允许为其原内部账户补发票据，不能转给其他账户或创建第二个账户。
+- `appleLogin` 云函数已部署，并增加无身份信息的阶段/耗时日志。无凭证调用返回预期 `TOKEN_MALFORMED`，函数冷启动约 532ms、函数主体约 5ms。开发签名 iPhone Debug 已重新构建、安装并冷启动；Apple 密码/Face ID 路径需用户本人完成一次真机验收。
+
+## 2026-08-14（续3）：账户头像与昵称编辑
+
+- 账户页顶部增加圆形头像：无自定义图片时保持纯色默认头像，登录后点击可从系统图片选择器自定义；图片在 WebView 本地缩至最长边 320px、JPEG 压缩后写入既有 `after-zero-account-v1`，不上传云端。
+- 账户信息中的昵称改为可编辑输入，失焦或按 Enter 保存，最多 24 个字符。头像/昵称仅为当前设备的展示资料，不改变 Apple/微信身份、CloudBase 会话、Premium、本地账本或云端用户资料；现有退出登录行为会一并清除本机账户展示资料。
+- 验证：React 45 文件/371 项、TypeScript、React build、Android/iOS sync、主 Web 脚本解析和 `git diff --check` 均通过；开发签名 iPhone Debug 已构建、安装并冷启动。
+- 昵称输入框会按中英文字符宽度自动伸缩，并保持最小可点按宽度与单行上限，避免过长昵称挤坏账户信息行；已重新构建、安装并冷启动 iPhone Debug 包。
+- 根据真机视觉反馈，昵称框改用 `border-box` 尺寸和居中文本，左右内边距保持对称，消除短昵称时左侧留白明显更宽的观感；已重新构建、安装并冷启动 iPhone Debug 包。
+- 设备构建首次暴露 `StoreKitPremiumPlugin.swift` 对 StoreKit 验证结果 JWS 的错误读取及可选缓存参数处理；已改为从验证结果传递 JWS，并正确解包缓存字典。已用开发签名构建并安装到连接的 iPhone；冷启动命令因设备锁屏被系统拒绝，需解锁后由用户打开确认。

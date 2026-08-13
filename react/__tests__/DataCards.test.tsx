@@ -47,25 +47,27 @@ describe("DataCards", () => {
     expect(backupHook.result.current).toBe(false);
   });
 
-  it("点档案库调用openDocsScreen(纯React状态)，无门禁", () => {
+  it.each(["档案库", "下载备份文件", "上传备份文件"])("未开通时点%s跳订阅页", (entry) => {
     window.__azBridge = makeMockBridge();
     render(<DataCards premium={{ premium: null }} account={null} />);
-    const hook = renderHook(() => useDocsScreenOpen());
+    const premiumHook = renderHook(() => usePremiumScreenOpen());
+    fireEvent.click(screen.getByText(entry));
+    expect(premiumHook.result.current).toBe(true);
+    expect(window.__azBridge.downloadBackupFile).not.toHaveBeenCalled();
+    expect(window.__azBridge.triggerImportFilePicker).not.toHaveBeenCalled();
+  });
+
+  it("已开通时档案库、下载和上传维持原入口", () => {
+    const bridge = makeMockBridge();
+    window.__azBridge = bridge;
+    const premium: Premium = { premium: { method: "onetime", at: "2026-01-01", offlineUntil: Date.now() + 60_000 } };
+    render(<DataCards premium={premium} account={account} />);
+    const docsHook = renderHook(() => useDocsScreenOpen());
     fireEvent.click(screen.getByText("档案库"));
-    expect(hook.result.current).toBe(true);
-  });
-
-  it("点下载备份文件调用downloadBackupFile", () => {
-    window.__azBridge = makeMockBridge();
-    render(<DataCards premium={{ premium: null }} account={null} />);
+    expect(docsHook.result.current).toBe(true);
     fireEvent.click(screen.getByText("下载备份文件"));
-    expect(window.__azBridge.downloadBackupFile).toHaveBeenCalledTimes(1);
-  });
-
-  it("点上传备份文件调用triggerImportFilePicker", () => {
-    window.__azBridge = makeMockBridge();
-    render(<DataCards premium={{ premium: null }} account={null} />);
     fireEvent.click(screen.getByText("上传备份文件"));
-    expect(window.__azBridge.triggerImportFilePicker).toHaveBeenCalledTimes(1);
+    expect(bridge.downloadBackupFile).toHaveBeenCalledOnce();
+    expect(bridge.triggerImportFilePicker).toHaveBeenCalledOnce();
   });
 });

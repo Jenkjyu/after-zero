@@ -3,13 +3,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { App } from "../src/mine/App";
-import { closeAboutScreen, closeAccountScreen, closeDocsScreen, useAboutScreenOpen, useAccountScreenOpen, useDocsScreenOpen } from "../src/shared/state";
+import { closeAboutScreen, closeAccountScreen, closeDocsScreen, closePremiumScreen, useAboutScreenOpen, useAccountScreenOpen, usePremiumScreenOpen } from "../src/shared/state";
 import { makeMockBridge } from "./mockBridge";
 import type { Account } from "../src/types";
 
 afterEach(() => {
   closeAccountScreen(); // accountScreenOpen/docsScreenOpen/aboutScreenOpen是模块级状态，重置避免测试间互相污染
   closeDocsScreen();
+  closePremiumScreen();
   closeAboutScreen();
 });
 
@@ -36,15 +37,15 @@ describe("mine App", () => {
     expect(screen.getByText("关于我们")).toBeInTheDocument();
   });
 
-  it("点头像→openAccountScreen，点档案库→openDocsScreen，两个都是纯React状态", () => {
+  it("点头像进入账户页；普通用户点档案库跳订阅页", () => {
     window.__azBridge = makeMockBridge({ account, premium: { premium: null } });
     render(<App />);
     const accountHook = renderHook(() => useAccountScreenOpen());
-    const docsHook = renderHook(() => useDocsScreenOpen());
+    const premiumHook = renderHook(() => usePremiumScreenOpen());
     fireEvent.click(screen.getByLabelText("账户"));
     expect(accountHook.result.current).toBe(true);
     fireEvent.click(screen.getByText("档案库"));
-    expect(docsHook.result.current).toBe(true);
+    expect(premiumHook.result.current).toBe(true);
   });
 
   it("点关于我们→openAboutScreen", () => {

@@ -6,6 +6,10 @@
 import { useSyncExternalStore } from "react";
 import type { Account, Debt, FileItem, NotifySettings, Premium } from "../types";
 
+// tabbar 仍属于 vanilla 宿主。它发现 Premium 未开通时只派发意图事件，具体订阅页开关
+// 仍由 React 的共享状态拥有，避免把 screen 导航塞回 bridge。
+window.addEventListener("az:premium-required", () => { openPremiumScreen(); });
+
 function subscribe(callback: () => void) {
   window.addEventListener("az:state-changed", callback);
   return () => window.removeEventListener("az:state-changed", callback);

@@ -8,7 +8,7 @@
 // 返回的原始数组，但内容应该始终一致。
 import { describe, expect, it } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { closeDetailSheet, closeEditSheet, NEW_DEBT_ID, openDetailSheet, openEditSheet, useAccount, useDebts, useDetailSheetId, useEditSheetId, usePremium } from "../src/shared/state";
+import { closeDetailSheet, closeEditSheet, closePremiumScreen, NEW_DEBT_ID, openDetailSheet, openEditSheet, useAccount, useDebts, useDetailSheetId, useEditSheetId, usePremium, usePremiumScreenOpen } from "../src/shared/state";
 import type { Premium } from "../src/types";
 import { makeMockBridge, makeDebt } from "./mockBridge";
 
@@ -126,6 +126,16 @@ describe("useDetailSheetId / openDetailSheet / closeDetailSheet", () => {
     act(() => { openDetailSheet("d1"); });
     expect(sheetHook.result.current).toBe("d1");
     expect(debtsHook.result.current).toBe(before); // 没有派发az:state-changed，debts快照不变
+  });
+});
+
+describe("vanilla tabbar Premium intent", () => {
+  it("az:premium-required打开React拥有的订阅页", () => {
+    closePremiumScreen();
+    const { result } = renderHook(() => usePremiumScreenOpen());
+    expect(result.current).toBe(false);
+    act(() => { window.dispatchEvent(new CustomEvent("az:premium-required")); });
+    expect(result.current).toBe(true);
   });
 });
 

@@ -24,7 +24,7 @@ public final class StoreKitPremiumPlugin: CAPPlugin, CAPBridgedPlugin {
             for await result in Transaction.updates {
                 guard let self else { return }
                 if case .verified(let transaction) = result {
-                    self.notifyListeners("transactionUpdated", data: self.transactionPayload(transaction))
+                    self.notifyListeners("transactionUpdated", data: self.transactionPayload(transaction, jws: result.jwsRepresentation))
                 }
             }
         }
@@ -73,7 +73,7 @@ public final class StoreKitPremiumPlugin: CAPPlugin, CAPBridgedPlugin {
                     }
                     // 只有服务端确认账户权益后，Web 层才会调用 finish()；网络失败时保留未完成
                     // 交易，之后可由 Transaction.updates 或恢复购买重新上报，不会丢失。
-                    call.resolve(transactionPayload(transaction))
+                    call.resolve(transactionPayload(transaction, jws: verification.jwsRepresentation))
                 case .pending:
                     call.resolve(["status": "pending"])
                 case .userCancelled:
@@ -94,7 +94,7 @@ public final class StoreKitPremiumPlugin: CAPPlugin, CAPBridgedPlugin {
                 try await AppStore.sync()
                 for await verification in Transaction.currentEntitlements {
                     guard case .verified(let transaction) = verification, transaction.productID == productId else { continue }
-                    call.resolve(transactionPayload(transaction))
+                    call.resolve(transactionPayload(transaction, jws: verification.jwsRepresentation))
                     return
                 }
                 call.resolve(["status": "notFound"])
@@ -128,7 +128,7 @@ public final class StoreKitPremiumPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         do {
             // `options` 同时包含 userId；缓存中仅保留服务端已经确认过的权益字段。
-            var payload = call.options
+            var payload = call.options ?? [:]
             payload.removeValue(forKey: "userId")
             let data = try JSONSerialization.data(withJSONObject: payload)
             try writeKeychain(data, account: userId)
@@ -174,12 +174,12 @@ public final class StoreKitPremiumPlugin: CAPPlugin, CAPBridgedPlugin {
         return productId
     }
 
-    private func transactionPayload(_ transaction: Transaction) -> [String: Any] {
+    private func transactionPayload(_ transaction: Transaction, jws: String) -> [String: Any] {
         ["status": "success",
          "transactionId": String(transaction.id),
          "originalTransactionId": String(transaction.originalID),
          "productId": transaction.productID,
-         "jws": transaction.jwsRepresentation]
+         "jws": jws]
     }
 
     private func writeKeychain(_ data: Data, account: String) throws {

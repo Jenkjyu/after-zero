@@ -1,5 +1,5 @@
-// "我的"页4张数据卡：云备份/档案库/下载备份/上传备份。云备份是唯一带门禁的
-// （hasPremium(premium)未过先跳订阅页）。"打开档案库"/"打开云备份"（第九步/第十步，
+// "我的"页4张数据卡：云备份/档案库/下载备份/上传备份。四项都受 Premium 门禁保护，
+// 未开通时统一跳订阅页。"打开档案库"/"打开云备份"（第九步/第十步，
 // React迁移收尾）后都调用shared/state.ts的纯React状态开关（#docsScreen/#backupScreen
 // 整体已经是React自己的sheet，不再经过bridge）；其余2张继续无条件触发vanilla桥接函数——
 // 备份文件的打包/解析、系统文件选择器这几件事继续100%vanilla。
@@ -80,12 +80,15 @@ export function DataCards({ premium, account }: DataCardsProps) {
     openBackupScreen();
   }
   function onDocs() {
+    if (!window.hasPremium(premium)) { openPremiumScreen(); return; }
     openDocsScreen();
   }
   function onDownload() {
+    if (!window.hasPremium(premium)) { openPremiumScreen(); return; }
     window.__azBridge.downloadBackupFile();
   }
   function onImport() {
+    if (!window.hasPremium(premium)) { openPremiumScreen(); return; }
     window.__azBridge.triggerImportFilePicker();
   }
 

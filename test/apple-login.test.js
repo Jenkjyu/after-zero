@@ -7,7 +7,7 @@ const {
   sha256Hex,
   verifyAppleIdentityToken,
 } = require("../cloudbase/functions/appleLogin/verifyAppleToken");
-const { consumeNonceOnce } = require("../cloudbase/functions/appleLogin/replayGuard");
+const { claimNonceForTicket } = require("../cloudbase/functions/appleLogin/replayGuard");
 const {
   isValidCustomUserId,
   newAppleUserId,
@@ -85,7 +85,7 @@ test("Apple token拒绝错误issuer", async () => {
   );
 });
 
-test("同一Apple token nonce只能消费一次，重放会被原子事务拒绝", async () => {
+test("同一已验签 Apple 凭证可为同一账户安全补发票据，但不能转给其他账户", async () => {
   const documents = new Map();
   const db = {
     runTransaction: async (callback) => callback({
@@ -98,9 +98,10 @@ test("同一Apple token nonce只能消费一次，重放会被原子事务拒绝
     }),
   };
   const claims = { sub: "apple-user-123", exp: Math.floor(nowMs / 1000) + 300 };
-  await consumeNonceOnce(db, claims, rawNonce, "u_internal", nowMs);
+  assert.deepEqual(await claimNonceForTicket(db, claims, rawNonce, "u_internal", nowMs), { retry: false });
+  assert.deepEqual(await claimNonceForTicket(db, claims, rawNonce, "u_internal", nowMs + 1), { retry: true });
   await assert.rejects(
-    consumeNonceOnce(db, claims, rawNonce, "u_internal", nowMs + 1),
+    claimNonceForTicket(db, claims, rawNonce, "u_other", nowMs + 2),
     (error) => error.code === "TOKEN_REPLAYED"
   );
   assert.equal([...documents.values()][0].userId, "u_internal");

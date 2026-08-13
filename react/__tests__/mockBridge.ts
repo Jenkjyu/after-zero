@@ -23,6 +23,7 @@ export function makeMockBridge(overrides?: {
     getDebts: vi.fn(() => debts),
     getPremium: vi.fn(() => premium),
     getAccount: vi.fn(() => account),
+    updateAccountProfile: vi.fn(() => true),
     payInstallment: vi.fn(),
     unsettle: vi.fn(),
     commitReorder: vi.fn(),

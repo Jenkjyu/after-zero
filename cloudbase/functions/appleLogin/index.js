@@ -1,6 +1,6 @@
 const cloudbase = require("@cloudbase/node-sdk");
 const { sha256Hex, verifyAppleIdentityToken } = require("./verifyAppleToken");
-const { consumeNonceOnce } = require("./replayGuard");
+const { claimNonceForTicket } = require("./replayGuard");
 const { isValidCustomUserId, newAppleUserId, migratedAppleUserId } = require("./userId");
 
 const app = cloudbase.init({ env: cloudbase.SYMBOL_CURRENT_ENV });
@@ -87,6 +87,8 @@ async function resolveAppleAccount(claims, displayName, now) {
 }
 
 exports.main = async (event) => {
+  const startedAt = Date.now();
+  let stage = "verify-token";
   try {
     const identityToken = event && event.identityToken;
     const rawNonce = event && event.rawNonce;
@@ -98,11 +100,14 @@ exports.main = async (event) => {
     const claims = await verifyAppleIdentityToken(identityToken, rawNonce, APPLE_CLIENT_ID);
     const now = Date.now();
     const requestedName = cleanDisplayName(event && event.fullName);
+    stage = "resolve-account";
     const accountResolution = await resolveAppleAccount(claims, requestedName, now);
     const userId = accountResolution && accountResolution.userId;
     if (!userId) throw new Error("无法建立内部账户");
-    await consumeNonceOnce(db, claims, rawNonce, userId, now);
+    stage = "claim-nonce";
+    const nonceClaim = await claimNonceForTicket(db, claims, rawNonce, userId, now);
 
+    stage = "update-account";
     const users = db.collection("users");
     const userResult = await users.where({ userId }).limit(1).get();
     const user = firstDocument(userResult) || {};
@@ -119,7 +124,12 @@ exports.main = async (event) => {
     });
     await db.collection("identities").doc(sha256Hex(`apple:${claims.sub}`)).update({ lastLoginAt: now });
 
+    stage = "create-ticket";
     const ticket = await authApp.auth().createTicket(userId);
+    console.info("[appleLogin] success", {
+      ms: Date.now() - startedAt,
+      retriedTicketDelivery: !!(nonceClaim && nonceClaim.retry),
+    });
     return {
       ok: true,
       ticket,
@@ -134,7 +144,7 @@ exports.main = async (event) => {
       },
     };
   } catch (error) {
-    console.error("[appleLogin] failed:", error && error.code, error && error.message);
+    console.error("[appleLogin] failed:", stage, error && error.code, error && error.message);
     return {
       ok: false,
       code: (error && error.code) || "APPLE_LOGIN_FAILED",

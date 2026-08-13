@@ -691,6 +691,8 @@
   .login-gate { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: none; align-items: center; justify-content: center;
     padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); }
   .login-gate.open { display: flex; }
+  /* 冷启动时复用登录门的品牌开屏，但它不是登录提示：不显示也不接收任何登录操作。 */
+  .login-gate.startup-splash .data-actions { display: none; }
   .login-gate-inner { max-width: 340px; width: 100%; text-align: center; }
   .gate-purpose { color: var(--text-muted); font-size: 13px; line-height: 1.55; margin: -6px 8px 18px; }
   .login-gate .data-actions { flex-direction: column; }
@@ -946,6 +948,9 @@
   .account-avatar-btn { background: none; border: none; padding: 0; border-radius: 50%;
     -webkit-tap-highlight-color: transparent; cursor: pointer; }
   .account-avatar-lg { width: 78px; height: 78px; border-radius: 50%; object-fit: cover; display: block; background: var(--surface-2); }
+  .account-avatar-placeholder { border: 1px solid var(--hair); box-shadow: var(--e1); }
+  .account-avatar-hint { color: var(--text-muted); font-size: 12px; line-height: 1; }
+  .account-avatar-input { display: none; }
   .account-name-c { font-size: 16px; font-weight: 600; text-align: center; }
   .account-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex: none; background: var(--surface-2); }
   .account-chevron { width: 18px; height: 18px; flex: none; color: var(--text-muted); }
@@ -981,6 +986,9 @@
   .account-detail-row:last-child { border-bottom: none; }
   .account-detail-label { font-size: 13px; color: var(--text-muted); }
   .account-detail-value { font-size: 14px; font-weight: 600; }
+  .account-detail-row-edit { gap: 14px; }
+  .account-nickname-input { box-sizing: border-box; min-width: 6em; max-width: 62%; border: 1px solid var(--border); border-radius: 9px; padding: 7px 9px;
+    background: var(--surface-2); color: var(--text); font: inherit; font-size: 14px; font-weight: 600; text-align: center; }
   .account-local-note { margin: 14px 2px 0; color: var(--text-muted); font-size: 13px; line-height: 1.6; }
 
   /* 高级统计报表：横向条形图(债务余额对比)/堆叠条形图(类型占比)/折线图(负债预测走势)，
@@ -1394,7 +1402,7 @@
   </button>
 </nav>
 
-<div class="login-gate" id="loginGate">
+<div class="login-gate open startup-splash" id="loginGate" aria-hidden="false">
   <div class="login-gate-inner">
     <div class="gate-icon" aria-hidden="true">
       <img src="img/app-icon.png" alt="">
@@ -1414,13 +1422,10 @@
         <path class="hw-letter" style="--i:8;--len:1677.7" transform="translate(3258.0,0)" d="M169 15Q156 15 148.5 20.0Q141 25 130 34Q111 54 103.0 72.5Q95 91 98 108Q101 116 100.5 123.5Q100 131 100 131Q95 136 97.0 137.5Q99 139 101 143Q107 143 105 154Q103 162 113.0 189.0Q123 216 138 240Q144 250 156.0 266.5Q168 283 182.5 299.5Q197 316 209 326Q234 347 253.0 357.0Q272 367 294 372Q316 377 324.5 377.0Q333 377 348 361Q371 351 381.5 337.0Q392 323 395 296Q398 266 390.5 227.5Q383 189 343 132Q318 96 297.0 78.5Q276 61 247 44Q226 30 209.0 23.5Q192 17 169 15ZM265 121Q289 148 303.5 172.0Q318 196 331 233Q335 244 336.0 260.5Q337 277 335.5 291.5Q334 306 328 308Q316 315 299.0 312.5Q282 310 262 293Q231 267 208.0 228.5Q185 190 163 141Q148 105 156.5 83.5Q165 62 193.5 68.5Q222 75 265 121Z"/>
       </g>
     </svg>
-    <p class="gate-purpose" id="loginPurpose">登录后即可获得 7 天 Premium 会员体验。</p>
+    <p class="gate-purpose" id="loginPurpose" hidden></p>
     <div class="data-actions" style="margin:0">
       <button class="btn apple-login-btn" id="appleLoginBtn" hidden><span class="apple-login-logo" aria-hidden="true"></span>通过 Apple 登录</button>
       <button class="btn primary" id="wxLoginBtn"><svg class="btn-ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 0 1 .598.082l1.584.926a.272.272 0 0 0 .14.047c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 0 1-.023-.156.49.49 0 0 1 .201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.837-6.656-6.088V8.89c-.135-.01-.27-.027-.407-.03zm-2.53 3.274c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.97-.982zm4.844 0c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.969-.982z"/></svg>微信登录</button>
-      <button class="btn primary" id="gateBuyBtn" hidden>¥28 永久解锁</button>
-      <button class="btn ghost" id="gateRestoreBtn" hidden>恢复购买</button>
-      <div id="gateRedeemWrap" hidden style="display:flex;gap:8px"><input id="gateRedeemInput" type="text" placeholder="输入兑换码" autocomplete="off"><button class="btn ghost" id="gateRedeemBtn">兑换</button></div>
       <button class="btn ghost" id="loginCancelBtn">暂不登录</button>
     </div>
   </div>
@@ -2108,23 +2113,9 @@
     return callPremiumEntitlement({ action: "status" }).then(function (access) { return !!access.active; })
       .catch(function () { return cachedPremiumAccess(); });
   }
-  function setGatePurchaseVisible(visible) {
-    $("gateBuyBtn").hidden = !visible;
-    $("gateRestoreBtn").hidden = !visible;
-    $("gateRedeemWrap").hidden = !visible;
-    $("loginCancelBtn").hidden = visible;
-  }
-
   var pendingLoginPromise = null, pendingLoginResolve = null;
   function finishCloudLoginPrompt(ok) {
     var gate = $("loginGate");
-    // iOS 的全量产品门禁不可被取消、返回或失败路径关闭；只有有效权益才放行。
-    if (isIosPurchaseRuntime() && !hasPremium(premium)) {
-      var blockedResolve = pendingLoginResolve;
-      pendingLoginPromise = null; pendingLoginResolve = null;
-      if (blockedResolve) blockedResolve(false);
-      return;
-    }
     if (gate.classList.contains("open")) { gate.classList.remove("open"); gate.setAttribute("aria-hidden", "true"); unlockScroll(); }
     var resolve = pendingLoginResolve;
     pendingLoginPromise = null; pendingLoginResolve = null;
@@ -2133,18 +2124,13 @@
   function requestCloudLogin(purpose) {
     if (account) {
       if (!isIosPurchaseRuntime()) return Promise.resolve(true);
-      return refreshPremiumAccess().then(function (active) {
-        if (active) { finishCloudLoginPrompt(true); return true; }
-        openRequiredAccessGate("体验已结束，可永久解锁完整账本。");
-        return false;
-      });
+      return refreshPremiumAccess().then(function () { return true; }, function () { return true; });
     }
     if (pendingLoginPromise) return pendingLoginPromise;
-    $("loginPurpose").textContent = purpose || (isIosPurchaseRuntime() ? "登录后即可获得 7 天 Premium 会员体验。" : "登录后可使用需要云端身份的功能；本地账本不会自动上传。");
+    $("loginPurpose").textContent = "";
     var platform = currentPlatform();
     $("appleLoginBtn").hidden = platform !== "ios";
     $("wxLoginBtn").hidden = platform !== "android" && platform !== "ios";
-    setGatePurchaseVisible(false);
     var gate = $("loginGate");
     gate.setAttribute("aria-hidden", "false");
     gate.classList.add("open");
@@ -2152,13 +2138,24 @@
     pendingLoginPromise = new Promise(function (resolve) { pendingLoginResolve = resolve; });
     return pendingLoginPromise;
   }
-  function openRequiredAccessGate(message) {
-    $("loginPurpose").textContent = message;
-    $("appleLoginBtn").hidden = true;
-    $("wxLoginBtn").hidden = true;
-    setGatePurchaseVisible(true);
+  function finishStartupSplash() {
     var gate = $("loginGate");
-    gate.setAttribute("aria-hidden", "false"); gate.classList.add("open"); lockScroll();
+    if (!gate.classList.contains("startup-splash")) return;
+    // 冷启动始终回到首个债务 tab；不读取或改变账户、Premium、本地账本及云端会话。
+    document.querySelectorAll(".tabbar button").forEach(function (button) {
+      button.setAttribute("aria-selected", button.getAttribute("data-view") === "debts" ? "true" : "false");
+    });
+    document.querySelectorAll(".view").forEach(function (view) { view.classList.remove("active"); });
+    $("view-debts").classList.add("active");
+    window.scrollTo(0, 0);
+    window.dispatchEvent(new CustomEvent("az:tab-changed", { detail: { view: "debts" } }));
+    gate.classList.remove("startup-splash", "open");
+    gate.setAttribute("aria-hidden", "true");
+  }
+  function startStartupSplash() {
+    // 最后一个字母的绘制结束于 150ms + 8×90ms + 500ms；完成后额外停留半秒。
+    var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.setTimeout(finishStartupSplash, reduceMotion ? 500 : 1870);
   }
   function cloudLoginRequired(feature) {
     var err = new Error((feature || "此云功能") + "需要先登录");
@@ -2172,6 +2169,27 @@
     // window.__azBridge.getAccount())，这里不再直接操作那两处DOM节点，改成派发通用
     // 状态变化事件让React自己重新读取account。
     window.dispatchEvent(new CustomEvent("az:state-changed"));
+  }
+  function updateAccountProfile(profile) {
+    if (!account) { toast("请先登录后再编辑资料"); return false; }
+    var next = {};
+    if (profile && Object.prototype.hasOwnProperty.call(profile, "nickname")) {
+      var nickname = String(profile.nickname || "").trim().slice(0, 24);
+      if (!nickname) { toast("昵称不能为空"); return false; }
+      next.nickname = nickname;
+    }
+    if (profile && Object.prototype.hasOwnProperty.call(profile, "avatarUrl")) {
+      var avatarUrl = typeof profile.avatarUrl === "string" ? profile.avatarUrl : "";
+      // 头像在本机既有账户资料中保存；限制已压缩 data URL 的大小，避免挤占账本存储空间。
+      if (!avatarUrl || avatarUrl.length > 700000) { toast("头像文件过大，请换一张图片"); return false; }
+      next.avatarUrl = avatarUrl;
+    }
+    var nextAccount = Object.assign({}, account, next);
+    try { localStorage.setItem(ACCOUNT_KEY, JSON.stringify(nextAccount)); }
+    catch (e) { toast("资料保存失败，请清理一些本地空间后重试"); return false; }
+    account = nextAccount;
+    renderAccountUI();
+    return true;
   }
 
   // renderAccountDetail()/openAccountScreen()/closeAccountScreen()已删除——#accountScreen
@@ -2192,7 +2210,6 @@
     renderAccountUI();
     if (isIosPurchaseRuntime()) {
       setPremiumAccess(null);
-      requestCloudLogin("退出后需重新登录并验证权益。");
     }
     toast("已退出登录");
   }
@@ -2211,7 +2228,6 @@
       renderAccountUI();
       if (isIosPurchaseRuntime()) {
         setPremiumAccess(null);
-        requestCloudLogin("账户已注销。重新登录后将验证可恢复的权益。");
       }
       toast("已注销账户");
       return true;
@@ -2632,14 +2648,14 @@
         toast("登录成功 ✓");
         return true;
       }
-      return refreshPremiumAccess().then(function (active) {
-        if (active) {
-          finishCloudLoginPrompt(true);
-          toast("登录成功 ✓");
-          return true;
-        }
-        openRequiredAccessGate("7 天体验已结束，¥28 一次性永久解锁完整账本。");
-        return false;
+      return refreshPremiumAccess().then(function () {
+        finishCloudLoginPrompt(true);
+        toast("登录成功 ✓");
+        return true;
+      }, function () {
+        finishCloudLoginPrompt(true);
+        toast("登录成功 ✓");
+        return true;
       });
     });
   }
@@ -2679,15 +2695,40 @@
     });
   }
 
+  var appleLoginInProgress = false;
+  function setAppleLoginInProgress(inProgress) {
+    var button = $("appleLoginBtn");
+    button.disabled = inProgress;
+    button.setAttribute("aria-busy", inProgress ? "true" : "false");
+  }
+  function isRetryableAppleTicketError(error) {
+    var code = error && error.code;
+    return !code || !/^(SERVER_CONFIG_INVALID|TOKEN_|NONCE_|APPLE_LOGIN_)/.test(code);
+  }
+  function signInWithAppleCredential(credential, attempt) {
+    return signInWithCloudTicket("appleLogin", {
+      identityToken: credential.identityToken,
+      rawNonce: credential.rawNonce,
+      fullName: credential.fullName,
+    }, "apple").catch(function (error) {
+      // Apple 已经签发了凭证时，短暂网络/换票据故障只重试云端交付一次，
+      // 不重新弹出 Apple 认证面板，也不重复请求用户密码。
+      if (attempt === 0 && isRetryableAppleTicketError(error)) {
+        toast("登录连接不稳，正在重试…");
+        return new Promise(function (resolve) { window.setTimeout(resolve, 500); })
+          .then(function () { return signInWithAppleCredential(credential, 1); });
+      }
+      throw error;
+    });
+  }
   function startAppleLogin() {
+    if (appleLoginInProgress) return;
+    appleLoginInProgress = true;
+    setAppleLoginInProgress(true);
     toast("正在打开 Apple 登录…");
     appleCredential("login").then(function (credential) {
       toast("登录中…");
-      return signInWithCloudTicket("appleLogin", {
-        identityToken: credential.identityToken,
-        rawNonce: credential.rawNonce,
-        fullName: credential.fullName,
-      }, "apple");
+      return signInWithAppleCredential(credential, 0);
     }).catch(function (err) {
       finishCloudLoginPrompt(false);
       if (err && err.code === "APPLE_LOGIN_CANCELLED") {
@@ -2695,6 +2736,9 @@
       } else {
         toast("Apple 登录失败：" + ((err && err.message) || "网络错误"));
       }
+    }).finally(function () {
+      appleLoginInProgress = false;
+      setAppleLoginInProgress(false);
     });
   }
 
@@ -3040,11 +3084,15 @@
 
   document.querySelectorAll(".tabbar button").forEach(function (b) {
     b.addEventListener("click", function () {
+      var view = b.getAttribute("data-view");
+      if ((view === "pay" || view === "report") && !hasPremium(premium)) {
+        window.dispatchEvent(new CustomEvent("az:premium-required"));
+        return;
+      }
       document.querySelectorAll(".tabbar button").forEach(function (x) { x.setAttribute("aria-selected", "false"); });
       b.setAttribute("aria-selected", "true");
       b.classList.remove("bounce"); void b.offsetWidth; b.classList.add("bounce");
       document.querySelectorAll(".view").forEach(function (v) { v.classList.remove("active"); });
-      var view = b.getAttribute("data-view");
       $("view-" + view).classList.add("active"); window.scrollTo(0, 0);
       // "在还债务"/"还款日"/"统计"三个tab现在都整体是React接管的(各自的#react-*-root)，
       // jiggleMode/debtSwipeOpen/paySwipeOpen这些手势状态已经不在vanilla这边了——切走时
@@ -3086,6 +3134,7 @@
     // 先关"优先级链，只是判断逻辑物理上不在这个文件里了。详见AGENTS.md"React 迁移"一节。
     if (window.__azDebtsBack && window.__azDebtsBack()) return true;
     if ($("modalScrim").classList.contains("open")) { closeModal(); return true; }
+    if ($("loginGate").classList.contains("startup-splash")) return true;
     if ($("loginGate").classList.contains("open")) {
       if (!isIosPurchaseRuntime()) finishCloudLoginPrompt(false);
       return true;
@@ -3152,13 +3201,6 @@
   });
   $("appleLoginBtn").addEventListener("click", startAppleLogin);
   $("loginCancelBtn").addEventListener("click", function () { finishCloudLoginPrompt(false); });
-  $("gateBuyBtn").addEventListener("click", function () { buyPremium(); });
-  $("gateRestoreBtn").addEventListener("click", function () { restorePremium(); });
-  $("gateRedeemBtn").addEventListener("click", function () {
-    var code = $("gateRedeemInput").value.trim();
-    if (!code) { toast("请输入兑换码"); return; }
-    redeemCode(code).then(function (ok) { if (ok) $("gateRedeemInput").value = ""; });
-  });
   // dlBackupBtn/importFileBtn(react/src/mine/DataCards.tsx里的"下载备份文件"/"上传备份文件"
   // 按钮)已经不在vanilla DOM里了，下载逻辑抽成了上面的downloadBackupFile()、通过桥接调用；
   // "上传备份文件"改成下面这个新函数，间接点击还留在vanilla DOM里的#importFileInput。
@@ -3213,6 +3255,7 @@
     // 保证每次都拿到当前最新的那个引用。
     getPremium: function () { return premium; },
     getAccount: function () { return account; },
+    updateAccountProfile: updateAccountProfile,
     // openDetail/openEdit都已删除——打开详情窗/编辑表单现在都是纯React状态(shared/state.ts的
     // openDetailSheet/openEditSheet)，不再经过这个桥接对象，见react/src/sheets/。
     payInstallment: payInstallment,
@@ -3285,7 +3328,7 @@
     buildAiSummary: buildAiSummary
   };
 
-  renderAll(); loadUploads(); renderAccountUI();
+  renderAll(); loadUploads(); renderAccountUI(); startStartupSplash();
   if (isIosPurchaseRuntime()) {
     var nativePremium = storeKitPremium();
     if (nativePremium && nativePremium.addListener) {
@@ -3293,8 +3336,8 @@
         if (account) verifyStoreKitTransaction(result).catch(function () {});
       });
     }
-    // iOS 是全量买断产品：启动必须先登录并得到服务端/离线窗口确认。
-    requestCloudLogin("登录后即可获得 7 天 Premium 会员体验。");
+    // 已登录用户静默刷新服务端权益；首次使用不弹登录门，债务首页始终可用。
+    if (account) refreshPremiumAccess();
   }
 })();
 </script>
