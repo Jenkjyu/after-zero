@@ -40,6 +40,15 @@ describe("PremiumScreen", () => {
     expect(window.__azBridge.buyPremium).toHaveBeenCalledTimes(1);
   });
 
+  it("购买与恢复购买按钮共用等高容器，不给恢复按钮单独偏移", () => {
+    window.__azBridge = makeMockBridge();
+    const { container } = render(<PremiumScreen />);
+    act(() => { openPremiumScreen(); });
+    const actions = container.querySelector(".premium-actions");
+    expect(actions?.querySelectorAll(".btn")).toHaveLength(2);
+    expect(screen.getByText("恢复购买")).not.toHaveStyle({ marginTop: "10px" });
+  });
+
   it("兑换码输入框默认收起，点开才展开，每次重新打开screen都强制复位收起", () => {
     window.__azBridge = makeMockBridge();
     render(<PremiumScreen />);

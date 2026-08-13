@@ -9,10 +9,10 @@ export interface PremiumEntryCardProps {
 }
 
 export function PremiumEntryCard({ premium }: PremiumEntryCardProps) {
-  const label = window.premiumLabel(premium);
+  const isMember = window.hasPremium(premium);
 
   return (
-    <div className={"data-card entry-card premium-entry-card" + (label ? " is-member" : "")}>
+    <div className={"data-card entry-card premium-entry-card" + (isMember ? " is-member" : "")}>
       <button type="button" className="entry-row" onClick={openPremiumScreen}>
         <div className="entry-ic" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
@@ -20,8 +20,8 @@ export function PremiumEntryCard({ premium }: PremiumEntryCardProps) {
           </svg>
         </div>
         <div className="entry-text">
-          <div className="entry-title">{label || "升级 Premium"}</div>
-          <div className="entry-sub">{label ? "查看会员详情" : "云备份 · 报表导出 · AI 债务助手"}</div>
+          <div className="entry-title">{isMember ? "Premium 会员" : "升级 Premium"}</div>
+          <div className="entry-sub">{isMember ? "查看会员详情" : "云备份 · 报表导出 · AI 债务助手"}</div>
         </div>
         <svg className="account-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <path d="M9 6l6 6-6 6" />

@@ -3002,3 +3002,7 @@ PDF字体经历了一次有价值的测试拦截：先下载的Noto OTF在`pdf`�
 - 验证：React 45 文件/371 项、TypeScript、React build、Android/iOS sync、主Web脚本解析和`git diff --check`通过；开发签名 iPhone Debug已构建、安装并冷启动。未暂存、提交或推送。
 - 追加：昵称编辑框现按中英文昵称长度自动伸缩，有最小宽度与行内上限；React 371项、TypeScript、build、Android/iOS sync、`git diff --check`通过，iPhone Debug已重新安装并冷启动。未暂存、提交或推送。
 - 根据真机视觉反馈，昵称框改为 `border-box` 尺寸并将文本居中，左右内边距对称，修正短昵称时左侧留白明显更宽的观感；最新 iPhone Debug 已重新构建、安装并冷启动。未暂存、提交或推送。
+- 纠正“体验”文案范围：账户页会员字段保留“Premium 会员体验”，订阅页标题和“我的”Premium 入口统一显示“Premium 会员”。订阅页的“已开通 Premium”和“恢复购买”改为同一并列容器，去掉恢复按钮单独顶部偏移，并固定为相同 44px 外框高度。React 45 文件/373 项、TypeScript、React build、Android/iOS sync、`git diff --check`通过；最新开发签名 iPhone Debug 已构建、安装并启动，待用户目视确认。未暂存、提交或推送。
+- 新增 iOS 系统式左缘交互返回：使用原生 `UIScreenEdgePanGestureRecognizer` 驱动 WebView 中最上层全屏 subpage 跟手右移；松手超过 35% 或快速右甩才沿现有 `__handleBackButton()` 返回链关闭，否则回弹。继续关闭 Web 网页历史侧滑；首页、登录门、确认框和底部 sheet 均不响应，避免越过 App 层级或同现有表单/横滑手势冲突。React 45 文件/373 项、TypeScript、React build、Android/iOS sync、`git diff --check`与开发签名 iPhone 构建/安装/启动通过；待用户真机手势验收。未暂存、提交或推送。
+- iOS 26 的底栏改为原生 `UIGlassEffect` 外壳：四个图标按原 Web SVG 的形状重绘，选中时仍只变为原本的实心/强调色，不加任何彩色圆角外框；点击通过 WK 消息桥触发原 Web tab 按钮，继续复用 Premium 门禁、切换逻辑与“我的”实际的 `data` 路由。栏宽比旧版每侧收窄 8pt；打开登录门、全屏 subpage、sheet 或确认框时原生栏隐藏。iOS 25 及以下、Android 和浏览器保留 Web 浮动玻璃降级样式，同样去除选中图标的色块。React 45 文件/373 项、TypeScript、React build、iOS sync、`git diff --check`与开发签名 iPhone 构建、安装、启动通过；待用户目视验收。未暂存、提交或推送。
+- 用户已确认底栏视觉效果；本批包含 Premium 文案与按钮尺寸修正、iOS 左缘交互返回、冷启动品牌开屏、Apple 登录重复认证修复、账户头像与昵称编辑，以及 iOS 26 原生 Liquid Glass 底栏。经用户明确授权，准备提交并推送当前 `main` 分支。

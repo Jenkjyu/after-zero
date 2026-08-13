@@ -1,4 +1,4 @@
-// premiumLabel()是真实calc.js实现(见setup.ts)，未开通返回null、已开通固定返回"Premium 会员"。
+// “体验”只属于账户页会员字段；“我的”入口统一显示“Premium 会员”。
 import { afterEach, describe, expect, it } from "vitest";
 import { fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { PremiumEntryCard } from "../src/mine/PremiumEntryCard";
@@ -27,6 +27,14 @@ describe("PremiumEntryCard", () => {
     expect(screen.getByText("Premium 会员")).toBeInTheDocument();
     expect(screen.getByText("查看会员详情")).toBeInTheDocument();
     expect(container.querySelector(".premium-entry-card")).toHaveClass("is-member");
+  });
+
+  it("试用期入口也不显示“体验”字样", () => {
+    window.__azBridge = makeMockBridge();
+    const premium: Premium = { premium: { method: "trial", at: "2026-01-01", expiresAt: Date.now() + 60_000 } };
+    render(<PremiumEntryCard premium={premium} />);
+    expect(screen.getByText("Premium 会员")).toBeInTheDocument();
+    expect(screen.queryByText("Premium 会员体验")).not.toBeInTheDocument();
   });
 
   it("点击总是调用openPremiumScreen(纯React状态)，跟是否开通无关", () => {

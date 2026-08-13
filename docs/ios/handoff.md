@@ -242,4 +242,7 @@
 - 验证：React 45 文件/371 项、TypeScript、React build、Android/iOS sync、主 Web 脚本解析和 `git diff --check` 均通过；开发签名 iPhone Debug 已构建、安装并冷启动。
 - 昵称输入框会按中英文字符宽度自动伸缩，并保持最小可点按宽度与单行上限，避免过长昵称挤坏账户信息行；已重新构建、安装并冷启动 iPhone Debug 包。
 - 根据真机视觉反馈，昵称框改用 `border-box` 尺寸和居中文本，左右内边距保持对称，消除短昵称时左侧留白明显更宽的观感；已重新构建、安装并冷启动 iPhone Debug 包。
+- 试用态的“Premium 会员体验”仅保留在账户页的会员字段；订阅页会员标题与“我的”Premium 入口统一为“Premium 会员”。订阅页的“已开通 Premium”与“恢复购买”放入专用并列容器，移除恢复按钮额外顶部偏移并固定为相同 44px 外框高度。React 45 文件/373 项、TypeScript、React build、Android/iOS sync 和 `git diff --check` 均通过；开发签名 iPhone Debug 已重新构建、安装并启动，待用户目视确认。
+- iOS 原生 `UIScreenEdgePanGestureRecognizer` 已接入左侧边缘返回，继续禁用 WebView 网页历史手势。账户、Premium、关于、档案、AI 等最上层全屏 subpage 会随手指实时右移；松手超过 35% 或快速右甩时，沿既有 `__handleBackButton()` 链关闭，未达到阈值则回弹。首页、登录门、确认框和底部 sheet 不响应此手势，避免绕过层级或与表单/横滑冲突。React 45 文件/373 项、TypeScript、React build、Android/iOS sync、`git diff --check` 以及开发签名 iPhone 构建/安装/启动均通过；仍待用户真机手势验收。
+- iOS 26 的底栏使用原生 `UIGlassEffect` 作为悬浮玻璃外壳，但没有采用 SF Symbols 或系统选中胶囊：四个图标按原 Web SVG 的形状重绘，选中态仍仅为原来的实心/强调色。触点经 WK 消息桥调用原 Web tab 按钮，因此 Premium 门禁、既有切换逻辑和“我的”的实际 `data` 路由保持不变；登录门、全屏 subpage、sheet、确认框打开时原生栏自动隐藏。栏体每侧比此前 Web 样式收窄 8pt。iOS 25 及以下继续使用 Web 浮动玻璃降级样式，Android/浏览器也保留该样式并去除选中态色块。React 45 文件/373 项、TypeScript、React build、iOS sync、`git diff --check`与开发签名 iPhone 构建、安装、启动通过，待用户真机目视确认。
 - 设备构建首次暴露 `StoreKitPremiumPlugin.swift` 对 StoreKit 验证结果 JWS 的错误读取及可选缓存参数处理；已改为从验证结果传递 JWS，并正确解包缓存字典。已用开发签名构建并安装到连接的 iPhone；冷启动命令因设备锁屏被系统拒绝，需解锁后由用户打开确认。

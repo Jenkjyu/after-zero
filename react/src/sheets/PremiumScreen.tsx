@@ -40,6 +40,7 @@ export function PremiumScreen() {
   }
 
   const label = window.premiumLabel(premium);
+  const isMember = !!label;
 
   return (
     <div className={"subpage" + (isOpen ? " open" : "")} id="premiumScreen">
@@ -55,7 +56,7 @@ export function PremiumScreen() {
           <div className="premium-hero-ic" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l2.9 6.3L21.5 9l-4.8 4.5 1.3 6.7L12 17l-6 3.2 1.3-6.7L2.5 9l6.6-.7L12 2z" /></svg>
           </div>
-          <div className="premium-hero-title">{label || "解锁完整 After Zero"}</div>
+          <div className="premium-hero-title">{isMember ? "Premium 会员" : "解锁完整 After Zero"}</div>
           <div className="premium-hero-sub">首次登录即可体验全部功能 7 天</div>
         </div>
 
@@ -82,9 +83,9 @@ export function PremiumScreen() {
           </div>
         </div>
 
-        <div className="data-actions" style={{ marginTop: 4 }}>
-          <button type="button" className="btn primary" onClick={onSubscribe}>{label ? "已开通 Premium" : "¥28 永久解锁"}</button>
-          <button type="button" className="btn ghost" style={{ marginTop: 10 }} onClick={onRestore}>恢复购买</button>
+        <div className="data-actions premium-actions" style={{ marginTop: 4 }}>
+          <button type="button" className="btn primary" onClick={onSubscribe}>{isMember ? "已开通 Premium" : "¥28 永久解锁"}</button>
+          <button type="button" className="btn ghost" onClick={onRestore}>恢复购买</button>
         </div>
         <div className="redeem-row">
           <button type="button" className="redeem-toggle" onClick={() => setRedeemOpen((v) => !v)}>我有兑换码</button>

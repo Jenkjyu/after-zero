@@ -248,12 +248,17 @@
   .ai-banner-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   @media (prefers-reduced-motion: reduce) { .ai-banner::before, .ai-banner::after, .wand { animation: none !important; } }
 
-  .tabbar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--border);
-    display: flex; z-index: 20; padding-bottom: env(safe-area-inset-bottom); }
-  .tabbar button { flex: 1; background: none; border: none; color: var(--text-muted); padding: 14px 2px;
+  /* 保留原有 Web tab 图标和切换逻辑，只将外壳改为悬浮磨砂玻璃。内容底部仍按 .app 的 100px
+     预留，不会被底栏遮住。 */
+  .tabbar { position: fixed; left: max(20px, env(safe-area-inset-left)); right: max(20px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom));
+    max-width: 532px; margin: 0 auto; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 28px;
+    -webkit-backdrop-filter: blur(22px) saturate(1.35); backdrop-filter: blur(22px) saturate(1.35); box-shadow: var(--e3), inset 0 1px 0 var(--glass-hi);
+    display: flex; z-index: 20; padding: 5px; }
+  .tabbar button { flex: 1; min-height: 46px; border-radius: 18px; background: none; border: none; color: var(--text-muted); padding: 10px 2px;
     display: flex; align-items: center; justify-content: center; }
   .tabbar button svg { width: 23px; height: 23px; display: block; }
   .tabbar button .ic-filled { display: none; }
+  .native-liquid-tabbar .tabbar { display: none; }
   .tabbar button[aria-selected="true"] { color: var(--accent); }
   .tabbar button[aria-selected="true"] .ic-outline { display: none; }
   .tabbar button[aria-selected="true"] .ic-filled { display: block; }
@@ -507,6 +512,8 @@
   .data-card textarea { width: 100%; min-height: 84px; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
     border-radius: 9px; padding: 10px; font-family: var(--font-num); font-size: 11px; resize: vertical; }
   .data-actions { display: flex; gap: 8px; margin-top: 9px; }
+  /* 订阅页的购买/恢复是并列操作：统一外框高度，避免描边按钮比实心按钮高 2px。 */
+  .premium-actions .btn { box-sizing: border-box; height: 44px; }
   .btn { border: none; border-radius: 10px; padding: 11px; font-size: var(--fs-base); font-weight: 600; flex: 1;
     display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
   .btn-ic { width: 15px; height: 15px; flex: none; }
@@ -722,7 +729,13 @@
     transition: transform .28s cubic-bezier(.2,.7,.3,1); overflow-y: auto; overscroll-behavior: contain;
     scroll-padding: 12px 0 max(20px, calc(12px + env(safe-area-inset-bottom))); }
   .subpage.open { transform: translateX(0); }
-  @media (prefers-reduced-motion: reduce) { .subpage { transition: none; } }
+  /* iOS 左边缘返回：原生 edge-pan 将实时进度写入 --az-back-progress。只给 full-screen
+     subpage 跟手，sheet 继续使用自己的 grip/横滑手势；松手后按已有返回链关闭或弹回。 */
+  .subpage.open.az-interactive-back { transform: translateX(calc(var(--az-back-progress, 0) * 100%)); transition: none; }
+  .subpage.open.az-interactive-back.az-interactive-back-commit { transition: transform .18s cubic-bezier(.2,.72,.32,1); }
+  @media (prefers-reduced-motion: reduce) {
+    .subpage, .subpage.open.az-interactive-back.az-interactive-back-commit { transition: none; }
+  }
   .subpage-header { display: flex; align-items: center; gap: 4px; padding: max(14px, env(safe-area-inset-top)) 6px 14px; position: sticky; top: 0;
     background: var(--bg); border-bottom: 1px solid var(--border); }
   .subpage-back { background: none; border: none; padding: 8px; color: var(--text); display: flex; width: 40px; flex: none; }
@@ -3179,6 +3192,55 @@
     if (window.__azStrategyScreenBack && window.__azStrategyScreenBack()) return true;
     return false;
   };
+  // iOS 原生的 UIScreenEdgePanGestureRecognizer 通过这组窄接口驱动全屏 subpage 的交互式
+  // 返回。不要开启 WKWebView 网页历史手势：它不认识 React screen/sheet 的层级，也会绕过
+  // 上面的“最上层先关”返回链。所有读取真实状态的判断留在这里，Swift 只传递手势进度。
+  (function () {
+    var target = null;
+    var settling = false;
+    var settleTimer = 0;
+    function clear() {
+      if (!target) return;
+      target.classList.remove("az-interactive-back", "az-interactive-back-commit");
+      target.style.removeProperty("--az-back-progress");
+      target = null;
+      settling = false;
+      if (settleTimer) { clearTimeout(settleTimer); settleTimer = 0; }
+    }
+    function topOpenSubpage() {
+      // 底部 sheet、确认框和登录门应继续走自己的关闭方式；只让独立的全屏页面响应系统式侧滑。
+      if (document.querySelector(".sheet.open, #modalScrim.open, #loginGate.open")) return null;
+      var open = document.querySelectorAll(".subpage.open");
+      return open.length ? open[open.length - 1] : null;
+    }
+    window.__azInteractiveBack = {
+      begin: function () {
+        if (target || settling) return false;
+        target = topOpenSubpage();
+        if (!target) return false;
+        target.classList.add("az-interactive-back");
+        target.style.setProperty("--az-back-progress", "0");
+        return true;
+      },
+      update: function (progress) {
+        if (!target || settling) return;
+        var safeProgress = Math.max(0, Math.min(1, Number(progress) || 0));
+        target.style.setProperty("--az-back-progress", String(safeProgress));
+      },
+      finish: function (commit) {
+        if (!target || settling) return;
+        if (!commit) { clear(); return; }
+        settling = true;
+        target.classList.add("az-interactive-back-commit");
+        target.style.setProperty("--az-back-progress", "1");
+        settleTimer = setTimeout(function () {
+          // React 的 closeX() 仍是唯一关闭入口，确保侧滑与返回箭头/硬件返回的层级完全一致。
+          if (window.__handleBackButton) window.__handleBackButton();
+          clear();
+        }, 180);
+      }
+    };
+  })();
   // #topAvatarBtn(在还债务页头像)/"我的"页accountAvatarBtn/premiumEntryBtn的点击现在由
   // React直接调用shared/state.ts的openAccountScreen/openPremiumScreen(第七步)，这几个
   // DOM节点都已经不存在于vanilla里了，这里不再需要绑监听器；accountBackBtn/premiumBackBtn/
