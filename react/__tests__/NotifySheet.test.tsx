@@ -49,6 +49,14 @@ describe("NotifySheet", () => {
     expect(window.__azBridge.sendTestNotification).toHaveBeenCalledTimes(1);
   });
 
+  it("测试通知说明覆盖iOS系统通知设置和Android后台限制", () => {
+    window.__azBridge = makeMockBridge();
+    render(<NotifySheet />);
+    act(() => { openNotifySheet(); });
+    expect(screen.getByText(/先在系统设置允许通知/)).toBeInTheDocument();
+    expect(screen.getByText(/Android 还可能受电池优化或自启动限制影响/)).toBeInTheDocument();
+  });
+
   it("添加规则：选中偏移天数+时间后点添加，调用addNotifyRule", () => {
     window.__azBridge = makeMockBridge();
     render(<NotifySheet />);

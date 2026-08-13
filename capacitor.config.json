@@ -1,5 +1,10 @@
 {
   "appId": "io.github.jenkjyu.afterzero",
   "appName": "After Zero",
-  "webDir": "www"
+  "webDir": "www",
+  "plugins": {
+    "LocalNotifications": {
+      "presentationOptions": ["sound", "banner", "list"]
+    }
+  }
 }

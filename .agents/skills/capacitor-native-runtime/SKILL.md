@@ -24,7 +24,7 @@ description: "Use this skill when modifying or debugging After Zero's Capacitor 
 
 根`ios/`已在iOS主线步骤1通过一次`npx cap add ios`建立，Bundle ID为`io.github.jenkjyu.afterzero`、最低iOS 15。后续只运行build/sync，不能重复`cap add ios`重建。当前Capacitor 8工程使用Swift Package Manager；`CapApp-SPM/Package.swift`固定`capacitor-swift-pm` 8.4.1，并接入本地`@capacitor/local-notifications`。
 
-步骤3已新增`AppleLoginPlugin.swift`、`AfterZeroBridgeViewController.swift`与`App.entitlements`，并完成无签名模拟器构建；Apple云函数已部署，但开发签名和真实 Apple ID 真机端到端尚未验收，因此仍不能写成已支持。步骤5已新增并注册`SaveFilePlugin.swift`：iOS 保存/分享代码和模拟器编译已通过，仍须在 iPhone 验收 Files 保存、分享、取消和大文件路径。iOS微信、完整通知策略、购买和发布签名也尚未实现。
+步骤3已新增`AppleLoginPlugin.swift`、`AfterZeroBridgeViewController.swift`与`App.entitlements`，并完成无签名模拟器构建；Apple云函数已部署，但开发签名和真实 Apple ID 真机端到端尚未验收，因此仍不能写成已支持。步骤5已新增并注册`SaveFilePlugin.swift`：iOS 保存/分享代码和模拟器编译已通过，仍须在 iPhone 验收 Files 保存、分享、取消和大文件路径。步骤6的双平台通知代码和构建已完成，但仍须真机验收权限、前后台/锁屏送达与数量上限；iOS微信、购买和发布签名仍未实现。
 
 ## 区分手写插件与npm插件
 
@@ -78,7 +78,7 @@ iOS手写`AppleLoginPlugin`由storyboard中的`AfterZeroBridgeViewController`在
 
 ## 维护本地通知
 
-React的`NotifySheet`只拥有UI状态；通知配置持久化、权限和原生调用仍在`www/index.html`的vanilla运行时。`syncNotifications()`使用“全清再重排”：取消当前全部pending，再调用`computeNotifySchedule()`为未来6个月内全部未还期次生成提醒，最多保留最近的450条，不是只排每笔债务的`nextDate`。
+React的`NotifySheet`只拥有UI状态；通知配置持久化、权限和原生调用仍在`www/index.html`的vanilla运行时。`syncNotifications()`使用“全清再重排”：取消当前全部pending，再调用`computeNotifySchedule()`为未来6个月内全部未还期次生成提醒，不是只排每笔债务的`nextDate`。Android最多保留最近450条；iOS最多保留最近63条正式提醒，为测试通知留一个pending位置。
 
 保持以下原生约束：
 
@@ -86,8 +86,8 @@ React的`NotifySheet`只拥有UI状态；通知配置持久化、权限和原生
 - 通知使用单色矢量`android/app/src/main/res/drawable/ic_stat_notify.xml`作为`smallIcon`，不要用全彩launcher图标。
 - 当前刻意不申请`SCHEDULE_EXACT_ALARM`，接受省电策略造成的分钟级延迟；若改成精确提醒，先重新评估权限和系统设置成本。
 - `POST_NOTIFICATIONS`、`RECEIVE_BOOT_COMPLETED`、`WAKE_LOCK`及restore receiver来自Local Notifications AAR的manifest merge；用合并后的manifest验证，不在主manifest机械复制。
-- “发送测试通知”在10秒后触发，用它验证权限→channel→schedule链；桌面浏览器无法验证真实通知。
-- `createChannel`是Android专属API，Web宿主必须先检查`Capacitor.getPlatform() === "android"`；iOS启动不得调用它。iOS pending上限和正式提醒策略在获批的通知步骤中闭环。
+- “发送测试通知”在10秒后触发，用它验证权限→channel→schedule链；桌面浏览器无法验证真实通知。iOS测试通知使用系统默认声音，Android仍使用`repay` channel。
+- `createChannel`、`channelId`、`smallIcon`都是Android专属：Web宿主必须先检查`Capacitor.getPlatform() === "android"`，iOS启动和调度都不得发送这些字段。iOS前台表现由`capacitor.config.json`的`presentationOptions: ["sound", "banner", "list"]`配置。
 
 排查“前台能收到、划掉最近任务后收不到”时，先记录手机品牌/系统和用户如何关闭App。华为/荣耀已实测会限制后台唤醒，需要在应用启动管理中允许自启动、关联启动和后台活动；先区分厂商电源策略与调度代码问题。
 

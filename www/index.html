@@ -1497,9 +1497,9 @@
   // 还款提醒通知设置（全局共享，不按债务区分），独立于上面几个键。
   var NOTIF_KEY = "after-zero-notify-v1";
   // 通知调度窗口：往前排几个月的未还期次（见下面syncNotifications()/calc.js的
-  // computeNotifySchedule()），NOTIFY_MAX_PENDING是安卓AlarmManager单UID待触发闹钟数隐性
-  // 上限(~500)的兜底截断值，两者都在"已知的数据模型缺口①"那节有完整背景。
-  var NOTIFY_WINDOW_MONTHS = 6, NOTIFY_MAX_PENDING = 450;
+  // computeNotifySchedule()）。Android以AlarmManager单UID约500个待触发闹钟为边界，保留
+  // 450条正式提醒；iOS最多64条pending，正式提醒只占63条，留一个位置给10秒测试通知。
+  var NOTIFY_WINDOW_MONTHS = 6, NOTIFY_MAX_PENDING_ANDROID = 450, NOTIFY_MAX_PENDING_IOS = 63;
   // 订阅状态：单一 Premium 会员，只有买断（一次性）一种购买方式——2026-08-04 去掉了月付/
   // 年付两个入口：面向负债人群的产品判断是"再背一笔月费"对这批用户心理阻力太大，一次性
   // 买断更符合这个场景；以后真正开始付费时靠订阅做增量，不是唯一收入来源。早期曾是
@@ -1730,22 +1730,39 @@
   // App就只收到一次提醒(已知的数据模型缺口①)。现在一次性把未来NOTIFY_WINDOW_MONTHS个月内的
   // 全部未还期次都排上，具体"该排哪些"这个纯计算挪进了calc.js的computeNotifySchedule()，
   // 这里只剩真正调用LocalNotifications插件(impure)这一步。
+  function notificationPlatform() {
+    return window.Capacitor && window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : "web";
+  }
+  function notificationPendingLimit(platform) {
+    return platform === "ios" ? NOTIFY_MAX_PENDING_IOS : NOTIFY_MAX_PENDING_ANDROID;
+  }
+  function platformNotificationFields(notification, platform) {
+    if (platform === "android") {
+      notification.channelId = "repay";
+      notification.smallIcon = "ic_stat_notify";
+    } else if (platform === "ios") {
+      // 空字符串按插件契约使用系统默认声音；不能把Android的channel/icon字段传到iOS。
+      notification.sound = "";
+    }
+    return notification;
+  }
   function syncNotifications() {
     var LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
-    if (!LN) return; // 桌面浏览器测试：静默跳过
-    LN.getPending().then(function (res) {
+    if (!LN) return Promise.resolve(); // 桌面浏览器测试：静默跳过
+    var platform = notificationPlatform();
+    return LN.getPending().then(function (res) {
       var pend = (res && res.notifications) || [];
       if (pend.length) return LN.cancel({ notifications: pend.map(function (n) { return { id: n.id }; }) });
     }).then(function () {
-      var items = computeNotifySchedule(debts, notify, Date.now(), NOTIFY_WINDOW_MONTHS, NOTIFY_MAX_PENDING);
+      var items = computeNotifySchedule(debts, notify, Date.now(), NOTIFY_WINDOW_MONTHS, notificationPendingLimit(platform));
       var list = items.map(function (it, idx) {
         var p = it.date.split("-");
-        return {
-          id: 1000 + idx, channelId: "repay", smallIcon: "ic_stat_notify",
+        return platformNotificationFields({
+          id: 1000 + idx,
           title: "还款提醒",
           body: it.name + " · " + (+p[1]) + "月" + (+p[2]) + "日到期 · ¥" + fmt(it.amount),
           schedule: { at: it.fireAt }
-        };
+        }, platform);
       });
       if (list.length) return LN.schedule({ notifications: list });
     }).catch(function (e) { console.error("syncNotifications failed", e); });
@@ -1894,17 +1911,21 @@
   // "开了通知但一条规则都没加就退出兜底成当天到期09:00"那条逻辑挪进了NotifySheet.tsx的
   // handleClose()里(用notify.enabled/notify.rules判断+调用addNotifyRule)。
   function setNotifyEnabled(enabled) {
-    if (!enabled) { notify.enabled = false; saveNotify(); return Promise.resolve(false); }
+    if (!enabled) {
+      notify.enabled = false; saveNotify();
+      // 关闭开关不仅改本地状态，还要取消已排的正式提醒，不能留旧通知在系统队列里。
+      return syncNotifications().then(function () { return false; });
+    }
     var LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
-    if (!LN) { toast("通知仅支持安卓App内使用"); return Promise.resolve(false); }
+    if (!LN) { toast("通知仅支持 App 内使用"); return Promise.resolve(false); }
     return LN.checkPermissions().then(function (r) {
       if (r.display === "granted") return r;
       return LN.requestPermissions();
     }).then(function (r) {
-      if (r.display !== "granted") { toast("未授予通知权限"); return false; }
+      if (r.display !== "granted") { toast("未授予通知权限，请在系统设置中允许通知后重试"); return false; }
       notify.enabled = true; saveNotify();
-      return true;
-    }).catch(function () { toast("未授予通知权限"); return false; });
+      return syncNotifications().then(function () { return true; });
+    }).catch(function () { toast("未授予通知权限，请在系统设置中允许通知后重试"); return false; });
   }
   function addNotifyRule(offsetDays, time) {
     notify.rules.push({ offsetDays: offsetDays, time: time || "09:00" });
@@ -1915,18 +1936,19 @@
   }
   function sendTestNotification() {
     var LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
-    if (!LN) { toast("通知仅支持安卓App内使用"); return; }
+    if (!LN) { toast("通知仅支持 App 内使用"); return; }
+    var platform = notificationPlatform();
     LN.checkPermissions().then(function (r) {
       if (r.display === "granted") return r;
       return LN.requestPermissions();
     }).then(function (r) {
       if (r.display !== "granted") { toast("未授予通知权限，去系统设置里给本App开启通知权限"); return; }
-      return LN.schedule({ notifications: [{
-        id: 999, channelId: "repay", smallIcon: "ic_stat_notify",
+      return LN.schedule({ notifications: [platformNotificationFields({
+        id: 999,
         title: "测试通知",
-        body: "能看到这条说明推送链路正常。如果到了真实还款日一直收不到，大概率是系统电池优化/自启动限制拦了它，不是App本身的问题。",
+        body: "能看到这条说明通知链路正常。若真实提醒仍未送达，请先检查系统通知设置；Android 还可能受电池优化或自启动限制影响。",
         schedule: { at: new Date(Date.now() + 10000) }
-      }] }).then(function () { toast("已安排，10秒后看通知栏"); });
+      }, platform)] }).then(function () { toast("已安排，10秒后查看系统通知"); });
     }).catch(function (e) { toast("发送失败：" + (e && e.message ? e.message : "未知错误")); });
   }
 

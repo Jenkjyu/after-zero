@@ -1278,3 +1278,26 @@ test("computeNotifySchedule: 超过maxCount按触发时间截断，保留最近�
   assert.equal(list[0].date, "2026-01-15", "截断后保留的是离现在最近的那些，不是随便丢的");
   assert.equal(list[4].date, "2026-05-15");
 });
+
+test("computeNotifySchedule: iOS 的63条正式提醒上限仍按最近触发时间保留", () => {
+  const plan = [];
+  for (let day = 1; day <= 70; day++) {
+    const date = new Date(2026, 8, day);
+    const dateKey = date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+    plan.push({ date: dateKey, amount: 100, principal: 100, interest: 0, paid: false });
+  }
+  const list = calc.computeNotifySchedule([{ id: "ios", name: "iPhone", plan }], { enabled: true, rules: [{ offsetDays: 0, time: "09:00" }] }, new Date(2026, 7, 31, 12).getTime(), 3, 63);
+  assert.equal(list.length, 63);
+  assert.equal(list[0].date, "2026-09-01");
+  assert.equal(list[62].date, "2026-11-02");
+});
+
+test("computeNotifySchedule: 夏令时切换日仍按本地提醒时间生成", () => {
+  const due = { id: "dst", name: "夏令时", plan: [{ date: "2026-03-08", amount: 100, principal: 100, interest: 0, paid: false }] };
+  const list = calc.computeNotifySchedule([due], { enabled: true, rules: [{ offsetDays: 0, time: "09:00" }] }, new Date(2026, 2, 7, 12).getTime(), 1, 63);
+  assert.equal(list.length, 1);
+  assert.equal(list[0].fireAt.getFullYear(), 2026);
+  assert.equal(list[0].fireAt.getMonth(), 2);
+  assert.equal(list[0].fireAt.getDate(), 8);
+  assert.equal(list[0].fireAt.getHours(), 9);
+});
