@@ -1362,6 +1362,131 @@
   .flash { position: fixed; bottom: 92px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--good); color: var(--on-good);
     padding: 9px 20px; border-radius: 999px; font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; transition: all .25s; z-index: 60; max-width: 90%; text-align: center; }
   .flash.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* iPhone 的 CSS 视口比 Android 基准更宽；不使用 pageZoom（它会改变有效宽度并造成横向拖动），
+     而是在原始 viewport 内仅调整视觉密度。这里的数值是 1.2 倍试行值，安卓不会获得
+     ios-ui-density class，布局与交互保持原样。图表的坐标尺寸刻意不统一放大，避免触摸命中
+     与绘图区比例失配。 */
+  :root.ios-ui-density {
+    --fs-xs: 13.2px; --fs-sm: 13.8px; --fs-base: 16.8px; --fs-lg: 18.6px;
+    --fs-figure: 21.6px; --fs-xl: 22.8px; --fs-xxl: 27.6px;
+  }
+  :root.ios-ui-density .app { padding: max(22px, env(safe-area-inset-top)) 17px max(120px, calc(86px + env(safe-area-inset-bottom))); }
+  :root.ios-ui-density header#topHeader { min-height: 43px; padding: 5px 4px; }
+  :root.ios-ui-density .wordmark { height: 31px; }
+  :root.ios-ui-density .avatar-btn { width: 41px; height: 41px; }
+  :root.ios-ui-density .avatar-btn svg { width: 25px; height: 25px; }
+
+  :root.ios-ui-density .hero { padding: 24px 24px 22px; margin-bottom: 16px; }
+  :root.ios-ui-density .hero-label { font-size: 15px; }
+  :root.ios-ui-density .hero-pill { font-size: 13.2px; padding: 4px 12px; }
+  :root.ios-ui-density .hero-amt { font-size: 43px; margin-top: 10px; }
+  :root.ios-ui-density .hero-amt .cur { font-size: 25px; }
+  :root.ios-ui-density .hero-prog { margin-top: 18px; }
+  :root.ios-ui-density .hero-prog-track { height: 7px; }
+  :root.ios-ui-density .hero-prog-row { margin-top: 10px; }
+  :root.ios-ui-density .hero-prog-row .l,
+  :root.ios-ui-density .hero-prog-row .r { font-size: 13.8px; }
+  :root.ios-ui-density .summary { gap: 11px; margin-bottom: 16px; }
+  :root.ios-ui-density .kpi { padding: 14px 17px; }
+  :root.ios-ui-density .kpi .v { font-size: 20px; }
+  :root.ios-ui-density .kpi .k { font-size: 13.2px; }
+  :root.ios-ui-density .kpi-sub { font-size: 12.6px; }
+  :root.ios-ui-density .ai-banner { gap: 13px; padding: 14px 19px 14px 14px; margin-bottom: 24px; }
+  :root.ios-ui-density .ai-banner-ic { width: 40px; height: 40px; }
+  :root.ios-ui-density .ai-banner-ic svg { width: 22px; height: 22px; }
+  :root.ios-ui-density .ai-banner-title { font-size: 15.6px; }
+  :root.ios-ui-density .ai-banner-sub { font-size: 13.2px; }
+  :root.ios-ui-density .sort-sel { font-size: 14.4px; padding: 7px 10px; }
+  :root.ios-ui-density .debt-hint { font-size: 13.8px; margin-bottom: 12px; }
+  :root.ios-ui-density .debt { margin-bottom: 13px; }
+  :root.ios-ui-density .debt-front { padding: 17px 19px; }
+  :root.ios-ui-density .debt-meta { font-size: 13.8px; margin-top: 4px; }
+  :root.ios-ui-density .debt-ballab { font-size: 12.6px; }
+  :root.ios-ui-density .debt-tags { gap: 7px; margin-top: 13px; }
+  :root.ios-ui-density .tag { padding: 3px 10px; }
+
+  :root.ios-ui-density .pay { gap: 14px; padding: 14px 17px; }
+  :root.ios-ui-density .pay .d .day,
+  :root.ios-ui-density .pay .a { font-size: 18px; }
+  :root.ios-ui-density .pay .d .rel { font-size: 13.2px; }
+  :root.ios-ui-density .pay .w { font-size: 16.8px; }
+  :root.ios-ui-density .pay-stats { gap: 8px; margin-bottom: 19px; }
+  :root.ios-ui-density .pay-stats .kpi { padding: 12px; }
+  :root.ios-ui-density .pay-stats .kpi .v { font-size: 18.6px; }
+  :root.ios-ui-density .pay-stats .kpi .k { font-size: 12.6px; }
+  :root.ios-ui-density .pay-filter { gap: 10px; margin-bottom: 14px; }
+  :root.ios-ui-density .pf-btn,
+  :root.ios-ui-density .pf-cal { padding: 10px 15px; font-size: 15px; }
+  :root.ios-ui-density .pay-hero { padding: 19px 22px 18px; margin-bottom: 19px; }
+  :root.ios-ui-density .pay-hero-label { font-size: 14.4px; }
+  :root.ios-ui-density .pay-hero-daynum { font-size: 29px; }
+  :root.ios-ui-density .pay-hero-rel { font-size: 15.6px; }
+  :root.ios-ui-density .pay-hero-amt { font-size: 25px; }
+  :root.ios-ui-density .pay-hero-name { font-size: 16.8px; }
+
+  :root.ios-ui-density .subpage-header { padding: max(17px, env(safe-area-inset-top)) 7px 17px; }
+  :root.ios-ui-density .subpage-back,
+  :root.ios-ui-density .subpage-header-spacer { width: 48px; }
+  :root.ios-ui-density .subpage-back { padding: 10px; }
+  :root.ios-ui-density .subpage-back svg { width: 26px; height: 26px; }
+  :root.ios-ui-density .subpage-title { font-size: 19.2px; }
+  :root.ios-ui-density .subpage-body { padding: 17px 17px max(34px, calc(17px + env(safe-area-inset-bottom))); }
+  :root.ios-ui-density .premium-hero { padding: 26px 12px 22px; }
+  :root.ios-ui-density .premium-hero-ic { width: 67px; height: 67px; margin-bottom: 14px; }
+  :root.ios-ui-density .premium-hero-ic svg { width: 34px; height: 34px; }
+  :root.ios-ui-density .premium-hero-title { font-size: 21.6px; }
+  :root.ios-ui-density .premium-hero-sub { font-size: 15.6px; margin-top: 5px; }
+  :root.ios-ui-density .pf-row { gap: 14px; padding: 12px 0; }
+  :root.ios-ui-density .pf-ic { width: 26px; height: 26px; }
+  :root.ios-ui-density .pf-title { font-size: 16.8px; }
+  :root.ios-ui-density .pf-desc { font-size: 14.4px; }
+  :root.ios-ui-density .price-grid { gap: 12px; margin-bottom: 22px; }
+  :root.ios-ui-density .price-card { padding: 17px; }
+  :root.ios-ui-density .price-card .pc-badge { font-size: 12.6px; padding: 3px 10px; }
+  :root.ios-ui-density .price-card .pc-amt { font-size: 22.8px; }
+  :root.ios-ui-density .price-card .pc-period { font-size: 14.4px; }
+  :root.ios-ui-density .price-card .pc-note { font-size: 13.2px; }
+  :root.ios-ui-density .premium-actions .btn { height: 53px; }
+
+  :root.ios-ui-density .account-head { gap: 12px; padding: 12px 0 5px; margin-bottom: 22px; }
+  :root.ios-ui-density .account-avatar-lg { width: 94px; height: 94px; }
+  :root.ios-ui-density .account-avatar-hint { font-size: 14.4px; }
+  :root.ios-ui-density .account-name-c { font-size: 19.2px; }
+  :root.ios-ui-density .entry-card { padding: 17px 19px; }
+  :root.ios-ui-density .entry-row { gap: 14px; }
+  :root.ios-ui-density .entry-ic { width: 46px; height: 46px; }
+  :root.ios-ui-density .entry-ic svg { width: 24px; height: 24px; }
+  :root.ios-ui-density .entry-title { font-size: 18px; }
+  :root.ios-ui-density .entry-sub { font-size: 14.4px; margin-top: 3px; }
+  :root.ios-ui-density .entry-group { margin-bottom: 24px; }
+
+  :root.ios-ui-density .rpt-head { padding: 7px 0 22px; }
+  :root.ios-ui-density .rpt-kicker { font-size: 13.2px; }
+  :root.ios-ui-density .rpt-title { font-size: 30px; margin-top: 10px; }
+  :root.ios-ui-density .rpt-lede { font-size: 16.2px; margin-top: 12px; }
+  :root.ios-ui-density .rpt-note { font-size: 13.8px; }
+  :root.ios-ui-density .sec { padding: 24px 0; }
+  :root.ios-ui-density .sec-q { font-size: 13.8px; }
+  :root.ios-ui-density .sec-a { font-size: 20.4px; margin-top: 6px; }
+  :root.ios-ui-density .sec-note { font-size: 15px; margin-top: 10px; }
+  :root.ios-ui-density .finding { gap: 13px; padding: 13px 0; }
+  :root.ios-ui-density .finding-ic { width: 36px; height: 36px; }
+  :root.ios-ui-density .finding-ic svg { width: 19px; height: 19px; }
+  :root.ios-ui-density .finding-t { font-size: 16.2px; }
+  :root.ios-ui-density .finding-s { font-size: 14.4px; margin-top: 4px; }
+  :root.ios-ui-density .act-box { padding: 17px 18px; margin-top: 14px; }
+  :root.ios-ui-density .act-top { gap: 8px; font-size: 15.6px; }
+  :root.ios-ui-density .act-top svg { width: 18px; height: 18px; }
+  :root.ios-ui-density .act-body { font-size: 15px; margin-top: 8px; }
+  :root.ios-ui-density .act-list { margin-top: 12px; gap: 7px; }
+  :root.ios-ui-density .act-item { gap: 10px; font-size: 14.4px; }
+  :root.ios-ui-density .act-item .nm { width: 62px; }
+  :root.ios-ui-density .act-item .track { height: 7px; }
+  :root.ios-ui-density .act-item .rt { width: 74px; }
+  :root.ios-ui-density .outro { padding: 18px 19px; margin-top: 24px; }
+  :root.ios-ui-density .outro-t { font-size: 15.6px; }
+  :root.ios-ui-density .outro-b { font-size: 15px; margin-top: 7px; }
 </style>
 
 <div class="app">

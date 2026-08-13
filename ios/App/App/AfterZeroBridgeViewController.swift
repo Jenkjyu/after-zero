@@ -403,6 +403,8 @@ final class AfterZeroBridgeViewController: CAPBridgeViewController, UIGestureRec
       const handler = window.webkit?.messageHandlers?.afterZeroInteractiveBackState;
       if (!handler || window.__afterZeroInteractiveBackStateBridgeInstalled) return;
       window.__afterZeroInteractiveBackStateBridgeInstalled = true;
+      // 仅标记 iOS 容器；页面本身仍使用原始 viewport，避免 pageZoom 改变有效宽度。
+      document.documentElement.classList.add('ios-ui-density');
 
       let lastAvailable;
       const sync = () => {

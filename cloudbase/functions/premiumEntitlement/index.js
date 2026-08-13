@@ -195,7 +195,10 @@ async function redeemCode(userId, code, now) {
       error.code = "REDEEM_CODE_INVALID";
       throw error;
     }
-    await codeRef.update({ status: "redeemed", redeemedBy: userId, redeemedAt: now });
+    // 测试码显式标记为 reusable 时不核销；正式兑换码仍只能使用一次。
+    if (codeDoc.reusable !== true) {
+      await codeRef.update({ status: "redeemed", redeemedBy: userId, redeemedAt: now });
+    }
     const next = { ...entitlement, kind: "paid", source: "redeem", redeemedAt: now, updatedAt: now };
     await transaction.collection("premiumEntitlements").doc(userId).set(next);
     return next;

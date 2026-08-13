@@ -3016,3 +3016,9 @@ PDF字体经历了一次有价值的测试拦截：先下载的Noto OTF在`pdf`�
 - 服务端删除账户后仅保留基于身份哈希的最小已购凭据；登录不会自动恢复该权益，只有用户主动恢复购买且 Apple 交易验证成功时才重新归属。`appleLogin`、`wxLogin`、`deleteAccount` 与 `premiumEntitlement` 已部署。未对真实账户执行删除验证。
 - 验证：React 45 文件、373 项通过；TypeScript、React build、Android/iOS sync、`git diff --check`通过；本轮多次开发签名 iPhone Debug 构建、安装、启动成功。
 - 视觉密度尝试：曾临时设置 `WKWebView.pageZoom = 1.2`，真机发现它改变有效网页宽度并产生页面可拖动/横向滚动，已立即撤回并重新构建、覆盖安装正常版本。后续 iOS 密度适配必须采用受控的 CSS 尺寸与间距方案，不能使用 `pageZoom`。未暂存、提交或推送。
+
+## 2026-08-14（续7）：iOS 视觉密度与 Premium 云函数运行时修复
+
+- iOS 容器在启动时只给根元素附加 `ios-ui-density` 标记；网页 viewport 保持原宽度。该标记通过 CSS 提高字体、卡片和纵向间距密度，Android 与浏览器不受影响，避免重用会改变有效宽度并造成横向拖动的 `WKWebView.pageZoom`。
+- `premiumEntitlement` 的 CloudBase 部署改为显式安装函数目录声明的依赖。此前运行时因缺少 `@cloudbase/node-sdk` 在初始化阶段以 `FUNCTIONS_EXECUTE_FAIL` 退出；重新部署后，管理员无用户会话调用已正常返回受控的 `LOGIN_REQUIRED` 业务结果。以后重新部署该函数必须带 `--install-dependency true`，或确保等价配置生效。
+- 验证：主 Web 脚本语法检查、`git diff --check`、iOS web 资源 sync、开发签名真机 Debug 构建、覆盖安装和启动均成功；云函数管理员调用不再发生运行时崩溃。未记录任何测试兑换码细节。
