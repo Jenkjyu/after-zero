@@ -92,6 +92,9 @@ exports.main = async (event) => {
   // 微信provider identity保留，不再由新代码当作通用账号概念。
   const users = db.collection("users");
   const now = Date.now();
+  const trialClaimId = identityDocumentId("wechat", openid);
+  const trialClaimResult = await db.collection("premiumTrialClaims").doc(trialClaimId).get();
+  const trialClaim = trialClaimResult && trialClaimResult.data || null;
   const existing = await users.where({ openid }).get();
   const legacyUserId = openid;
   let userId = legacyUserId;
@@ -117,6 +120,8 @@ exports.main = async (event) => {
       unionid: unionid || "",
       nickname,
       avatarUrl,
+      trialEligible: !trialClaim,
+      preservedPremiumEntitlement: trialClaim && trialClaim.preservedPremiumEntitlement || null,
       createdAt: now,
       lastLoginAt: now,
     });
@@ -128,6 +133,9 @@ exports.main = async (event) => {
     createdAt: existing.data.length ? (existing.data[0].createdAt || now) : now,
     lastLoginAt: now,
   });
+  if (!trialClaim) {
+    await db.collection("premiumTrialClaims").doc(trialClaimId).set({ createdAt: now, updatedAt: now });
+  }
 
   // `userId` 可能因账户合并而指向目标账号；返回目标账号资料并为它签发票据，
   // 不能把已合并的旧 users 文档当成仍可使用的独立会话。

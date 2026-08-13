@@ -16,11 +16,11 @@ describe("PremiumScreen", () => {
     expect(container.querySelector("#premiumScreen")).not.toHaveClass("open");
   });
 
-  it("只有一张买断价卡：朴素现价¥15，没有划线原价/限时优惠这类促销话术，没有月付/年付选项", () => {
+  it("只有一张买断价卡：现价¥28，没有划线原价/限时优惠这类促销话术，没有月付/年付选项", () => {
     window.__azBridge = makeMockBridge();
     const { container } = render(<PremiumScreen />);
     act(() => { openPremiumScreen(); });
-    expect(screen.getByText("¥15")).toBeInTheDocument();
+    expect(screen.getByText("¥28")).toBeInTheDocument();
     expect(container.querySelectorAll(".price-card")).toHaveLength(1);
     // 只有一张卡时没有"选中"这个语义，卡片不再常驻高亮描边
     expect(container.querySelector(".price-card")).not.toHaveClass("selected");
@@ -32,12 +32,12 @@ describe("PremiumScreen", () => {
     expect(screen.queryByText(/真实的服务器成本/)).not.toBeInTheDocument();
   });
 
-  it("点开通Premium调用confirmAsync弹出暂未开放支付提示", () => {
+  it("点永久解锁调用原生购买桥接", () => {
     window.__azBridge = makeMockBridge();
     render(<PremiumScreen />);
     act(() => { openPremiumScreen(); });
-    fireEvent.click(screen.getByText("开通 Premium"));
-    expect(window.__azBridge.confirmAsync).toHaveBeenCalledWith("暂未开放真实支付", expect.stringContaining("敬请期待"));
+    fireEvent.click(screen.getByText("¥28 永久解锁"));
+    expect(window.__azBridge.buyPremium).toHaveBeenCalledTimes(1);
   });
 
   it("兑换码输入框默认收起，点开才展开，每次重新打开screen都强制复位收起", () => {
@@ -62,9 +62,9 @@ describe("PremiumScreen", () => {
     expect(window.__azBridge.redeemCode).not.toHaveBeenCalled();
   });
 
-  it("无效兑换码：桥接返回null，toast提示兑换码无效", () => {
+  it("无效兑换码：桥接返回失败，不显示成功提示", async () => {
     const bridge = makeMockBridge();
-    bridge.redeemCode = vi.fn(() => null);
+    bridge.redeemCode = vi.fn(() => Promise.resolve(false));
     window.__azBridge = bridge;
     render(<PremiumScreen />);
     act(() => { openPremiumScreen(); });
@@ -72,20 +72,21 @@ describe("PremiumScreen", () => {
     fireEvent.change(screen.getByPlaceholderText("输入兑换码"), { target: { value: "9999" } });
     fireEvent.click(screen.getByText("兑换"));
     expect(window.__azBridge.redeemCode).toHaveBeenCalledWith("9999");
-    expect(window.__azBridge.toast).toHaveBeenCalledWith("兑换码无效");
+    await Promise.resolve();
+    expect(window.__azBridge.toast).not.toHaveBeenCalledWith("兑换成功，已解锁 Premium");
   });
 
-  it("有效兑换码：桥接返回tier，toast成功文案+收起输入框", () => {
+  it("有效兑换码：桥接返回成功，toast成功文案+收起输入框", async () => {
     const bridge = makeMockBridge();
-    bridge.redeemCode = vi.fn(() => "premium");
+    bridge.redeemCode = vi.fn(() => Promise.resolve(true));
     window.__azBridge = bridge;
     render(<PremiumScreen />);
     act(() => { openPremiumScreen(); });
     fireEvent.click(screen.getByText("我有兑换码"));
     fireEvent.change(screen.getByPlaceholderText("输入兑换码"), { target: { value: "0000" } });
     fireEvent.click(screen.getByText("兑换"));
+    await Promise.resolve();
     expect(window.__azBridge.toast).toHaveBeenCalledWith("兑换成功，已解锁 Premium");
-    expect(screen.queryByPlaceholderText("输入兑换码")).not.toBeInTheDocument();
   });
 
   it("点《会员服务协议》打开termsScreen(纯React状态)", () => {

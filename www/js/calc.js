@@ -742,11 +742,19 @@ function remainingInterest(d) {
   return r2(s);
 }
 
-// 会员判断：原来直接读闭包变量 premium，改成显式传参（跟 detectMatchingSort/computeReportData
-// 参数化的道理一样）。premium 的形状是 {premium: {method, at} | null}，见 index.html 里 PREMIUM_KEY
-// 的注释——这里不重新解释那份数据模型，只是把判断逻辑本身搬出来。
-function hasPremium(premium) { return !!(premium && premium.premium); }
-function premiumLabel(premium) { return hasPremium(premium) ? "Premium 会员" : null; }
+// Premium 仅在服务端已确认的体验期或离线窗口内有效；本地字段不是购买凭证。
+function hasPremium(premium) {
+  var value = premium && premium.premium;
+  if (!value) return false;
+  var now = Date.now();
+  // 旧 Android/测试形状没有访问窗口；iOS 启动迁移已经会清除它，避免它成为 iOS 购买凭证。
+  if (value.expiresAt == null && value.offlineUntil == null) return true;
+  return value.method === "trial" ? Number(value.expiresAt) > now : Number(value.offlineUntil) > now;
+}
+function premiumLabel(premium) {
+  if (!hasPremium(premium)) return null;
+  return premium.premium.method === "trial" ? "Premium 会员体验" : "Premium 会员";
+}
 
 // AI历史对话列表操作：原来直接读/改闭包变量 aiConvos，改成显式传参。bumpAiConvTop 会原地
 // 修改传入的数组(splice+unshift)，不是没有副作用的纯函数，但副作用只作用于传入的参数本身

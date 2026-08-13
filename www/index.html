@@ -108,7 +108,8 @@
   /* React 管理的新增/编辑债务 sheet 打开时也要锁住根滚动。
      .sheet-scroll 的 overscroll-behavior 在 iOS WKWebView 上不足以阻止滚动链传到主页面；
      旧版 lockScroll() 只由 vanilla 的确认弹窗/登录门调用，因此不能覆盖这个 React sheet。 */
-  html.az-edit-sheet-open, body.az-edit-sheet-open { overflow: hidden; }
+  html.az-edit-sheet-open, body.az-edit-sheet-open,
+  html.az-detail-sheet-open, body.az-detail-sheet-open { overflow: hidden; }
   @supports (height: 100dvh) {
     :root { --az-viewport-height: 100dvh; }
   }
@@ -1413,11 +1414,14 @@
         <path class="hw-letter" style="--i:8;--len:1677.7" transform="translate(3258.0,0)" d="M169 15Q156 15 148.5 20.0Q141 25 130 34Q111 54 103.0 72.5Q95 91 98 108Q101 116 100.5 123.5Q100 131 100 131Q95 136 97.0 137.5Q99 139 101 143Q107 143 105 154Q103 162 113.0 189.0Q123 216 138 240Q144 250 156.0 266.5Q168 283 182.5 299.5Q197 316 209 326Q234 347 253.0 357.0Q272 367 294 372Q316 377 324.5 377.0Q333 377 348 361Q371 351 381.5 337.0Q392 323 395 296Q398 266 390.5 227.5Q383 189 343 132Q318 96 297.0 78.5Q276 61 247 44Q226 30 209.0 23.5Q192 17 169 15ZM265 121Q289 148 303.5 172.0Q318 196 331 233Q335 244 336.0 260.5Q337 277 335.5 291.5Q334 306 328 308Q316 315 299.0 312.5Q282 310 262 293Q231 267 208.0 228.5Q185 190 163 141Q148 105 156.5 83.5Q165 62 193.5 68.5Q222 75 265 121Z"/>
       </g>
     </svg>
-    <p class="gate-purpose" id="loginPurpose">登录后可使用需要云端身份的功能；本地账本不会自动上传。</p>
+    <p class="gate-purpose" id="loginPurpose">登录后即可获得 7 天 Premium 会员体验。</p>
     <div class="data-actions" style="margin:0">
       <button class="btn apple-login-btn" id="appleLoginBtn" hidden><span class="apple-login-logo" aria-hidden="true"></span>通过 Apple 登录</button>
       <button class="btn primary" id="wxLoginBtn"><svg class="btn-ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 0 1 .598.082l1.584.926a.272.272 0 0 0 .14.047c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 0 1-.023-.156.49.49 0 0 1 .201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.837-6.656-6.088V8.89c-.135-.01-.27-.027-.407-.03zm-2.53 3.274c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.97-.982zm4.844 0c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.969-.982z"/></svg>微信登录</button>
-      <button class="btn ghost" id="loginCancelBtn">继续本地使用</button>
+      <button class="btn primary" id="gateBuyBtn" hidden>¥28 永久解锁</button>
+      <button class="btn ghost" id="gateRestoreBtn" hidden>恢复购买</button>
+      <div id="gateRedeemWrap" hidden style="display:flex;gap:8px"><input id="gateRedeemInput" type="text" placeholder="输入兑换码" autocomplete="off"><button class="btn ghost" id="gateRedeemBtn">兑换</button></div>
+      <button class="btn ghost" id="loginCancelBtn">暂不登录</button>
     </div>
   </div>
 </div>
@@ -1585,14 +1589,14 @@
   if (account) localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
   var notify = loadJSON(NOTIF_KEY, { enabled: false, rules: [] });
   function saveNotify() { try { localStorage.setItem(NOTIF_KEY, JSON.stringify(notify)); } catch (e) {} window.dispatchEvent(new CustomEvent("az:state-changed")); }
-  // 新装必须是空数据：默认 premium 为 null，即"普通用户"。
-  // 单一 Premium tier；兼容迁移：旧调试数据里若残留 premiumPlus 字段，搬进 premium。
-  // billing曾经是"monthly"|"yearly"|"redeemed"，现在method只剩"onetime"|"redeemed"两个
-  // 取值——月付/年付入口已经删除，不会再有新数据带这两个值，这条老迁移路径统一归成
-  // "redeemed"（反正它本来记录的就是"当年靠某种付费方式解锁的"，不影响hasPremium()判断）。
+  // 本机只缓存服务端已经确认的访问窗口；不能把 localStorage 当成购买凭证。
   var premium = loadJSON(PREMIUM_KEY, { premium: null });
-  if (premium && premium.premiumPlus && !premium.premium) {
-    premium.premium = { method: "redeemed", at: premium.premiumPlus.startedAt || new Date().toISOString() };
+  // iOS 不再相信旧本地开通记录；Android 尚未进入买断迁移，本轮继续保持原行为。
+  if (premium && premium.premium && !premium.premium.offlineUntil && !premium.premium.expiresAt) {
+    var initialPlatform = window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform();
+    premium = initialPlatform === "ios" ? { premium: null } : { premium: {
+      method: premium.premium.method || "onetime", at: premium.premium.at || new Date().toISOString(), offlineUntil: Number.MAX_SAFE_INTEGER
+    } };
   }
   if (premium) delete premium.premiumPlus;
   function savePremium() { try { localStorage.setItem(PREMIUM_KEY, JSON.stringify(premium)); } catch (e) {} }
@@ -1606,32 +1610,6 @@
   // (跟SIM_KEY当年"没有别的地方依赖它，整体移交"是同一个先例)，vanilla不再声明/持有这两份数据。
   // hasPremium/premiumLabel 已搬进 www/js/calc.js（改成显式传参 hasPremium(premium)/
   // premiumLabel(premium)，原来直接读闭包变量 premium，下面调用处都已经加了这个参数）。
-  // 兑换码：这一批只做最小可用——硬编码一个调试码方便自己在没有真实支付渠道时验证
-  // Premium效果，不是真实的兑换码发放/核销系统。App正式上线、接入真实支付后，
-  // 这条硬编码要删掉，换成真正的后端兑换码校验（一次性使用、绑定具体商品等）。
-  var REDEEM_CODES = { "0000": "premium" };
-  function applyRedeemTier(tier) {
-    if (tier === "premium") {
-      premium.premium = premium.premium || { method: "redeemed", at: new Date().toISOString() };
-    }
-    savePremium();
-    // AccountScreen/PremiumEntryCard/AI banner现在都归React管(见window.__azBridge.getPremium())，这里改成派发事件通知它重读premium。
-    window.dispatchEvent(new CustomEvent("az:state-changed"));
-  }
-  // 开发/测试期间模拟"已订阅"效果用——App还没上应用商店，接不了真实支付，没有别的
-  // 办法能走通购买流程。跟AGENTS.md记录的"手写localStorage模拟登录"是同一类调试
-  // 手法，区别是这个函数会立即重渲染当前页面上三处订阅相关UI，不需要手动刷新页面。
-  // 用法（桌面浏览器或真机WebView的devtools console里执行）：
-  //   window.__debugPremium("premium")   // 模拟已开通 Premium
-  //   window.__debugPremium("none")      // 清空，恢复"普通用户"
-  window.__debugPremium = function (state) {
-    if (state === "none") { premium = { premium: null }; }
-    else if (state === "premium") { premium = { premium: { method: "onetime", at: new Date().toISOString() } }; }
-    savePremium();
-    // AccountScreen/PremiumEntryCard/AI banner现在都归React管(见window.__azBridge.getPremium())，这里改成派发事件通知它重读premium。
-    window.dispatchEvent(new CustomEvent("az:state-changed"));
-    toast("（调试）订阅状态已设为：" + state);
-  };
   debts.forEach(normalize);
   // editIndex/editingPlan/oneTimeStash/planMode(手动添加/公式生成二选一)这几个模块变量已经
   // 删除——#editSheet的实际内容整体搬进了React(react/src/sheets/EditSheet.tsx等)，这些状态
@@ -2079,29 +2057,108 @@
     return _cbAuth;
   }
 
+  var PREMIUM_PRODUCT_ID = "io.github.jenkjyu.afterzero.premium";
+  function currentPlatform() {
+    return window.Capacitor && typeof window.Capacitor.getPlatform === "function" ? window.Capacitor.getPlatform() : "web";
+  }
+  function isIosPurchaseRuntime() { return currentPlatform() === "ios"; }
+  function storeKitPremium() {
+    return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.StoreKitPremium;
+  }
+  function setPremiumAccess(access) {
+    if (!access) {
+      premium = { premium: null };
+    } else {
+      premium = { premium: {
+        method: access.state === "trial" || access.state === "expired" ? "trial" : (access.state === "redeemed" ? "redeemed" : "onetime"),
+        at: new Date(Number(access.checkedAt) || Date.now()).toISOString(),
+        expiresAt: access.expiresAt || null,
+        offlineUntil: access.offlineUntil || null,
+        appAccountToken: access.appAccountToken || null
+      } };
+    }
+    savePremium();
+    window.dispatchEvent(new CustomEvent("az:state-changed"));
+  }
+  function callPremiumEntitlement(data) {
+    return cbApp().callFunction({ name: "premiumEntitlement", data: data }).then(function (res) {
+      var result = res && res.result;
+      if (!result || !result.ok) {
+        var error = new Error((result && result.error) || "权益校验失败");
+        error.code = result && result.code;
+        throw error;
+      }
+      setPremiumAccess(result.entitlement);
+      var native = storeKitPremium();
+      if (native && account) native.saveAccessCache(Object.assign({ userId: account.userId }, result.entitlement)).catch(function () {});
+      return result.entitlement;
+    });
+  }
+  function cachedPremiumAccess() {
+    var native = storeKitPremium();
+    if (!native || !account) return Promise.resolve(false);
+    return native.getAccessCache({ userId: account.userId }).then(function (result) {
+      var access = result && result.access;
+      if (access && access.active && Number(access.offlineUntil) > Date.now()) { setPremiumAccess(access); return true; }
+      return false;
+    }).catch(function () { return false; });
+  }
+  function refreshPremiumAccess() {
+    if (!account) return Promise.resolve(false);
+    return callPremiumEntitlement({ action: "status" }).then(function (access) { return !!access.active; })
+      .catch(function () { return cachedPremiumAccess(); });
+  }
+  function setGatePurchaseVisible(visible) {
+    $("gateBuyBtn").hidden = !visible;
+    $("gateRestoreBtn").hidden = !visible;
+    $("gateRedeemWrap").hidden = !visible;
+    $("loginCancelBtn").hidden = visible;
+  }
+
   var pendingLoginPromise = null, pendingLoginResolve = null;
   function finishCloudLoginPrompt(ok) {
     var gate = $("loginGate");
+    // iOS 的全量产品门禁不可被取消、返回或失败路径关闭；只有有效权益才放行。
+    if (isIosPurchaseRuntime() && !hasPremium(premium)) {
+      var blockedResolve = pendingLoginResolve;
+      pendingLoginPromise = null; pendingLoginResolve = null;
+      if (blockedResolve) blockedResolve(false);
+      return;
+    }
     if (gate.classList.contains("open")) { gate.classList.remove("open"); gate.setAttribute("aria-hidden", "true"); unlockScroll(); }
     var resolve = pendingLoginResolve;
     pendingLoginPromise = null; pendingLoginResolve = null;
     if (resolve) resolve(!!ok);
   }
   function requestCloudLogin(purpose) {
-    if (account) return Promise.resolve(true);
+    if (account) {
+      if (!isIosPurchaseRuntime()) return Promise.resolve(true);
+      return refreshPremiumAccess().then(function (active) {
+        if (active) { finishCloudLoginPrompt(true); return true; }
+        openRequiredAccessGate("体验已结束，可永久解锁完整账本。");
+        return false;
+      });
+    }
     if (pendingLoginPromise) return pendingLoginPromise;
-    $("loginPurpose").textContent = purpose || "登录后可使用需要云端身份的功能；本地账本不会自动上传。";
-    var platform = window.Capacitor && typeof window.Capacitor.getPlatform === "function"
-      ? window.Capacitor.getPlatform()
-      : "web";
+    $("loginPurpose").textContent = purpose || (isIosPurchaseRuntime() ? "登录后即可获得 7 天 Premium 会员体验。" : "登录后可使用需要云端身份的功能；本地账本不会自动上传。");
+    var platform = currentPlatform();
     $("appleLoginBtn").hidden = platform !== "ios";
     $("wxLoginBtn").hidden = platform !== "android" && platform !== "ios";
+    setGatePurchaseVisible(false);
     var gate = $("loginGate");
     gate.setAttribute("aria-hidden", "false");
     gate.classList.add("open");
     lockScroll();
     pendingLoginPromise = new Promise(function (resolve) { pendingLoginResolve = resolve; });
     return pendingLoginPromise;
+  }
+  function openRequiredAccessGate(message) {
+    $("loginPurpose").textContent = message;
+    $("appleLoginBtn").hidden = true;
+    $("wxLoginBtn").hidden = true;
+    setGatePurchaseVisible(true);
+    var gate = $("loginGate");
+    gate.setAttribute("aria-hidden", "false"); gate.classList.add("open"); lockScroll();
   }
   function cloudLoginRequired(feature) {
     var err = new Error((feature || "此云功能") + "需要先登录");
@@ -2126,10 +2183,17 @@
   // 去掉了原doDeleteAccount()里"成功后closeAccountScreen()"那行(React关闭)，改成返回
   // 布尔值让React自己决定要不要关闭。
   function wxLogout() {
+    var previousAccount = account;
     account = null;
     localStorage.removeItem(ACCOUNT_KEY);
     try { cbAuth().signOut().catch(function () {}); } catch (e) {}
+    var native = storeKitPremium();
+    if (native && previousAccount) native.clearAccessCache({ userId: previousAccount.userId }).catch(function () {});
     renderAccountUI();
+    if (isIosPurchaseRuntime()) {
+      setPremiumAccess(null);
+      requestCloudLogin("退出后需重新登录并验证权益。");
+    }
     toast("已退出登录");
   }
   function deleteAccount() {
@@ -2138,10 +2202,17 @@
     return cbApp().callFunction({ name: "deleteAccount" }).then(function (res) {
       var result = res && res.result;
       if (!result || !result.ok) throw new Error((result && result.error) || "注销失败");
+      var previousAccount = account;
       account = null;
       localStorage.removeItem(ACCOUNT_KEY);
       try { cbAuth().signOut().catch(function () {}); } catch (e) {}
+      var native = storeKitPremium();
+      if (native && previousAccount) native.clearAccessCache({ userId: previousAccount.userId }).catch(function () {});
       renderAccountUI();
+      if (isIosPurchaseRuntime()) {
+        setPremiumAccess(null);
+        requestCloudLogin("账户已注销。重新登录后将验证可恢复的权益。");
+      }
       toast("已注销账户");
       return true;
     }).catch(function (err) {
@@ -2173,12 +2244,45 @@
   // (react/src/sheets/PremiumScreen.tsx、TermsScreen.tsx)，三张价卡的互斥选中态、
   // 兑换码输入框的展开/复位现在都是React组件本地状态，开关是shared/state.ts的
   // openPremiumScreen/closePremiumScreen/openTermsScreen/closeTermsScreen(纯React状态)。
-  // redeemCode(code)是"兑换"按钮唯一还需要vanilla做的事——查REDEEM_CODES表+写premium。
+  // 购买、恢复和兑换都先向服务端取得真实权益；本机只接受服务端返回的访问窗口。
   function redeemCode(code) {
-    var tier = REDEEM_CODES[code];
-    if (!tier) return null;
-    applyRedeemTier(tier);
-    return tier;
+    if (!account) { toast("请先登录"); return Promise.resolve(false); }
+    return callPremiumEntitlement({ action: "redeem", code: code }).then(function (access) {
+      if (!access.active) throw new Error("兑换未能开通权益");
+      finishCloudLoginPrompt(true); toast("兑换成功，已解锁 Premium"); return true;
+    }).catch(function (err) { toast("兑换失败：" + ((err && err.message) || "请重试")); return false; });
+  }
+  function verifyStoreKitTransaction(result) {
+    if (!result || result.status !== "success" || !result.jws) return Promise.resolve(false);
+    return callPremiumEntitlement({ action: "verifyTransaction", jws: result.jws }).then(function (access) {
+      var native = storeKitPremium();
+      if (native && result.transactionId) native.finish({ transactionId: result.transactionId }).catch(function () {});
+      if (access.active) finishCloudLoginPrompt(true);
+      toast("已开通 Premium");
+      return !!access.active;
+    });
+  }
+  function buyPremium() {
+    if (!account) { requestCloudLogin(); return Promise.resolve(false); }
+    if (hasPremium(premium) && premium.premium.method !== "trial") { toast("你已开通 Premium"); return Promise.resolve(true); }
+    var native = storeKitPremium();
+    if (!isIosPurchaseRuntime() || !native) { toast("购买仅在 iPhone App 内可用"); return Promise.resolve(false); }
+    return refreshPremiumAccess().then(function () {
+      if (!premium.premium || !premium.premium.appAccountToken) throw new Error("购买账户标识未就绪，请稍后重试");
+      return native.purchase({ productId: PREMIUM_PRODUCT_ID, appAccountToken: premium.premium.appAccountToken });
+    }).then(verifyStoreKitTransaction).catch(function (err) {
+      if (err && /cancelled|取消/i.test(err.message || "")) return false;
+      toast("购买未完成：" + ((err && err.message) || "请重试")); return false;
+    });
+  }
+  function restorePremium() {
+    if (!account) { requestCloudLogin(); return Promise.resolve(false); }
+    var native = storeKitPremium();
+    if (!isIosPurchaseRuntime() || !native) { toast("恢复购买仅在 iPhone App 内可用"); return Promise.resolve(false); }
+    return native.restore({ productId: PREMIUM_PRODUCT_ID }).then(function (result) {
+      if (!result || result.status === "notFound") { toast("未找到可恢复的购买"); return false; }
+      return verifyStoreKitTransaction(result);
+    }).catch(function (err) { toast("恢复失败：" + ((err && err.message) || "请重试")); return false; });
   }
 
   // ===== AI 债务助手（Premium）=====
@@ -2523,9 +2627,20 @@
       if (!account) throw new Error("登录成功但账户资料无效");
       localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
       renderAccountUI();
-      finishCloudLoginPrompt(true);
-      toast("登录成功 ✓");
-      return true;
+      if (!isIosPurchaseRuntime()) {
+        finishCloudLoginPrompt(true);
+        toast("登录成功 ✓");
+        return true;
+      }
+      return refreshPremiumAccess().then(function (active) {
+        if (active) {
+          finishCloudLoginPrompt(true);
+          toast("登录成功 ✓");
+          return true;
+        }
+        openRequiredAccessGate("7 天体验已结束，¥28 一次性永久解锁完整账本。");
+        return false;
+      });
     });
   }
 
@@ -2971,7 +3086,10 @@
     // 先关"优先级链，只是判断逻辑物理上不在这个文件里了。详见AGENTS.md"React 迁移"一节。
     if (window.__azDebtsBack && window.__azDebtsBack()) return true;
     if ($("modalScrim").classList.contains("open")) { closeModal(); return true; }
-    if ($("loginGate").classList.contains("open")) { finishCloudLoginPrompt(false); return true; }
+    if ($("loginGate").classList.contains("open")) {
+      if (!isIosPurchaseRuntime()) finishCloudLoginPrompt(false);
+      return true;
+    }
     // termsScreen/premiumScreen/accountScreen同理已经是React状态(react/src/sheets/
     // TermsScreen.tsx、PremiumScreen.tsx、AccountScreen.tsx，第七步)，vanilla看不到，
     // 判断逻辑物理上也不在这个文件里了——跟jiggleMode那条(window.__azDebtsBack)是同一个
@@ -3034,6 +3152,13 @@
   });
   $("appleLoginBtn").addEventListener("click", startAppleLogin);
   $("loginCancelBtn").addEventListener("click", function () { finishCloudLoginPrompt(false); });
+  $("gateBuyBtn").addEventListener("click", function () { buyPremium(); });
+  $("gateRestoreBtn").addEventListener("click", function () { restorePremium(); });
+  $("gateRedeemBtn").addEventListener("click", function () {
+    var code = $("gateRedeemInput").value.trim();
+    if (!code) { toast("请输入兑换码"); return; }
+    redeemCode(code).then(function (ok) { if (ok) $("gateRedeemInput").value = ""; });
+  });
   // dlBackupBtn/importFileBtn(react/src/mine/DataCards.tsx里的"下载备份文件"/"上传备份文件"
   // 按钮)已经不在vanilla DOM里了，下载逻辑抽成了上面的downloadBackupFile()、通过桥接调用；
   // "上传备份文件"改成下面这个新函数，间接点击还留在vanilla DOM里的#importFileInput。
@@ -3126,6 +3251,8 @@
     requestCloudLogin: requestCloudLogin,
     bindCloudIdentity: bindCloudIdentity,
     deleteAccount: deleteAccount,
+    buyPremium: buyPremium,
+    restorePremium: restorePremium,
     redeemCode: redeemCode,
     // "注销账户"确认弹窗的第三条路径新增：只清本机storage、不删服务器账户(见定义处的注释)。
     resetLocalData: resetLocalData,
@@ -3159,5 +3286,15 @@
   };
 
   renderAll(); loadUploads(); renderAccountUI();
+  if (isIosPurchaseRuntime()) {
+    var nativePremium = storeKitPremium();
+    if (nativePremium && nativePremium.addListener) {
+      nativePremium.addListener("transactionUpdated", function (result) {
+        if (account) verifyStoreKitTransaction(result).catch(function () {});
+      });
+    }
+    // iOS 是全量买断产品：启动必须先登录并得到服务端/离线窗口确认。
+    requestCloudLogin("登录后即可获得 7 天 Premium 会员体验。");
+  }
 })();
 </script>

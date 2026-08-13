@@ -685,10 +685,15 @@ test("mdToHtml: 空输入返回空字符串，不抛异常", () => {
 });
 
 test("hasPremium/premiumLabel: 会员判断与文案", () => {
-  assert.equal(calc.hasPremium({ premium: { method: "onetime" } }), true);
+  const future = Date.now() + 60_000;
+  const past = Date.now() - 60_000;
+  assert.equal(calc.hasPremium({ premium: { method: "onetime", offlineUntil: future } }), true);
+  assert.equal(calc.hasPremium({ premium: { method: "trial", expiresAt: future } }), true);
+  assert.equal(calc.hasPremium({ premium: { method: "onetime", offlineUntil: past } }), false);
   assert.equal(calc.hasPremium({ premium: null }), false);
   assert.equal(calc.hasPremium(null), false); // 整个premium对象都没有也不抛异常
-  assert.equal(calc.premiumLabel({ premium: { method: "yearly" } }), "Premium 会员");
+  assert.equal(calc.premiumLabel({ premium: { method: "trial", expiresAt: future } }), "Premium 会员体验");
+  assert.equal(calc.premiumLabel({ premium: { method: "onetime", offlineUntil: future } }), "Premium 会员");
   assert.equal(calc.premiumLabel({ premium: null }), null);
 });
 

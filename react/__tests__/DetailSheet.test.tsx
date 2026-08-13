@@ -15,6 +15,22 @@ afterEach(() => {
 });
 
 describe("DetailSheet", () => {
+  it("打开时锁住根滚动，关闭后解除，避免 iOS 详情滚动带动主页面", () => {
+    const debts: Debt[] = [makeDebt()];
+    window.__azBridge = makeMockBridge({ debts });
+    render(<DetailSheet />);
+    expect(document.documentElement).not.toHaveClass("az-detail-sheet-open");
+    expect(document.body).not.toHaveClass("az-detail-sheet-open");
+
+    act(() => { openDetailSheet(debts[0].id); });
+    expect(document.documentElement).toHaveClass("az-detail-sheet-open");
+    expect(document.body).toHaveClass("az-detail-sheet-open");
+
+    act(() => { closeDetailSheet(); });
+    expect(document.documentElement).not.toHaveClass("az-detail-sheet-open");
+    expect(document.body).not.toHaveClass("az-detail-sheet-open");
+  });
+
   it("openDetailSheet(id)后显示对应债务的数据(含还款计划表格行数)", () => {
     const debts: Debt[] = [
       makeDebt({ name: "银行贷", funder: "某银行", type: "银行贷", original: 10000, balance: 8000, rate: 6, monthly: 1000, nextDate: "2026-09-01", opened: "2026-01-01", paidTerms: 2, totalTerms: 10, terms: 8 }),

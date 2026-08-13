@@ -133,6 +133,7 @@ async function mergeAccounts(db, input) {
   const backups = db.collection("backups");
   const identities = db.collection("identities");
   const usages = db.collection("aiUsage");
+  const entitlements = db.collection("premiumEntitlements");
   const targetUser = await getUserByUserId(db, targetUserId);
   const sourceUser = await getUserByUserId(db, sourceUserId);
   if (!targetUser || !sourceUser) throw new Error("待合并账号不存在，请重新发起绑定");
@@ -140,13 +141,15 @@ async function mergeAccounts(db, input) {
     throw new Error("待合并账号状态已变化，请重新发起绑定");
   }
 
-  const [sourceBackups, sourceLegacyBackups, sourceIdentities, targetUsages, sourceUsages, sourceLegacyUsages] = await Promise.all([
+  const [sourceBackups, sourceLegacyBackups, sourceIdentities, targetUsages, sourceUsages, sourceLegacyUsages, targetEntitlement, sourceEntitlement] = await Promise.all([
     readOwnedRecords(backups, "userId", sourceUserId),
     readOwnedRecords(backups, "openid", sourceUserId),
     readOwnedRecords(identities, "userId", sourceUserId),
     readOwnedRecords(usages, "userId", targetUserId),
     readOwnedRecords(usages, "userId", sourceUserId),
     readOwnedRecords(usages, "openid", sourceUserId),
+    entitlements.doc(targetUserId).get(),
+    entitlements.doc(sourceUserId).get(),
   ]);
   const uniqueById = (records) => [...new Map(records.filter(Boolean).map((record) => [record._id, record])).values()];
   const backupRecords = uniqueById([...sourceBackups, ...sourceLegacyBackups]);
@@ -219,6 +222,28 @@ async function mergeAccounts(db, input) {
       for (const record of records.target.slice(1).concat(records.source)) {
         await transaction.collection("aiUsage").doc(record._id).remove();
       }
+    }
+    // Premium 不能在账户绑定时丢失：已购优先于体验期，同时合并历史 appAccountToken，
+    // 使绑定前发起的 Apple 交易仍能被服务端核验。
+    const freshTargetEntitlement = firstDocument(await transaction.collection("premiumEntitlements").doc(targetUserId).get()) || firstDocument(targetEntitlement);
+    const freshSourceEntitlement = firstDocument(await transaction.collection("premiumEntitlements").doc(sourceUserId).get()) || firstDocument(sourceEntitlement);
+    if (freshTargetEntitlement || freshSourceEntitlement) {
+      const candidates = [freshTargetEntitlement, freshSourceEntitlement].filter(Boolean);
+      const paid = candidates.find((record) => record.kind === "paid");
+      const tokens = uniqueStrings(candidates.flatMap((record) => record.appAccountTokens || []));
+      const nextEntitlement = paid
+        ? { ...paid, userId: targetUserId, appAccountTokens: tokens, updatedAt: now, mergedAt: now }
+        : {
+          ...(freshTargetEntitlement || freshSourceEntitlement),
+          userId: targetUserId,
+          kind: "trial",
+          trialEndsAt: Math.max(...candidates.map((record) => Number(record.trialEndsAt) || 0)),
+          appAccountTokens: tokens,
+          updatedAt: now,
+          mergedAt: now,
+        };
+      await transaction.collection("premiumEntitlements").doc(targetUserId).set(nextEntitlement);
+      if (freshSourceEntitlement) await transaction.collection("premiumEntitlements").doc(sourceUserId).remove();
     }
     await transaction.collection("accountMerges").doc(mergeId).set({
       targetUserId,

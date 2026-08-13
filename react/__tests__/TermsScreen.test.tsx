@@ -16,7 +16,8 @@ describe("TermsScreen", () => {
     act(() => { openTermsScreen(); });
     expect(container.querySelector("#termsScreen")).toHaveClass("open");
     expect(screen.getByText("会员服务协议")).toBeInTheDocument();
-    expect(screen.getByText(/尚未接入真实的支付渠道/)).toBeInTheDocument();
+    expect(screen.getByText(/7 天 Premium 会员体验/)).toBeInTheDocument();
+    expect(screen.getByText(/人民币 28 元/)).toBeInTheDocument();
   });
 
   it("点返回箭头关闭", () => {

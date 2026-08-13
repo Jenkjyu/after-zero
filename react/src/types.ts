@@ -72,10 +72,9 @@ export interface Debt {
 }
 
 export interface Premium {
-  // "monthly"/"yearly"已删除(2026-08-04)——订阅页只保留买断一种购买方式，不再有月付/年付
-  // 入口，这两个取值不会再被任何代码写入。旧设备上如果还有历史数据带着这两个值，
-  // hasPremium()只看premium是不是非null就判定已解锁，不读method的具体取值，不受影响。
-  premium: { method: "onetime" | "redeemed"; at: string } | null;
+  // 本机只缓存服务端已确认的访问结果；到期时间和3天离线窗口都由服务端返回，
+  // 不能把 localStorage 当作购买凭证。
+  premium: { method: "trial" | "onetime" | "redeemed"; at: string; expiresAt?: number | null; offlineUntil?: number | null; appAccountToken?: string | null } | null;
 }
 
 export interface Account {
@@ -256,8 +255,8 @@ export interface AzBridge {
   confirmAsync(title: string, body: string, opts?: { month?: string; date?: string; dateMin?: string; amount?: number; amountHint?: string; thirdLabel?: string }): Promise<string | boolean | null>;
   // 第七步(accountScreen/premiumScreen)新增：这三个都是真实的cloud/native调用或者共享状态
   // 变更，不能重写成纯React——wxLogout()清本地账号态+CloudBase signOut；deleteAccount()调
-  // deleteAccount云函数(不信任客户端参数，身份来自已认证会话)；redeemCode(code)查
-  // REDEEM_CODES表、命中就写premium并返回tier，没命中返回null让React决定toast文案。
+  // deleteAccount云函数(不信任客户端参数，身份来自已认证会话)；购买、恢复和兑换均由
+  // 原生 StoreKit + 服务端权益函数完成，不能在客户端伪造 Premium。
   wxLogout(): void;
   // 本地模式进入AI/云备份或从账户页主动登录时打开可取消的微信登录表面。登录成功返回true，
   // 取消/失败返回false；无论结果如何都不上传、恢复或清空本地数据。
@@ -268,7 +267,9 @@ export interface AzBridge {
   // 返回是否真的注销成功——vanilla内部会自己toast成功/失败文案(保持跟原doDeleteAccount()
   // 一致的用户反馈)，React只需要这个布尔值来决定要不要顺带关闭accountScreen。
   deleteAccount(): Promise<boolean>;
-  redeemCode(code: string): string | null;
+  buyPremium(): Promise<boolean>;
+  restorePremium(): Promise<boolean>;
+  redeemCode(code: string): Promise<boolean>;
   // "注销账户"弹窗第三条路径新增：只清本机localStorage+IndexedDB上传文件库、不删服务器
   // 账户，清完立刻reload()回到空白本地账本——没有返回值，页面已经在这个函数内部被刷新掉了。
   resetLocalData(): void;

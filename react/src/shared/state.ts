@@ -58,13 +58,13 @@ let premiumFingerprint = "";
 function getPremiumSnapshot(): Premium {
   const source = window.__azBridge.getPremium();
   const fp = source.premium
-    ? source.premium.method + "|" + source.premium.at
+    ? source.premium.method + "|" + source.premium.at + "|" + (source.premium.expiresAt || "") + "|" + (source.premium.offlineUntil || "") + "|" + (source.premium.appAccountToken || "")
     : "none";
   if (!premiumCache || fp !== premiumFingerprint) {
     premiumFingerprint = fp;
     premiumCache = {
       premium: source.premium
-        ? { method: source.premium.method, at: source.premium.at }
+        ? { method: source.premium.method, at: source.premium.at, expiresAt: source.premium.expiresAt, offlineUntil: source.premium.offlineUntil, appAccountToken: source.premium.appAccountToken }
         : null,
     };
   }

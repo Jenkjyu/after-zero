@@ -56,9 +56,29 @@ exports.main = async () => {
 
   const identities = db.collection("identities");
   const identityDocs = await identities.where({ userId }).get();
+  // 账户资料、备份和登录映射仍会删除。为落实“不重复赠送体验”且让已购用户恢复购买，
+  // 仅保留哈希 identity 对应的最小权益记录，不包含昵称、邮箱、openid 或账本内容。
+  const entitlementResult = await db.collection("premiumEntitlements").doc(userId).get();
+  const entitlement = entitlementResult && entitlementResult.data || null;
+  const preservedPremiumEntitlement = entitlement && entitlement.kind === "paid" ? {
+    kind: "paid",
+    source: entitlement.source || "appStore",
+    transactionId: entitlement.transactionId || null,
+    originalTransactionId: entitlement.originalTransactionId || null,
+    purchasedAt: entitlement.purchasedAt || null,
+    appAccountTokens: Array.isArray(entitlement.appAccountTokens) ? entitlement.appAccountTokens : [],
+  } : null;
+  for (const identity of identityDocs.data || []) {
+    await db.collection("premiumTrialClaims").doc(identity._id).set({
+      createdAt: identity.createdAt || Date.now(),
+      updatedAt: Date.now(),
+      ...(preservedPremiumEntitlement ? { preservedPremiumEntitlement } : {}),
+    });
+  }
   for (const identity of identityDocs.data || []) {
     await identities.doc(identity._id).remove();
   }
+  if (entitlement) await db.collection("premiumEntitlements").doc(userId).remove();
 
   const appleLoginNonces = db.collection("appleLoginNonces");
   const nonceDocs = await appleLoginNonces.where({ userId }).get();

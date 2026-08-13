@@ -39,11 +39,11 @@ describe("AccountScreen", () => {
     window.__azBridge = bridge;
     render(<AccountScreen />);
     act(() => { openAccountScreen(); });
-    expect(screen.getByText("本地使用")).toBeInTheDocument();
-    expect(screen.getByText(/债务、还款、统计、档案、通知/)).toBeInTheDocument();
+    expect(screen.getByText("尚未登录")).toBeInTheDocument();
+    expect(screen.getByText(/完整账本需要登录并验证体验或购买权益/)).toBeInTheDocument();
     expect(screen.queryByText("退出登录")).not.toBeInTheDocument();
     expect(screen.queryByText("注销云端账户")).not.toBeInTheDocument();
-    await act(async () => { fireEvent.click(screen.getByText("登录云账号")); });
+    await act(async () => { fireEvent.click(screen.getByText("登录并验证权益")); });
     expect(bridge.requestCloudLogin).toHaveBeenCalledWith(expect.stringContaining("不会自动上传"));
   });
 

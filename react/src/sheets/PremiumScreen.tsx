@@ -24,19 +24,22 @@ export function PremiumScreen() {
     return () => { delete window.__azPremiumScreenBack; };
   }, [isOpen]);
 
-  function onSubscribe() {
-    window.__azBridge.confirmAsync("暂未开放真实支付", "After Zero 还未上架应用商店，支付功能尚未接入。上架后即可在此完成开通——敬请期待。");
+  async function onSubscribe() {
+    await window.__azBridge.buyPremium();
   }
-  function onApplyRedeem() {
+  async function onRestore() {
+    await window.__azBridge.restorePremium();
+  }
+  async function onApplyRedeem() {
     const code = redeemCode.trim();
     if (!code) { window.__azBridge.toast("请输入兑换码"); return; }
-    const tier = window.__azBridge.redeemCode(code);
-    if (!tier) { window.__azBridge.toast("兑换码无效"); return; }
+    const ok = await window.__azBridge.redeemCode(code);
+    if (!ok) return;
     setRedeemCodeInput(""); setRedeemOpen(false);
     window.__azBridge.toast("兑换成功，已解锁 Premium");
   }
 
-  void premium; // 目前订阅页本身不需要按premium状态改变展示(未来如"已开通"态可以在这里加)
+  const label = window.premiumLabel(premium);
 
   return (
     <div className={"subpage" + (isOpen ? " open" : "")} id="premiumScreen">
@@ -52,8 +55,8 @@ export function PremiumScreen() {
           <div className="premium-hero-ic" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l2.9 6.3L21.5 9l-4.8 4.5 1.3 6.7L12 17l-6 3.2 1.3-6.7L2.5 9l6.6-.7L12 2z" /></svg>
           </div>
-          <div className="premium-hero-title">升级你的 After Zero</div>
-          <div className="premium-hero-sub">解锁云备份、AI 债务助手与更多功能</div>
+          <div className="premium-hero-title">{label || "解锁完整 After Zero"}</div>
+          <div className="premium-hero-sub">首次登录即可体验全部功能 7 天</div>
         </div>
 
         <div className="pf-list">
@@ -72,7 +75,7 @@ export function PremiumScreen() {
             <div className="price-card">
               <span className="pc-badge">永久解锁</span>
               <div className="pc-price-row">
-                <span className="pc-amt num">¥15</span>
+                <span className="pc-amt num">¥28</span>
               </div>
               <div className="pc-period">一次性付费，永久使用，不再另外收费</div>
             </div>
@@ -80,7 +83,8 @@ export function PremiumScreen() {
         </div>
 
         <div className="data-actions" style={{ marginTop: 4 }}>
-          <button type="button" className="btn primary" onClick={onSubscribe}>开通 Premium</button>
+          <button type="button" className="btn primary" onClick={onSubscribe}>{label ? "已开通 Premium" : "¥28 永久解锁"}</button>
+          <button type="button" className="btn ghost" style={{ marginTop: 10 }} onClick={onRestore}>恢复购买</button>
         </div>
         <div className="redeem-row">
           <button type="button" className="redeem-toggle" onClick={() => setRedeemOpen((v) => !v)}>我有兑换码</button>
@@ -91,7 +95,7 @@ export function PremiumScreen() {
             </div>
           ) : null}
         </div>
-        <div className="footnote">开通即表示你同意我们的<button type="button" className="terms-link" onClick={openTermsScreen}>《会员服务协议》</button>。目前应用内价格为占位展示，尚未开通真实支付渠道；正式开通后，扣款、续订与取消方式将以届时接入的支付渠道为准。</div>
+        <div className="footnote">开通即表示你同意我们的<button type="button" className="terms-link" onClick={openTermsScreen}>《会员服务协议》</button>。¥28 为一次性买断价，不会自动续费；已购买可通过 Apple 恢复购买。</div>
       </div>
     </div>
   );

@@ -6,11 +6,11 @@
 
 ## 当前控制状态
 
-- 当前步骤：步骤 3“Apple 登录与统一内部账户端到端闭环”、步骤 4“iOS 微信登录、身份绑定与既有云账号合并”、步骤 5“iOS 文件保存、分享与导入导出闭环”、步骤 6“Android/iOS 本地通知双平台闭环”、步骤 7“iOS WebView、布局、键盘与手势全量适配”并行收尾
+- 当前步骤：步骤 8“StoreKit Premium、恢复购买与服务端权益”进行中；步骤 3～7 仍按既有 Android 回归项并行收尾
 - 当前状态：步骤 3、5、6、7 的 iPhone 集中验收已通过；步骤 3 仍待 Android 旧微信账号回归，步骤 5～7 仍待 Android 对照回归。步骤 4 的微信开放平台审核、官方 iOS SDK、CloudBase 函数/私有集合和 iPhone Apple→微信绑定均已通过；其余账户组合及 Android 旧微信账号回归仍待完成。
 - 上一步：步骤 2 已批准
-- 下一步骤：无；不得进入步骤 8
-- 下一步骤授权：步骤 8 未授权，严禁开始
+- 下一步骤：完成步骤 8 的云端部署、App Store Connect 配置和 iPhone StoreKit 验收后停止等待检查；不得进入步骤 9
+- 下一步骤授权：用户已于 2026-08-13 明确授权开始步骤 8；不授权步骤 9 或后续范围
 - Git 操作：用户已于 2026-08-13 分别明确授权提交步骤 3/4 改动，以及记录进度、提交并推送当前验证通过的步骤 7 改动；除此之外后续不得自行提交、推送或创建 PR
 - Flutter：继续停止并封存；本计划只处理根 Capacitor + React 主线
 
@@ -25,6 +25,7 @@
 7. 执行必须逐步进行；同一端到端任务不得拆成前后两个步骤。每步完成代码、测试、部署/真机验证、相关项目文档和本交接后停止等待用户检查。
 8. 用户批准上一步后仍不得自动进入下一步；必须再次收到明确的“开始下一步”指令。用户已单次例外授权在步骤 3、4 停点未解除时提前实施步骤 5，并于 2026-08-13 明确授权提前实现步骤 6、步骤 7；这些例外都不授权步骤 8 或后续范围，步骤 3～7 仍需真机验收后才能改变状态。
 9. 除用户于 2026-08-13 明确要求的步骤 3/4 提交和本次步骤 7 提交/推送外，不执行 git 操作。
+10. 步骤 8 产品决策：仅 iOS 首发；每个登录身份首次服务端确认后赠送一次 7 天完整 Premium 会员体验，注销/重装/重新登录不重复赠送；体验结束后一次性买断价为人民币 28 元；每次在线服务端确认后可离线使用 3 天；旧用户不作免费升级，需重新购买。
 
 ## 当前仓库与环境事实
 
@@ -205,3 +206,14 @@
 - 步骤 6：用户确认 iPhone 通知验收无问题；Android channel、450 条上限和重排仍需独立回归。
 - 步骤 7：用户确认深色模式四主 tab、键盘/表单、债务详情拖拽关闭、长按排序、还款日左滑、统计图表触摸与动态字体等检查无问题。发现“新增债务”内层滚动到边界会带动主页面：原因是 React `EditSheet` 未调用旧 vanilla `lockScroll()`；已在打开期间给 `html/body` 加 `az-edit-sheet-open` 根滚动锁，新增回归测试，React 367/367、TypeScript、React build、iOS sync、签名真机构建/安装均通过，用户复测通过。
 - 下一步仍只有步骤 4 的其余账户组合和各步骤待做的 Android 回归；步骤 8 未授权，禁止开始。未暂存、提交或推送。
+
+## 2026-08-13（续5）：步骤 8 StoreKit Premium 本地实现与外部停点
+
+- 用户明确授权开始步骤 8，并确认产品规则：iOS 首发、首次登录赠送一次 7 天完整体验、体验标签为“Premium 会员体验”、¥28 一次性买断、服务端确认后可离线 3 天、旧用户不免费升级。
+- 新增 iOS `StoreKitPremiumPlugin`：基于 StoreKit 2 查询商品、购买、恢复购买、监听未完成交易；购买请求带服务端生成的 UUID `appAccountToken`，只在服务端验签并写入权益后完成交易。最近一次服务端确认结果同时进 Keychain，且仅在 3 天离线窗口内允许使用。
+- 新增 `premiumEntitlement` CloudBase 函数及 Apple 根证书：用 Apple 官方 App Store Server Library 验证交易 JWS，校验 bundle/product/appAccountToken/撤销状态，保存 `premiumEntitlements`、交易去重记录和兑换结果。本地 `after-zero-premium-v1` 仅缓存访问窗口；iOS 不再信任旧本地 Premium 或备份内的 Premium 字段。
+- Apple/微信新账号会写入仅含哈希 identity 文档 id 的 `premiumTrialClaims`；注销时删除用户资料、备份和登录映射，但保留最小试用/已购权益标记，以防重复赠送体验并允许购买恢复。账户绑定合并时优先保留已购权益并合并历史 appAccountToken。
+- iOS 启动改为强制登录 → 服务端权益校验 → 有效体验/已购才进入完整账本；体验结束则在门禁内显示购买、恢复购买与兑换入口。Android 仍保留原有本地/兑换策略，本轮未被购买门禁锁死。
+- 会员协议 Markdown/App 内副本、账户说明、Premium 页面和 bridge/type/mock 已同步为体验、¥28、一次性买断、恢复购买及注销后的最小权益保留语义。
+- 本地验证通过：`npm test` 131/131、`npm run test:react` 45 文件/368 项、TypeScript、React build、iOS sync、主 Web 内联脚本语法与 `git diff --check`。iOS Simulator 无签名 `xcodebuild` 已通过；首次构建因本机 SPM 的 Capacitor Cordova 缓存缺件失败，重新解析已有 SPM 依赖后复验成功。
+- 2026-08-14 已将 `premiumEntitlement` 加入本机受控部署配置并成功部署。仍未完成、不得宣称步骤 8 闭环：① 在 CloudBase 创建 `premiumEntitlements`、`premiumTransactions`、`premiumRedeemCodes`、`premiumTrialClaims` 为 ADMINONLY；② 配置生产环境 `APPLE_APP_STORE_ID`；③ 在 App Store Connect 创建非消耗型商品 `io.github.jenkjyu.afterzero.premium`、中国区价格 ¥28 与 Sandbox 测试账号；④ 配置 App Store Server Notifications V2，完成购买、取消、失败、恢复、换设备、退款/撤销的 iPhone 真机验收；⑤ Android 回归。未暂存、提交或推送。

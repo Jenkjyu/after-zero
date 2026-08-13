@@ -37,6 +37,8 @@ async function resolveAppleAccount(claims, displayName, now) {
   const identityId = sha256Hex(`apple:${claims.sub}`);
   const transactionResult = await db.runTransaction(async (transaction) => {
     const identityRef = transaction.collection("identities").doc(identityId);
+    // 文档 id 是不可逆哈希；账户删除后只靠它阻止重复体验或恢复已购权益。
+    const trialClaimRef = transaction.collection("premiumTrialClaims").doc(identityId);
     const existingIdentity = firstDocument(await identityRef.get());
     if (existingIdentity && existingIdentity.userId) {
       // 合并事务会把来源账号的 identity 映射迁到目标账号；因此这里始终以映射为准，
@@ -56,6 +58,7 @@ async function resolveAppleAccount(claims, displayName, now) {
       return { userId, created: false };
     }
 
+    const claim = firstDocument(await trialClaimRef.get());
     const userId = newAppleUserId();
     await transaction.collection("users").doc(userId).set({
       userId,
@@ -63,6 +66,8 @@ async function resolveAppleAccount(claims, displayName, now) {
       nickname: displayName,
       email: typeof claims.email === "string" ? claims.email : "",
       avatarUrl: "",
+      trialEligible: !claim,
+      preservedPremiumEntitlement: claim && claim.preservedPremiumEntitlement || null,
       createdAt: now,
       lastLoginAt: now,
     });
@@ -73,6 +78,7 @@ async function resolveAppleAccount(claims, displayName, now) {
       createdAt: now,
       lastLoginAt: now,
     });
+    if (!claim) await trialClaimRef.set({ createdAt: now, updatedAt: now });
     return { userId, created: true };
   });
   return transactionResult && transactionResult.result

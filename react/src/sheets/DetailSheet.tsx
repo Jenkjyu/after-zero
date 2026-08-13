@@ -23,6 +23,7 @@ function kv(k: string, v: string) {
 
 export function DetailSheet() {
   const openId = useDetailSheetId();
+  const isOpen = openId !== null;
   const debts = useDebts();
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const gripRef = useRef<HTMLDivElement | null>(null);
@@ -72,6 +73,19 @@ export function DetailSheet() {
     };
   }, [openId]);
 
+  // iOS WKWebView 不会始终把内层 .sheet-scroll 的 overscroll-behavior 当成根滚动链屏障。
+  // 详情的还款计划较长时，滚到边界后不能继续带动下方的债务主页。
+  useEffect(() => {
+    if (!isOpen) return;
+    const root = document.documentElement;
+    root.classList.add("az-detail-sheet-open");
+    document.body.classList.add("az-detail-sheet-open");
+    return () => {
+      root.classList.remove("az-detail-sheet-open");
+      document.body.classList.remove("az-detail-sheet-open");
+    };
+  }, [isOpen]);
+
   useEffect(() => {
     const grip = gripRef.current;
     const sheet = sheetRef.current;
@@ -92,7 +106,6 @@ export function DetailSheet() {
     };
   }, []);
 
-  const isOpen = openId !== null;
   const d = displayId !== null ? debts.find((x) => x.id === displayId) : undefined;
 
   function onEdit() {
