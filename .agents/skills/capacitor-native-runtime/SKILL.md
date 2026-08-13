@@ -24,7 +24,7 @@ description: "Use this skill when modifying or debugging After Zero's Capacitor 
 
 根`ios/`已在iOS主线步骤1通过一次`npx cap add ios`建立，Bundle ID为`io.github.jenkjyu.afterzero`、最低iOS 15。后续只运行build/sync，不能重复`cap add ios`重建。当前Capacitor 8工程使用Swift Package Manager；`CapApp-SPM/Package.swift`固定`capacitor-swift-pm` 8.4.1，并接入本地`@capacitor/local-notifications`。
 
-步骤1只证明原生壳可运行：iOS微信/Apple登录、文件保存、完整通知策略、购买和发布签名尚未实现。不要因模拟器能启动就把这些能力写成已支持。
+步骤3已新增`AppleLoginPlugin.swift`、`AfterZeroBridgeViewController.swift`与`App.entitlements`，并完成无签名模拟器构建；Apple云函数尚未部署，Apple能力/开发签名和真实Apple ID真机端到端尚未验收，因此仍不能写成已支持。iOS微信、文件保存、完整通知策略、购买和发布签名也尚未实现。
 
 ## 区分手写插件与npm插件
 
@@ -41,7 +41,7 @@ description: "Use this skill when modifying or debugging After Zero's Capacitor 
 
 修改微信原生链、`WXEntryActivity`、CloudBase自定义登录或release包调试时，同时加载`wechat-login-setup`；构建签名包或处理keystore/SHA1时加载`release-keystore`。
 
-iOS当前只有Capacitor模板`AppDelegate.swift`，尚无手写业务插件。以后新增Swift插件时必须维护Xcode target membership/注册方式和JS契约；不要把Android四个Java类机械翻译后一次性塞入iOS。
+iOS手写`AppleLoginPlugin`由storyboard中的`AfterZeroBridgeViewController`在`capacitorDidLoad()`显式注册；Xcode target membership、storyboard module/class、entitlement和JS插件名必须同步。以后新增Swift插件仍按能力逐项维护，不要把Android四个Java类机械翻译后一次性塞入iOS。
 
 ## 维护 `MainActivity` 的三条边界
 

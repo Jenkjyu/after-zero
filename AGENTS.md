@@ -11,10 +11,10 @@
 
 ## 进行中的 iOS 扩展计划
 
-- iOS 步骤 2“本地优先模式与云功能登录门”已完成，等待用户检查；步骤 3 尚未授权。权威计划为 `docs/ios/implementation-plan.md`，准确停点与下一步授权状态为 `docs/ios/handoff.md`。
+- iOS 步骤 2 已通过检查；步骤 3“Apple 登录与统一内部账户端到端闭环”云端已部署，仍差 iPhone 真机验收。用户已明确允许步骤 4“iOS 微信登录、身份绑定与既有云账号合并”先行实施；当前等待微信开放平台审核、官方 iOS SDK 接入与真机验收。步骤 5 尚未授权。权威计划为 `docs/ios/implementation-plan.md`，准确恢复动作见 `docs/ios/handoff.md`。
 - 该计划严格逐步执行：每一步必须完成本步的代码、测试、原生/云端验证和相关文档后停止等待用户检查；用户批准后仍不得自动进入下一步，必须再次收到明确开工指令。
 - 计划期间未经用户改变指令不得暂存、提交、推送或创建 PR。新 session 涉及 iOS 计划时，先完整读取交接和当前步骤；没有明确批准只讨论，不实施。
-- 根 `ios/` 已是可编译、可在模拟器冷启动的 Capacitor 8.4.1 Swift Package Manager 原生壳；本地优先登录模式已实现，iOS 登录/文件/通知/购买和上架仍未实现，不能把原生壳误写成可发布 iOS 产品。Flutter 继续封存。
+- 根 `ios/` 已是可编译、可在模拟器冷启动的 Capacitor 8.4.1 Swift Package Manager 原生壳；Apple 登录本地代码已实现但尚未部署和真机验收，iOS 微信/文件/通知/购买和上架仍未实现，不能把原生壳误写成可发布 iOS 产品。Flutter 继续封存。
 
 ## 当前产品与架构
 
@@ -26,7 +26,7 @@ After Zero 当前产品主线是 **Capacitor + React**：Android App 是当前�
 - `window.__azBridge`：vanilla 向 React 暴露数据和 impure 操作的窄边界。运行时形状、`react/src/types.ts` 的 `AzBridge`、`react/__tests__/mockBridge.ts` 必须同步。
 - `cloudbase/functions/**`：独立服务端单元，不进入 APK，也不由 Capacitor sync 自动部署。
 - 根 `android/`：当前 Capacitor 原生工程，混合项目维护源码与生成接线；不是可以整体重建后丢弃的目录。
-- 根 `ios/`：Capacitor 8.4.1 iOS 原生工程，最低 iOS 15，通过 `ios/App/CapApp-SPM/Package.swift` 接入 Capacitor 与 Local Notifications；`npx cap add ios` 已执行且不得重复重建。
+- 根 `ios/`：Capacitor 8.4.1 iOS 原生工程，最低 iOS 15，通过 `ios/App/CapApp-SPM/Package.swift` 接入 Capacitor 与 Local Notifications；手写 `AppleLoginPlugin` 由 `AfterZeroBridgeViewController` 注册；`npx cap add ios` 已执行且不得重复重建。
 
 `flutter/` 是已停止并封存的重写成果。Flutter 阶段 8 未完成，Flutter 阶段 9 从未开始。除非用户在当前任务中明确重新授权，不得修改 Flutter 产品、parity 工具或相关历史文档，不得恢复阶段 8.1、继续 8.2–8.10 或开始 Flutter 阶段 9；普通产品需求只处理当前 Capacitor + React 主线。需要检查或恢复该路线时必须加载 `flutter-rewrite-parity`。
 
@@ -36,7 +36,7 @@ After Zero 当前产品主线是 **Capacitor + React**：Android App 是当前�
 - Web 内容要进入原生 assets 时运行对应的 `npx cap sync android` / `npx cap sync ios`。不要直接编辑 `android/app/src/main/assets/public/**` 或 `ios/App/App/public/**`。
 - `android/capacitor.settings.gradle` 与 `android/app/capacitor.build.gradle` 是生成接线；不要手写修改。
 - 根 Android 工程中需要长期维护的内容包括 `MainActivity`、`SaveFilePlugin`、`WeChatLoginPlugin`、`wxapi/WXEntryActivity`、主 manifest、非生成 Gradle 配置和手写资源。具体边界以 `capacitor-native-runtime` 为准。
-- iOS 长期源码包括 Xcode 工程、`AppDelegate.swift`、`Info.plist`、storyboard、asset catalog 和以后新增的 Swift 插件；`ios/App/App/capacitor.config.json`、`config.xml`、`public/`、Pods/build/DerivedData 和用户签名数据均为生成或本机内容，不提交。
+- iOS 长期源码包括 Xcode 工程、`AppDelegate.swift`、`AppleLoginPlugin.swift`、`AfterZeroBridgeViewController.swift`、`App.entitlements`、`Info.plist`、storyboard 和 asset catalog；`ios/App/App/capacitor.config.json`、`config.xml`、`public/`、Pods/build/DerivedData 和用户签名数据均为生成或本机内容，不提交。
 - `resources/` 是 App 图标设计源；`android/app/src/main/res/mipmap-*` 是生成结果。重新生成图标后要按原生 skill 核对自适应图标 background inset。
 - CloudBase 函数必须单独部署；任何密钥、AppSecret、私钥或环境专属配置只能放受控环境变量/本机忽略文件，不能提交进仓库。
 
@@ -45,7 +45,7 @@ After Zero 当前产品主线是 **Capacitor + React**：Android App 是当前�
 1. **持久化键名不可改、不可复用、不可合并。** 当前受保护键为：`debt-manager-v5`、`debt-manager-docs-v5`、`after-zero-account-v1`、`debt-manager-sort-v1`、`after-zero-notify-v1`、`after-zero-premium-v1`、`after-zero-simulate-v1`、`after-zero-backup-meta-v1`、`after-zero-ai-usage-v1`、`after-zero-ai-chatlog-v1`、`after-zero-ai-limit-notice-v1`。需要演进数据形状时做兼容迁移，不能用改 key 的方式清空旧数据。
 2. **新安装必须为空数据。** `SEED` 与 `DOCS_SEED` 保持空值；测试数据只放测试/临时环境。提交前检查真实姓名、金额、日期、openid、token、档案和个人财务描述等隐私内容，不能只搜 seed 常量。
 3. **App 身份与恢复策略不可随意改。** `io.github.jenkjyu.afterzero` 是包名、更新、微信回调和签名身份；manifest 保持 `android:allowBackup="false"`，否则卸载重装可能恢复旧数据。`INTERNET` 权限已被 CloudBase/微信登录使用，不能删除。
-4. **本地优先与云功能 fail-closed。** `#loginGate` 默认隐藏，仅由本地模式进入 AI、云备份或账户主动登录时按需打开；取消后必须回到原页面继续本地使用。AI、云备份、注销等 CloudBase 执行层必须拒绝无 `ACCOUNT_KEY` 的调用，不能以匿名会话绕过；微信换票据流程的匿名垫底例外按 `wechat-login-setup` 处理。
+4. **本地优先与云功能 fail-closed。** `#loginGate` 默认隐藏，仅由本地模式进入 AI、云备份或账户主动登录时按需打开；iOS 只展示 Apple、Android 只展示微信，取消后必须回到原页面继续本地使用。AI、云备份、注销等 CloudBase 执行层必须拒绝无 `ACCOUNT_KEY` 的调用，不能以匿名会话绕过；只有用户主动发起的登录换票据流程可按专项 skill 使用匿名垫底。
 5. **账本只有一份实现。** 财务变换复用 `www/js/calc.js` 中已测试函数；`plan` 是账本权威，派生字段由 `recompute()` 计算，不在 React、bridge、导出或云端另写一套算法。
 6. **release keystore 是长期身份材料。** 不提交、不移动、不重建替换；一旦正式发布后丢失，将无法用同一身份更新 App。release 构建必须加载 `release-keystore`。
 7. **License 是 PolyForm Noncommercial 1.0.0。** 修改 `LICENSE`、`package.json` license 或 README 许可说明前，必须确认非商业授权前提确实改变。

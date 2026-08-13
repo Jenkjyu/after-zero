@@ -5,7 +5,7 @@ import { closeBackupScreen, closeDocsScreen, closePremiumScreen, useBackupScreen
 import { makeMockBridge } from "./mockBridge";
 import type { Premium } from "../src/types";
 
-const account = { openid: "o1", nickname: "测试", avatarUrl: "", loggedInAt: 0 };
+const account = { userId: "o1", openid: "o1", provider: "wechat" as const, providers: ["wechat" as const], nickname: "测试", avatarUrl: "", loggedInAt: 0 };
 
 afterEach(() => {
   // premiumScreenOpen/docsScreenOpen/backupScreenOpen是模块级状态，重置避免测试间互相污染

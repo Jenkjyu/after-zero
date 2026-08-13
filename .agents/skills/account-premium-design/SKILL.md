@@ -12,16 +12,16 @@ description: Use this skill when modifying or debugging After Zero account scree
 - React 页面与入口：`react/src/mine/**`、`AccountScreen.tsx`、`PremiumScreen.tsx`、`TermsScreen.tsx`、`useSettleCelebration.ts`。
 - React 只负责展示、确认和 screen 状态；登录会话、localStorage、CloudBase 调用、兑换写入、退出/注销/重置仍由 `www/index.html` 经 `window.__azBridge` 执行。
 - `hasPremium(premium)` / `premiumLabel(premium)` 的权威实现位于 `www/js/calc.js`。
-- 微信登录接线加载 `wechat-login-setup`；`deleteAccount` 云函数部署加载 `cloudbase-deploy`；React 外部状态和返回链加载 `react-bridge-architecture`。
+- 微信登录接线加载 `wechat-login-setup`；Apple 登录叠加 `capacitor-native-runtime` 与 `cloudbase-deploy`；`deleteAccount` 云函数部署加载 `cloudbase-deploy`；React 外部状态和返回链加载 `react-bridge-architecture`。
 
 ## 账户生命周期
 
-- App是本地优先模式：`ACCOUNT_KEY = "after-zero-account-v1"`为空时仍可使用本地债务、还款、统计、档案、通知、导入导出和模拟。该键只保存账户展示资料；CloudBase自定义登录会话才是云函数身份来源。
+- App是本地优先模式：`ACCOUNT_KEY = "after-zero-account-v1"`为空时仍可使用本地债务、还款、统计、档案、通知、导入导出和模拟。该键只保存provider-neutral账户展示资料；CloudBase自定义登录会话中的内部`userId`才是云函数身份来源。旧`{openid,nickname,...}`数据在不改键名的前提下惰性补成兼容形状。
 - AI、云备份等真实云功能在React入口调用`requestCloudLogin(purpose)`，提示必须说明用途并可取消；bridge执行函数还要独立拒绝无account的调用，不能只依赖按钮门禁。
 - “退出登录”清`ACCOUNT_KEY`并调用CloudBase `signOut()`，随后继续本地使用；不删除本地债务、档案、通知或服务器账户，也不自动上传/恢复。
 - “重置本地数据”是账户页独立操作，二次确认后执行`localStorage.clear()`、删除IndexedDB `debtManagerFiles`并reload；它不调用云函数、不删除账户或云备份。
-- “注销账户”只在已登录状态展示并调用`deleteAccount`。服务端只信任`app.auth().getUserInfo().customUserId`，先删除该用户全部`backups`文档和Storage文件，再删除`users`文档；客户端成功后清账户展示资料并退出CloudBase会话，本机账本继续保留。
-- 不把客户端传入的 openid 当身份，也不要把重置本地数据和注销账户合并成一个动作。
+- “注销账户”只在已登录状态展示并调用`deleteAccount`。服务端只信任`app.auth().getUserInfo().customUserId`，先删除该用户全部`backups`文档和Storage文件，再删除`users`、`identities`和Apple nonce记录；客户端成功后清账户展示资料并退出CloudBase会话，本机账本继续保留。
+- 不把客户端传入的openid、Apple sub或userId当身份，也不要把重置本地数据和注销账户合并成一个动作。
 
 ## Premium 当前模型
 

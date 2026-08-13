@@ -30,7 +30,7 @@ describe("debts App AI login gate", () => {
   });
 
   it("已登录Premium用户直接打开AI", () => {
-    const account = { openid: "o1", nickname: "测试", avatarUrl: "", loggedInAt: 0 };
+    const account = { userId: "o1", openid: "o1", provider: "wechat" as const, providers: ["wechat" as const], nickname: "测试", avatarUrl: "", loggedInAt: 0 };
     window.__azBridge = makeMockBridge({ premium: { premium: { method: "onetime", at: "2026-01-01" } }, account });
     render(<App />);
     const hook = renderHook(() => useAiScreenOpen());

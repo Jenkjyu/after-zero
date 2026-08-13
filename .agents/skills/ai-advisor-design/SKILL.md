@@ -17,7 +17,7 @@ description: Use this skill when modifying or debugging After Zero's AI debt adv
 
 ## 服务端月度额度
 
-- 权威限制是每个已认证 `customUserId` 每个北京时间自然月 50 次，记录在 `aiUsage` 集合，以 `{openid, month}` 查询。
+- 权威限制是每个已认证内部`customUserId`每个北京时间自然月50次。新记录在`aiUsage`集合以`{userId, month}`查询；读取时兼容旧微信用户已有的`{openid, month}`记录。
 - 只在模型成功返回非空内容后计数；失败、超时和空回复不扣次数。超额返回 `code: "QUOTA_EXCEEDED"` 和 `{month,used,limit}`。
 - `AI_USAGE_KEY = "after-zero-ai-usage-v1"` 只是服务端 quota 的本地缓存，用于欢迎态显示和已知超额时的快路径拦截，不是权威计数器。旧 `{date,count}` 数据或跨月缓存应视为未知并放行到服务端。
 - 月份计算客户端和云函数都按 UTC+8；不要直接用 UTC 月份。

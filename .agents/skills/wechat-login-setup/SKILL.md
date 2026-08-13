@@ -21,7 +21,7 @@ description: This skill should be used when debugging or configuring the WeChat 
 
 2. **CloudBase JS SDK（至少2.28.6这个版本）有个内部bug**：`auth._getCredentials()`内部先读`t.scope`再判断`t`是否为`null`，全新设备/App从没建立过任何登录态时`t`就是`null`，直接抛`TypeError: Cannot read properties of null (reading 'scope')`，会连带搞挂`callFunction()`。规避方法：真正走自定义票据登录流程之前，先调一次`auth.signInAnonymously()`（失败就忽略，不阻塞主流程）垫底写入一份本地凭证，绕开这个先用后判的bug。
 
-   这个匿名垫底只能存在于用户主动发起的微信登录换票据流程。App的“本地使用”不是CloudBase匿名账号；AI、云备份、注销等受保护执行层必须在没有本地account时直接拒绝，不能调用`signInAnonymously()`。
+   这个匿名垫底只能存在于用户主动发起的登录换票据流程（当前微信与Apple共用客户端换票据helper）。App的“本地使用”不是CloudBase匿名账号；AI、云备份、注销等受保护执行层必须在没有本地account时直接拒绝，不能调用`signInAnonymously()`。
 
 3. **CloudBase控制台"身份认证→登录方式"里，"匿名登录"必须单独开启**，不开的话第2条的`signInAnonymously()`会直接被拒（400，报错信息会明确写"当前调用的signInAnonymously()所需的登录方式尚未在云开发控制台启用"）。
 
@@ -33,7 +33,7 @@ description: This skill should be used when debugging or configuring the WeChat 
 
 ## CloudBase自定义登录API用法（已核对官方文档，别凭记忆写）
 
-- 云函数端：`app.auth().createTicket(openid)`——只接受一个参数，不支持`refresh`/`expire`选项。
+- 云函数端：`app.auth().createTicket(userId)`——只接受一个参数，不支持`refresh`/`expire`选项。现有微信用户为避免迁移既有云数据，惰性保持内部`userId === openid`，并写入`identities`映射；新代码不再把openid当通用账户字段。
 - 客户端：不是直接`signInWithTicket(ticket)`，而是先用`auth.setCustomSignFunc(fn)`注册"怎么去拿ticket"的回调，再调用**不带参数**的`auth.signInWithCustomTicket()`。
 - `app.auth().createTicket()`必须用启用"自定义登录"后下载的私钥初始化的app实例调用，不能用云函数默认的admin app（那个实例没有签发登录票据的权限）。
 

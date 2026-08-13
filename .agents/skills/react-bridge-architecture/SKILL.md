@@ -41,7 +41,7 @@ description: Use this skill when modifying After Zero's current Capacitor + Reac
 
 刻意保留的vanilla DOM例外：
 
-- `#loginGate`是vanilla拥有的按需登录表面，默认隐藏；本地模式进入AI/云备份或从账户页主动登录时，React调用`requestCloudLogin(purpose)`打开。它必须可取消并返回原页面，不能恢复成启动强制门，也不能迁移出持有CloudBase/原生插件状态的vanilla边界。
+- `#loginGate`是vanilla拥有的按需登录表面，默认隐藏；本地模式进入AI/云备份或从账户页主动登录时，React调用`requestCloudLogin(purpose)`打开。iOS只显示Apple入口，Android只显示微信入口，普通浏览器不伪造原生提供方。它必须可取消并返回原页面，不能恢复成启动强制门，也不能迁移出持有CloudBase/原生插件状态的vanilla边界。
 - `#modalScrim`是全App唯一确认弹窗；React通过`confirmAsync`复用，不另建第二套。
 - `#importFileInput`及其change流程仍由vanilla拥有；React只通过`triggerImportFilePicker`触发。
 - tabbar和全局CSS仍在宿主中；React复用现有class和CSS变量。

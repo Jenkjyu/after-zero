@@ -45,6 +45,7 @@ export function makeMockBridge(overrides?: {
     ),
     wxLogout: vi.fn(),
     requestCloudLogin: vi.fn(() => Promise.resolve(true)),
+    bindCloudIdentity: vi.fn(() => Promise.resolve(true)),
     deleteAccount: vi.fn(() => Promise.resolve(true)),
     redeemCode: vi.fn(() => null),
     resetLocalData: vi.fn(),

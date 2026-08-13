@@ -23,6 +23,9 @@ export function AccountScreen() {
   async function onLogin() {
     await window.__azBridge.requestCloudLogin("登录后可使用 AI 债务助手和云备份；登录不会自动上传、下载或覆盖这台设备上的本地账本。");
   }
+  async function onBind(provider: "apple" | "wechat") {
+    await window.__azBridge.bindCloudIdentity(provider);
+  }
   async function onResetLocalData() {
     const reallyReset = await window.__azBridge.confirmAsync(
       "确定重置本地数据？",
@@ -51,14 +54,18 @@ export function AccountScreen() {
       </div>
       <div className="subpage-body">
         <div className="data-card">
-          {account && <div className="account-detail-row"><span className="account-detail-label">头像</span><img className="account-avatar" alt="" src={account.avatarUrl || undefined} /></div>}
+          {account?.avatarUrl && <div className="account-detail-row"><span className="account-detail-label">头像</span><img className="account-avatar" alt="" src={account.avatarUrl} /></div>}
           <div className="account-detail-row"><span className="account-detail-label">使用方式</span><span className="account-detail-value">{!account ? "本地使用" : account.provider === "apple" ? "Apple 登录" : account.provider === "unified" ? "统一账号" : "微信登录"}</span></div>
           {account && <div className="account-detail-row"><span className="account-detail-label">昵称</span><span className="account-detail-value">{account.nickname || "已登录"}</span></div>}
+          {account?.email && <div className="account-detail-row"><span className="account-detail-label">邮箱</span><span className="account-detail-value">{account.email}</span></div>}
           <div className="account-detail-row"><span className="account-detail-label">会员</span><span className="account-detail-value">{window.premiumLabel(premium) || "普通用户"}</span></div>
           <div className="account-detail-row"><span className="account-detail-label">本地账本</span><span className="account-detail-value">仅存本机</span></div>
         </div>
         {!account && <p className="account-local-note">债务、还款、统计、档案、通知和本地导入导出无需登录。AI 与云备份会在使用时再请求登录。</p>}
-        {!account && <div className="data-actions" style={{ marginTop: 16 }}><button type="button" className="btn primary" onClick={onLogin}>微信登录云账号</button></div>}
+        {!account && <div className="data-actions" style={{ marginTop: 16 }}><button type="button" className="btn primary" onClick={onLogin}>登录云账号</button></div>}
+        {account && !account.providers.includes("apple") && <div className="data-actions" style={{ marginTop: 16 }}><button type="button" className="btn ghost" onClick={() => onBind("apple")}>绑定 Apple</button></div>}
+        {account && !account.providers.includes("wechat") && <div className="data-actions" style={{ marginTop: 10 }}><button type="button" className="btn ghost" onClick={() => onBind("wechat")}>绑定微信</button></div>}
+        {account && <p className="account-local-note">绑定时会分别验证当前账号和待绑定账号；只合并云备份与 AI 用量，不会改变本机账本。</p>}
         {account && <div className="data-actions" style={{ marginTop: 16 }}><button type="button" className="btn ghost" onClick={onLogout}>退出登录</button></div>}
         <div className="data-actions" style={{ marginTop: 10 }}><button type="button" className="btn ghost" onClick={onResetLocalData}>重置本地数据</button></div>
         {account && <div className="data-actions" style={{ marginTop: 10 }}><button type="button" className="btn danger" onClick={onDeleteAccount}>注销云端账户</button></div>}

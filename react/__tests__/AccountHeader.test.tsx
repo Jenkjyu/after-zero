@@ -10,7 +10,10 @@ afterEach(() => {
 });
 
 const account: Account = {
+  userId: "test-openid",
   openid: "test-openid",
+  provider: "wechat",
+  providers: ["wechat"],
   nickname: "测试昵称",
   avatarUrl: "https://example.com/a.png",
   loggedInAt: 0,

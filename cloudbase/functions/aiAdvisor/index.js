@@ -3,10 +3,16 @@ const cloudbase = require("@cloudbase/node-sdk");
 const app = cloudbase.init({ env: cloudbase.SYMBOL_CURRENT_ENV });
 const db = app.database();
 
+async function isMergedSession(userId) {
+  const result = await db.collection("users").where({ userId }).limit(1).get();
+  const user = result.data && result.data[0];
+  return Boolean(user && user.mergedInto);
+}
+
 // ===== 每月用量上限（2026-08-04，服务端计数）=====
 // 以前是客户端localStorage存"20次/天"，清一下本地数据就绕过了——买断制下AI是持续成本，
 // 这个敞口必须在服务端堵住。改成按自然月计：一个用户一个月一条 aiUsage 文档，
-// 靠 openid+month 寻址（跟 backups 集合用 openid 做普通字段 + .where() 是同一个模式）。
+// 新记录靠userId+month寻址；读取时兼容旧微信用户已有的openid+month记录。
 const AI_MONTHLY_LIMIT = 50;
 
 // 月份串按**北京时间**算，不能直接用 new Date().toISOString()——云函数跑在UTC，
@@ -17,10 +23,14 @@ function currentMonth() {
 }
 
 // 读这个用户本月已用多少次。集合/文档不存在都返回0（第一次用的人本来就没有记录）。
-async function readUsage(openid, month) {
+async function readUsage(userId, month) {
   try {
-    const res = await db.collection("aiUsage").where({ openid, month }).limit(1).get();
-    const rec = (res.data || [])[0];
+    const usage = db.collection("aiUsage");
+    const current = await usage.where({ userId, month }).limit(1).get();
+    const legacy = (current.data || []).length
+      ? { data: [] }
+      : await usage.where({ openid: userId, month }).limit(1).get();
+    const rec = (current.data || [])[0] || (legacy.data || [])[0];
     return { used: (rec && rec.count) || 0, id: rec && rec._id };
   } catch (e) {
     // 集合不存在等异常：不能因为计数读不到就把功能整个卡死，放行并记日志（宁可漏计
@@ -31,14 +41,14 @@ async function readUsage(openid, month) {
 }
 
 // 计数只在**模型真的返回内容之后**才加——调用失败/超时不该扣用户额度。
-async function bumpUsage(openid, month, existingId) {
+async function bumpUsage(userId, month, existingId) {
   try {
     if (existingId) {
       await db.collection("aiUsage").doc(existingId).update({
         count: db.command.inc(1), updatedAt: Date.now(),
       });
     } else {
-      await db.collection("aiUsage").add({ openid, month, count: 1, updatedAt: Date.now() });
+      await db.collection("aiUsage").add({ userId, month, count: 1, updatedAt: Date.now() });
     }
   } catch (e) {
     console.error("[aiUsage] bump failed:", e && e.message);
@@ -74,6 +84,9 @@ exports.main = async (event) => {
   const { customUserId } = auth.getUserInfo() || {};
   if (!customUserId) {
     return { ok: false, error: "未登录，无法使用 AI 分析" };
+  }
+  if (await isMergedSession(customUserId)) {
+    return { ok: false, code: "ACCOUNT_MERGED_RELOGIN_REQUIRED", error: "该账号已合并，请重新登录后继续使用" };
   }
 
   const mode = event && event.mode === "chat" ? "chat" : "report";

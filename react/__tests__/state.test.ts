@@ -40,7 +40,7 @@ describe("useDebts / usePremium / useAccount", () => {
 
     const newDebts = [makeDebt({ name: "新债务" })];
     const newPremium = { premium: { method: "onetime" as const, at: "2026-01-01" } };
-    const newAccount = { openid: "o1", nickname: "测试", avatarUrl: "https://x/y.png", loggedInAt: 1 };
+    const newAccount = { userId: "o1", openid: "o1", provider: "wechat" as const, providers: ["wechat" as const], nickname: "测试", avatarUrl: "https://x/y.png", loggedInAt: 1 };
     window.__azBridge.getDebts = () => newDebts;
     window.__azBridge.getPremium = () => newPremium;
     window.__azBridge.getAccount = () => newAccount;

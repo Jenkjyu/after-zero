@@ -1,4 +1,5 @@
 const cloudbase = require("@cloudbase/node-sdk");
+const crypto = require("crypto");
 const https = require("https");
 
 const app = cloudbase.init({ env: cloudbase.SYMBOL_CURRENT_ENV });
@@ -44,6 +45,10 @@ function httpGetJSON(url) {
   });
 }
 
+function identityDocumentId(provider, providerUserId) {
+  return crypto.createHash("sha256").update(`${provider}:${providerUserId}`, "utf8").digest("hex");
+}
+
 exports.main = async (event) => {
   const code = event && event.code;
   if (!code) return { ok: false, error: "缺少code" };
@@ -82,20 +87,75 @@ exports.main = async (event) => {
     // ignore
   }
 
-  // 3. 按openid在users集合里upsert。
+  // 3. 惰性建立provider-neutral身份映射。兼容已有微信用户时，内部userId继续等于旧
+  // openid，因此已有备份、AI用量和CloudBase会话归属都不需要搬迁；openid从此只作为
+  // 微信provider identity保留，不再由新代码当作通用账号概念。
   const users = db.collection("users");
   const now = Date.now();
   const existing = await users.where({ openid }).get();
+  const legacyUserId = openid;
+  let userId = legacyUserId;
   if (existing.data.length) {
-    await users.doc(existing.data[0]._id).update({ nickname, avatarUrl, lastLoginAt: now });
+    const existingUser = existing.data[0];
+    // 合并后微信身份仍可重新授权，但必须换到主账号会话，不能继续签发已合并账号的票据。
+    userId = existingUser.mergedInto || existingUser.userId || legacyUserId;
+    if (!existingUser.mergedInto) {
+      const oldProviders = Array.isArray(existingUser.providers) ? existingUser.providers : [];
+      await users.doc(existingUser._id).update({
+        userId,
+        providers: oldProviders.includes("wechat") ? oldProviders : [...oldProviders, "wechat"],
+        nickname,
+        avatarUrl,
+        lastLoginAt: now,
+      });
+    }
   } else {
-    await users.add({ openid, unionid: unionid || "", nickname, avatarUrl, createdAt: now, lastLoginAt: now });
+    await users.add({
+      userId: legacyUserId,
+      providers: ["wechat"],
+      openid,
+      unionid: unionid || "",
+      nickname,
+      avatarUrl,
+      createdAt: now,
+      lastLoginAt: now,
+    });
   }
+  await db.collection("identities").doc(identityDocumentId("wechat", openid)).set({
+    provider: "wechat",
+    providerUserId: openid,
+    userId,
+    createdAt: existing.data.length ? (existing.data[0].createdAt || now) : now,
+    lastLoginAt: now,
+  });
+
+  // `userId` 可能因账户合并而指向目标账号；返回目标账号资料并为它签发票据，
+  // 不能把已合并的旧 users 文档当成仍可使用的独立会话。
+  const activeUserResult = await users.where({ userId }).limit(1).get();
+  const activeUser = activeUserResult.data && activeUserResult.data[0] || {};
+  const providers = Array.isArray(activeUser.providers) && activeUser.providers.length
+    ? activeUser.providers
+    : ["wechat"];
 
   // 4. 签发CloudBase自定义登录票据。
   // createTicket只接受一个参数(自定义用户唯一标识)，不支持refresh/expire这类选项——
   // 已对照CloudBase当前"自定义登录"文档核实(docs.cloudbase.net/authentication-v2/method/custom-login)。
-  const ticket = await authApp.auth().createTicket(openid);
+  const ticket = await authApp.auth().createTicket(userId);
 
-  return { ok: true, ticket, openid, nickname, avatarUrl };
+  return {
+    ok: true,
+    ticket,
+    userId,
+    openid,
+    account: {
+      userId,
+      provider: providers.length > 1 ? "unified" : providers[0],
+      providers,
+      openid: activeUser.openid || openid,
+      nickname: activeUser.nickname || nickname,
+      avatarUrl: activeUser.avatarUrl || avatarUrl,
+      email: activeUser.email || "",
+      loggedInAt: now,
+    },
+  };
 };

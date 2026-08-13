@@ -3,22 +3,35 @@ const cloudbase = require("@cloudbase/node-sdk");
 const app = cloudbase.init({ env: cloudbase.SYMBOL_CURRENT_ENV });
 const db = app.database();
 
-// 不信任客户端传来的任何openid参数——身份完全来自CloudBase已认证的调用上下文
-// （客户端signInWithCustomTicket()登录后，customUserId就是wxLogin创建票据时传入的openid）。
+async function isMergedSession(userId) {
+  const result = await db.collection("users").where({ userId }).limit(1).get();
+  const user = result.data && result.data[0];
+  return Boolean(user && user.mergedInto);
+}
+
+// 不信任客户端传来的任何provider identity或userId参数——内部userId完全来自CloudBase
+// 已认证调用上下文的customUserId。
 exports.main = async () => {
   const auth = app.auth();
-  const { customUserId } = auth.getUserInfo();
-  if (!customUserId) {
+  const { customUserId: userId } = auth.getUserInfo();
+  if (!userId) {
     return { ok: false, error: "未登录，无法注销" };
+  }
+  if (await isMergedSession(userId)) {
+    return { ok: false, code: "ACCOUNT_MERGED_RELOGIN_REQUIRED", error: "该账号已合并，请重新登录后继续使用" };
   }
 
   // 先清云备份(backups集合+Storage文件)，再删users文档——云备份的二进制文件真实存在
   // Storage里，注销不清理的话会留下孤儿文件，是隐私缺口，不是可选步骤。云备份现在是
-  // "一个用户可以有多条备份记录"的模型（openid是普通字段，不是doc id），要查出这个
-  // 用户名下的全部记录逐条清理，不是当年单doc模型那样doc(customUserId)一次搞定。
+  // "一个用户可以有多条备份记录"的模型，要查出这个userId名下的新记录及旧微信
+  // openid字段记录逐条清理，不是当年单doc模型那样doc(userId)一次搞定。
   const backups = db.collection("backups");
-  const backupDocs = await backups.where({ openid: customUserId }).get();
-  for (const record of backupDocs.data || []) {
+  const currentBackups = await backups.where({ userId }).get();
+  const legacyBackups = await backups.where({ openid: userId }).get();
+  const seenBackupIds = new Set();
+  const backupDocs = [...(currentBackups.data || []), ...(legacyBackups.data || [])]
+    .filter((record) => record && !seenBackupIds.has(record._id) && seenBackupIds.add(record._id));
+  for (const record of backupDocs) {
     const fileIDs = (record.files || []).map((f) => f.fileID).filter(Boolean);
     if (fileIDs.length) {
       try {
@@ -31,9 +44,26 @@ exports.main = async () => {
   }
 
   const users = db.collection("users");
-  const existing = await users.where({ openid: customUserId }).get();
-  if (existing.data.length) {
-    await users.doc(existing.data[0]._id).remove();
+  const currentUsers = await users.where({ userId }).get();
+  const legacyUsers = await users.where({ openid: userId }).get();
+  const seenUserIds = new Set();
+  for (const user of [...(currentUsers.data || []), ...(legacyUsers.data || [])]) {
+    if (user && !seenUserIds.has(user._id)) {
+      seenUserIds.add(user._id);
+      await users.doc(user._id).remove();
+    }
+  }
+
+  const identities = db.collection("identities");
+  const identityDocs = await identities.where({ userId }).get();
+  for (const identity of identityDocs.data || []) {
+    await identities.doc(identity._id).remove();
+  }
+
+  const appleLoginNonces = db.collection("appleLoginNonces");
+  const nonceDocs = await appleLoginNonces.where({ userId }).get();
+  for (const nonce of nonceDocs.data || []) {
+    await appleLoginNonces.doc(nonce._id).remove();
   }
   return { ok: true };
 };

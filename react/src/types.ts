@@ -79,12 +79,15 @@ export interface Premium {
 }
 
 export interface Account {
-  // 旧微信账户没有provider字段，按wechat兼容读取。Apple/统一账号的真实登录与数据形状
-  // 在iOS步骤3闭环；这里先让账户展示能区分三态，不提供尚不可用的Apple入口。
+  // ACCOUNT_KEY保持不变；vanilla加载时把旧{openid,nickname,...}惰性补成provider-neutral
+  // 形状。openid只为旧微信资料兼容保留，云功能归属以CloudBase会话的内部userId为准。
+  userId: string;
   openid?: string;
-  provider?: "wechat" | "apple" | "unified";
+  provider: "wechat" | "apple" | "unified";
+  providers: Array<"wechat" | "apple">;
   nickname: string;
   avatarUrl: string;
+  email?: string;
   loggedInAt: number;
 }
 
@@ -259,6 +262,9 @@ export interface AzBridge {
   // 本地模式进入AI/云备份或从账户页主动登录时打开可取消的微信登录表面。登录成功返回true，
   // 取消/失败返回false；无论结果如何都不上传、恢复或清空本地数据。
   requestCloudLogin(purpose: string): Promise<boolean>;
+  // 账户绑定会先要求当前账号和待绑定账号分别完成一次真实原生授权；若两者已有云账号，
+  // bridge 会显示确认并仅合并云备份/AI用量，不触碰本机账本。
+  bindCloudIdentity(provider: "apple" | "wechat"): Promise<boolean>;
   // 返回是否真的注销成功——vanilla内部会自己toast成功/失败文案(保持跟原doDeleteAccount()
   // 一致的用户反馈)，React只需要这个布尔值来决定要不要顺带关闭accountScreen。
   deleteAccount(): Promise<boolean>;

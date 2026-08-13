@@ -19,11 +19,11 @@ iOS 已建立同一套 Web 产品的 Capacitor 原生壳，可在 iOS 26.5 模�
 
 更细的开发边界、硬规则和按任务加载的知识入口见 [`AGENTS.md`](AGENTS.md) 与 [`.agents/skills/`](.agents/skills/)。
 
-## iOS 扩展（步骤 2 完成，等待检查）
+## iOS 扩展（步骤 3 / 4 真机验收阻塞）
 
-当前正按“Capacitor + React 双平台”方向实施 iOS 扩展，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 2 已完成本地优先模式与云功能登录门：取消登录仍可继续本地使用，登录不会自动同步本地账本；iPhone 17 Pro / iOS 26.5 模拟器已完成构建、安装和冷启动。
+当前正按“Capacitor + React 双平台”方向实施 iOS 扩展，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 2 的本地优先登录门已通过检查；步骤 3 已完成 Apple 登录、内部 `userId`、旧微信兼容和相关云函数的本地代码，并通过双平台构建及 iOS 模拟器冷启动。
 
-已确认的后续原则是：Apple/微信可绑定为同一云端账号；Android 与 iOS 各自的本地债务不自动同步或合并，仍通过用户主动创建/恢复云备份迁移。Apple 登录、iOS 微信登录、身份绑定/合并、文件、通知、购买和上架尚未实现。实施严格逐步验收，每一步完成后停止等待用户检查，未经明确批准不进入下一步、不提交代码。权威范围与当前停点见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
+步骤 3 的 CloudBase 部署、凭据轮换和 Apple 能力配置已完成，仍差 iPhone 真机验收。用户已允许步骤 4 先行实现：微信开放平台 iOS 配置正在审核，账户绑定/合并代码已完成本地验证，仍须接入官方 iOS SDK、部署新增云函数并以真机验收。当前发布版本仍不能使用 iOS Apple/微信登录，iOS 也仍不是可发布产品；步骤 5 及后续文件、通知、购买和上架未获授权。权威范围与恢复动作见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
 
 ## Flutter 重写（已停止并封存）
 
@@ -73,12 +73,12 @@ npx cap sync ios
 npx cap open ios
 ```
 
-Xcode 工程为 `ios/App/App.xcodeproj`。模拟器 Debug 构建不需要发布签名；真机、Apple 登录和 App Store 签名在后续步骤配置。
+Xcode 工程为 `ios/App/App.xcodeproj`。模拟器 Debug 构建不需要发布签名；Apple 登录真机验收需要为 App ID 启用相应能力，并使用有效开发签名与描述文件。
 
 - 只改 `react/src/**`：先 `npm run build:react`；要打进 APK 时再 sync 和构建 Android。
 - 只改 `www/**` 且 React 产物已是最新：可以跳过 React build，但仍需 `npx cap sync android`。
 - 不要直接编辑 `www/js/react-debts/**`、`android/app/src/main/assets/public/**` 或 Capacitor 生成的 Gradle 接线。
-- CloudBase 函数必须单独部署；微信登录端到端必须使用已登记包名和签名的 release 包验证。
+- CloudBase 函数必须单独部署；Apple/微信登录都必须使用真实提供方账号和已正确签名的真机包做端到端验证。
 
 常用检查：
 
@@ -96,7 +96,7 @@ git diff --check
 - `www/`：Capacitor Web 宿主、持久化/云端/原生编排、纯计算和本地静态库。
 - `android/`：当前 Android 原生工程；同时包含生成接线和必须长期维护的手写源码。
 - `ios/`：可运行的 iOS 原生壳；使用 Swift Package Manager，功能适配尚未完成。
-- `cloudbase/`：微信登录、账户注销、云备份和 AI 顾问云函数。
+- `cloudbase/`：Apple/微信登录、账户注销、云备份和 AI 顾问云函数。
 - `resources/`：App 图标设计源。
 - `flutter/`：已停止并封存的 Flutter 重写成果，不是当前产品主线。
 - `docs/`：法律文本、iOS 主线计划与交接、Flutter 历史存档和上下文工程计划。

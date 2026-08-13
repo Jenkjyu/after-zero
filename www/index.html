@@ -667,6 +667,10 @@
   .login-gate.open { display: flex; }
   .login-gate-inner { max-width: 340px; width: 100%; text-align: center; }
   .gate-purpose { color: var(--text-muted); font-size: 13px; line-height: 1.55; margin: -6px 8px 18px; }
+  .login-gate .data-actions { flex-direction: column; }
+  .apple-login-btn { background: #000; color: #fff; border-color: #000; }
+  .apple-login-btn:active { background: #1c1c1e; }
+  .apple-login-logo { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 20px; line-height: 1; }
 
   .gate-icon { display: flex; justify-content: center; margin-bottom: 14px; }
   .gate-icon img { width: 108px; height: 108px; object-fit: cover; border-radius: 22px; border: 1px solid var(--border); }
@@ -1385,6 +1389,7 @@
     </svg>
     <p class="gate-purpose" id="loginPurpose">登录后可使用需要云端身份的功能；本地账本不会自动上传。</p>
     <div class="data-actions" style="margin:0">
+      <button class="btn apple-login-btn" id="appleLoginBtn" hidden><span class="apple-login-logo" aria-hidden="true"></span>通过 Apple 登录</button>
       <button class="btn primary" id="wxLoginBtn"><svg class="btn-ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 0 1 .598.082l1.584.926a.272.272 0 0 0 .14.047c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 0 1-.023-.156.49.49 0 0 1 .201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.837-6.656-6.088V8.89c-.135-.01-.27-.027-.407-.03zm-2.53 3.274c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.97-.982zm4.844 0c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.969-.982z"/></svg>微信登录</button>
       <button class="btn ghost" id="loginCancelBtn">继续本地使用</button>
     </div>
@@ -1529,11 +1534,29 @@
   var UPLOAD_ALLOWED_EXT = ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "bmp", "pdf", "md", "markdown", "doc", "docx"];
 
   function loadJSON(k, seed) { try { var r = localStorage.getItem(k); if (r) return JSON.parse(r); } catch (e) {} return clone(seed); }
+  function normalizeAccount(value) {
+    if (!value || typeof value !== "object") return null;
+    var provider = value.provider || (value.openid ? "wechat" : null);
+    var userId = value.userId || value.openid || "";
+    if (!provider || !userId) return null;
+    var providers = Array.isArray(value.providers) && value.providers.length
+      ? value.providers.slice()
+      : [provider === "unified" ? "wechat" : provider];
+    return Object.assign({}, value, {
+      userId: userId,
+      provider: provider,
+      providers: providers,
+      nickname: value.nickname || "",
+      avatarUrl: value.avatarUrl || "",
+      loggedInAt: Number(value.loggedInAt) || 0,
+    });
+  }
   function saveAll() { try { localStorage.setItem(KEY, JSON.stringify(debts)); localStorage.setItem(DKEY, JSON.stringify(docs)); } catch (e) {} }
 
   var debts = loadJSON(KEY, SEED);
   var docs = loadJSON(DKEY, DOCS_SEED);
-  var account = loadJSON(ACCOUNT_KEY, null);
+  var account = normalizeAccount(loadJSON(ACCOUNT_KEY, null));
+  if (account) localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
   var notify = loadJSON(NOTIF_KEY, { enabled: false, rules: [] });
   function saveNotify() { try { localStorage.setItem(NOTIF_KEY, JSON.stringify(notify)); } catch (e) {} window.dispatchEvent(new CustomEvent("az:state-changed")); }
   // 新装必须是空数据：默认 premium 为 null，即"普通用户"。
@@ -1992,6 +2015,11 @@
     if (account) return Promise.resolve(true);
     if (pendingLoginPromise) return pendingLoginPromise;
     $("loginPurpose").textContent = purpose || "登录后可使用需要云端身份的功能；本地账本不会自动上传。";
+    var platform = window.Capacitor && typeof window.Capacitor.getPlatform === "function"
+      ? window.Capacitor.getPlatform()
+      : "web";
+    $("appleLoginBtn").hidden = platform !== "ios";
+    $("wxLoginBtn").hidden = platform !== "android";
     var gate = $("loginGate");
     gate.setAttribute("aria-hidden", "false");
     gate.classList.add("open");
@@ -2379,19 +2407,22 @@
   }
 
   var wxAuthListenerBound = false;
-  function handleWxAuthResult(data) {
-    if (!data.stateOk) { toast("授权状态校验失败，请重试"); finishCloudLoginPrompt(false); return; }
-    if (data.errCode !== 0 || !data.code) { toast("微信授权已取消或失败"); finishCloudLoginPrompt(false); return; }
-    toast("登录中…");
+  var pendingWeChatCredential = null;
+  function signInWithCloudTicket(functionName, data, fallbackProvider) {
     var pendingLoginResult = null;
     var auth = cbAuth();
-    // 全新设备/App从没建立过任何登录态时，SDK内部_getCredentials()对着null读.scope会直接崩溃
-    // （SDK自身的判空顺序bug：先用后判）。用一次匿名登录垫底写入本地凭证，绕开这个坑。
-    Promise.resolve(auth.signInAnonymously ? auth.signInAnonymously().catch(function () {}) : null).then(function () {
+    // CloudBase JS SDK在全新安装没有任何凭证时会在_getCredentials()里先读取null.scope。
+    // 匿名登录只用于两种主动登录流程换取自定义票据，不代表本地模式已登录，也不能被
+    // AI、备份或注销执行层复用。
+    return Promise.resolve(auth.signInAnonymously ? auth.signInAnonymously().catch(function () {}) : null).then(function () {
       return auth.setCustomSignFunc(function () {
-        return cbApp().callFunction({ name: "wxLogin", data: { code: data.code } }).then(function (res) {
+        return cbApp().callFunction({ name: functionName, data: data }).then(function (res) {
           var result = res && res.result;
-          if (!result || !result.ok) throw new Error((result && result.error) || "登录失败");
+          if (!result || !result.ok) {
+            var error = new Error((result && result.error) || "登录失败");
+            error.code = result && result.code;
+            throw error;
+          }
           pendingLoginResult = result;
           return result.ticket;
         });
@@ -2399,14 +2430,153 @@
     }).then(function () {
       return auth.signInWithCustomTicket();
     }).then(function () {
-      account = { openid: pendingLoginResult.openid, nickname: pendingLoginResult.nickname, avatarUrl: pendingLoginResult.avatarUrl, loggedInAt: Date.now() };
+      var resultAccount = pendingLoginResult && pendingLoginResult.account;
+      if (!resultAccount && fallbackProvider === "wechat") {
+        resultAccount = {
+          userId: pendingLoginResult.userId || pendingLoginResult.openid,
+          provider: "wechat",
+          providers: ["wechat"],
+          openid: pendingLoginResult.openid,
+          nickname: pendingLoginResult.nickname,
+          avatarUrl: pendingLoginResult.avatarUrl,
+          loggedInAt: Date.now(),
+        };
+      }
+      account = normalizeAccount(resultAccount);
+      if (!account) throw new Error("登录成功但账户资料无效");
       localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
       renderAccountUI();
       finishCloudLoginPrompt(true);
       toast("登录成功 ✓");
-    }).catch(function (err) {
+      return true;
+    });
+  }
+
+  function handleWxAuthResult(data) {
+    if (data && data.mode && data.mode !== "login") {
+      var pending = pendingWeChatCredential;
+      pendingWeChatCredential = null;
+      if (!pending || pending.mode !== data.mode) return;
+      if (!data.stateOk) { pending.reject(new Error("微信授权状态校验失败，请重试")); return; }
+      if (data.errCode !== 0 || !data.code) { pending.reject(new Error("微信授权已取消或失败")); return; }
+      pending.resolve({ provider: "wechat", code: data.code });
+      return;
+    }
+    if (!data.stateOk) { toast("授权状态校验失败，请重试"); finishCloudLoginPrompt(false); return; }
+    if (data.errCode !== 0 || !data.code) { toast("微信授权已取消或失败"); finishCloudLoginPrompt(false); return; }
+    toast("登录中…");
+    signInWithCloudTicket("wxLogin", { code: data.code }, "wechat").catch(function (err) {
       finishCloudLoginPrompt(false);
       toast("登录失败：" + ((err && err.message) || "网络错误"));
+    });
+  }
+
+  function appleCredential(mode) {
+    var native = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppleLogin;
+    if (!native) return Promise.reject(new Error("Apple 登录仅支持 iOS App 内使用"));
+    return native.login({ mode: mode || "login" }).then(function (credential) {
+      if (!credential || !credential.identityToken || !credential.rawNonce) {
+        throw new Error("Apple 未返回完整登录凭证");
+      }
+      return {
+        provider: "apple",
+        identityToken: credential.identityToken,
+        rawNonce: credential.rawNonce,
+        fullName: credential.fullName || "",
+      };
+    });
+  }
+
+  function startAppleLogin() {
+    toast("正在打开 Apple 登录…");
+    appleCredential("login").then(function (credential) {
+      toast("登录中…");
+      return signInWithCloudTicket("appleLogin", {
+        identityToken: credential.identityToken,
+        rawNonce: credential.rawNonce,
+        fullName: credential.fullName,
+      }, "apple");
+    }).catch(function (err) {
+      finishCloudLoginPrompt(false);
+      if (err && err.code === "APPLE_LOGIN_CANCELLED") {
+        toast("已取消");
+      } else {
+        toast("Apple 登录失败：" + ((err && err.message) || "网络错误"));
+      }
+    });
+  }
+
+  function weChatCredential(mode) {
+    var native = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.WeChatLogin;
+    if (!native) return Promise.reject(new Error("微信登录仅支持原生 App 内使用"));
+    if (pendingWeChatCredential) return Promise.reject(new Error("微信授权正在进行中"));
+    return native.isInstalled().then(function (result) {
+      if (!result || !result.installed) throw new Error("请先安装微信");
+      if (!wxAuthListenerBound) { wxAuthListenerBound = true; native.addListener("wechatAuthResult", handleWxAuthResult); }
+      return new Promise(function (resolve, reject) {
+        pendingWeChatCredential = { mode: mode, resolve: resolve, reject: reject };
+        native.login({ mode: mode }).then(function () {
+          toast("正在跳转微信授权…");
+        }).catch(function (error) {
+          pendingWeChatCredential = null;
+          reject(error);
+        });
+      });
+    });
+  }
+
+  function credentialForProvider(provider, mode) {
+    if (provider === "apple") return appleCredential(mode);
+    if (provider === "wechat") return weChatCredential(mode);
+    return Promise.reject(new Error("当前账号没有可验证的登录方式"));
+  }
+
+  function saveBoundAccount(nextAccount) {
+    account = normalizeAccount(nextAccount);
+    if (!account) throw new Error("绑定成功但账户资料无效");
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
+    renderAccountUI();
+  }
+
+  function bindCloudIdentity(targetProvider) {
+    if (!account) { toast("请先登录当前云账号"); return Promise.resolve(false); }
+    if (account.providers && account.providers.indexOf(targetProvider) >= 0) {
+      toast("该登录方式已绑定");
+      return Promise.resolve(true);
+    }
+    var currentProvider = account.providers && account.providers[0];
+    if (!currentProvider) { toast("当前账号缺少可验证的登录方式，请先退出后重新登录"); return Promise.resolve(false); }
+    toast("请先验证当前登录方式…");
+    return credentialForProvider(currentProvider, "bind-current").then(function (current) {
+      toast("请授权要绑定的登录方式…");
+      return credentialForProvider(targetProvider, "bind-target").then(function (target) {
+        return cbApp().callFunction({ name: "accountBinding", data: { current: current, target: target } });
+      });
+    }).then(function (response) {
+      var result = response && response.result;
+      if (!result || !result.ok) {
+        if (!result || result.code !== "ACCOUNT_CONFLICT") throw new Error((result && result.error) || "绑定失败");
+        return askAsync("合并云账号", result.error + "\n\n确认后只合并云备份和本月 AI 用量；本机账本不会上传、下载或被覆盖。")
+          .then(function (confirmed) {
+            if (!confirmed) return null;
+            return cbApp().callFunction({ name: "accountBinding", data: { action: "confirmMerge", mergeIntent: result.mergeIntent } })
+              .then(function (confirmResponse) {
+                var confirmedResult = confirmResponse && confirmResponse.result;
+                if (!confirmedResult || !confirmedResult.ok) throw new Error((confirmedResult && confirmedResult.error) || "合并失败");
+                return confirmedResult;
+              });
+          });
+      }
+      return result;
+    }).then(function (result) {
+      if (!result) { toast("已取消合并"); return false; }
+      saveBoundAccount(result.account);
+      toast(result.merged ? "云账号已合并 ✓" : "登录方式已绑定 ✓");
+      return true;
+    }).catch(function (error) {
+      if (error && error.code === "APPLE_LOGIN_CANCELLED") toast("已取消");
+      else toast("绑定失败：" + ((error && error.message) || "网络错误"));
+      return false;
     });
   }
 
@@ -2790,6 +2960,7 @@
       if (err && err.message) toast(err.message);
     });
   });
+  $("appleLoginBtn").addEventListener("click", startAppleLogin);
   $("loginCancelBtn").addEventListener("click", function () { finishCloudLoginPrompt(false); });
   // dlBackupBtn/importFileBtn(react/src/mine/DataCards.tsx里的"下载备份文件"/"上传备份文件"
   // 按钮)已经不在vanilla DOM里了，下载逻辑抽成了上面的downloadBackupFile()、通过桥接调用；
@@ -2881,6 +3052,7 @@
     // 状态变更，留在vanilla私有作用域里，React只调用不重新实现。
     wxLogout: wxLogout,
     requestCloudLogin: requestCloudLogin,
+    bindCloudIdentity: bindCloudIdentity,
     deleteAccount: deleteAccount,
     redeemCode: redeemCode,
     // "注销账户"确认弹窗的第三条路径新增：只清本机storage、不删服务器账户(见定义处的注释)。

@@ -3,13 +3,20 @@ const cloudbase = require("@cloudbase/node-sdk");
 const app = cloudbase.init({ env: cloudbase.SYMBOL_CURRENT_ENV });
 const db = app.database();
 
-// 不信任客户端传来的openid——身份来自已认证会话，doc本身归属谁靠这里显式核对
-// record.openid === customUserId，而不是假设"能传对id就有权限看"（备份记录的_id
+async function isMergedSession(userId) {
+  const result = await db.collection("users").where({ userId }).limit(1).get();
+  const user = result.data && result.data[0];
+  return Boolean(user && user.mergedInto);
+}
+
+// 不信任客户端传来的provider identity——身份来自已认证会话，doc本身归属谁靠这里显式核对
+// (record.userId || legacy record.openid) === customUserId，而不是假设"能传对id就有权限看"（备份记录的_id
 // 本身不是私密凭证，必须在服务端二次校验归属）。
 exports.main = async (event) => {
   const auth = app.auth();
   const { customUserId } = auth.getUserInfo();
   if (!customUserId) return { ok: false, error: "未登录，无法恢复备份" };
+  if (await isMergedSession(customUserId)) return { ok: false, code: "ACCOUNT_MERGED_RELOGIN_REQUIRED", error: "该账号已合并，请重新登录后继续使用" };
 
   const { backupId } = event;
   if (!backupId) return { ok: false, error: "缺少backupId" };
@@ -18,7 +25,7 @@ exports.main = async (event) => {
   const result = await backups.doc(backupId).get();
   if (!result.data || !result.data.length) return { ok: false, error: "备份记录不存在" };
   const record = result.data[0];
-  if (record.openid !== customUserId) return { ok: false, error: "无权访问该备份" };
+  if ((record.userId || record.openid) !== customUserId) return { ok: false, error: "无权访问该备份" };
 
   let files = [];
   if (Array.isArray(record.files) && record.files.length) {

@@ -1,6 +1,6 @@
 ---
 name: cloudbase-deploy
-description: This skill should be used when the user wants to deploy or debug a CloudBase cloud function in this project (wxLogin, deleteAccount, backupCreate, backupList, backupRestore, backupDelete, backupUploadFile, aiAdvisor), or asks about "部署云函数", "tcb fn deploy", "Cannot find module '@cloudbase/node-sdk'", "cloudbaserc.json", or CloudBase environment variable / permission control errors.
+description: This skill should be used when the user wants to deploy or debug a CloudBase cloud function in this project (appleLogin, wxLogin, deleteAccount, backupCreate, backupList, backupRestore, backupDelete, backupUploadFile, aiAdvisor), or asks about "部署云函数", "tcb fn deploy", "Cannot find module '@cloudbase/node-sdk'", "cloudbaserc.json", or CloudBase environment variable / permission control errors.
 ---
 
 # CloudBase 云函数部署
@@ -30,7 +30,8 @@ npx --yes -p @cloudbase/cli tcb fn deploy <函数名> --force
    ```json
    {
      "*": { "invoke": "auth.loginType != 'ANONYMOUS' && auth != null" },
-     "wxLogin": { "invoke": true }
+     "wxLogin": { "invoke": true },
+     "appleLogin": { "invoke": true }
    }
    ```
 
@@ -43,8 +44,11 @@ npx --yes -p @cloudbase/cli tcb fn deploy <函数名> --force
 | 函数 | 作用 | envVariables |
 |---|---|---|
 | `wxLogin` | 微信登录换票据 | `WX_APPID`、`WX_APPSECRET`、`TCB_CUSTOM_LOGIN_*` 三个 |
+| `appleLogin` | 服务端验证Apple identity token并换票据 | `APPLE_CLIENT_ID`、`TCB_CUSTOM_LOGIN_*` 三个 |
 | `deleteAccount` | 注销账户，联动清理云备份 | 无 |
 | `backupCreate`/`backupList`/`backupRestore`/`backupDelete`/`backupUploadFile` | 云备份 | 无 |
 | `aiAdvisor` | AI债务助手，调CloudBase内置大模型 | 无 |
 
-不信任客户端传参是这些函数共同的安全原则——身份一律来自`app.auth().getUserInfo()`读到的已认证会话`customUserId`，不接受客户端自己传的openid/用户id。
+`wxLogin`与`appleLogin`共用同一组CloudBase自定义登录签名凭据；轮换时必须停用旧凭据并成组更新/部署两个函数，私钥不得进入仓库、命令输出或部署日志。`identities`与`appleLoginNonces`集合需在控制台创建为ADMINONLY。
+
+不信任客户端传参是这些函数共同的安全原则——登录函数分别在服务端验证提供方凭证，再映射内部`userId`；其余函数身份一律来自`app.auth().getUserInfo()`读到的已认证会话`customUserId`，不接受客户端自己传的openid、Apple sub或userId。

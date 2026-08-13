@@ -8,7 +8,10 @@ import type { Account } from "../src/types";
 afterEach(() => { closeAccountScreen(); });
 
 const account: Account = {
+  userId: "test-openid",
   openid: "test-openid",
+  provider: "wechat",
+  providers: ["wechat"],
   nickname: "测试昵称",
   avatarUrl: "https://example.com/a.png",
   loggedInAt: 0,
@@ -31,7 +34,7 @@ describe("AccountScreen", () => {
     expect(screen.getByText("仅存本机")).toBeInTheDocument();
   });
 
-  it("本地模式明确展示可用范围，提供微信登录且不显示退出/注销", async () => {
+  it("本地模式明确展示可用范围，提供云账号登录且不显示退出/注销", async () => {
     const bridge = makeMockBridge({ account: null });
     window.__azBridge = bridge;
     render(<AccountScreen />);
@@ -40,18 +43,39 @@ describe("AccountScreen", () => {
     expect(screen.getByText(/债务、还款、统计、档案、通知/)).toBeInTheDocument();
     expect(screen.queryByText("退出登录")).not.toBeInTheDocument();
     expect(screen.queryByText("注销云端账户")).not.toBeInTheDocument();
-    await act(async () => { fireEvent.click(screen.getByText("微信登录云账号")); });
+    await act(async () => { fireEvent.click(screen.getByText("登录云账号")); });
     expect(bridge.requestCloudLogin).toHaveBeenCalledWith(expect.stringContaining("不会自动上传"));
   });
 
   it.each([
-    [{ ...account, provider: "apple" as const }, "Apple 登录"],
+    [{ ...account, provider: "apple" as const, providers: ["apple" as const], openid: undefined, email: "private@example.com" }, "Apple 登录"],
     [{ ...account, provider: "unified" as const }, "统一账号"],
   ])("未来账号形状%#可映射为第三态展示", (value, label) => {
     window.__azBridge = makeMockBridge({ account: value });
     render(<AccountScreen />);
     act(() => { openAccountScreen(); });
     expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
+  it("Apple账号展示服务端确认的邮箱且不渲染空头像", () => {
+    const apple: Account = { userId: "u_1", provider: "apple", providers: ["apple"], nickname: "Apple 用户", avatarUrl: "", email: "relay@example.com", loggedInAt: 1 };
+    window.__azBridge = makeMockBridge({ account: apple });
+    const { container } = render(<AccountScreen />);
+    act(() => { openAccountScreen(); });
+    expect(screen.getByText("relay@example.com")).toBeInTheDocument();
+    expect(container.querySelector(".account-avatar")).toBeNull();
+  });
+
+  it("仅显示尚未绑定的登录方式，并经桥接发起双重授权绑定", async () => {
+    const bridge = makeMockBridge({ account });
+    window.__azBridge = bridge;
+    render(<AccountScreen />);
+    act(() => { openAccountScreen(); });
+    expect(screen.getByText("绑定 Apple")).toBeInTheDocument();
+    expect(screen.queryByText("绑定微信")).not.toBeInTheDocument();
+    await act(async () => { fireEvent.click(screen.getByText("绑定 Apple")); });
+    expect(bridge.bindCloudIdentity).toHaveBeenCalledWith("apple");
+    expect(screen.getByText(/不会改变本机账本/)).toBeInTheDocument();
   });
 
   it("点返回箭头关闭", () => {

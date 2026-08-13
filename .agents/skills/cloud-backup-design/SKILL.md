@@ -21,14 +21,14 @@ description: Use this skill when modifying or debugging After Zero's manual clou
 - `backupCreate` 每用户最多保留 20 条记录、总大小最多 300 MB。写入新记录后按时间从最老开始删除超额记录及其 Storage 文件；单条内容本身超过 300 MB 时拒绝。
 - `backupUploadFile` 只做代理上传，不写数据库；云路径按已认证用户、客户端生成的临时 backup id 和 file id 组织。
 - `backupList` 只投影列表轻量字段并按创建时间倒序返回，不带完整 debts/docs/premium。
-- `backupRestore` 和 `backupDelete` 必须先取文档并验证 `record.openid === customUserId`；记录 id 不是访问凭证。恢复时再把 fileID 换成临时 URL。
+- `backupRestore` 和 `backupDelete` 必须先取文档并验证 `(record.userId || record.openid) === customUserId`；`openid`只兼容旧微信记录，记录 id 不是访问凭证。恢复时再把 fileID 换成临时 URL。
 - `backupDelete` 对不存在记录幂等成功，并删除记录关联 Storage 文件。
 
 ## 身份、权限与注销
 
-- 五个函数只信任 `app.auth().getUserInfo().customUserId`，不接受客户端 openid 作为身份。
-- `backups` 是“一用户多文档”：openid 是普通字段，用 `.where()` 查询；集合需在控制台创建为 ADMINONLY，Storage 也保持私有。
-- 函数调用依赖持久化的自定义登录会话。`ensureCbAuthReady()`对本地模式直接拒绝，五个备份调用都不得建立匿名会话或发出云请求；匿名垫底只允许发生在微信换取自定义票据的登录流程。
+- 五个函数只信任 `app.auth().getUserInfo().customUserId`，不接受客户端openid、Apple sub或userId作为身份。
+- `backups` 是“一用户多文档”：新记录使用普通字段`userId`查询，列表/配额/注销同时兼容旧`openid`字段；集合需在控制台创建为ADMINONLY，Storage也保持私有。
+- 函数调用依赖持久化的自定义登录会话。`ensureCbAuthReady()`对本地模式直接拒绝，五个备份调用都不得建立匿名会话或发出云请求；匿名垫底只允许发生在用户主动发起的登录换票据流程。
 - `deleteAccount` 必须先删除用户全部备份文档和 Storage 文件，再删 `users` 文档。账户语义归 `account-premium-design`。
 - 部署、集合、环境权限或 `@cloudbase/node-sdk` 问题加载 `cloudbase-deploy`。
 

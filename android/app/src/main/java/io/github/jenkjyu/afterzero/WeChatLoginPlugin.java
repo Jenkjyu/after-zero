@@ -23,6 +23,7 @@ public class WeChatLoginPlugin extends Plugin {
 
     private IWXAPI api;
     private String pendingState;
+    private String pendingMode;
 
     public static WeChatLoginPlugin getInstance() {
         return instance;
@@ -50,6 +51,7 @@ public class WeChatLoginPlugin extends Plugin {
         }
 
         pendingState = UUID.randomUUID().toString();
+        pendingMode = call.getString("mode", "login");
 
         SendAuth.Req req = new SendAuth.Req();
         req.scope = "snsapi_userinfo";
@@ -76,7 +78,9 @@ public class WeChatLoginPlugin extends Plugin {
         data.put("errCode", errCode);
         data.put("errMsg", errMsg == null ? "" : errMsg);
         data.put("stateOk", stateOk);
+        data.put("mode", pendingMode == null ? "login" : pendingMode);
         pendingState = null;
+        pendingMode = null;
         notifyListeners("wechatAuthResult", data);
     }
 }
