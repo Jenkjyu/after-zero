@@ -24,7 +24,7 @@ description: "Use this skill when modifying or debugging After Zero's Capacitor 
 
 根`ios/`已在iOS主线步骤1通过一次`npx cap add ios`建立，Bundle ID为`io.github.jenkjyu.afterzero`、最低iOS 15。后续只运行build/sync，不能重复`cap add ios`重建。当前Capacitor 8工程使用Swift Package Manager；`CapApp-SPM/Package.swift`固定`capacitor-swift-pm` 8.4.1，并接入本地`@capacitor/local-notifications`。
 
-步骤3已新增`AppleLoginPlugin.swift`、`AfterZeroBridgeViewController.swift`与`App.entitlements`，并完成无签名模拟器构建；Apple云函数尚未部署，Apple能力/开发签名和真实Apple ID真机端到端尚未验收，因此仍不能写成已支持。iOS微信、文件保存、完整通知策略、购买和发布签名也尚未实现。
+步骤3已新增`AppleLoginPlugin.swift`、`AfterZeroBridgeViewController.swift`与`App.entitlements`，并完成无签名模拟器构建；Apple云函数已部署，但开发签名和真实 Apple ID 真机端到端尚未验收，因此仍不能写成已支持。步骤5已新增并注册`SaveFilePlugin.swift`：iOS 保存/分享代码和模拟器编译已通过，仍须在 iPhone 验收 Files 保存、分享、取消和大文件路径。iOS微信、完整通知策略、购买和发布签名也尚未实现。
 
 ## 区分手写插件与npm插件
 
@@ -51,9 +51,18 @@ iOS手写`AppleLoginPlugin`由storyboard中的`AfterZeroBridgeViewController`在
 
 当前`applicationId`/namespace/appId都是`io.github.jenkjyu.afterzero`，这是更新、微信回调和签名身份的一部分，不要随意改。保持manifest中的`android:allowBackup="false"`、`INTERNET`权限、微信包可见性`queries`和`.wxapi.WXEntryActivity`声明；新安装为空数据依赖`allowBackup=false`不被平台脚手架覆盖。
 
-## 维护 SAF 文件保存
+## 维护双平台文件保存
 
-所有“把文件保存到手机”的Web入口统一调用`www/index.html`的`saveToDeviceDownloads(blob, filename, mime)`：原生环境调用`SaveFile`，桌面浏览器才回退`<a download>`。不要给新的备份、档案或导出按钮直接写`<a download>`，Android WebView里可能没有任何反应。
+所有“把文件保存到手机”的Web入口统一调用`www/index.html`的`saveToDeviceDownloads(blob, filename, mime)`：Android/iOS 原生环境都调用同名的手写`SaveFile`，桌面浏览器才回退`<a download>`。档案分享使用`shareFileFromDevice()`：iOS 调`SaveFile.share()`打开`UIActivityViewController`，其它环境保留 Web Share fallback。不要给新的备份、档案或导出按钮直接写`<a download>`，原生 WebView 里可能没有任何反应。
+
+### iOS：Files 与系统分享
+
+- `SaveFilePlugin.swift`保持`save({data,filename,mimeType})`契约，并额外提供同形状的`share()`；由`AfterZeroBridgeViewController.capacitorDidLoad()`显式注册，新增/改名时同步 Xcode target membership、注册名与 Web 调用。
+- 先将 base64 分块解码到唯一的`temporaryDirectory`文件。`UIDocumentPickerViewController(forExporting:asCopy:)`和`UIActivityViewController`只接收该文件 URL；保存成功、取消、失败及分享完成、取消、失败均清理临时文件。
+- iOS 的`<input type="file">`会调用系统文件选择器，现有 JSON 备份导入和档案上传继续由 Web 宿主的 FileReader/IndexedDB 流程处理；不为此重复建立第二套导入账本逻辑。
+- Files 保存、分享、取消、文件打开和大 PDF/XLSX/接近档案上限的内存表现必须在 iPhone 真机验收。模拟器编译只能验证 Swift、SPM 与插件接线，不能替代这些路径。
+
+### Android：SAF
 
 保持当前SAF架构：
 

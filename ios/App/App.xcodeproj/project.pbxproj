@@ -17,6 +17,7 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		A30000000000000000000001 /* AppleLoginPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000011 /* AppleLoginPlugin.swift */; };
 		A30000000000000000000002 /* AfterZeroBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000012 /* AfterZeroBridgeViewController.swift */; };
+		A50000000000000000000001 /* SaveFilePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50000000000000000000011 /* SaveFilePlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +34,7 @@
 		A30000000000000000000011 /* AppleLoginPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleLoginPlugin.swift; sourceTree = "<group>"; };
 		A30000000000000000000012 /* AfterZeroBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AfterZeroBridgeViewController.swift; sourceTree = "<group>"; };
 		A30000000000000000000013 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		A50000000000000000000011 /* SaveFilePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveFilePlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +73,7 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				A30000000000000000000012 /* AfterZeroBridgeViewController.swift */,
 				A30000000000000000000011 /* AppleLoginPlugin.swift */,
+				A50000000000000000000011 /* SaveFilePlugin.swift */,
 				A30000000000000000000013 /* App.entitlements */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
@@ -171,6 +174,7 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				A30000000000000000000002 /* AfterZeroBridgeViewController.swift in Sources */,
 				A30000000000000000000001 /* AppleLoginPlugin.swift in Sources */,
+				A50000000000000000000001 /* SaveFilePlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

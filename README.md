@@ -6,7 +6,7 @@
 
 当前可用、可发布的产品主线是 **Capacitor + React 的 Android App**，包名为 `io.github.jenkjyu.afterzero`。全新安装默认没有任何债务或档案数据，可直接在本地使用；仅在主动使用 AI 债务助手、云备份等真实云功能时要求登录。
 
-iOS 已建立同一套 Web 产品的 Capacitor 原生壳，可在 iOS 26.5 模拟器编译和冷启动；登录、文件保存、通知、购买和上架尚未闭环，因此当前不能视为可发布 iOS 产品。
+iOS 已建立同一套 Web 产品的 Capacitor 原生壳，可在 iOS 26.5 模拟器编译和冷启动；文件保存/分享代码已完成本机构建，但登录、文件真机验收、通知、购买和上架尚未闭环，因此当前不能视为可发布 iOS 产品。
 
 - `react/src/**` 负责“债务”“还款日”“统计”“我的”四个 tab，以及不属于 tab 的 subpage、sheet 和 screen。Vite 使用 `debts`、`pay`、`report`、`mine`、`sheets` 五个入口。
 - `www/index.html` 是唯一 Web 宿主，保留全局 CSS、tabbar、登录门、共享确认框、隐藏导入 input、localStorage/IndexedDB、CloudBase 和原生能力编排；财务计算集中在 `www/js/calc.js`。
@@ -23,7 +23,7 @@ iOS 已建立同一套 Web 产品的 Capacitor 原生壳，可在 iOS 26.5 模�
 
 当前正按“Capacitor + React 双平台”方向实施 iOS 扩展，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 2 的本地优先登录门已通过检查；步骤 3 已完成 Apple 登录、内部 `userId`、旧微信兼容和相关云函数的本地代码，并通过双平台构建及 iOS 模拟器冷启动。
 
-步骤 3 的 CloudBase 部署、凭据轮换和 Apple 能力配置已完成，仍差 iPhone 真机验收。用户已允许步骤 4 先行实现：微信开放平台 iOS 配置正在审核，账户绑定/合并代码已完成本地验证，仍须接入官方 iOS SDK、部署新增云函数并以真机验收。当前发布版本仍不能使用 iOS Apple/微信登录，iOS 也仍不是可发布产品；步骤 5 及后续文件、通知、购买和上架未获授权。权威范围与恢复动作见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
+步骤 3 的 CloudBase 部署、凭据轮换和 Apple 能力配置已完成，仍差 iPhone 真机验收。用户已允许步骤 4 与步骤 5 先行实现：微信开放平台 iOS 配置正在审核，账户绑定/合并仍须接入官方 iOS SDK、部署新增云函数并以真机验收；iOS `SaveFile` 已完成临时文件、系统“另存为”和系统分享面板代码及本机构建，仍须在 iPhone 验收保存、分享、取消和大文件路径。当前发布版本仍不能使用 iOS Apple/微信登录，iOS 也仍不是可发布产品；通知、购买和上架尚未授权。权威范围与恢复动作见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
 
 ## Flutter 重写（已停止并封存）
 

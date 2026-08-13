@@ -1981,6 +1981,28 @@
       toast((err && err.message) || "保存失败");
     });
   }
+  function shareFileFromDevice(blob, filename, mime) {
+    var capacitor = window.Capacitor;
+    var native = capacitor && capacitor.Plugins && capacitor.Plugins.SaveFile;
+    // iOS uses the handwritten native plugin so sharing always goes through the
+    // system activity sheet. Android keeps the existing browser/Web Share fallback.
+    if (native && capacitor.getPlatform && capacitor.getPlatform() === "ios") {
+      return blobToDataURL(blob).then(function (dataURL) {
+        var base64 = String(dataURL).split(",")[1] || "";
+        return native.share({ data: base64, filename: filename, mimeType: mime || "application/octet-stream" });
+      }).then(function () {
+        toast("已分享");
+      }).catch(function (err) {
+        toast((err && err.message) || "分享失败");
+      });
+    }
+    var file = new File([blob], filename, { type: mime || blob.type });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      return navigator.share({ files: [file], title: filename }).catch(function () {});
+    }
+    toast("此设备不支持分享，可先下载后用其他应用打开");
+    return Promise.resolve();
+  }
   // bindFileDownload()已删除——原来给renderFiles()每一行按钮绑点击监听器用，第九步(档案库)
   // 迁移React后，下载按钮的点击直接由React调用downloadArchiveFile(id)触发，不需要这层
   // DOM绑定辅助函数了。
@@ -2774,12 +2796,7 @@
     }).catch(function () { /* IndexedDB unavailable in this browser/context — upload UI still works per-session via in-memory list until reload */ });
   }
   function tryShareFile(it) {
-    var file = new File([it.blob], it.name, { type: it.mime || it.blob.type });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], title: it.name }).catch(function () {});
-    } else {
-      toast("此设备不支持分享，可长按预览区尝试保存");
-    }
+    return shareFileFromDevice(it.blob, it.name, it.mime || it.blob.type);
   }
 
   // fileItems()/renderFiles()/renderDocContent()都已删除——第九步(档案库)迁移React后，
