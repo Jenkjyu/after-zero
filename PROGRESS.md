@@ -3072,3 +3072,11 @@ PDF字体经历了一次有价值的测试拦截：先下载的Noto OTF在`pdf`�
 - 按用户要求去掉直接购买提示末尾的句号，实际文案为“原账号已购买过Premium会员，请点“恢复购买””。将 Debug/Release 的 `CURRENT_PROJECT_VERSION` 升为 `3`，归档版本核对为 `1.0 (3)`。
 - `npm test` 141/141、React 测试 373/373、TypeScript、`npx cap sync ios` 和 `git diff --check` 通过；iOS Release Archive 成功。
 - `1.0 (3)` 已用 Apple Distribution 上传至 App Store Connect，Xcode 返回 `Upload succeeded`、`Uploaded App`、`EXPORT SUCCEEDED`。只创建 TestFlight 候选，未提交审核或公开发布；步骤 8 仍进行中，未提交或推送 Git。
+
+## 2026-08-21（续3）：步骤 9 App Store Connect 元数据与审核信息整理
+
+- 用户已在 App Store Connect 上传 iPhone 6.5 英寸截图；当前先完成其他元数据，宣传式截图设计留到最后再处理。
+- 已整理并准备填写简体中文副标题、描述、关键词和版权信息：版权字段使用 `2026 余健聪`，不填写 `©` 或网址；营销网址可暂留空，技术支持网址和隐私政策 URL 仍需提供可公开访问的真实页面后补齐。
+- 已确认“路由 App 覆盖地区文件”只适用于提供路线导航的 App，After Zero 不上传 `.geojson` 文件，保持为空。
+- App 审核信息按当前版本实际行为整理：未登录时仅可使用债务页；还款日、统计、AI、云备份及备份文件导入导出需要登录并经过 Premium 门禁。iOS 审核使用“通过 Apple 登录”，不提供个人 Apple ID 或密码；首次登录可获得 7 天 Premium 体验。审核备注将说明登录路径，并准备将测试备份 JSON 压缩为 ZIP 作为审核附件，供审核员登录后从第 4 个 Tab 的“上传备份文件”导入。
+- 当前仍待：完成 App Store Connect 未填元数据、上传审核附件、最终确认 App Privacy/年龄评级/内容权利/出口合规和审核构建信息；未提交 App 审核、未公开发布，步骤 10 未开始。
