@@ -3028,3 +3028,12 @@ PDF字体经历了一次有价值的测试拦截：先下载的Noto OTF在`pdf`�
 - 用户明确决定：iOS 是产品发布主线；Android 降为仅供内部测试的通道，不承诺 Google Play 发布。
 - 因此，Android 旧微信、SAF、通知与交互回归不再阻塞 iOS 步骤完成、TestFlight 或 App Store；共享代码仍需完成受影响测试、TypeScript、React build 与 iOS 构建验证，Android 原生改动或发放内测包前再做针对性 Android 构建和冒烟。
 - 已同步 `AGENTS.md`、README 与 iOS 计划/交接；本条仅改变项目门禁和文档，不修改产品代码或 Flutter 封存边界。未暂存、提交或推送。
+
+## 2026-08-20：步骤 8 Apple Server Notifications V2 已部署，等待 iPhone 验收
+
+- App Store Connect 的付费 App 协议、银行与税务资料均已有效；非消耗型商品 `io.github.jenkjyu.afterzero.premium` 已配置为中国大陆 ¥28，仍是“准备提交”。Sandbox 测试账号已存在。
+- 新增 `appStoreNotifications` CloudBase HTTP 函数，验证 Apple 通知 JWS、校验本 App/商品、以通知 UUID 在 `premiumNotificationEvents`（ADMINONLY）去重，并处理 `REFUND`/`REVOKE` 撤销与 `REFUND_REVERSED` 恢复。`premiumEntitlement` 和账户绑定合并逻辑同时保护已撤销交易不被重新授予权益。
+- `appStoreNotifications` 与更新后的 `premiumEntitlement` 已用安装依赖方式部署；本机受控部署配置设置 `APPLE_APP_STORE_ID=6801229132`，不提交。HTTP 网关路由为 `/apple/storekit/notifications`，映射到 `appStoreNotifications`；跨域、路径透传、网关身份认证均关闭。外部空 POST 已收到预期 `400 SIGNED_PAYLOAD_REQUIRED`。
+- App Store Connect 已把生产、沙盒服务器通知 URL 都设为该网关地址。当前 Apple UI 仅要求填写 URL；代码按 V2 签名通知处理。
+- 验证：`npm test` 136/136、`git diff --check` 通过；云函数受控直调返回预期 `LOGIN_REQUIRED` 与 `405 METHOD_NOT_ALLOWED`，未暴露权益接口。
+- 用户暂时没有 iPhone，因此尚未进行实际 Sandbox 购买、取消/失败、恢复购买、换机、退款/撤销以及 Apple 实际通知投递验收。步骤 8 保持进行中；不进入步骤 9。本条按用户授权后提交，不推送。

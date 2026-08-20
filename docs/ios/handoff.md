@@ -9,9 +9,9 @@
 - 当前步骤：步骤 8“StoreKit Premium、恢复购买与服务端权益”进行中；步骤 3、5、6、7 的 iOS 验收已完成。
 - 当前状态：步骤 3、5、6、7 的 iPhone 集中验收已通过。步骤 4 的微信开放平台审核、官方 iOS SDK、CloudBase 函数/私有集合和 iPhone Apple→微信绑定均已通过；仍待其余 iOS 账户组合及合并后备份可见性。Android 回归改列内部测试，不阻塞 iOS 发布。
 - 上一步：步骤 2 已批准
-- 下一步骤：完成步骤 8 的云端部署、App Store Connect 配置和 iPhone StoreKit 验收后停止等待检查；不得进入步骤 9
+- 下一步骤：完成步骤 8 的 iPhone StoreKit 验收后停止等待检查；CloudBase 部署和 App Store Connect 通知 URL 已于 2026-08-20 配置；不得进入步骤 9
 - 下一步骤授权：用户已于 2026-08-13 明确授权开始步骤 8；不授权步骤 9 或后续范围
-- Git 操作：用户已于 2026-08-13 分别明确授权提交步骤 3/4 改动，以及记录进度、提交并推送当前验证通过的步骤 7 改动；除此之外后续不得自行提交、推送或创建 PR
+- Git 操作：用户已于 2026-08-13 分别明确授权提交步骤 3/4 改动，以及记录进度、提交并推送当前验证通过的步骤 7 改动；用户于 2026-08-20 明确授权记录本次步骤 8 通知改动并提交，但未授权推送；除此之外后续不得自行提交、推送或创建 PR
 - Flutter：继续停止并封存；本计划只处理根 Capacitor + React 主线
 
 ## 用户已确认的长期决策
@@ -41,7 +41,7 @@
 - 当前通知计算未来 6 个月：Android 最多提交 450 条，iOS 最多提交 63 条正式提醒并为测试通知保留一个槽位。iOS 配置已启用前台 sound/banner/list，正式/测试通知均不发送 Android 专属字段；iPhone 真机已验收，Android 仍待回归。
 - 当前 Android 有四个手写 Java 类；iOS 已新增 `AppleLoginPlugin.swift`、`WeChatLoginPlugin.swift`、`SaveFilePlugin.swift` 与 `AfterZeroBridgeViewController.swift`，以后仍按能力逐项实现，不机械复制 Android 四个类。
 - 步骤 3 已建立 provider-neutral 内部 `userId` 与 `identities` 映射：旧微信用户惰性保持 `userId === openid`，Apple 新用户使用随机内部 id。相关 CloudBase 函数已部署，`identities` 与 `appleLoginNonces` 已创建为 ADMINONLY；iPhone Apple 真机闭环已通过，仍不能以此替代 Android 旧微信账号回归。
-- 当前 Premium 是本地状态和买断占位，尚无 StoreKit 或可信服务端购买权益。步骤 8 才会闭环；不能把当前本地 Premium 描述成跨设备账号权益。
+- 当前 Premium 已有 StoreKit 2 客户端和 CloudBase 服务端权益验证；`premiumEntitlement` 与 App Store Server Notifications 接收器均已部署。真实购买、恢复、换机及退款/撤销仍未在 iPhone 完成验收，不能描述为已发布或已闭环的跨设备权益。
 
 ## 步骤 0 本轮变更
 
@@ -249,3 +249,13 @@
 - iOS 原生 `UIScreenEdgePanGestureRecognizer` 已接入左侧边缘返回，继续禁用 WebView 网页历史手势。账户、Premium、关于、档案、AI 等最上层全屏 subpage 会随手指实时右移；松手超过 35% 或快速右甩时，沿既有 `__handleBackButton()` 链关闭，未达到阈值则回弹。首页、登录门、确认框和底部 sheet 不响应此手势，避免绕过层级或与表单/横滑冲突。React 45 文件/373 项、TypeScript、React build、Android/iOS sync、`git diff --check` 以及开发签名 iPhone 构建/安装/启动均通过；仍待用户真机手势验收。
 - iOS 26 的底栏使用原生 `UIGlassEffect` 作为悬浮玻璃外壳，但没有采用 SF Symbols 或系统选中胶囊：四个图标按原 Web SVG 的形状重绘，选中态仍仅为原来的实心/强调色。触点经 WK 消息桥调用原 Web tab 按钮，因此 Premium 门禁、既有切换逻辑和“我的”的实际 `data` 路由保持不变；登录门、全屏 subpage、sheet、确认框打开时原生栏自动隐藏。栏体每侧比此前 Web 样式收窄 8pt。iOS 25 及以下继续使用 Web 浮动玻璃降级样式，Android/浏览器也保留该样式并去除选中态色块。React 45 文件/373 项、TypeScript、React build、iOS sync、`git diff --check`与开发签名 iPhone 构建、安装、启动通过，待用户真机目视确认。
 - 设备构建首次暴露 `StoreKitPremiumPlugin.swift` 对 StoreKit 验证结果 JWS 的错误读取及可选缓存参数处理；已改为从验证结果传递 JWS，并正确解包缓存字典。已用开发签名构建并安装到连接的 iPhone；冷启动命令因设备锁屏被系统拒绝，需解锁后由用户打开确认。
+
+## 2026-08-20：步骤 8 App Store Server Notifications V2 接入与外部配置
+
+- 新增独立的公开 HTTP 云函数 `appStoreNotifications`，不公开 `premiumEntitlement`。它使用 Apple App Store Server Library 验证通知的 JWS、校验 Bundle ID `io.github.jenkjyu.afterzero` 和商品 ID `io.github.jenkjyu.afterzero.premium`，并用 `premiumNotificationEvents` 的通知 UUID 去重。
+- `REFUND`/`REVOKE` 会将对应服务端权益标为已撤销；`REFUND_REVERSED` 会恢复已付费权益；测试及无权益变化通知只记录并安全忽略。`premiumEntitlement` 现在会拒绝被撤销的交易重新授予权益；账户合并也不会把已撤销 App Store 权益变成体验权益。
+- CloudBase 已创建 `premiumNotificationEvents` 并设为 ADMINONLY；`appStoreNotifications` 和更新后的 `premiumEntitlement` 均以安装函数依赖的方式部署。受控本机部署配置中已设置 `APPLE_APP_STORE_ID=6801229132`，该配置不提交仓库。
+- HTTP 网关路由已启用：`https://after-zero-d7gub5p5f09c8cc2d-1454845992.ap-shanghai.app.tcloudbase.com/apple/storekit/notifications` → `appStoreNotifications`。路由关闭跨域、路径透传和网关身份认证，外部空 POST 返回预期 `400 SIGNED_PAYLOAD_REQUIRED`，说明路径已连通而不会接受伪造通知。
+- App Store Connect 已为生产和沙盒环境设置上述同一 URL。非消耗型商品 `io.github.jenkjyu.afterzero.premium` 的中国大陆价格为 ¥28，仍处于“准备提交”，尚未随新 App 版本送审。
+- 代码验证：`npm test` 136/136 通过，`git diff --check` 通过；云函数直调分别返回预期的 `LOGIN_REQUIRED`（`premiumEntitlement`）和 `405 METHOD_NOT_ALLOWED`（`appStoreNotifications`）。
+- 当前阻塞：用户暂时没有 iPhone，尚未用 Sandbox 完成真实购买、取消/失败、恢复购买、换机与退款/撤销通知验收。步骤 8 保持进行中，步骤 9 未开始且未获授权。

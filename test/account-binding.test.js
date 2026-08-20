@@ -111,3 +111,24 @@ test("账户合并保留双方备份、迁移身份、封顶当月 AI 用量且�
   assert.equal(retry.merged, true);
   assert.equal(db.record("aiUsage", "usage-target-aug").count, AI_MONTHLY_LIMIT);
 });
+
+test("账户合并不会把已退款的 Apple 买断权益恢复成体验或已购", async () => {
+  const db = mergeDb({
+    users: [
+      { _id: "target-doc", userId: "u_target", providers: ["apple"] },
+      { _id: "source-doc", userId: "u_source", providers: ["wechat"] },
+    ],
+    identities: [], backups: [], aiUsage: [],
+    premiumEntitlements: [
+      { _id: "u_target", userId: "u_target", kind: "trial", trialEndsAt: 999, appAccountTokens: ["target-token"] },
+      { _id: "u_source", userId: "u_source", kind: "expired", source: "appStore", revokedAt: 10, transactionId: "t-1", appAccountTokens: ["source-token"] },
+    ],
+  });
+  await mergeAccounts(db, { currentUserId: "u_target", otherUserId: "u_source", provider: "wechat", now: 100 });
+  const entitlement = db.record("premiumEntitlements", "u_target");
+  assert.equal(entitlement.kind, "expired");
+  assert.equal(entitlement.source, "appStore");
+  assert.equal(entitlement.revokedAt, 10);
+  assert.deepEqual(entitlement.appAccountTokens.sort(), ["source-token", "target-token"]);
+  assert.equal(db.record("premiumEntitlements", "u_source"), undefined);
+});

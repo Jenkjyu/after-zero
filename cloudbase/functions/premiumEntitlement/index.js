@@ -146,6 +146,12 @@ async function verifyTransaction(userId, jws, now, allowAccountRecovery) {
   const result = await db.runTransaction(async (transaction) => {
     const transactionRef = transaction.collection("premiumTransactions").doc(transactionId);
     const claimed = firstDocument(await transactionRef.get());
+    // Apple 的退款/撤销通知可能先于客户端重试抵达。无论通知先后，已撤销交易都不能重新授予权益。
+    if (claimed && claimed.status === "revoked") {
+      const error = new Error("该购买已退款或被撤销");
+      error.code = "STOREKIT_REVOKED";
+      throw error;
+    }
     if (claimed && claimed.userId && claimed.userId !== userId && !ownsTransaction && !deletedPurchase) {
       const error = new Error("该 Apple 购买已绑定到其他 After Zero 账号");
       error.code = "STOREKIT_TRANSACTION_ALREADY_CLAIMED";
@@ -160,6 +166,8 @@ async function verifyTransaction(userId, jws, now, allowAccountRecovery) {
       purchaseDate: decoded.purchaseDate || now,
       appAccountToken: transactionToken,
       source: "appStore",
+      status: "active",
+      revokedAt: null,
       verifiedAt: now,
     });
     const next = {
