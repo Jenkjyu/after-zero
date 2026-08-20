@@ -20,7 +20,7 @@
 		A50000000000000000000001 /* SaveFilePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50000000000000000000011 /* SaveFilePlugin.swift */; };
 		C80000000000000000000001 /* StoreKitPremiumPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C80000000000000000000011 /* StoreKitPremiumPlugin.swift */; };
 		B41000000000000000000001 /* WeChatLoginPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B41000000000000000000011 /* WeChatLoginPlugin.swift */; };
-		B41000000000000000000002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B41000000000000000000012 /* PrivacyInfo.xcprivacy */; };
+		D90000000000000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D90000000000000000000011 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,7 +40,7 @@
 		A50000000000000000000011 /* SaveFilePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveFilePlugin.swift; sourceTree = "<group>"; };
 		C80000000000000000000011 /* StoreKitPremiumPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitPremiumPlugin.swift; sourceTree = "<group>"; };
 		B41000000000000000000011 /* WeChatLoginPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeChatLoginPlugin.swift; sourceTree = "<group>"; };
-		B41000000000000000000012 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = WechatOpenSDK/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		D90000000000000000000011 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -80,7 +80,7 @@
 				A30000000000000000000012 /* AfterZeroBridgeViewController.swift */,
 				A30000000000000000000011 /* AppleLoginPlugin.swift */,
 				B41000000000000000000011 /* WeChatLoginPlugin.swift */,
-				B41000000000000000000012 /* PrivacyInfo.xcprivacy */,
+				D90000000000000000000011 /* PrivacyInfo.xcprivacy */,
 				A50000000000000000000011 /* SaveFilePlugin.swift */,
 				C80000000000000000000011 /* StoreKitPremiumPlugin.swift */,
 				A30000000000000000000013 /* App.entitlements */,
@@ -170,7 +170,7 @@
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
-				B41000000000000000000002 /* PrivacyInfo.xcprivacy in Resources */,
+				D90000000000000000000001 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -328,7 +328,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = RYU53AS626;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
@@ -355,7 +355,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = RYU53AS626;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;

@@ -21,11 +21,11 @@ iOS 体验结束且未购买时，仍可使用“债务”tab 的本地功能；
 
 更细的开发边界、硬规则和按任务加载的知识入口见 [`AGENTS.md`](AGENTS.md) 与 [`.agents/skills/`](.agents/skills/)。
 
-## iOS 发布主线（步骤 8 进行中）
+## iOS 发布主线（步骤 8 未闭环；步骤 9 例外进行中）
 
-当前以 iOS 为发布主线，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 3～7 的 iPhone 验收已完成；步骤 8 正在完成 StoreKit、恢复购买、服务端权益与 App Store 发布准备。
+当前以 iOS 为发布主线，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 3～7 的 iPhone 验收已完成；步骤 8 正在完成 StoreKit、恢复购买与服务端权益，步骤 9 已按例外授权开始进行签名、隐私、合规和 TestFlight 候选准备。
 
-Android 的登录、文件、通知和交互回归改为内部测试清单，不再阻塞 iOS 的 TestFlight 或 App Store 发布；共享代码仍保持基础构建验证。当前 iOS 的剩余关键项是 StoreKit 真机购买/恢复等场景、App Store Connect 配置、签名合规和上架材料。权威范围与恢复动作见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
+Android 的登录、文件、通知和交互回归改为内部测试清单，不再阻塞 iOS 的 TestFlight 或 App Store 发布；共享代码仍保持基础构建验证。当前 iOS 的剩余关键项是 StoreKit 真机购买/恢复等场景、签名合规、App Store Connect 配置和上架材料。步骤 9 的当前检查见 [`docs/ios/release-readiness.md`](docs/ios/release-readiness.md)，权威范围与恢复动作见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
 
 ## Flutter 重写（已停止并封存）
 

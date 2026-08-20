@@ -2437,6 +2437,7 @@
       return native.purchase({ productId: PREMIUM_PRODUCT_ID, appAccountToken: premium.premium.appAccountToken });
     }).then(verifyStoreKitTransaction).catch(function (err) {
       if (err && /cancelled|取消/i.test(err.message || "")) return false;
+      if (err && err.code === "STOREKIT_ACCOUNT_MISMATCH") { toast("原账号已购买过Premium会员，请点“恢复购买”"); return false; }
       toast("购买未完成：" + ((err && err.message) || "请重试")); return false;
     });
   }

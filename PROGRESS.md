@@ -3037,3 +3037,38 @@ PDF字体经历了一次有价值的测试拦截：先下载的Noto OTF在`pdf`�
 - App Store Connect 已把生产、沙盒服务器通知 URL 都设为该网关地址。当前 Apple UI 仅要求填写 URL；代码按 V2 签名通知处理。
 - 验证：`npm test` 136/136、`git diff --check` 通过；云函数受控直调返回预期 `LOGIN_REQUIRED` 与 `405 METHOD_NOT_ALLOWED`，未暴露权益接口。
 - 用户暂时没有 iPhone，因此尚未进行实际 Sandbox 购买、取消/失败、恢复购买、换机、退款/撤销以及 Apple 实际通知投递验收。步骤 8 保持进行中；不进入步骤 9。本条按用户授权后提交，不推送。
+
+## 2026-08-20（续）：步骤 9 例外授权与本地发布准备
+
+- 用户明确例外授权在步骤 8 StoreKit 真机验收前开始步骤 9；本轮不进入步骤 10，不进行正式发布或自动 Git 操作。
+- 新增 App target 隐私清单 `ios/App/App/PrivacyInfo.xcprivacy`：声明原生 `UserDefaults` 的 `CA92.1` 理由、无追踪，以及实际云端账户身份、账户资料、用户内容和 Premium 购买历史类别。原先被复制进 App Resources 的微信 SDK 同名清单已移出 Resources phase，避免产物重名冲突。
+- `Info.plist` 增加 `ITSAppUsesNonExemptEncryption=false`，并在 `docs/ios/release-readiness.md` 记录这是基于当前源码/依赖的暂定出口合规判断，最终仍需账号持有人在 App Store Connect 确认。
+- `xcodebuild` iPhoneOS generic device `Release`、`CODE_SIGNING_ALLOWED=NO` 构建成功；产物校验确认 Bundle ID `io.github.jenkjyu.afterzero`、版本 `1.0 (1)`、图标、启动资源和单一 App `PrivacyInfo.xcprivacy` 均存在。Simulator 构建因微信静态库仅含真机架构而不能链接，未作为本轮阻塞依据。
+- 初次本地发布准备阶段，受限自动化 shell 的 `security find-identity -v -p codesigning` 为 0，因此当时不能以该 shell 直接 Archive/上传；用户随后在 Xcode 创建了带私钥的 Apple Distribution 证书，后续 Archive、分发重签与上传结果见下一条。App Store Connect 元数据、URL、截图、出口合规最终确认和审核材料仍待补齐。未暂存、提交或推送。
+
+## 2026-08-20（续）：步骤 9 TestFlight 候选已上传，等待 Apple 处理
+
+- 用户在 Xcode 为本机创建新的 Apple Distribution 证书；钥匙串确认该证书下有对应专用私钥。受限自动化 shell 的 `security find-identity` 仍显示 0，但 Xcode 实际签名与导出已验证私钥可用。
+- Xcode 自动签名 Archive 成功；App Store Connect 分发导出后的 IPA 校验为 `Apple Distribution: JIANCONG YU (RYU53AS626)`，Bundle ID 为 `io.github.jenkjyu.afterzero`。归档阶段使用开发签名是自动签名流程的一部分，最终上传包已由 Distribution 重签。
+- `1.0 (1)` 已上传到现有 App Store Connect 记录；Xcode ContentDelivery 最终记录 `UPLOAD SUCCEEDED with no errors`。本次上传未提交 App Store 审核、未公开发布；等待 Apple 处理后再分配 TestFlight 测试者。
+- 剩余：App Store Connect 隐私标签、年龄评级、分类、截图、支持/隐私 URL、出口合规确认和审核材料；TestFlight iPhone 安装与步骤 8 Sandbox 购买、取消/失败、恢复、换机、退款/撤销及服务端通知验收。步骤 10 未开始；未暂存、提交或推送。
+
+## 2026-08-21：TestFlight Sandbox 注销后恢复购买修复
+
+- `1.0 (1)` 已在 Apple 芯片 Mac 的 TestFlight 安装；Sandbox 首次购买成功。随后用户执行“注销账户”、以同一 Apple 登录方式重新登录，再次购买与恢复购买均返回 `STOREKIT_ACCOUNT_MISMATCH`。
+- 再次购买拒绝旧 `appAccountToken` 是防止把已有 Apple 交易自动绑定给新 After Zero 账号的预期保护；“恢复购买”同样失败则是步骤 8 缺陷。原流程只靠注销时保存的身份哈希购买凭据恢复；历史线上删除如果未写入该凭据，便无法恢复。
+- `premiumEntitlement` 新增受限回退：仅在用户主动点击恢复购买、Apple JWS 验签通过且交易未撤销时，才允许从既有 `premiumTransactions` 重新归属；若历史部署故障导致交易账本缺失，则还必须是同一登录身份注销后重建、已被服务端标记为不可重复试用的账号，才可在恢复路径补建。普通购买、新账号、旧账号仍存在或已撤销交易一律继续拒绝，避免权益转移。
+- 新增 `test/premium-recovery.test.js` 覆盖正常保留凭据恢复、历史缺失凭据恢复、未删除账号与已撤销交易拒绝；首次复测进一步发现 CloudBase 查询结果携带只读 `_id`，旧代码展开整份权益文档后写回会报“不能更新 _id 的值”，现已在购买与兑换权益写回前剥离 `_id` 并补回归测试。`npm test` 141/141、`git diff --check` 通过；修正版 `premiumEntitlement` 已带依赖重新部署，无用户会话健康检查返回预期 `LOGIN_REQUIRED`。当前 TestFlight 构建无需重新上传，待用户点击“恢复购买”复测。未暂存、提交、推送或进入步骤 10。
+- 用户确认恢复购买已通过。直接购买遇到旧账号交易时，客户端现显示“原账号已购买过Premium会员，请点“恢复购买”。”；仅匹配 `STOREKIT_ACCOUNT_MISMATCH` 的购买路径，恢复购买与其他失败仍保留原错误。主脚本语法与文案检查通过，并已 `npx cap sync ios`；需在下一个 TestFlight 构建中才会对测试者可见。未暂存、提交、推送或进入步骤 10。
+
+## 2026-08-21（续）：TestFlight `1.0 (2)` 已上传，等待 Apple 处理
+
+- 为使上述提示进入 TestFlight，将 Debug/Release 的 `CURRENT_PROJECT_VERSION` 从 `1` 升为 `2`，归档内版本已核对为 `1.0 (2)`；未改变 Bundle ID、Team、产品或 TestFlight 测试范围。
+- `npm test` 141/141、`git diff --check` 和 `npx cap sync ios` 通过。`xcodebuild` Release 通用 iOS 设备 Archive 成功；随后以 `app-store-connect`、自动签名、Apple Distribution、Team `RYU53AS626` 导出上传，Xcode 输出 `Upload succeeded`、`Uploaded App`、`EXPORT SUCCEEDED`。
+- 上传只创建 TestFlight 候选，未提交审核、未公开发布，也未限制为内部测试；等待 Apple 处理后再在 TestFlight 验证新文案。步骤 8 仍进行中，步骤 10 未开始；未暂存、提交或推送。
+
+## 2026-08-21（续2）：TestFlight `1.0 (3)` 已上传
+
+- 按用户要求去掉直接购买提示末尾的句号，实际文案为“原账号已购买过Premium会员，请点“恢复购买””。将 Debug/Release 的 `CURRENT_PROJECT_VERSION` 升为 `3`，归档版本核对为 `1.0 (3)`。
+- `npm test` 141/141、React 测试 373/373、TypeScript、`npx cap sync ios` 和 `git diff --check` 通过；iOS Release Archive 成功。
+- `1.0 (3)` 已用 Apple Distribution 上传至 App Store Connect，Xcode 返回 `Upload succeeded`、`Uploaded App`、`EXPORT SUCCEEDED`。只创建 TestFlight 候选，未提交审核或公开发布；步骤 8 仍进行中，未提交或推送 Git。

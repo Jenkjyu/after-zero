@@ -1,6 +1,6 @@
 # After Zero iOS 主线实施计划
 
-状态：步骤 0–2 已批准；步骤 3、5、6、7 的本轮 iPhone 验收已完成；步骤 4 的 Apple→微信绑定已通过，其他 iOS 账户组合仍待补齐。步骤 8 的 CloudBase 与 App Store Connect 通知配置已完成，仍待 iPhone StoreKit 真机验收。Android 回归降为内部测试事项，不阻塞 iOS 发布主线。
+状态：步骤 0–2 已批准；步骤 3、5、6、7 的本轮 iPhone 验收已完成；步骤 4 的 Apple→微信绑定已通过，其他 iOS 账户组合仍待补齐。步骤 8 的 CloudBase 与 App Store Connect 通知配置已完成，仍待 iPhone StoreKit 真机验收。用户于 2026-08-20 例外授权提前开始步骤 9；步骤 9 的仓库配置、Apple Distribution 签名及 `1.0 (1)`、`1.0 (2)`、`1.0 (3)` TestFlight 上传已完成，等待 Apple 处理、TestFlight 安装验收与 App Store Connect 元数据。Android 回归降为内部测试事项，不阻塞 iOS 发布主线。
 
 建立日期：2026-08-12
 
@@ -30,6 +30,8 @@
 4. 每一步达到全部验收门槛后，将状态写为“等待用户检查”，更新 [`handoff.md`](handoff.md)、`PROGRESS.md` 和该步涉及的稳定项目文档，然后立即停止。
 5. 用户检查通过只代表该步可标为“已批准”；仍需用户明确指示“开始步骤 N+1”后才能进入下一步。
 6. 未经用户改变指令，不执行 `git add`、`git commit`、`git push`、创建 PR 或发布正式版本。
+
+2026-08-20，用户明确例外授权在步骤 8 的 iPhone StoreKit 验收完成前开始步骤 9。该例外只覆盖步骤 9 的签名、隐私、合规和 TestFlight 候选准备，不改变步骤 8 未闭环事实，不授权步骤 10、正式发布或自动 Git 操作。
 
 ### 原子步骤规则
 
@@ -65,8 +67,8 @@
 | 5 | iOS 文件保存、分享与导入导出闭环 | iOS 验收完成；当前 UI 未暴露档案分享入口，用户确认本轮不阻塞；Android SAF 回归列为内部测试 |
 | 6 | Android/iOS 本地通知双平台闭环 | iOS 验收完成；Android channel、450 条上限与重排列为内部测试 |
 | 7 | iOS WebView、布局、键盘与手势全量适配 | iOS 验收完成；Android 交互回归列为内部测试 |
-| 8 | StoreKit Premium、恢复购买与服务端权益 | 进行中：CloudBase 权益/通知函数、ADMINONLY 去重集合、HTTP 网关与 App Store Connect 生产/沙盒通知 URL 已配置，并完成受控联通验证；待 iPhone 真机 StoreKit 验收 |
-| 9 | 签名、隐私、合规与 TestFlight 发布候选 | 未开始 |
+| 8 | StoreKit Premium、恢复购买与服务端权益 | 进行中：CloudBase 权益/通知函数、ADMINONLY 去重集合、HTTP 网关与 App Store Connect 生产/沙盒通知 URL 已配置；Mac TestFlight Sandbox 首购通过，注销后恢复购买的线上回退已部署待复测，仍待 iPhone 真机 StoreKit 验收 |
+| 9 | 签名、隐私、合规与 TestFlight 发布候选 | 进行中（例外授权）：仓库隐私/发布配置、Apple Distribution 签名和 `1.0 (1)`、`1.0 (2)`、`1.0 (3)` 上传已完成；等待 Apple 处理、TestFlight 安装验收及 App Store Connect 元数据 |
 | 10 | iOS 总回归、Android 内测冒烟与 App Store 首次提交 | 未开始 |
 
 ## 步骤 0：计划、交接与跨 session 门禁

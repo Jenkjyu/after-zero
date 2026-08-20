@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const cloudbase = require("@cloudbase/node-sdk");
 const { Environment, SignedDataVerifier } = require("@apple/app-store-server-library");
+const { deletedPurchaseClaimForUser, withoutDocumentId } = require("./recoveryService");
 
 const app = cloudbase.init({ env: cloudbase.SYMBOL_CURRENT_ENV });
 const db = app.database();
@@ -101,24 +102,13 @@ function decodePayload(jws) {
   return JSON.parse(Buffer.from(normalized, "base64").toString("utf8"));
 }
 
-async function deletedPurchaseClaimForUser(userId, appAccountToken) {
-  const identities = await db.collection("identities").where({ userId }).get();
-  for (const identity of identities.data || []) {
-    const claim = firstDocument(await db.collection("premiumTrialClaims").doc(identity._id).get());
-    const preserved = claim && claim.preservedPremiumEntitlement;
-    if (preserved && preserved.kind === "paid" && (preserved.appAccountTokens || []).includes(appAccountToken)) {
-      return preserved;
-    }
-  }
-  return null;
-}
-
 async function verifyTransaction(userId, jws, now, allowAccountRecovery) {
   if (typeof jws !== "string" || jws.length < 32) {
     const error = new Error("缺少 Apple 交易凭证");
     error.code = "STOREKIT_TRANSACTION_REQUIRED";
     throw error;
   }
+  const currentUser = await getUser(userId);
   const entitlement = await ensureEntitlement(userId, now);
   const decoded = await verifierFor(decodePayload(jws)).verifyAndDecodeTransaction(jws);
   if (decoded.bundleId !== BUNDLE_ID || decoded.productId !== PRODUCT_ID) {
@@ -135,7 +125,7 @@ async function verifyTransaction(userId, jws, now, allowAccountRecovery) {
   const ownsTransaction = transactionToken && (entitlement.appAccountTokens || []).includes(transactionToken);
   // 只在用户点了“恢复购买”后，才允许用已删除账户留下的最小购买线索恢复权益。
   const deletedPurchase = !ownsTransaction && allowAccountRecovery && transactionToken
-    ? await deletedPurchaseClaimForUser(userId, transactionToken)
+    ? await deletedPurchaseClaimForUser(db, userId, transactionToken, currentUser)
     : null;
   if (!transactionToken || (!ownsTransaction && !deletedPurchase)) {
     const error = new Error("该购买不属于当前 After Zero 账号");
@@ -171,7 +161,7 @@ async function verifyTransaction(userId, jws, now, allowAccountRecovery) {
       verifiedAt: now,
     });
     const next = {
-      ...entitlement,
+      ...withoutDocumentId(entitlement),
       kind: "paid",
       source: "appStore",
       transactionId,
@@ -207,7 +197,7 @@ async function redeemCode(userId, code, now) {
     if (codeDoc.reusable !== true) {
       await codeRef.update({ status: "redeemed", redeemedBy: userId, redeemedAt: now });
     }
-    const next = { ...entitlement, kind: "paid", source: "redeem", redeemedAt: now, updatedAt: now };
+    const next = { ...withoutDocumentId(entitlement), kind: "paid", source: "redeem", redeemedAt: now, updatedAt: now };
     await transaction.collection("premiumEntitlements").doc(userId).set(next);
     return next;
   });
