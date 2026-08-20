@@ -9,9 +9,9 @@
 - 当前执行步骤：步骤 9“签名、隐私、合规与 TestFlight 发布候选”按 2026-08-20 例外授权进行中；步骤 8 仍未完成，步骤 3、5、6、7 的 iOS 验收已完成。
 - 当前状态：步骤 3、5、6、7 的 iPhone 集中验收已通过。步骤 4 的微信开放平台审核、官方 iOS SDK、CloudBase 函数/私有集合和 iPhone Apple→微信绑定均已通过；仍待其余 iOS 账户组合及合并后备份可见性。Android 回归改列内部测试，不阻塞 iOS 发布。
 - 上一步：步骤 2 已批准
-- 当前恢复动作：`1.0 (1)` 已在 Mac TestFlight 安装，Sandbox 首次购买和注销后恢复购买均已通过；去掉句号后的 `1.0 (3)` 已上传 App Store Connect，等待 Apple 处理。仍须补齐 App Store Connect 发布资料和步骤 8 的 iPhone StoreKit 验收。步骤 10 未开始。
+- 当前恢复动作：`1.0 (1)` 已在 Mac TestFlight 安装，Sandbox 首次购买和注销后恢复购买均已通过；规范三段式版本 `1.0.0 (4)` 已 Archive 并上传 App Store Connect，当前等待 Apple 处理。公网页面已通过 Netlify 上线，`afterzero.tech` DNS 已验证，可使用隐私政策 `https://afterzero.tech/privacy.html` 和技术支持 `https://afterzero.tech/support.html`。处理完成后需在 App Store 版本 `1.0.0` 中关联构建并完成 TestFlight 回归；仍须补齐 App Store Connect App Privacy、发布资料和步骤 8 的 iPhone StoreKit 验收。步骤 10 未开始。
 - 下一步骤授权：用户已于 2026-08-13 明确授权开始步骤 8，并于 2026-08-20 例外授权开始步骤 9；不授权步骤 10 或正式发布。
-- Git 操作：用户已于 2026-08-13 分别明确授权提交步骤 3/4 改动，以及记录进度、提交并推送当前验证通过的步骤 7 改动；用户于 2026-08-20 明确授权记录本次步骤 8 通知改动并提交，但未授权推送；除此之外后续不得自行提交、推送或创建 PR
+- Git 操作：用户已于 2026-08-21 明确授权更新本次项目交接文件并执行 `git commit`；本次不执行 `git push`、不创建 PR、不提交审核。此前各阶段的提交/推送授权仍以当时记录为准。
 - Flutter：继续停止并封存；本计划只处理根 Capacitor + React 主线
 
 ## 用户已确认的长期决策

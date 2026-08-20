@@ -3080,3 +3080,23 @@ PDF字体经历了一次有价值的测试拦截：先下载的Noto OTF在`pdf`�
 - 已确认“路由 App 覆盖地区文件”只适用于提供路线导航的 App，After Zero 不上传 `.geojson` 文件，保持为空。
 - App 审核信息按当前版本实际行为整理：未登录时仅可使用债务页；还款日、统计、AI、云备份及备份文件导入导出需要登录并经过 Premium 门禁。iOS 审核使用“通过 Apple 登录”，不提供个人 Apple ID 或密码；首次登录可获得 7 天 Premium 体验。审核备注将说明登录路径，并准备将测试备份 JSON 压缩为 ZIP 作为审核附件，供审核员登录后从第 4 个 Tab 的“上传备份文件”导入。
 - 当前仍待：完成 App Store Connect 未填元数据、上传审核附件、最终确认 App Privacy/年龄评级/内容权利/出口合规和审核构建信息；未提交 App 审核、未公开发布，步骤 10 未开始。
+
+## 2026-08-21（续4）：规范三段式版本 `1.0.0 (4)` 已 Archive 并上传
+
+- 按 Apple 三段式版本要求，将 iOS Debug/Release 的 `MARKETING_VERSION` 从 `1.0` 改为 `1.0.0`，将 `CURRENT_PROJECT_VERSION` 从 `3` 升为 `4`；历史 `1.0 (1)`、`1.0 (2)`、`1.0 (3)` 记录保留为已上传构建事实。
+- `xcodebuild` Release 通用 iPhoneOS Archive 成功；归档内已核对 Bundle ID `io.github.jenkjyu.afterzero`、版本 `1.0.0`、构建号 `4`。导出阶段使用 App Store Connect 分发方式、Apple Distribution 证书和 Team `RYU53AS626`，Xcode 输出 `Upload succeeded`、`Uploaded App`、`EXPORT SUCCEEDED`。
+- Apple 已接收 `1.0.0 (4)`，上传日志记录版本/构建为 `1.0.0`/`4`、状态为 `PROCESSING`；尚未提交审核或公开发布。处理完成后需在 App Store 版本 `1.0.0` 中选择该构建，再进行 TestFlight 安装验收。
+- 本轮仅保留 `ios/App/App.xcodeproj/project.pbxproj` 版本配置改动；构建产生的 SwiftPM 临时 `Package.resolved` 未保留。`git diff --check` 通过，未提交或推送 Git。
+
+## 2026-08-21（续5）：新增 App Store Connect 所需公网页面源码
+
+- 按用户要求新增 `website/` 纯静态页面源码：`privacy.html` 为隐私政策，`support.html` 为技术支持，`index.html` 为入口，并附 `styles.css` 与部署说明。
+- 页面不依赖后端服务器、数据库或第三方统计；隐私政策内容基于当前 `docs/legal/隐私政策.md` 与实际功能整理，支持页公开 `jenkjyu36@outlook.com` 联系方式。
+- 当前项目没有既有托管配置，`afterzero.tech` 尚未确认可访问；仍需选择静态托管、配置域名/DNS、通过 HTTPS 验证后，才能把 URL 填入 App Store Connect。未提交或推送 Git。
+
+## 2026-08-21（续6）：公网页面已部署并完成自定义域名 DNS 验证
+
+- 已通过 Netlify 将已提交的 `website/` 静态页面部署为公开生产站点；`afterzero.tech` 为主域名，`www.afterzero.tech` 自动跳转到主域名，DNS 验证已完成。
+- 当前可供 App Store Connect 使用的 URL：隐私政策 `https://afterzero.tech/privacy.html`；技术支持 `https://afterzero.tech/support.html`；入口（可选）`https://afterzero.tech/`。
+- 站点为纯静态页面，不需要额外服务器、数据库或后端；后续修改 `website/` 并推送到 `main` 后由 Netlify 自动重新部署。
+- 当前仍待：Apple 处理 `1.0.0 (4)` 后在 App Store 版本 `1.0.0` 关联构建并完成 TestFlight 验收；App Store Connect App Privacy 逐项核对并保存（姓名按实际账户功能声明，追踪选“否”）、以及发布资料最终核对。当前未提交审核、未公开上架，步骤 8/9 仍未完成，步骤 10 未开始。

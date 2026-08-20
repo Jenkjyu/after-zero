@@ -1,6 +1,6 @@
 # After Zero iOS 主线实施计划
 
-状态：步骤 0–2 已批准；步骤 3、5、6、7 的本轮 iPhone 验收已完成；步骤 4 的 Apple→微信绑定已通过，其他 iOS 账户组合仍待补齐。步骤 8 的 CloudBase 与 App Store Connect 通知配置已完成，仍待 iPhone StoreKit 真机验收。用户于 2026-08-20 例外授权提前开始步骤 9；步骤 9 的仓库配置、Apple Distribution 签名及 `1.0 (1)`、`1.0 (2)`、`1.0 (3)` TestFlight 上传已完成，等待 Apple 处理、TestFlight 安装验收与 App Store Connect 元数据。Android 回归降为内部测试事项，不阻塞 iOS 发布主线。
+状态：步骤 0–2 已批准；步骤 3、5、6、7 的本轮 iPhone 验收已完成；步骤 4 的 Apple→微信绑定已通过，其他 iOS 账户组合仍待补齐。步骤 8 的 CloudBase 与 App Store Connect 通知配置已完成，仍待 iPhone StoreKit 真机验收。用户于 2026-08-20 例外授权提前开始步骤 9；步骤 9 的仓库配置、Apple Distribution 签名及 `1.0 (1)`、`1.0 (2)`、`1.0 (3)`、`1.0.0 (4)` TestFlight 上传已完成，`1.0.0 (4)` 当前等待 Apple 处理；公网页面已通过 Netlify 上线且 `afterzero.tech` DNS 已验证，隐私政策和技术支持 URL 已具备，随后还需在 App Store Connect 填写/保存元数据、关联 App Store 版本并完成 TestFlight 验收。Android 回归降为内部测试事项，不阻塞 iOS 发布主线。
 
 建立日期：2026-08-12
 
@@ -68,7 +68,7 @@
 | 6 | Android/iOS 本地通知双平台闭环 | iOS 验收完成；Android channel、450 条上限与重排列为内部测试 |
 | 7 | iOS WebView、布局、键盘与手势全量适配 | iOS 验收完成；Android 交互回归列为内部测试 |
 | 8 | StoreKit Premium、恢复购买与服务端权益 | 进行中：CloudBase 权益/通知函数、ADMINONLY 去重集合、HTTP 网关与 App Store Connect 生产/沙盒通知 URL 已配置；Mac TestFlight Sandbox 首购通过，注销后恢复购买的线上回退已部署待复测，仍待 iPhone 真机 StoreKit 验收 |
-| 9 | 签名、隐私、合规与 TestFlight 发布候选 | 进行中（例外授权）：仓库隐私/发布配置、Apple Distribution 签名和 `1.0 (1)`、`1.0 (2)`、`1.0 (3)` 上传已完成；等待 Apple 处理、TestFlight 安装验收及 App Store Connect 元数据 |
+| 9 | 签名、隐私、合规与 TestFlight 发布候选 | 进行中（例外授权）：仓库隐私/发布配置、Apple Distribution 签名、`1.0 (1)`、`1.0 (2)`、`1.0 (3)`、`1.0.0 (4)` 上传、公网页面上线和 DNS 验证已完成；等待 `1.0.0 (4)` 处理、TestFlight 安装验收、构建关联、App Privacy 和 App Store Connect 其他元数据 |
 | 10 | iOS 总回归、Android 内测冒烟与 App Store 首次提交 | 未开始 |
 
 ## 步骤 0：计划、交接与跨 session 门禁
