@@ -14,7 +14,7 @@
 - iOS 步骤 2 已通过检查；步骤 3、5、6、7 均已完成本轮 iPhone 验收，步骤 4 的官方微信 SDK、Apple→微信绑定、CloudBase 账户绑定函数与私有集合也已在 iPhone 通过。用户已确认步骤 4 的其余 iOS 账户组合与合并后备份可见性属于小问题，延后到上架后验证，不再阻塞当前上架。步骤 8 的剩余 StoreKit 购买/恢复/退款撤销等真机验收同样延后到上架后，不再阻塞当前上架。步骤 9 已完成；AI 识图已完成真实样本识别率与成本验证。Android 旧微信、SAF、通知和交互回归改列为内部测试事项，不再阻塞 iOS 步骤完成、TestFlight 或 App Store 发布。权威计划为 `docs/ios/implementation-plan.md`，准确恢复动作见 `docs/ios/handoff.md`。
 - 该计划严格逐步执行：每一步必须完成本步的代码、测试、原生/云端验证和相关文档后停止等待用户检查；用户批准后仍不得自动进入下一步，必须再次收到明确开工指令。
 - 计划期间未经用户改变指令不得暂存、提交、推送或创建 PR。新 session 涉及 iOS 计划时，先完整读取交接和当前步骤；没有明确批准只讨论，不实施。
-- 根 `ios/` 已是可编译、可在 iPhone 运行的 Capacitor 8.4.1 Swift Package Manager 原生壳；Apple/微信登录、iOS `SaveFile` 与本地通知均已完成本轮 iPhone 验收。步骤 9 的签名、隐私、合规、App Store Connect 资料、`1.0.0 (4)` 构建关联和 TestFlight 回归已完成；AI 识图的真实样本识别率与成本也已验证。步骤 10 已完成本地基线：根测试/React/TypeScript/React build、双平台 sync、Android Release 和 iOS Release Archive/分发导出均已通过；用户确认沿用既有 iPhone 验收证据，将新增真机总回归视为完成。当前仅剩 App Store 首次提交；步骤 4/8 的剩余小项按用户决定延后到上架后。当前不能把工程误写成已发布 iOS 产品。Flutter 继续封存。
+- 根 `ios/` 已是可编译、可在 iPhone 运行的 Capacitor 8.4.1 Swift Package Manager 原生壳；Apple/微信登录、iOS `SaveFile` 与本地通知均已完成本轮 iPhone 验收。步骤 9 的签名、隐私、合规、App Store Connect 资料、`1.0.0 (4)` 构建关联和 TestFlight 回归已完成；AI 识图的真实样本识别率与成本也已验证。步骤 10 的本地基线、总回归证据、App Store Connect 首次提交均已完成，当前等待 Apple 审核；步骤 4/8 的剩余小项按用户决定延后到上架后。当前不能把工程误写成已公开上架的 iOS 产品。Flutter 继续封存。
 - **平台优先级（2026-08-14 决策）：iOS 是产品发布主线；Android 仅供内部测试，不进入 Google Play 发布承诺。** Android 实机回归不再作为 iOS 计划、TestFlight 或 App Store 的阻塞门槛；但共享代码仍须完成 React/TypeScript/iOS 构建验证，改动 Android 原生代码或发放 Android 内测包前仍须完成对应 Android 构建与必要冒烟。
 
 ## 当前产品与架构

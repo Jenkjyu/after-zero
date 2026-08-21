@@ -1,6 +1,6 @@
 # After Zero iOS 主线实施计划
 
-状态：步骤 0–2 已批准；步骤 3、5、6、7 的本轮 iPhone 验收已完成；步骤 4 的 Apple→微信绑定已通过，其余账户组合与合并后备份可见性按用户决定延后到上架后。步骤 8 的 CloudBase 与 App Store Connect 通知配置已完成，剩余 StoreKit 真机生命周期验收按用户决定延后到上架后，不阻塞当前发布。步骤 9 已完成；AI 识图真实样本识别率与成本也已验证。步骤 10 的本地测试、双平台 sync、Android Release、iOS Release 分发导出已通过，用户确认沿用既有 iPhone 验收证据完成总回归；当前仅待 App Store 首次提交。Android 回归降为内部测试事项，不阻塞 iOS 发布主线。
+状态：步骤 0–2 已批准；步骤 3、5、6、7 的本轮 iPhone 验收已完成；步骤 4 的 Apple→微信绑定已通过，其余账户组合与合并后备份可见性按用户决定延后到上架后。步骤 8 的 CloudBase 与 App Store Connect 通知配置已完成，剩余 StoreKit 真机生命周期验收按用户决定延后到上架后，不阻塞当前发布。步骤 9 已完成；AI 识图真实样本识别率与成本也已验证。步骤 10 的本地测试、双平台 sync、Android Release、iOS Release 分发导出、总回归证据和 App Store 首次提交均已完成，当前等待 Apple 审核。Android 回归降为内部测试事项，不阻塞 iOS 发布主线。
 
 建立日期：2026-08-12
 
@@ -69,7 +69,7 @@
 | 7 | iOS WebView、布局、键盘与手势全量适配 | iOS 验收完成；Android 交互回归列为内部测试 |
 | 8 | StoreKit Premium、恢复购买与服务端权益 | 当前上架门槛已完成；CloudBase 权益/通知函数、ADMINONLY 去重集合、HTTP 网关与 App Store Connect 生产/沙盒通知 URL 已配置；剩余 StoreKit 真机生命周期验收延后到上架后 |
 | 9 | 签名、隐私、合规与 TestFlight 发布候选 | 已完成；签名、隐私、App Store Connect 资料、`1.0.0 (4)` 构建关联、公网页面上线、TestFlight 回归均已完成 |
-| 10 | iOS 总回归、Android 内测冒烟与 App Store 首次提交 | 进行中：本地构建与总回归按既有 iPhone 验收证据完成；当前仅待 App Store 首次提交 |
+| 10 | iOS 总回归、Android 内测冒烟与 App Store 首次提交 | 已完成：本地构建、总回归证据和首次提交均已完成；当前等待 Apple 审核 |
 
 ## 步骤 0：计划、交接与跨 session 门禁
 
@@ -357,8 +357,8 @@
 - 根测试、React测试、TypeScript、React build、Android/iOS sync 与双平台 release 构建全部通过。
 - Android 与 iOS 真机矩阵无未解释阻断差异；本地数据独立和手动云备份语义有明确验证证据。
 - CloudBase 生产函数、集合权限、身份映射、备份归属、AI额度和购买权益检查通过。
-- App Store Connect 成功进入“等待审核”或当时等价状态；若 Apple 返回技术/元数据问题，本步骤保持进行中直至首次提交闭环。
-- 最终更新 README、AGENTS、skills、法律/发布文档、计划、交接和 `PROGRESS.md`，停止等待用户最终检查；仍不自行提交 git。
+- 用户已在 App Store Connect 手动完成首次提交，当前等待 Apple 审核；若 Apple 返回技术/元数据问题，再根据审核结果处理。
+- 最终更新 README、AGENTS、发布文档、计划、交接和 `PROGRESS.md`；本次文档改动的 Git 提交与推送已获用户明确授权。
 
 ## 新 session 恢复顺序
 

@@ -3197,3 +3197,9 @@ PDF字体经历了一次有价值的测试拦截：先下载的Noto OTF在`pdf`�
 - 用户确认：本机 CoreDevice 服务失效、无法新增执行 TestFlight 真机总回归，不再作为步骤 10 阻塞；沿用此前已完成的 iPhone 验收证据，将该项视为完成。
 - 步骤 10 当前状态更新为：本地测试、双平台 sync、Android Release、iOS Release Archive/分发导出和总回归证据均已完成；仅剩 App Store 首次提交。步骤 4/8 剩余小项继续延后到上架后。
 - 本次只更新进度、交接、实施计划、发布清单、README 和 AGENTS；用户已明确授权随后对本次文档改动执行 `git commit` 与 `git push`。不提交 App 审核、不创建 PR、不修改现有未纳入本次范围的 `ios/App/App/WeChatLoginPlugin.swift`。
+## 2026-08-22（续7）：App Store Connect 首次审核已提交
+
+- 用户已在 App Store Connect 手动修正审核备注中的重复文字“解压后的解压后的附件”，改为“解压后的附件（.json 文件）”，并完成 `1.0.0` 首次审核提交。
+- App Store Connect 当前状态记录为已提交、等待 Apple 审核；尚未公开上架。步骤 10 的本地构建、总回归证据和首次提交均已完成；步骤 4/8 剩余小项继续延后到上架后。
+- 发布资料复核确认：对外描述和审核备注使用“AI 识图导入”，未出现“AI 债务助手”或 `aiAdvisor` 旧功能表述；隐私、App 信息、截图、支持/隐私 URL 和构建关联无新增问题。
+- 本次同步更新 `AGENTS.md`、`README.md`、`docs/ios/handoff.md`、`docs/ios/implementation-plan.md`、`docs/ios/release-readiness.md` 与本机 `PROGRESS.md`；用户已明确授权随后执行 Git commit/push，不纳入既有的 `ios/App/App/WeChatLoginPlugin.swift` 工作树改动。

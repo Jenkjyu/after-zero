@@ -4,14 +4,14 @@
 
 ## 当前产品
 
-当前正式发布主线是 **Capacitor + React 的 iOS App**，包名为 `io.github.jenkjyu.afterzero`。Android 保留为内部测试包，暂不作为正式发布渠道。全新安装默认没有任何债务或档案数据，可直接在本地使用；AI 债务助手、云备份，以及 Premium 的购买、恢复购买和兑换等服务端权益操作才要求登录。
+当前正式发布主线是 **Capacitor + React 的 iOS App**，包名为 `io.github.jenkjyu.afterzero`。Android 保留为内部测试包，暂不作为正式发布渠道。全新安装默认没有任何债务或档案数据，可直接在本地使用；AI 识图导入、云备份，以及 Premium 的购买、恢复购买和兑换等服务端权益操作才要求登录。
 
-iOS 已建立同一套 Web 产品的 Capacitor 原生壳，并已完成 Apple/微信登录、文件保存、通知、主要交互和 TestFlight 候选回归。AI 识图已完成真实样本识别率与成本验证。StoreKit 剩余真机生命周期验证按用户决定延后到上架后；App Store 首次提交与上架仍未完成，因此当前不能视为已发布 iOS 产品。
+iOS 已建立同一套 Web 产品的 Capacitor 原生壳，并已完成 Apple/微信登录、文件保存、通知、主要交互和 TestFlight 候选回归。AI 识图已完成真实样本识别率与成本验证。StoreKit 剩余真机生命周期验证按用户决定延后到上架后；App Store 首次提交已完成，当前等待 Apple 审核，尚未公开上架。
 
 - `react/src/**` 负责“债务”“还款日”“统计”“我的”四个 tab，以及不属于 tab 的 subpage、sheet 和 screen。Vite 使用 `debts`、`pay`、`report`、`mine`、`sheets` 五个入口。
 - `www/index.html` 是唯一 Web 宿主，保留全局 CSS、tabbar、登录门、共享确认框、隐藏导入 input、localStorage/IndexedDB、CloudBase 和原生能力编排；财务计算集中在 `www/js/calc.js`。
 - 根 `android/` 是现行 Capacitor 原生工程，包含手写的 WebView/返回链、SAF 文件保存、微信登录和回调代码；本地提醒使用 Capacitor Local Notifications。
-- `cloudbase/functions/**` 是独立部署的服务端单元，涵盖 Apple/微信登录、账户绑定、Premium 权益、账户注销、云备份和 AI 顾问；不会随原生包构建或 Capacitor sync 自动部署。
+- `cloudbase/functions/**` 是独立部署的服务端单元，涵盖 Apple/微信登录、账户绑定、Premium 权益、账户注销、云备份和 AI 识图导入相关能力；不会随原生包构建或 Capacitor sync 自动部署。
 
 “还款日”按期次列出待还项目，支持时间窗口筛选、部分还款、协商减免和按顺序销期。“统计”是一份基于当前账本生成的债务报告，包含结论、还清走势、未来压力、余额排行和类型构成。
 
@@ -21,11 +21,11 @@ iOS 体验结束且未购买时，仍可使用“债务”tab 的本地功能；
 
 更细的开发边界、硬规则和按任务加载的知识入口见 [`AGENTS.md`](AGENTS.md) 与 [`.agents/skills/`](.agents/skills/)。
 
-## iOS 发布主线（步骤 10 进行中；步骤 4/8 剩余小项延后上架后）
+## iOS 发布主线（步骤 10 已提交，等待 Apple 审核；步骤 4/8 剩余小项延后上架后）
 
-当前以 iOS 为发布主线，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 3～7 的 iPhone 验收已完成；步骤 9 的签名、隐私、合规和 TestFlight 候选回归已完成，AI 识图真实样本与成本验证也已完成。步骤 10 的本地基线已完成，用户确认沿用既有 iPhone 验收证据完成总回归；当前仅剩 App Store 首次提交。步骤 4/8 的剩余小项按用户决定放到上架后，不再阻塞当前发布流程。
+当前以 iOS 为发布主线，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 3～7 的 iPhone 验收已完成；步骤 9 的签名、隐私、合规和 TestFlight 候选回归已完成，AI 识图真实样本与成本验证也已完成。步骤 10 的本地基线、总回归证据和 App Store 首次提交已完成，当前等待 Apple 审核。步骤 4/8 的剩余小项按用户决定放到上架后，不再阻塞当前发布流程。
 
-Android 的登录、文件、通知和交互回归改为内部测试清单，不再阻塞 iOS 的 TestFlight 或 App Store 发布；共享代码已完成本轮基础构建验证。步骤 4/8 的剩余验证已明确延后到上架后；步骤 10 总回归按既有 iPhone 验收证据视为完成，当前仅待 App Store 首次提交，尚未提交审核或公开上架。权威范围与恢复动作见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
+Android 的登录、文件、通知和交互回归改为内部测试清单，不再阻塞 iOS 的 TestFlight 或 App Store 发布；共享代码已完成本轮基础构建验证。步骤 4/8 的剩余验证已明确延后到上架后；步骤 10 总回归和首次审核提交已完成，当前等待 Apple 审核，尚未公开上架。权威范围与恢复动作见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
 
 ## Flutter 重写（已停止并封存）
 
@@ -106,7 +106,7 @@ git diff --check
 - `www/`：Capacitor Web 宿主、持久化/云端/原生编排、纯计算和本地静态库。
 - `android/`：内部测试用 Android 原生工程；同时包含生成接线和必须长期维护的手写源码。
 - `ios/`：正式发布主线的 iOS 原生工程；使用 Swift Package Manager，正完成 StoreKit 与上架收尾。
-- `cloudbase/`：Apple/微信登录、账户绑定、Premium 权益、账户注销、云备份和 AI 顾问云函数。
+- `cloudbase/`：Apple/微信登录、账户绑定、Premium 权益、账户注销、云备份和 AI 识图导入相关云函数。
 - `resources/`：App 图标设计源。
 - `flutter/`：已停止并封存的 Flutter 重写成果，不是当前产品主线。
 - `docs/`：法律文本、iOS 主线计划与交接、Flutter 历史存档和上下文工程计划。
