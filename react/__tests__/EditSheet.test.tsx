@@ -90,6 +90,15 @@ describe("一次性还清(oneTimeStash)", () => {
 });
 
 describe("手动逐行编辑(PlanRows)——已知的数据模型缺口③", () => {
+  it("新加一期时金额、本金、利息输入框初始留空，不把默认0显示成已填写", () => {
+    window.__azBridge = makeMockBridge();
+    const { container } = render(<EditSheet />);
+    act(() => { openEditSheet(NEW_DEBT_ID); });
+    fireEvent.click(screen.getByText("＋ 加一期"));
+    const r2Inputs = container.querySelectorAll<HTMLInputElement>(".prow .r2 input");
+    expect([...r2Inputs].map((input) => input.value)).toEqual(["", "", ""]);
+  });
+
   it("手动取消勾选已还，顺手清掉paidAt/paidAmount(不留矛盾中间态)", () => {
     const debts: Debt[] = [makeDebt({
       opened: "2026-01-01",
@@ -407,7 +416,9 @@ describe("批量设置(BatchBlock)", () => {
     await waitFor(() => {
       const r2Inputs = container.querySelectorAll(".prow .r2 input");
       expect((r2Inputs[0] as HTMLInputElement).value).toBe("600"); // 金额
-      expect((r2Inputs[1] as HTMLInputElement).value).toBe("0"); // 本金被清零
+      // 数据层本金/利息仍被清零，但输入框不把默认0显示成用户已填值。
+      expect((r2Inputs[1] as HTMLInputElement).value).toBe("");
+      expect((r2Inputs[2] as HTMLInputElement).value).toBe("");
     });
   });
 

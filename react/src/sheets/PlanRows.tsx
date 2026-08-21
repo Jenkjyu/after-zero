@@ -54,6 +54,12 @@ export function PlanRows({ plan, oneTime, planMode, onChange }: PlanRowsProps) {
     onChange(plan.concat([{ date: nd, amount: 0, principal: 0, interest: 0, paid: false }]));
   }
 
+  // 新加的计划行在数据层仍以0初始化，方便沿用既有金额校验与本金/利息联动；但0不是有意义的
+  // 引导文案，界面初始留空，避免用户误以为已经填好了金额。实际填写为非零后正常显示。
+  function displayNumber(value: number | null | undefined): number | "" {
+    return value === 0 || value == null ? "" : value;
+  }
+
   return (
     <>
       <div className="plan-rows" id="planRows">
@@ -68,9 +74,9 @@ export function PlanRows({ plan, oneTime, planMode, onChange }: PlanRowsProps) {
               <button type="button" className="del" onClick={() => handleDelete(idx)}>✕</button>
             </div>
             <div className="r2">
-              <div><span>金额</span><input type="number" step="0.01" min={0} inputMode="decimal" value={r.amount != null ? r.amount : ""} onChange={(e) => handleAmount(idx, e.target.value)} /></div>
-              <div><span>本金</span><input type="number" step="0.01" min={0} inputMode="decimal" value={r.principal != null ? r.principal : ""} onChange={(e) => handlePrincipal(idx, e.target.value)} /></div>
-              <div><span>利息/费</span><input type="number" step="0.01" min={0} inputMode="decimal" value={r.interest != null ? r.interest : ""} onChange={(e) => handleInterest(idx, e.target.value)} /></div>
+              <div><span>金额</span><input type="number" step="0.01" min={0} inputMode="decimal" value={displayNumber(r.amount)} onChange={(e) => handleAmount(idx, e.target.value)} /></div>
+              <div><span>本金</span><input type="number" step="0.01" min={0} inputMode="decimal" value={displayNumber(r.principal)} onChange={(e) => handlePrincipal(idx, e.target.value)} /></div>
+              <div><span>利息/费</span><input type="number" step="0.01" min={0} inputMode="decimal" value={displayNumber(r.interest)} onChange={(e) => handleInterest(idx, e.target.value)} /></div>
             </div>
           </div>
         ))}
