@@ -60,6 +60,8 @@ exports.main = async () => {
   // 仅保留哈希 identity 对应的最小权益记录，不包含昵称、邮箱、openid 或账本内容。
   const entitlementResult = await db.collection("premiumEntitlements").doc(userId).get();
   const entitlement = entitlementResult && entitlementResult.data || null;
+  const importCreditResult = await db.collection("aiImportCredits").doc(userId).get();
+  const importCredit = importCreditResult && importCreditResult.data || null;
   const preservedPremiumEntitlement = entitlement && entitlement.kind === "paid" ? {
     kind: "paid",
     source: entitlement.source || "appStore",
@@ -67,6 +69,7 @@ exports.main = async () => {
     originalTransactionId: entitlement.originalTransactionId || null,
     purchasedAt: entitlement.purchasedAt || null,
     appAccountTokens: Array.isArray(entitlement.appAccountTokens) ? entitlement.appAccountTokens : [],
+    paidAiImportUsed: Math.max(0, Number(importCredit && importCredit.paidUsed) || 0),
   } : null;
   for (const identity of identityDocs.data || []) {
     await db.collection("premiumTrialClaims").doc(identity._id).set({
@@ -79,6 +82,16 @@ exports.main = async () => {
     await identities.doc(identity._id).remove();
   }
   if (entitlement) await db.collection("premiumEntitlements").doc(userId).remove();
+  if (importCredit) await db.collection("aiImportCredits").doc(userId).remove();
+
+  const importSessions = await db.collection("aiImportSessions").where({ userId }).get();
+  for (const session of importSessions.data || []) {
+    const fileIDs = Array.isArray(session.fileIds) ? session.fileIds.filter(Boolean) : [];
+    if (fileIDs.length) {
+      try { await app.deleteFile({ fileList: fileIDs }); } catch (_) { /* 文件可能已按正常流程删除 */ }
+    }
+    await db.collection("aiImportSessions").doc(session._id).remove();
+  }
 
   const appleLoginNonces = db.collection("appleLoginNonces");
   const nonceDocs = await appleLoginNonces.where({ userId }).get();

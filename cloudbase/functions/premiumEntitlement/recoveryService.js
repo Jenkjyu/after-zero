@@ -20,7 +20,7 @@ async function deletedPurchaseClaimForUser(db, userId, appAccountToken, currentU
     const claim = firstDocument(await db.collection("premiumTrialClaims").doc(identity._id).get());
     const preserved = claim && claim.preservedPremiumEntitlement;
     if (preserved && preserved.kind === "paid" && (preserved.appAccountTokens || []).includes(appAccountToken)) {
-      return { source: "preserved-identity" };
+      return { source: "preserved-identity", paidAiImportUsed: Math.max(0, Number(preserved.paidAiImportUsed) || 0) };
     }
   }
 

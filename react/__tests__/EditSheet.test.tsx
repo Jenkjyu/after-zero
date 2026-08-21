@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { EditSheet } from "../src/sheets/EditSheet";
-import { closeEditSheet, NEW_DEBT_ID, openEditSheet, useEditSheetId } from "../src/shared/state";
+import { clearAiImportDraft, closeAiImportScreen, closeEditSheet, NEW_DEBT_ID, openEditSheet, setAiImportDraft, useAiImportDraft, useAiImportScreenOpen, useEditSheetId } from "../src/shared/state";
 import { makeMockBridge, makeDebt } from "./mockBridge";
 import type { Debt } from "../src/types";
 
@@ -15,6 +15,66 @@ function getForm(container: HTMLElement) {
 
 afterEach(() => {
   closeEditSheet(); // editSheetId是模块级状态，重置避免测试间互相污染
+  closeAiImportScreen();
+  clearAiImportDraft();
+});
+
+describe("AI 识图草稿衔接", () => {
+  function seedDraft() {
+    act(() => { setAiImportDraft({
+      sessionId: "ais_edit",
+      draft: {
+        productHint: "识别消费贷", funderHint: "识别银行", typeHint: "网贷",
+        notes: "原还款计划含本期贴息 5 元，请核对；系统未自动抵扣。", warnings: ["内部处理提示"], sourceStatuses: ["已入账"],
+        plan: [{ date: "2026-09-01", amount: 1020, principal: 1000, interest: 20, paid: true }],
+      },
+    }); });
+  }
+
+  it("预填识别字段但借款日留空，所有计划强制保持未还", () => {
+    seedDraft();
+    window.__azBridge = makeMockBridge();
+    const { container } = render(<EditSheet />);
+    act(() => { openEditSheet(NEW_DEBT_ID); });
+    expect(screen.getByText("AI 识别草稿")).toBeInTheDocument();
+    expect(screen.getByLabelText(/贷款产品/)).toHaveValue("识别消费贷");
+    expect(screen.getByLabelText(/出资方/)).toHaveValue("识别银行");
+    expect(screen.getByLabelText(/借款日/)).toHaveValue("");
+    expect(screen.getByLabelText(/备注/)).toHaveValue("原还款计划含本期贴息 5 元，请核对；系统未自动抵扣。");
+    expect(screen.getByText("请在下方核对并补齐识别草稿，确认无误后再新增债务。")).toBeInTheDocument();
+    expect(screen.queryByText("内部处理提示")).not.toBeInTheDocument();
+    expect(container.querySelector<HTMLInputElement>('.prow input[type="checkbox"]')).not.toBeChecked();
+  });
+
+  it("返回只回到截图页，不写入账本也不清除草稿", () => {
+    seedDraft();
+    window.__azBridge = makeMockBridge();
+    render(<EditSheet />);
+    const importHook = renderHook(() => useAiImportScreenOpen());
+    const draftHook = renderHook(() => useAiImportDraft());
+    act(() => { openEditSheet(NEW_DEBT_ID); });
+    fireEvent.click(screen.getByText("返回调整截图"));
+    expect(importHook.result.current).toBe(true);
+    expect(draftHook.result.current).not.toBe(null);
+    expect(window.__azBridge.setDebt).not.toHaveBeenCalled();
+  });
+
+  it("补齐借款日并确认后复用现有新增流程，随后完成任务并清除草稿", () => {
+    seedDraft();
+    window.__azBridge = makeMockBridge();
+    const { container } = render(<EditSheet />);
+    const draftHook = renderHook(() => useAiImportDraft());
+    act(() => { openEditSheet(NEW_DEBT_ID); });
+    fireEvent.change(screen.getByLabelText(/借款日/), { target: { value: "2026-08-01" } });
+    fireEvent.submit(getForm(container));
+    const [, obj] = (window.__azBridge.setDebt as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(obj.plan[0].paid).toBe(false);
+    expect(window.__azBridge.setDebt).toHaveBeenCalledWith(null, expect.any(Object));
+    expect(window.__azBridge.saveAll).toHaveBeenCalledOnce();
+    expect(window.__azBridge.renderAll).toHaveBeenCalledOnce();
+    expect(window.__azBridge.completeAiDebtImport).toHaveBeenCalledWith("ais_edit");
+    expect(draftHook.result.current).toBe(null);
+  });
 });
 
 describe("EditSheet 开关 + 回填", () => {

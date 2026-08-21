@@ -1,7 +1,7 @@
 // 测试用的window.__azBridge假实现——用vitest的vi.fn()包一层，方便断言"React调用了正确的
 // vanilla桥接函数"，不需要真的挂载一整个vanilla index.html环境。
 import { vi } from "vitest";
-import type { Account, AzBridge, BackupRecord, Debt, FileItem, NotifySettings, Premium } from "../src/types";
+import type { Account, AiDebtImportResult, AiDebtImportStatus, AzBridge, BackupRecord, Debt, FileItem, NotifySettings, Premium } from "../src/types";
 
 export function makeMockBridge(overrides?: {
   debts?: Debt[];
@@ -66,6 +66,14 @@ export function makeMockBridge(overrides?: {
     restoreBackup: vi.fn(() => Promise.resolve(true)),
     deleteBackup: vi.fn(() => Promise.resolve(true)),
     getBackupMeta: vi.fn(() => ({ lastBackupAt })),
+    getAiDebtImportStatus: vi.fn(() => Promise.resolve<AiDebtImportStatus>({
+      credits: { bucket: "paid", limit: 25, used: 0, remaining: 25 }, session: null,
+    })),
+    startAiDebtImport: vi.fn(() => Promise.resolve<AiDebtImportResult>({
+      sessionId: "ais_test", status: "succeeded", credits: { bucket: "paid", limit: 25, used: 1, remaining: 24 },
+      draft: { productHint: "测试贷款", funderHint: "", typeHint: "银行贷", notes: "", warnings: [], sourceStatuses: [], plan: [] },
+    })),
+    completeAiDebtImport: vi.fn(() => Promise.resolve(true)),
     callAiAdvisor: vi.fn(() => Promise.resolve({ text: "测试回复", quota: null })),
     buildAiSummary: vi.fn(() => ({
       在还总负债: 0, 加权平均年化利率百分比: 0, 预计全部还清日期: "未知", 债务清单: [],

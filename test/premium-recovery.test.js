@@ -51,9 +51,9 @@ test("权益文档写回前剥离 CloudBase 只读 _id，且不修改查询结�
 test("注销后同一登录身份可使用保留的购买 token 恢复", async () => {
   const db = createDb({
     "identities/apple-hash": { _id: "apple-hash", userId: "u-new" },
-    "premiumTrialClaims/apple-hash": { preservedPremiumEntitlement: { kind: "paid", appAccountTokens: ["token-old"] } },
+    "premiumTrialClaims/apple-hash": { preservedPremiumEntitlement: { kind: "paid", appAccountTokens: ["token-old"], paidAiImportUsed: 7 } },
   });
-  assert.deepEqual(await deletedPurchaseClaimForUser(db, "u-new", "token-old"), { source: "preserved-identity" });
+  assert.deepEqual(await deletedPurchaseClaimForUser(db, "u-new", "token-old"), { source: "preserved-identity", paidAiImportUsed: 7 });
 });
 
 test("仅在旧账号及权益确实已删除时，才允许旧版遗漏保留凭据的交易恢复", async () => {

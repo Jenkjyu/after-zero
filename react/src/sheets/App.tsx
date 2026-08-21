@@ -18,6 +18,7 @@ import { AboutScreen } from "./AboutScreen";
 import { AccountScreen } from "./AccountScreen";
 import { AgreementScreen } from "./AgreementScreen";
 import { AiScreen } from "./AiScreen";
+import { AiImportScreen } from "./AiImportScreen";
 import { BackupScreen } from "./BackupScreen";
 import { DetailSheet } from "./DetailSheet";
 import { DocsScreen } from "./DocsScreen";
@@ -51,6 +52,7 @@ export function App() {
       <DocsScreen />
       <BackupScreen />
       <AiScreen />
+      <AiImportScreen />
       <StrategyCompareScreen />
     </>
   );

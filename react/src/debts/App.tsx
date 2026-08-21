@@ -5,7 +5,7 @@
 import { Header } from "./Header";
 import { Summary } from "./Summary";
 import { DebtList } from "./DebtList";
-import { openAccountScreen, openAiScreen, openPremiumScreen, useAccount, useDebts, usePremium } from "../shared/state";
+import { openAccountScreen, openAiImportScreen, openPremiumScreen, useAccount, useDebts, usePremium } from "../shared/state";
 
 export function App() {
   const debts = useDebts();
@@ -15,10 +15,10 @@ export function App() {
   async function onAiBannerClick() {
     if (!window.hasPremium(premium)) { openPremiumScreen(); return; }
     if (!account) {
-      const loggedIn = await window.__azBridge.requestCloudLogin("AI 债务助手会把本次问题和债务摘要发送到云端生成回复；登录提示可取消，本地账本不会自动上传。");
+      const loggedIn = await window.__azBridge.requestCloudLogin("AI 识图录入会把你主动选择的还款计划截图临时上传，用于生成可编辑草稿；登录提示可取消，本地账本不会自动上传。");
       if (!loggedIn) return;
     }
-    openAiScreen();
+    openAiImportScreen();
   }
 
   return (

@@ -30,9 +30,9 @@ export function AiBanner({ premium, onClick }: AiBannerProps) {
         </svg>
       </div>
       <div className="ai-banner-text">
-        <div className="ai-banner-title" id="aiBannerTitle">{ai ? "AI 债务助手" : "AI 债务分析报告"}</div>
+        <div className="ai-banner-title" id="aiBannerTitle">AI 识图录入</div>
         <div className="ai-banner-sub" id="aiBannerSub">
-          {ai ? "雪球/雪崩法分析、优先还款建议，随问随答" : "开通 Premium，获取雪球/雪崩法分析与更省钱的还款顺序"}
+          {ai ? "多张还款计划截图生成一份可编辑草稿" : "Premium 买断包含 25 次终身识图录入额度"}
         </div>
       </div>
       <svg className="account-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">

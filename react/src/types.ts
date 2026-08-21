@@ -195,6 +195,46 @@ export interface BackupRecord {
   totalSizeBytes: number;
 }
 
+export interface AiDebtImportDraft {
+  productHint: string;
+  funderHint: string;
+  typeHint: string;
+  notes: string;
+  warnings: string[];
+  sourceStatuses: string[];
+  plan: PlanRow[];
+}
+
+export interface AiImportCredits {
+  bucket: "paid" | "trial";
+  limit: number;
+  used: number;
+  remaining: number;
+}
+
+export interface AiDebtImportResult {
+  sessionId: string;
+  status: "uploading" | "processing" | "succeeded" | "accepted" | "failed";
+  draft: AiDebtImportDraft | null;
+  credits: AiImportCredits;
+}
+
+export interface AiDebtImportSession {
+  sessionId: string;
+  status: AiDebtImportResult["status"];
+  draft: AiDebtImportDraft | null;
+}
+
+export interface AiDebtImportStatus {
+  credits: AiImportCredits;
+  session: AiDebtImportSession | null;
+}
+
+export interface AiDebtImportDraftState {
+  sessionId: string;
+  draft: AiDebtImportDraft;
+}
+
 // vanilla主IIFE暴露出来的桥接对象——见 www/index.html 里 window.__azBridge 的定义和AGENTS.md
 // "React 迁移"一节。只包含已迁移的React页面实际需要调用的这几个，其余(saveForm/公式生成器
 // 等)继续留在vanilla私有作用域里，后续阶段迁移到别的页面时才按需加进来。
@@ -303,6 +343,15 @@ export interface AzBridge {
   restoreBackup(id: string): Promise<boolean>;
   deleteBackup(id: string): Promise<boolean>;
   getBackupMeta(): { lastBackupAt: number };
+  // AI 识图录入：浏览器桥负责登录会话、临时图片上传和云函数往返；React 只负责选图、进度
+  // 与草稿编辑。多张图组成同一任务，只有服务端成功返回草稿才消耗一次额度。
+  getAiDebtImportStatus(sessionId?: string): Promise<AiDebtImportStatus>;
+  startAiDebtImport(
+    files: File[],
+    idempotencyKey: string,
+    onProgress?: (stage: "uploading" | "recognizing", completed: number, total: number) => void,
+  ): Promise<AiDebtImportResult>;
+  completeAiDebtImport(sessionId: string): Promise<boolean>;
   // 第十一步(aiScreen)新增，且是这一步唯一的新增：callAiAdvisor原样保留现有vanilla函数
   // (内部继续用vanilla自己的debts调buildAiSummary())，因为它依赖ensureCbAuthReady/
   // cbApp().callFunction这套认证会话状态，不可移植。AI_USAGE_KEY/AI_CHATLOG_KEY整体移交

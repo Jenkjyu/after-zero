@@ -145,6 +145,8 @@ declare global {
     // 排在backupScreen之前、termsScreen之后。
     __azAiScreenBack?: () => boolean;
     __azAiHistorySheetBack?: () => boolean;
+    // AI 识图录入独立 subpage；成功后会打开 EditSheet，因此返回链中 EditSheet 仍先关闭。
+    __azAiImportScreenBack?: () => boolean;
     // 同上，多策略对比规划(2026-08-04新增)——见 react/src/sheets/StrategyCompareScreen.tsx。
     // 不从别的sheets屏幕内部打开、也不从自己内部打开别的sheets屏幕，链里位置不受排序
     // 约束，放在链尾。

@@ -4,7 +4,7 @@
 // 这几个hook本身跟"在还债务"页无关，是所有React tab(在还债务/还款日/统计)共用的通用逻辑，
 // 所以放在shared/而不是某个具体tab的目录下。
 import { useSyncExternalStore } from "react";
-import type { Account, Debt, FileItem, NotifySettings, Premium } from "../types";
+import type { Account, AiDebtImportDraftState, Debt, FileItem, NotifySettings, Premium } from "../types";
 
 // tabbar 仍属于 vanilla 宿主。它发现 Premium 未开通时只派发意图事件，具体订阅页开关
 // 仍由 React 的共享状态拥有，避免把 screen 导航塞回 bridge。
@@ -349,6 +349,44 @@ export function closeAiScreen() {
 }
 export function useAiScreenOpen(): boolean {
   return useSyncExternalStore(subscribeAiScreen, () => aiScreenOpen);
+}
+
+// AI 识图录入是独立于旧 AI 对话助手的 subpage。识别成功后的草稿放在共享层，供该
+// subpage 与现有 EditSheet 两棵组件树衔接；草稿只存在内存中，用户确认保存后才进入账本。
+let aiImportScreenOpen = false;
+let aiImportDraft: AiDebtImportDraftState | null = null;
+function subscribeAiImportScreen(callback: () => void) {
+  window.addEventListener("az:ai-import-screen-changed", callback);
+  return () => window.removeEventListener("az:ai-import-screen-changed", callback);
+}
+function subscribeAiImportDraft(callback: () => void) {
+  window.addEventListener("az:ai-import-draft-changed", callback);
+  return () => window.removeEventListener("az:ai-import-draft-changed", callback);
+}
+export function openAiImportScreen() {
+  aiImportScreenOpen = true;
+  window.dispatchEvent(new CustomEvent("az:ai-import-screen-changed"));
+}
+export function closeAiImportScreen() {
+  aiImportScreenOpen = false;
+  window.dispatchEvent(new CustomEvent("az:ai-import-screen-changed"));
+}
+export function useAiImportScreenOpen(): boolean {
+  return useSyncExternalStore(subscribeAiImportScreen, () => aiImportScreenOpen);
+}
+export function setAiImportDraft(value: AiDebtImportDraftState) {
+  aiImportDraft = value;
+  window.dispatchEvent(new CustomEvent("az:ai-import-draft-changed"));
+}
+export function clearAiImportDraft() {
+  aiImportDraft = null;
+  window.dispatchEvent(new CustomEvent("az:ai-import-draft-changed"));
+}
+export function resetAiImportWorkspace() {
+  window.dispatchEvent(new CustomEvent("az:ai-import-workspace-reset"));
+}
+export function useAiImportDraft(): AiDebtImportDraftState | null {
+  return useSyncExternalStore(subscribeAiImportDraft, () => aiImportDraft);
 }
 
 // 档案库——第九步(React迁移收尾)新增，布尔开关，跟accountScreen/premiumScreen/termsScreen/

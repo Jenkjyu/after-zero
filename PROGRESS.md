@@ -3106,3 +3106,66 @@ PDF字体经历了一次有价值的测试拦截：先下载的Noto OTF在`pdf`�
 - 用户确认下一代 AI 功能方向为“多张还款计划截图 → 一次识别 → 可编辑手动债务草稿 → 用户确认新增”，而非继续扩展聊天式债务分析。完整范围、交互、临时图片策略、服务端额度规则和验收门槛已写入 `docs/ai-debt-import-plan.md`；尚未开始实现。
 - 已确认 Premium 买断为 ¥28、正式购买含 25 次终身 AI 识图录入额度；一组同债务图片成功生成一个草稿才扣 1 次，多图不重复扣费，失败不扣。体验期额度建议为 1 次，待实现前最终确认。
 - 手动新增/编辑债务时，“＋加一期”生成的金额、本金、利息仍在数据层以 0 初始化以保持既有校验与联动，但输入框初始不再显示 0，避免误认为已填写；实际输入与账本口径未改变。
+
+## 2026-08-21（续8）：更正步骤 9 发布候选状态
+
+- 用户确认：规范版本 `1.0.0 (4)` 的 App Store Connect 处理、App Store 版本构建关联、App Privacy、发布元数据和 TestFlight 安装回归均已完成。此前交接中“等待 Apple 处理、关联构建、补齐 App Privacy/发布资料和 TestFlight 回归”的表述已过时，今后不再作为待办或阻塞项。
+- 步骤 9“签名、隐私、合规与 TestFlight 发布候选”现记为“等待用户检查”；步骤 8 的 iPhone StoreKit 真机完整验收仍未完成，步骤 10 仍未开始。未据此进入步骤 10、提交审核或公开上架。
+
+## 2026-08-21（续9）：AI 识图录入首版已实现并部署
+
+- 债务页 AI 入口已切换为“AI 识图录入”。一组支持 1–20 张同一笔债务截图，可预览、删除、排序并一次开始识别；成功生成草稿才消耗 1 次额度，多图仍计 1 次，失败不扣。旧聊天助手代码与受保护本地键保留，但首页不再进入旧页面。
+- 新增 AI 草稿模式并复用现有 `EditSheet`、`PlanRows` 和账本保存路径：产品/出资方/类型/备注/逐期计划可预填，借款日留空等待用户补齐；服务端和客户端均强制所有计划行为未还，“已入账”只作警告，贴息只写备注；不要求年化利率或还款方式。取消只返回截图页，确认后才执行既有 `setDebt(null, obj) → saveAll() → renderAll()`。
+- 新增并部署 `aiDebtImport` CloudBase 函数；创建 `aiImportSessions`、`aiImportCredits` 两个 `ADMINONLY` 集合并验证权限。买断 Premium 固定 25 次终身额度；体验次数未确认，保持 `AI_IMPORT_TRIAL_LIMIT=0`，不会误发买断额度。任务采用预留、租约和幂等结果，成功后计数，失败释放；临时图片在处理结束后删除，结构化草稿最多保留 24 小时。
+- 账户合并会合并识图用量并封顶 25；注销会删除识图任务/草稿，并将已用次数随最小购买恢复凭据保留，防止注销后重置额度。更新后的 `accountBinding`、`deleteAccount`、`premiumEntitlement` 已部署。
+- Premium 页面、会员协议、用户协议、App 内/仓库/网站隐私政策源码已同步 25 次额度、临时截图处理和保留期限。网站源码尚未重新发布，App Store Connect App Privacy/审核备注也尚未针对该新功能重新提交。
+- 验证：`npm test` 145/145、React 46 文件 380/380、TypeScript、React production build、`npx cap sync ios`、无签名通用 iPhoneOS Debug build、云函数未登录 fail-closed 健康检查、集合 ACL 和 `git diff --check`通过。尚未用真实登录会话及约 20 组脱敏截图验证视觉模型可用性/识别率/成本，也未做本轮 iPhone 交互验收。未暂存、提交或推送。
+
+## 2026-08-21（续10）：识图链路更正为腾讯云 OCR
+
+- 用户指出最初已确认的是低成本“腾讯云 OCR 提字 + `hy3` 整理”方案，而非 `glm-5v-turbo` 直接识图。已将 `aiDebtImport` 更正为：每张临时截图调用腾讯云 `GeneralBasicOCR`，再将各图 OCR 文本按上传顺序交给 `hy3` 合并为草稿；不再调用视觉大模型。
+- 云函数使用 SCF/CloudBase 运行时临时凭据调用 OCR，不在仓库、本机部署配置或函数环境变量中放长期腾讯云密钥。每张图片会产生一次 OCR 提供方调用，但同一债务整组图片成功后仍只消耗用户 1 次识图额度。
+- 更新后的 `aiDebtImport` 已带 OCR SDK 部署；管理员无登录态健康检查返回预期 `LOGIN_REQUIRED`。当前尚未有真实登录截图调用，因而 OCR 运行角色权限与识别质量仍待 TestFlight 实测。
+- 验证：Node 146/146、React 46 文件 380/380、TypeScript、React production build、iOS sync、`git diff --check`和 Apple Distribution Archive 通过。`1.0.0 (5)` 因已存在被 Apple 拒绝；已递增为 `1.0.0 (6)` 并成功上传 App Store Connect，当前由 Apple 处理。未提交审核、未公开发布、未暂存或推送 Git。
+
+## 2026-08-21（续11）：修复 TestFlight 识图上传缺失 CloudBase Storage 模块
+
+- TestFlight `1.0.0 (6)` 实测的 `cbApp().uploadFile is not a function` 已定位为 WebView 包只加载 CloudBase core、auth、functions，漏掉 cloud storage 扩展；错误发生在上传临时截图之前，因此未上传任何图片、未调用 OCR/`hy3`，也未消耗识图额度。
+- 已随应用加入与现有 core 一致的 CloudBase Web SDK `2.28.6` 的 `www/js/cloudbase.storage.js`，在 core/auth/functions 后加载；该模块注册 `uploadFile`/`deleteFile`。新增 Node 回归测试，防止今后打包时再漏掉该依赖。
+- 已将 iOS 构建号从 `6` 升为 `7`。Node 147/147、React 46 文件 380/380、TypeScript、React production build、iOS sync 和 `git diff --check` 通过；Apple Distribution Archive 成功，归档内已核对 Bundle ID `io.github.jenkjyu.afterzero`、版本 `1.0.0`、构建号 `7`，并确认 `public/js/cloudbase.storage.js` 已随包存在。
+- `1.0.0 (7)` 已成功上传 App Store Connect，上传日志为 `UPLOAD SUCCEEDED with no errors`；仅创建新的 TestFlight 候选，未提交审核或公开发布。等待 Apple 处理后需重新实测一组截图上传与识别。未暂存、提交或推送 Git。
+
+## 2026-08-21（续12）：修复 CloudBase 云存储上传权限
+
+- TestFlight `1.0.0 (7)` 的 `STORAGE_EXCEED_AUTHORITY` 已确认不是客户端 SDK 或 OCR 问题，而是 `after-zero-d7gub5p5f09c8cc2d` 存储桶原来设置为“仅管理员可读写”，登录用户无法直传 AI 临时截图。
+- 已在 CloudBase 新版开发平台将存储桶切换为“仅创建者及管理员可读写”；控制台返回“操作成功”，刷新后该权限仍为选中状态。该设置不会删除文件；当前 AI 上传失败发生在写入前，现有云备份仍通过云函数管理员权限读写。
+- 这是云端权限变更，不需要重新上传 TestFlight；等待约 1–3 分钟传播后，使用 TestFlight `1.0.0 (7)` 重新上传一组截图验证。未暂存、提交或推送 Git。
+
+## 2026-08-21（续13）：识图改为云函数代理上传并上传 TestFlight `1.0.0 (8)`
+
+- `1.0.0 (7)` 权限修复后仍返回空的 `[cloudbase/js-sdk][OPERATION_FAIL][storage]`，定位为 iOS WebView 内 CloudBase Storage 直传链路不稳定；没有继续扩大当前环境的存储读写范围，也没有改动备份上传路径。
+- `aiDebtImport` 新增已登录云函数代理上传与失败清理：客户端将图片压缩后通过 `callFunction` 传入，服务端校验当前用户、任务归属、图片格式和 6 MiB 大小上限，再由管理员 SDK 写入 `ai-import/<sessionId>/...`；识别仍使用腾讯云 `GeneralBasicOCR` + `hy3`，成功草稿才扣 1 次额度。失败重试会重置失败任务，不会重复扣费。
+- 云函数已重新部署成功；本地验证通过：Node 148/148、React 46 文件 380/380、TypeScript、React production build、iOS sync、识图专项测试 7/7 和 `git diff --check`。
+- iOS 构建号从 `7` 升为 `8`；Release Archive 内已核对 Bundle ID `io.github.jenkjyu.afterzero`、版本 `1.0.0`、构建号 `8`。`1.0.0 (8)` 已按 App Store Connect 分发方式上传成功，Xcode 返回 `Uploaded App`、`EXPORT SUCCEEDED`；当前等待 Apple 处理，未提交审核或公开发布。
+- 待 Apple 处理完成后，只需在 TestFlight 安装 `1.0.0 (8)`，用一组真实截图验证“上传 → OCR → 草稿”；本轮没有暂存、提交或推送 Git。
+
+## 2026-08-22：确认 TestFlight `(8)` 的 OCR 服务未开通
+
+- 用户在 TestFlight `1.0.0 (8)` 实测确认图片已上传成功，但第 1 张截图在 OCR 阶段失败；此前客户端 Storage 问题已不再出现。
+- 第一轮按临时 URL 稳定性问题处理：云函数改为 CloudBase Node SDK `downloadFile` 取得 Buffer，再以 `ImageBase64` 调用 OCR，并已重新部署；用户复测后仍返回同一提示，证明该调整不是当前失败的根因，但作为更稳定的图片传输方式保留。
+- CloudBase 函数日志尚未开通，CLI 查询返回 `ResourceNotFound.TopicNotExist`。进一步进入同一腾讯云主账号的文字识别控制台后，页面明确显示“您尚未开通文字识别服务”；这才是当前 `GeneralBasicOCR` 调用被拒绝的外部阻塞。
+- 开通 OCR 需要账号持有人同意《文字识别服务条款》并点击“立即开通”，开通后有相应免费调用额度、超出后可能计费；在用户明确确认前未代为开通。现有 TestFlight `1.0.0 (8)` 和已部署云函数无需再次发版，开通服务后即可原包复测。
+- 用户随后已自行在同一腾讯云主账号开通文字识别服务；当前外部阻塞解除。下一步仅需使用现有 TestFlight `1.0.0 (8)` 重新识别同一张截图，确认 OCR → `hy3` → 可编辑草稿链路。
+
+## 2026-08-22（续1）：补齐 CloudBase 默认角色的最小 OCR 权限
+
+- OCR 服务开通后用户复测仍失败。为避免继续让用户盲测，临时增加并部署只读诊断入口，取得准确上游错误：`AuthFailure.UnauthorizedOperation`，缺少 `ocr:GeneralBasicOCR`；问题不是额度、图片上传或 OCR 服务开通状态。
+- 在 CAM 创建仅包含 `ocr:GeneralBasicOCR`、资源为 `*` 的自定义策略 `AfterZeroAiDebtImportOcr`。先用专用 SCF 角色试验，确认 OCR 权限角色会使请求进入下一阶段，但同时失去 CloudBase 数据库的 `tcb:QueryDocument`；已立即把 `aiDebtImport` 显式恢复为 `TCB_QcsRole`，数据库自检恢复正常，期间没有业务数据写入。
+- 经策略“新增关联”入口找到角色列表中单独隐藏的 `TCB_QcsRole`，在用户明确确认后将 `AfterZeroAiDebtImportOcr` 关联到该默认角色。关联后云端自检返回 `databaseAccessible: true`，OCR 从“无权限”前进到测试用 1×1 图片的 `FailedOperation.ImageDecodeFailed`，证明鉴权已通过且请求已进入 OCR 服务。
+- 最终 `aiDebtImport` 已重新部署：`cloudbaserc.json` 显式固定 `role: TCB_QcsRole`，临时诊断入口已删除，OCR 未授权、未开通和图片格式异常现在返回不同的明确提示。验证通过：函数语法检查、识图专项测试 8/8、`git diff --check`、云端部署成功。现有 TestFlight `1.0.0 (8)` 无需重新发版，下一步只需真实截图复测完整草稿链路。
+
+## 2026-08-22（续2）：统一识图草稿提醒与通用备注
+
+- AI 草稿页黄色框改为固定提醒“请在下方核对并补齐识别草稿，确认无误后再新增债务。”，不再把模型 warnings、OCR 清洗过程或“已入账/贴息”规则堆在黄色框中；数据规则仍保持所有导入计划为未还。
+- `aiDebtImport` 的整理提示词新增通用 `reviewItems`：模型保留可能影响金额、日期、费用或还款状态的原图业务词及期数/上下文，不依赖“贴息”单一词表；服务端 `normalizeDraft` 过滤 OCR 内部噪音，并把服务费、贴息、减免等业务信息统一转成简短备注供用户核对，贴息注明未自动抵扣。
+- 新增通用备注与黄色框回归测试，待完成 Node/React/TypeScript/build、差异检查后提交本次 AI 识图相关改动。

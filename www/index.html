@@ -960,6 +960,46 @@
     font-family: inherit; padding: 10px 6px 2px; }
   @media (prefers-reduced-motion: reduce) { .ai-limit-scrim, .ai-limit-modal { animation: none; } }
 
+  /* AI 识图录入：独立 subpage，图片只在用户主动选择后进入临时上传流程。 */
+  .ai-import-body { max-width: 620px; margin: 0 auto; padding-bottom: max(28px, calc(18px + env(safe-area-inset-bottom))); }
+  .ai-import-steps { display: flex; align-items: center; justify-content: center; gap: 7px; margin: 2px 0 18px; color: var(--text-faint); font-size: 11px; white-space: nowrap; }
+  .ai-import-steps span { display: inline-flex; align-items: center; gap: 4px; }
+  .ai-import-steps b { width: 19px; height: 19px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--surface-2); font-size: 10px; }
+  .ai-import-steps .active { color: var(--accent); font-weight: 700; }
+  .ai-import-steps .active b { background: var(--accent-fill); color: var(--on-accent); }
+  .ai-import-steps i { font-style: normal; opacity: .6; }
+  .ai-import-intro { margin: 4px 0 16px; }
+  .ai-import-intro h2 { margin: 0 0 7px; font-size: 18px; line-height: 1.35; }
+  .ai-import-intro p { margin: 0; color: var(--text-muted); font-size: 13px; line-height: 1.6; }
+  .ai-import-credit { display: inline-flex; margin-top: 10px; padding: 5px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 700; }
+  .ai-import-file-input { display: none; }
+  .ai-import-add { width: 100%; min-height: 76px; border: 1.5px dashed var(--border-strong); border-radius: 16px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 14px; font-weight: 700; }
+  .ai-import-add span { display: block; color: var(--accent); font-size: 25px; line-height: 1; margin-bottom: 4px; }
+  .ai-import-add:disabled { opacity: .5; }
+  .ai-import-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+  .ai-import-image { position: relative; overflow: hidden; min-height: 150px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-2); }
+  .ai-import-image img { display: block; width: 100%; height: 150px; object-fit: cover; }
+  .ai-import-image-index { position: absolute; left: 7px; top: 7px; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.68); color: #fff; font-size: 12px; font-weight: 700; }
+  .ai-import-image-actions { display: flex; justify-content: flex-end; gap: 5px; padding: 7px; }
+  .ai-import-image-actions button { width: 32px; height: 30px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font: inherit; }
+  .ai-import-image-actions button:disabled { opacity: .35; }
+  .ai-import-progress, .ai-import-error { display: flex; align-items: center; gap: 9px; margin: 12px 0; padding: 11px 13px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
+  .ai-import-progress { background: var(--accent-soft); color: var(--accent); }
+  .ai-import-error { background: var(--critical-soft); color: var(--critical); }
+  .ai-import-spinner { width: 15px; height: 15px; flex: none; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: aiImportSpin .8s linear infinite; }
+  @keyframes aiImportSpin { to { transform: rotate(360deg); } }
+  .ai-import-rules { margin: 14px 0; padding: 13px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+  .ai-import-rules strong { font-size: 13px; }
+  .ai-import-rules p { margin: 6px 0 0; color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+  .ai-import-start { width: 100%; }
+  .ai-import-draft-note { margin: 0 0 14px; padding: 12px 13px; border: 1px solid var(--warning); border-radius: 13px; background: var(--warning-soft); }
+  .ai-import-draft-note strong { font-size: 13px; }
+  .ai-import-draft-note p, .ai-import-draft-note li { color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+  .ai-import-draft-note p { margin: 5px 0 0; }
+  .ai-import-draft-note ul { margin: 7px 0 0; padding-left: 18px; }
+  @media (min-width: 540px) { .ai-import-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (prefers-reduced-motion: reduce) { .ai-import-spinner { animation: none; } }
+
   .account-head { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px 0 4px; margin-bottom: 18px; }
   .account-avatar-btn { background: none; border: none; padding: 0; border-radius: 50%;
     -webkit-tap-highlight-color: transparent; cursor: pointer; }
@@ -1622,10 +1662,11 @@
 <div class="flash" id="flash">已保存 ✓</div>
 
 <!-- 腾讯云开发(CloudBase) JS SDK 固定随 App 打包，不能让原生 WebView 的登录链依赖运行时 CDN。
-     内核之外，登录(auth)和云函数(functions)模块必须单独引入，不含在内核里——漏引入auth.js会导致app.auth()不是函数。 -->
+     内核之外，登录(auth)、云函数(functions)和云存储(storage)模块必须单独引入，不含在内核里——漏引入对应模块会使 app.auth()、callFunction() 或 uploadFile() 不可用。 -->
 <script src="js/cloudbase.js"></script>
 <script src="js/cloudbase.auth.js"></script>
 <script src="js/cloudbase.functions.js"></script>
+<script src="js/cloudbase.storage.js"></script>
 <!-- 高级统计报表导出用：jsPDF导出PDF(window.jspdf.jsPDF)，SheetJS(xlsx)导出真正的.xlsx(window.XLSX)。
      ⚠️ 这两个库本地打包在 www/js/ 下，不走CDN——早期从 cdn.jsdelivr.net / cdn.sheetjs.com 引入，
      在国内移动网络下经常加载失败(不像腾讯的 static.cloudbase.net 稳定)，表现为导出时报"图表库加载失败"。
@@ -2543,6 +2584,114 @@
     });
   }
 
+  // ===== AI 识图录入债务 =====
+  // React 管选图和草稿编辑；这里仅保留 CloudBase 登录会话、临时图片上传与云函数调用。
+  // 一组多图共用同一个 idempotencyKey，服务端成功生成草稿才计一次额度。
+  function aiDebtImportCall(data) {
+    if (!account) return Promise.reject(cloudLoginRequired("AI 识图录入"));
+    return ensureCbAuthReady().then(function () {
+      return cbApp().callFunction({ name: "aiDebtImport", data: data });
+    }).then(function (res) {
+      var result = res && res.result;
+      if (!result || !result.ok) {
+        var error = new Error((result && result.error) || "AI 识图录入失败，请稍后再试");
+        if (result && result.code) error.code = result.code;
+        throw error;
+      }
+      return result;
+    });
+  }
+  function getAiDebtImportStatus(sessionId) {
+    return aiDebtImportCall({ action: "status", sessionId: sessionId || "" }).then(function (result) {
+      return { credits: result.credits, session: result.session || null };
+    });
+  }
+  function safeAiImportName(name, index) {
+    var raw = String(name || "image.jpg");
+    var dot = raw.lastIndexOf(".");
+    var ext = dot >= 0 ? raw.slice(dot).toLowerCase().replace(/[^.a-z0-9]/g, "") : ".jpg";
+    if (!/^\.(jpg|jpeg|png|webp|heic|heif)$/.test(ext)) ext = ".jpg";
+    return String(index + 1).padStart(2, "0") + "-" + Date.now().toString(36) + ext;
+  }
+  function aiImportImagePayload(file) {
+    function rawPayload() {
+      return blobToDataURL(file).then(function (dataURL) {
+        var parts = String(dataURL).split(",");
+        var encoded = parts[1] || "";
+        if (encoded.length > 5 * 1024 * 1024) throw new Error("图片过大，请先裁剪或压缩后重试");
+        return { base64: encoded, mime: file.type || "image/jpeg" };
+      });
+    }
+    if (!/^image\/(jpeg|jpg|png|webp)$/i.test(file.type || "")) return rawPayload();
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var image = new Image();
+      image.onload = function () {
+        try {
+          var maxSide = 2200;
+          var scale = Math.min(1, maxSide / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
+          var canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
+          canvas.height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+          var context = canvas.getContext("2d");
+          if (!context) throw new Error("当前设备不支持图片处理");
+          context.fillStyle = "#ffffff";
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          var dataURL = canvas.toDataURL("image/jpeg", 0.88);
+          var parts = String(dataURL).split(",");
+          var encoded = parts[1] || "";
+          if (encoded.length > 5 * 1024 * 1024) throw new Error("图片过大，请先裁剪或压缩后重试");
+          resolve({ base64: encoded, mime: "image/jpeg" });
+        } catch (error) { reject(error); }
+        URL.revokeObjectURL(url);
+      };
+      image.onerror = function () { URL.revokeObjectURL(url); rawPayload().then(resolve, reject); };
+      image.src = url;
+    });
+  }
+  function startAiDebtImport(files, idempotencyKey, onProgress) {
+    if (!account) return Promise.reject(cloudLoginRequired("AI 识图录入"));
+    if (!Array.isArray(files) || !files.length) return Promise.reject(new Error("请先选择还款计划截图"));
+    var uploadedFileIds = [];
+    var sessionId = "";
+    return aiDebtImportCall({ action: "create", idempotencyKey: idempotencyKey }).then(function (created) {
+      sessionId = created.sessionId;
+      if ((created.status === "succeeded" || created.status === "accepted") && created.draft) return created;
+      var chain = Promise.resolve();
+      files.forEach(function (file, index) {
+        chain = chain.then(function () {
+          if (onProgress) onProgress("uploading", index, files.length);
+          return aiImportImagePayload(file).then(function (payload) {
+            return aiDebtImportCall({
+              action: "upload", sessionId: sessionId, index: index,
+              mime: payload.mime, base64: payload.base64,
+            });
+          }).then(function (result) {
+            if (!result || !result.fileID) throw new Error("第 " + (index + 1) + " 张截图上传失败");
+            uploadedFileIds.push(result.fileID);
+            if (onProgress) onProgress("uploading", index + 1, files.length);
+          });
+        });
+      });
+      return chain.then(function () {
+        if (onProgress) onProgress("recognizing", files.length, files.length);
+        return aiDebtImportCall({ action: "recognize", sessionId: sessionId, fileIds: uploadedFileIds });
+      });
+    }).then(function (result) {
+      return { sessionId: result.sessionId, status: result.status, draft: result.draft || null, credits: result.credits };
+    }).catch(function (error) {
+      if (sessionId) aiDebtImportCall({ action: "cleanup", sessionId: sessionId }).catch(function () {});
+      throw error;
+    });
+  }
+  function completeAiDebtImport(sessionId) {
+    return aiDebtImportCall({ action: "complete", sessionId: sessionId }).then(function () { return true; }).catch(function (error) {
+      console.error("[aiDebtImport] complete failed", error && error.message);
+      return false;
+    });
+  }
+
   // 提前还款收益模拟器（Premium）——simIndex/simMode/setSimMode/openSimScreen/closeSimScreen/
   // runSimulate全部已删除(第八步)，整体搬进react/src/sheets/SimScreen.tsx，直接调用
   // window.simulatePrepay(calc.js全局函数)，SIM_KEY也整体移交React(见上面注释)。
@@ -3320,6 +3469,7 @@
     // SimScreen.tsx、NotifySheet.tsx第八步、DocsScreen.tsx第九步)，位置沿用原来这几个
     // subpage/sheet在DOM里的顺序——aiHistorySheet必须排在aiScreen之前("最上层先关"：
     // 历史对话sheet的z-index比aiScreen所在的.subpage更高，视觉上盖在aiScreen上层)。
+    if (window.__azAiImportScreenBack && window.__azAiImportScreenBack()) return true;
     if (window.__azAiHistorySheetBack && window.__azAiHistorySheetBack()) return true;
     if (window.__azAiScreenBack && window.__azAiScreenBack()) return true;
     if (window.__azBackupScreenBack && window.__azBackupScreenBack()) return true;
@@ -3528,6 +3678,9 @@
     restoreBackup: restoreBackup,
     deleteBackup: deleteBackup,
     getBackupMeta: getBackupMeta,
+    getAiDebtImportStatus: getAiDebtImportStatus,
+    startAiDebtImport: startAiDebtImport,
+    completeAiDebtImport: completeAiDebtImport,
     // 第十一步(aiScreen)新增，且是这一步唯一的新增：callAiAdvisor原样保留(依赖
     // ensureCbAuthReady/cbApp().callFunction这套认证会话状态，不可移植)。
     callAiAdvisor: callAiAdvisor,

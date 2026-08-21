@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 
 const AI_MONTHLY_LIMIT = 50;
+const AI_IMPORT_PAID_LIMIT = 25;
 const BINDING_INTENT_TTL_MS = 10 * 60 * 1000;
 
 function identityDocumentId(provider, providerUserId) {
@@ -23,6 +24,13 @@ function mergedProviders(...users) {
 
 function mergedUsageCount(firstCount, secondCount) {
   return Math.min(AI_MONTHLY_LIMIT, Math.max(0, Number(firstCount) || 0) + Math.max(0, Number(secondCount) || 0));
+}
+
+function mergedAiImportCredits(first, second) {
+  return {
+    paidUsed: Math.min(AI_IMPORT_PAID_LIMIT, Math.max(0, Number(first && first.paidUsed) || 0) + Math.max(0, Number(second && second.paidUsed) || 0)),
+    trialUsed: Math.max(0, Number(first && first.trialUsed) || 0) + Math.max(0, Number(second && second.trialUsed) || 0),
+  };
 }
 
 function normalizeAccount(user, userId) {
@@ -134,6 +142,7 @@ async function mergeAccounts(db, input) {
   const identities = db.collection("identities");
   const usages = db.collection("aiUsage");
   const entitlements = db.collection("premiumEntitlements");
+  const importCredits = db.collection("aiImportCredits");
   const targetUser = await getUserByUserId(db, targetUserId);
   const sourceUser = await getUserByUserId(db, sourceUserId);
   if (!targetUser || !sourceUser) throw new Error("待合并账号不存在，请重新发起绑定");
@@ -141,7 +150,7 @@ async function mergeAccounts(db, input) {
     throw new Error("待合并账号状态已变化，请重新发起绑定");
   }
 
-  const [sourceBackups, sourceLegacyBackups, sourceIdentities, targetUsages, sourceUsages, sourceLegacyUsages, targetEntitlement, sourceEntitlement] = await Promise.all([
+  const [sourceBackups, sourceLegacyBackups, sourceIdentities, targetUsages, sourceUsages, sourceLegacyUsages, targetEntitlement, sourceEntitlement, targetImportCredit, sourceImportCredit] = await Promise.all([
     readOwnedRecords(backups, "userId", sourceUserId),
     readOwnedRecords(backups, "openid", sourceUserId),
     readOwnedRecords(identities, "userId", sourceUserId),
@@ -150,6 +159,8 @@ async function mergeAccounts(db, input) {
     readOwnedRecords(usages, "openid", sourceUserId),
     entitlements.doc(targetUserId).get(),
     entitlements.doc(sourceUserId).get(),
+    importCredits.doc(targetUserId).get(),
+    importCredits.doc(sourceUserId).get(),
   ]);
   const uniqueById = (records) => [...new Map(records.filter(Boolean).map((record) => [record._id, record])).values()];
   const backupRecords = uniqueById([...sourceBackups, ...sourceLegacyBackups]);
@@ -249,6 +260,19 @@ async function mergeAccounts(db, input) {
       await transaction.collection("premiumEntitlements").doc(targetUserId).set(nextEntitlement);
       if (freshSourceEntitlement) await transaction.collection("premiumEntitlements").doc(sourceUserId).remove();
     }
+    const freshTargetImportCredit = firstDocument(await transaction.collection("aiImportCredits").doc(targetUserId).get()) || firstDocument(targetImportCredit);
+    const freshSourceImportCredit = firstDocument(await transaction.collection("aiImportCredits").doc(sourceUserId).get()) || firstDocument(sourceImportCredit);
+    if (freshTargetImportCredit || freshSourceImportCredit) {
+      const merged = mergedAiImportCredits(freshTargetImportCredit, freshSourceImportCredit);
+      await transaction.collection("aiImportCredits").doc(targetUserId).set({
+        userId: targetUserId,
+        ...merged,
+        reservation: null,
+        updatedAt: now,
+        mergedAt: now,
+      });
+      if (freshSourceImportCredit) await transaction.collection("aiImportCredits").doc(sourceUserId).remove();
+    }
     await transaction.collection("accountMerges").doc(mergeId).set({
       targetUserId,
       sourceUserId,
@@ -281,6 +305,7 @@ async function confirmMerge(db, input) {
 }
 
 module.exports = {
+  AI_IMPORT_PAID_LIMIT,
   AI_MONTHLY_LIMIT,
   BINDING_INTENT_TTL_MS,
   assertCurrentIdentity,
@@ -289,6 +314,7 @@ module.exports = {
   identityDocumentId,
   mergeAccounts,
   mergeDocumentId,
+  mergedAiImportCredits,
   mergedProviders,
   mergedUsageCount,
   normalizeAccount,

@@ -67,6 +67,8 @@ export function PremiumScreen() {
             <div className="pf-text"><div className="pf-title">AI 债务分析报告</div><div className="pf-desc">雪球法 / 雪崩法分析，告诉你优先还哪笔最省钱</div></div></div>
           <div className="pf-row"><div className="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v11H8l-4 4z" /></svg></div>
             <div className="pf-text"><div className="pf-title">AI 智能问答</div><div className="pf-desc">针对你自己的债务数据直接提问，随问随答</div></div></div>
+          <div className="pf-row"><div className="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v14H4z" /><path d="M8 9h8M8 13h5" /></svg></div>
+            <div className="pf-text"><div className="pf-title">AI 识图录入</div><div className="pf-desc">多张还款计划截图合并成可编辑草稿，买断包含 25 次终身额度</div></div></div>
           <div className="pf-row"><div className="pf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M4 19l6-6 4 4 6-8" /><path d="M14 6h6v6" /></svg></div>
             <div className="pf-text"><div className="pf-title">多策略对比规划</div><div className="pf-desc">雪球法/雪崩法/自定义顺序并排对比，哪种最省利息一眼看出</div></div></div>
         </div>
@@ -78,7 +80,7 @@ export function PremiumScreen() {
               <div className="pc-price-row">
                 <span className="pc-amt num">¥28</span>
               </div>
-              <div className="pc-period">一次性付费，永久使用，不再另外收费</div>
+              <div className="pc-period">一次性付费，永久解锁；包含 25 次终身 AI 识图录入额度</div>
             </div>
           </div>
         </div>
@@ -96,7 +98,7 @@ export function PremiumScreen() {
             </div>
           ) : null}
         </div>
-        <div className="footnote">开通即表示你同意我们的<button type="button" className="terms-link" onClick={openTermsScreen}>《会员服务协议》</button>。¥28 为一次性买断价，不会自动续费；已购买可在 iPhone 通过 Apple 恢复购买，Android 入口将在接入 Google Play 后开放。</div>
+        <div className="footnote">开通即表示你同意我们的<button type="button" className="terms-link" onClick={openTermsScreen}>《会员服务协议》</button>。¥28 为一次性买断价，不会自动续费；其中 AI 识图录入为 25 次终身额度，多张图组成一笔并成功生成草稿时仅消耗 1 次。已购买可在 iPhone 通过 Apple 恢复购买，Android 入口将在接入 Google Play 后开放。</div>
       </div>
     </div>
   );

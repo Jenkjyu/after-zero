@@ -171,6 +171,18 @@ async function verifyTransaction(userId, jws, now, allowAccountRecovery) {
       appAccountTokens: uniqueStrings([...(entitlement.appAccountTokens || []), transactionToken]),
     };
     await transaction.collection("premiumEntitlements").doc(userId).set(next);
+    if (deletedPurchase && Number(deletedPurchase.paidAiImportUsed) > 0) {
+      const creditRef = transaction.collection("aiImportCredits").doc(userId);
+      const currentCredit = firstDocument(await creditRef.get()) || {};
+      await creditRef.set({
+        ...withoutDocumentId(currentCredit),
+        userId,
+        paidUsed: Math.max(Number(currentCredit.paidUsed) || 0, Number(deletedPurchase.paidAiImportUsed) || 0),
+        trialUsed: Math.max(0, Number(currentCredit.trialUsed) || 0),
+        reservation: null,
+        updatedAt: now,
+      });
+    }
     return next;
   });
   return result && result.result ? result.result : result;

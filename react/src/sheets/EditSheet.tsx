@@ -15,7 +15,16 @@
 // 不需要额外的冻结逻辑。
 import { useEffect, useRef, useState } from "react";
 import type { Debt, GenSpec, PlanRow } from "../types";
-import { closeEditSheet, NEW_DEBT_ID, useDebts, useEditSheetId } from "../shared/state";
+import {
+  clearAiImportDraft,
+  closeEditSheet,
+  NEW_DEBT_ID,
+  openAiImportScreen,
+  resetAiImportWorkspace,
+  useAiImportDraft,
+  useDebts,
+  useEditSheetId,
+} from "../shared/state";
 import { makeGripDragState, onGripPointerDown, onGripPointerEnd, onGripPointerMove } from "./gripDrag";
 import { DEFAULT_GEN_FIELDS, GenPanel, type GenFields } from "./GenPanel";
 import { PlanRows } from "./PlanRows";
@@ -23,6 +32,7 @@ import { BatchBlock } from "./BatchBlock";
 
 export function EditSheet() {
   const editId = useEditSheetId();
+  const aiImportDraft = useAiImportDraft();
   const debts = useDebts();
   const isOpen = editId !== null;
   const sheetRef = useRef<HTMLDivElement | null>(null);
@@ -52,6 +62,9 @@ export function EditSheet() {
   // 变成false(显示"删除"按钮消失/标题变"新增债务")产生视觉跳变，所以单独用一个"打开时冻结"
   // 的state存起来，只在openEdit效果里更新。
   const [isNew, setIsNew] = useState(false);
+  const isAiDraft = editId === NEW_DEBT_ID && aiImportDraft !== null;
+  const isAiDraftRef = useRef(isAiDraft);
+  useEffect(() => { isAiDraftRef.current = isAiDraft; }, [isAiDraft]);
 
   // 对应vanilla openEdit(i)——每次editId变化(打开新增/打开编辑/切换到另一条)时，把表单
   // 全部字段从对应的debt或空白重新灌一遍。也复刻了openEdit()末尾syncOneTimeUI()在"这条债务
@@ -60,13 +73,17 @@ export function EditSheet() {
     if (editId === null) return;
     const d: Debt | undefined = editId !== NEW_DEBT_ID ? debts.find((x) => x.id === editId) : undefined;
     setIsNew(editId === NEW_DEBT_ID);
-    setName(d?.name || "");
-    setFunder(d?.funder || "");
-    setType(d?.type || "银行贷");
+    const imported = editId === NEW_DEBT_ID ? aiImportDraft?.draft : null;
+    const allowedTypes = ["银行贷", "信用卡分期", "网贷", "私人借款"];
+    setName(imported?.productHint || d?.name || "");
+    setFunder(imported?.funderHint || d?.funder || "");
+    setType(imported && allowedTypes.includes(imported.typeHint) ? imported.typeHint : d?.type || "银行贷");
     setOpened(d?.opened || "");
-    setNotes(d?.notes || "");
+    setNotes(imported?.notes || d?.notes || "");
     const isOne = !!d?.oneTime;
-    let plan = window.clone(d?.plan || []);
+    let plan = imported
+      ? window.clone(imported.plan).map((row) => ({ ...row, paid: false }))
+      : window.clone(d?.plan || []);
     let stash: PlanRow[] = [];
     if (isOne && plan.length > 1) { stash = plan.slice(1); plan = plan.slice(0, 1); }
     setOneTime(isOne);
@@ -95,7 +112,15 @@ export function EditSheet() {
     setKindSheetOpen(false);
     if (sheetRef.current) sheetRef.current.scrollTop = 0;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editId]);
+  }, [editId, aiImportDraft]);
+
+  function dismissEditSheet() {
+    closeEditSheet();
+    if (isAiDraftRef.current) {
+      openAiImportScreen();
+      window.__azBridge.toast("未新增债务；已完成的识别额度不会退回");
+    }
+  }
 
   // 删除债务后(debts.splice原地mutate，靠useDebts()的脏标记修复触发重渲染，见shared/state.ts
   // useDebts()自己的注释)，正在编辑的这条从数组里消失了——自动关闭，跟DetailSheet.tsx
@@ -122,7 +147,7 @@ export function EditSheet() {
       // "最上层先关"：计息方式抽屉盖在#editSheet之上，比关闭整个表单更靠上，先判它。
       if (kindSheetOpenRef.current) { setKindSheetOpen(false); return true; }
       if (editId !== null) {
-        closeEditSheet();
+        dismissEditSheet();
         return true;
       }
       return false;
@@ -154,7 +179,7 @@ export function EditSheet() {
     // editSheet不支持上拖调高(resizable=false)，只支持下拖关闭——跟vanilla原来
     // initGripDrag($("editSheet"), grip, closeEdit, false)一致。
     function handleMove(e: PointerEvent) { onGripPointerMove(e, sheet!, state, false); }
-    function handleEnd(e: PointerEvent) { onGripPointerEnd(e, sheet!, state, closeEditSheet); }
+    function handleEnd(e: PointerEvent) { onGripPointerEnd(e, sheet!, state, dismissEditSheet); }
     grip.addEventListener("pointerdown", handleDown);
     grip.addEventListener("pointermove", handleMove);
     grip.addEventListener("pointerup", handleEnd);
@@ -241,8 +266,13 @@ export function EditSheet() {
     window.__azBridge.setDebt(editId === NEW_DEBT_ID ? null : editId, obj);
     window.__azBridge.saveAll();
     window.__azBridge.renderAll();
+    if (isAiDraft && aiImportDraft) {
+      void window.__azBridge.completeAiDebtImport(aiImportDraft.sessionId);
+      clearAiImportDraft();
+      resetAiImportWorkspace();
+    }
     closeEditSheet();
-    window.__azBridge.toast("已保存 ✓");
+    window.__azBridge.toast(isAiDraft ? "已新增到债务账本 ✓" : "已保存 ✓");
   }
 
   const firstDate = editingPlan[0] && editingPlan[0].date ? window.parseDate(editingPlan[0].date) : null;
@@ -254,14 +284,17 @@ export function EditSheet() {
 
   return (
     <>
-      <div className={"scrim" + (isOpen ? " open" : "")} onClick={closeEditSheet} />
+      <div className={"scrim" + (isOpen ? " open" : "")} onClick={dismissEditSheet} />
       <div ref={sheetRef} className={"sheet" + (isOpen ? " open" : "")} role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
         <div ref={gripRef} className="grip" />
         {/* 滚动放在这层、不放在.sheet上——.sheet同时有圆角+overflow:auto+transform时
             会被判定成不透明合成滚动层，深色模式下圆角处会露白底(见www/index.html里
             .sheet那段注释)。grip留在这层外面，拖动条永远在顶部不被内容滚走。 */}
         <div className="sheet-scroll">
-          <h2 id="sheetTitle">{isNew ? "新增债务" : "编辑债务"}</h2>
+          <h2 id="sheetTitle">{isAiDraft ? "AI 识别草稿" : isNew ? "新增债务" : "编辑债务"}</h2>
+          {isAiDraft ? <div className="ai-import-draft-note">
+            <strong>请在下方核对并补齐识别草稿，确认无误后再新增债务。</strong>
+          </div> : null}
           <form id="debtForm" onSubmit={handleSave}>
             <div className="field"><label htmlFor="f-name">贷款产品 <span className="req">*</span></label><input id="f-name" required value={name} onChange={(e) => setName(e.target.value)} /></div>
             <div className="field two">
@@ -314,8 +347,8 @@ export function EditSheet() {
 
             <div className="sheet-actions">
               {!isNew ? <button type="button" className="btn danger" id="deleteBtn" onClick={handleDelete}>删除</button> : null}
-              <button type="button" className="btn ghost" id="cancelBtn" onClick={closeEditSheet}>取消</button>
-              <button type="submit" className="btn primary">保存</button>
+              <button type="button" className="btn ghost" id="cancelBtn" onClick={dismissEditSheet}>{isAiDraft ? "返回调整截图" : "取消"}</button>
+              <button type="submit" className="btn primary">{isAiDraft ? "确认新增债务" : "保存"}</button>
             </div>
           </form>
         </div>

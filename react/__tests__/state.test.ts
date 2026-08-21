@@ -8,7 +8,7 @@
 // 返回的原始数组，但内容应该始终一致。
 import { describe, expect, it } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import { closeDetailSheet, closeEditSheet, closePremiumScreen, NEW_DEBT_ID, openDetailSheet, openEditSheet, useAccount, useDebts, useDetailSheetId, useEditSheetId, usePremium, usePremiumScreenOpen } from "../src/shared/state";
+import { clearAiImportDraft, closeAiImportScreen, closeDetailSheet, closeEditSheet, closePremiumScreen, NEW_DEBT_ID, openAiImportScreen, openDetailSheet, openEditSheet, setAiImportDraft, useAccount, useAiImportDraft, useAiImportScreenOpen, useDebts, useDetailSheetId, useEditSheetId, usePremium, usePremiumScreenOpen } from "../src/shared/state";
 import type { Premium } from "../src/types";
 import { makeMockBridge, makeDebt } from "./mockBridge";
 
@@ -97,6 +97,24 @@ describe("useDebts / usePremium / useAccount", () => {
     act(() => { window.dispatchEvent(new CustomEvent("az:state-changed")); });
 
     expect(result.current).toBe(before);
+  });
+});
+
+describe("AI 识图 screen 与草稿共享状态", () => {
+  it("screen 开关和草稿各自通过独立事件更新", () => {
+    closeAiImportScreen(); clearAiImportDraft();
+    const screenHook = renderHook(() => useAiImportScreenOpen());
+    const draftHook = renderHook(() => useAiImportDraft());
+    act(() => { openAiImportScreen(); });
+    expect(screenHook.result.current).toBe(true);
+    act(() => { setAiImportDraft({
+      sessionId: "ais_state",
+      draft: { productHint: "测试贷", funderHint: "", typeHint: "", notes: "", warnings: [], sourceStatuses: [], plan: [] },
+    }); });
+    expect(draftHook.result.current?.sessionId).toBe("ais_state");
+    act(() => { closeAiImportScreen(); clearAiImportDraft(); });
+    expect(screenHook.result.current).toBe(false);
+    expect(draftHook.result.current).toBe(null);
   });
 });
 

@@ -7,6 +7,7 @@ const {
   identityDocumentId,
   mergeAccounts,
   mergedProviders,
+  mergedAiImportCredits,
   mergedUsageCount,
 } = require("../cloudbase/functions/accountBinding/bindingService");
 
@@ -81,6 +82,7 @@ test("合并后的 provider 列表去重，AI 当月额度相加但绝不超过�
   assert.equal(mergedUsageCount(48, 9), AI_MONTHLY_LIMIT);
   assert.equal(mergedUsageCount(3, 4), 7);
   assert.equal(mergedUsageCount(-3, 4), 4);
+  assert.deepEqual(mergedAiImportCredits({ paidUsed: 20, trialUsed: 2 }, { paidUsed: 9, trialUsed: 1 }), { paidUsed: 25, trialUsed: 3 });
 });
 
 test("账户合并保留双方备份、迁移身份、封顶当月 AI 用量且可重试", async () => {
@@ -96,6 +98,10 @@ test("账户合并保留双方备份、迁移身份、封顶当月 AI 用量且�
       { _id: "usage-source-aug", userId: "u_source", month: "2026-08", count: 9 },
       { _id: "usage-source-sep", userId: "u_source", month: "2026-09", count: 5 },
     ],
+    aiImportCredits: [
+      { _id: "u_target", userId: "u_target", paidUsed: 20, trialUsed: 2 },
+      { _id: "u_source", userId: "u_source", paidUsed: 9, trialUsed: 1 },
+    ],
   });
   const now = Date.parse("2026-08-13T00:00:00Z");
   const result = await mergeAccounts(db, { currentUserId: "u_target", otherUserId: "u_source", provider: "wechat", now });
@@ -107,6 +113,9 @@ test("账户合并保留双方备份、迁移身份、封顶当月 AI 用量且�
   assert.equal(db.record("backups", "backup-source").mergeSource.device, "旧 Android");
   assert.equal(db.record("aiUsage", "usage-target-aug").count, AI_MONTHLY_LIMIT);
   assert.equal(db.record("aiUsage", "usage-source-aug"), undefined);
+  assert.equal(db.record("aiImportCredits", "u_target").paidUsed, 25);
+  assert.equal(db.record("aiImportCredits", "u_target").trialUsed, 3);
+  assert.equal(db.record("aiImportCredits", "u_source"), undefined);
   const retry = await mergeAccounts(db, { currentUserId: "u_target", otherUserId: "u_source", provider: "wechat", now: now + 1 });
   assert.equal(retry.merged, true);
   assert.equal(db.record("aiUsage", "usage-target-aug").count, AI_MONTHLY_LIMIT);
