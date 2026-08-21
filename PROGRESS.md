@@ -3175,3 +3175,25 @@ PDF字体经历了一次有价值的测试拦截：先下载的Noto OTF在`pdf`�
 - 按用户确认，将 AI 识图页识别规则改为“同一笔债务可上传多张截图，点击一次‘开始识别’后合并生成一份草稿，仅消耗 1 次额度；识别失败不扣次数”，主按钮简化为“开始识别”；识别中仍显示“识别中…”。
 - React 46 文件 380/380、TypeScript、React 生产构建、Android/iOS Capacitor sync 和 `git diff --check` 通过。iOS 构建号从 `8` 升为 `9`；归档内已核对 Bundle ID `io.github.jenkjyu.afterzero`、版本 `1.0.0`、构建号 `9`，并确认新文案已随包进入 `public/js/react-debts/sheets.js`。
 - `1.0.0 (9)` 已按 App Store Connect 分发方式上传成功，Xcode 返回 `Uploaded App`、`EXPORT SUCCEEDED`；当前等待 Apple 处理，未提交审核或公开发布，待处理完成后在 TestFlight 安装检查。
+
+## 2026-08-22（续4）：用户确认上架门槛与 AI 识图验收完成
+
+- 用户确认：步骤 4 剩余的 iOS 账户组合、合并后备份可见性，以及步骤 8 剩余的 StoreKit 购买/恢复/退款撤销等真机生命周期验收均属于小问题，统一延后到上架后验证，不再阻塞当前上架流程。
+- 步骤 9“签名、隐私、App Store Connect 资料、`1.0.0 (4)` TestFlight 回归”确认完成，状态保持“已完成，等待用户检查”。
+- AI 识图确认完成：`1.0.0 (9)` 已上传；“截图上传 → OCR → `hy3` 整理 → 可编辑草稿”链路已完成真实样本验证，识别率已验证，成本可接受，不再有待测产品问题。
+- 当前不自动进入步骤 10，不提交审核或公开发布；步骤 4/8 的补充验证留到上架后。以上仅更新进度文档，不执行 Git 提交或推送。
+
+## 2026-08-22（续5）：步骤 10 已开始，完成本地发布基线
+
+- 用户明确授权开始步骤 10。按当前决策，步骤 4/8 剩余小项继续延后到上架后，不重新作为本次上架阻塞。
+- 本地基线通过：`npm test` 150/150、React 测试 46 文件 380/380、TypeScript、React production build、`npx cap sync ios`、`npx cap sync android`、`git diff --check`。
+- Android：本机 release keystore 和 `keystore.properties` 存在；`JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:assembleRelease --no-daemon --console=plain` 成功，APK 位于 `android/app/build/outputs/apk/release/app-release.apk`，`apksigner` 验证 v2 签名通过、单一 signer。
+- iOS：首次 Archive 因受限 shell 无法写入用户 Swift/Clang 缓存失败；切换 DerivedData、SwiftPM 和模块缓存到 `/private/tmp` 并使用允许的系统构建权限后，Release iPhoneOS Archive 成功。归档版本为 `1.0.0 (9)`、Bundle ID 为 `io.github.jenkjyu.afterzero`；App Store Connect 分发导出成功，`DistributionSummary.plist` 核对为 Apple Distribution、Team `RYU53AS626`、`get-task-allow=false`。导出包包含 `cloudbase.storage.js`、React 产物和 `PrivacyInfo.xcprivacy`。
+- 当前阻塞不是源码或构建：`xcrun devicectl list devices` 因 CoreDevice 服务连接失效，未发现可用 iPhone；因此本轮不能新增真实设备总回归、TestFlight 安装和首屏/登录/通知/文件/备份等逐项证据。已上传的 `1.0.0 (9)` 不重复上传，待连接 iPhone 后继续。
+- 步骤 10 仍进行中；首次 App Store 提交需账号持有人在 App Store Connect 核对最新构建和审核资料后最终确认。未提交审核、未公开发布、未执行 Git commit/push。
+
+## 2026-08-22（续6）：用户确认步骤 10 真机回归门槛按既有证据完成
+
+- 用户确认：本机 CoreDevice 服务失效、无法新增执行 TestFlight 真机总回归，不再作为步骤 10 阻塞；沿用此前已完成的 iPhone 验收证据，将该项视为完成。
+- 步骤 10 当前状态更新为：本地测试、双平台 sync、Android Release、iOS Release Archive/分发导出和总回归证据均已完成；仅剩 App Store 首次提交。步骤 4/8 剩余小项继续延后到上架后。
+- 本次只更新进度、交接、实施计划、发布清单、README 和 AGENTS；用户已明确授权随后对本次文档改动执行 `git commit` 与 `git push`。不提交 App 审核、不创建 PR、不修改现有未纳入本次范围的 `ios/App/App/WeChatLoginPlugin.swift`。

@@ -6,7 +6,7 @@
 
 当前正式发布主线是 **Capacitor + React 的 iOS App**，包名为 `io.github.jenkjyu.afterzero`。Android 保留为内部测试包，暂不作为正式发布渠道。全新安装默认没有任何债务或档案数据，可直接在本地使用；AI 债务助手、云备份，以及 Premium 的购买、恢复购买和兑换等服务端权益操作才要求登录。
 
-iOS 已建立同一套 Web 产品的 Capacitor 原生壳，并已完成 Apple/微信登录、文件保存、通知和主要交互的 iPhone 验收。StoreKit 真实支付、TestFlight 与 App Store 上架仍未闭环，因此当前不能视为可发布 iOS 产品。
+iOS 已建立同一套 Web 产品的 Capacitor 原生壳，并已完成 Apple/微信登录、文件保存、通知、主要交互和 TestFlight 候选回归。AI 识图已完成真实样本识别率与成本验证。StoreKit 剩余真机生命周期验证按用户决定延后到上架后；App Store 首次提交与上架仍未完成，因此当前不能视为已发布 iOS 产品。
 
 - `react/src/**` 负责“债务”“还款日”“统计”“我的”四个 tab，以及不属于 tab 的 subpage、sheet 和 screen。Vite 使用 `debts`、`pay`、`report`、`mine`、`sheets` 五个入口。
 - `www/index.html` 是唯一 Web 宿主，保留全局 CSS、tabbar、登录门、共享确认框、隐藏导入 input、localStorage/IndexedDB、CloudBase 和原生能力编排；财务计算集中在 `www/js/calc.js`。
@@ -15,17 +15,17 @@ iOS 已建立同一套 Web 产品的 Capacitor 原生壳，并已完成 Apple/�
 
 “还款日”按期次列出待还项目，支持时间窗口筛选、部分还款、协商减免和按顺序销期。“统计”是一份基于当前账本生成的债务报告，包含结论、还清走势、未来压力、余额排行和类型构成。
 
-当前只有一个 Premium 等级。iOS 登录身份首次经服务端确认后可体验全部功能 7 天；体验结束后为 ¥28 一次性买断，不自动续费。StoreKit 购买、恢复购买和服务端权益验证已经实现，但 App Store 配置与真机支付验收尚未完成，因此不能视为已经对外开通支付。最近一次服务端确认后的 Premium 权益可离线使用 3 天。
+当前只有一个 Premium 等级。iOS 登录身份首次经服务端确认后可体验全部功能 7 天；体验结束后为 ¥28 一次性买断，不自动续费。StoreKit 购买、恢复购买和服务端权益验证已经实现，App Store Connect 配置与 TestFlight 回归已完成，但完整真机支付验收尚未完成，因此不能视为已经对外开通支付。最近一次服务端确认后的 Premium 权益可离线使用 3 天。
 
 iOS 体验结束且未购买时，仍可使用“债务”tab 的本地功能；AI、“还款日”“统计”，以及云备份、档案库、备份文件导入导出入口会引导至 Premium 页面。提前还款模拟仍可用。AI 额度由服务端按北京时间自然月计数，每月最多 50 次。
 
 更细的开发边界、硬规则和按任务加载的知识入口见 [`AGENTS.md`](AGENTS.md) 与 [`.agents/skills/`](.agents/skills/)。
 
-## iOS 发布主线（步骤 8 未闭环；步骤 9 例外进行中）
+## iOS 发布主线（步骤 10 进行中；步骤 4/8 剩余小项延后上架后）
 
-当前以 iOS 为发布主线，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 3～7 的 iPhone 验收已完成；步骤 8 正在完成 StoreKit、恢复购买与服务端权益，步骤 9 已按例外授权开始进行签名、隐私、合规和 TestFlight 候选准备。
+当前以 iOS 为发布主线，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 3～7 的 iPhone 验收已完成；步骤 9 的签名、隐私、合规和 TestFlight 候选回归已完成，AI 识图真实样本与成本验证也已完成。步骤 10 的本地基线已完成，用户确认沿用既有 iPhone 验收证据完成总回归；当前仅剩 App Store 首次提交。步骤 4/8 的剩余小项按用户决定放到上架后，不再阻塞当前发布流程。
 
-Android 的登录、文件、通知和交互回归改为内部测试清单，不再阻塞 iOS 的 TestFlight 或 App Store 发布；共享代码仍保持基础构建验证。当前 iOS 的剩余关键项是 StoreKit 真机购买/恢复等场景、签名合规、App Store Connect 配置和上架材料。步骤 9 的当前检查见 [`docs/ios/release-readiness.md`](docs/ios/release-readiness.md)，权威范围与恢复动作见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
+Android 的登录、文件、通知和交互回归改为内部测试清单，不再阻塞 iOS 的 TestFlight 或 App Store 发布；共享代码已完成本轮基础构建验证。步骤 4/8 的剩余验证已明确延后到上架后；步骤 10 总回归按既有 iPhone 验收证据视为完成，当前仅待 App Store 首次提交，尚未提交审核或公开上架。权威范围与恢复动作见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
 
 ## Flutter 重写（已停止并封存）
 

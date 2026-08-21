@@ -1,6 +1,6 @@
 # After Zero iOS 主线实施计划
 
-状态：步骤 0–2 已批准；步骤 3、5、6、7 的本轮 iPhone 验收已完成；步骤 4 的 Apple→微信绑定已通过，其他 iOS 账户组合仍待补齐。步骤 8 的 CloudBase 与 App Store Connect 通知配置已完成，仍待 iPhone StoreKit 真机验收。用户于 2026-08-20 例外授权提前开始步骤 9；步骤 9 的仓库配置、Apple Distribution 签名及 `1.0 (1)`、`1.0 (2)`、`1.0 (3)`、`1.0.0 (4)` TestFlight 上传已完成，`1.0.0 (4)` 当前等待 Apple 处理；公网页面已通过 Netlify 上线且 `afterzero.tech` DNS 已验证，隐私政策和技术支持 URL 已具备，随后还需在 App Store Connect 填写/保存元数据、关联 App Store 版本并完成 TestFlight 验收。Android 回归降为内部测试事项，不阻塞 iOS 发布主线。
+状态：步骤 0–2 已批准；步骤 3、5、6、7 的本轮 iPhone 验收已完成；步骤 4 的 Apple→微信绑定已通过，其余账户组合与合并后备份可见性按用户决定延后到上架后。步骤 8 的 CloudBase 与 App Store Connect 通知配置已完成，剩余 StoreKit 真机生命周期验收按用户决定延后到上架后，不阻塞当前发布。步骤 9 已完成；AI 识图真实样本识别率与成本也已验证。步骤 10 的本地测试、双平台 sync、Android Release、iOS Release 分发导出已通过，用户确认沿用既有 iPhone 验收证据完成总回归；当前仅待 App Store 首次提交。Android 回归降为内部测试事项，不阻塞 iOS 发布主线。
 
 建立日期：2026-08-12
 
@@ -63,13 +63,13 @@
 | 1 | iOS 工具链与可运行的 Capacitor 原生壳 | 已批准 |
 | 2 | 本地优先模式与云功能登录门 | 已批准 |
 | 3 | Apple 登录与统一内部账户端到端闭环 | iOS 验收完成；Android 旧微信账号回归列为内部测试，不阻塞 |
-| 4 | iOS 微信登录、身份绑定与既有云账号合并 | 进行中：官方 iOS SDK、CloudBase 函数/私有集合和 iPhone Apple→微信绑定已通过；仍待其余 iOS 账户组合与合并后备份可见性 |
+| 4 | iOS 微信登录、身份绑定与既有云账号合并 | 当前上架门槛已完成；其余 iOS 账户组合与合并后备份可见性延后到上架后 |
 | 5 | iOS 文件保存、分享与导入导出闭环 | iOS 验收完成；当前 UI 未暴露档案分享入口，用户确认本轮不阻塞；Android SAF 回归列为内部测试 |
 | 6 | Android/iOS 本地通知双平台闭环 | iOS 验收完成；Android channel、450 条上限与重排列为内部测试 |
 | 7 | iOS WebView、布局、键盘与手势全量适配 | iOS 验收完成；Android 交互回归列为内部测试 |
-| 8 | StoreKit Premium、恢复购买与服务端权益 | 进行中：CloudBase 权益/通知函数、ADMINONLY 去重集合、HTTP 网关与 App Store Connect 生产/沙盒通知 URL 已配置；Mac TestFlight Sandbox 首购通过，注销后恢复购买的线上回退已部署待复测，仍待 iPhone 真机 StoreKit 验收 |
-| 9 | 签名、隐私、合规与 TestFlight 发布候选 | 进行中（例外授权）：仓库隐私/发布配置、Apple Distribution 签名、`1.0 (1)`、`1.0 (2)`、`1.0 (3)`、`1.0.0 (4)` 上传、公网页面上线和 DNS 验证已完成；等待 `1.0.0 (4)` 处理、TestFlight 安装验收、构建关联、App Privacy 和 App Store Connect 其他元数据 |
-| 10 | iOS 总回归、Android 内测冒烟与 App Store 首次提交 | 未开始 |
+| 8 | StoreKit Premium、恢复购买与服务端权益 | 当前上架门槛已完成；CloudBase 权益/通知函数、ADMINONLY 去重集合、HTTP 网关与 App Store Connect 生产/沙盒通知 URL 已配置；剩余 StoreKit 真机生命周期验收延后到上架后 |
+| 9 | 签名、隐私、合规与 TestFlight 发布候选 | 已完成；签名、隐私、App Store Connect 资料、`1.0.0 (4)` 构建关联、公网页面上线、TestFlight 回归均已完成 |
+| 10 | iOS 总回归、Android 内测冒烟与 App Store 首次提交 | 进行中：本地构建与总回归按既有 iPhone 验收证据完成；当前仅待 App Store 首次提交 |
 
 ## 步骤 0：计划、交接与跨 session 门禁
 

@@ -1,17 +1,17 @@
 # After Zero iOS 主线滚动交接
 
-更新时间：2026-08-21
+更新时间：2026-08-22
 
 总计划：[`implementation-plan.md`](implementation-plan.md)
 
 ## 当前控制状态
 
-- 当前执行步骤：步骤 9“签名、隐私、合规与 TestFlight 发布候选”按 2026-08-20 例外授权进行中；步骤 8 仍未完成，步骤 3、5、6、7 的 iOS 验收已完成。
-- 当前状态：步骤 3、5、6、7 的 iPhone 集中验收已通过。步骤 4 的微信开放平台审核、官方 iOS SDK、CloudBase 函数/私有集合和 iPhone Apple→微信绑定均已通过；仍待其余 iOS 账户组合及合并后备份可见性。Android 回归改列内部测试，不阻塞 iOS 发布。
+- 当前发布停点：步骤 9“签名、隐私、合规与 TestFlight 发布候选”已完成；步骤 10“iOS 总回归、Android 内测冒烟与 App Store 首次提交”进行中。步骤 3、5、6、7 的 iOS 验收已完成。
+- 当前状态：步骤 3、5、6、7 的 iPhone 集中验收已通过。步骤 4 的微信开放平台审核、官方 iOS SDK、CloudBase 函数/私有集合和 iPhone Apple→微信绑定均已通过；其余账户组合及合并后备份可见性按用户决定延后到上架后。步骤 8 的剩余 StoreKit 真机生命周期验收也延后到上架后，不再阻塞当前发布。AI 识图已完成真实样本识别率与成本验证。步骤 10 的本地基线、Android Release 和 iOS Release 分发导出已通过；用户确认沿用既有 iPhone 验收证据，将新增真机总回归视为完成。当前仅剩 App Store 首次提交。Android 回归改列内部测试，不阻塞 iOS 发布。
 - 上一步：步骤 2 已批准
-- 当前恢复动作：`1.0 (1)` 已在 Mac TestFlight 安装，Sandbox 首次购买和注销后恢复购买均已通过；规范三段式版本 `1.0.0 (4)` 已 Archive 并上传 App Store Connect，当前等待 Apple 处理。公网页面已通过 Netlify 上线，`afterzero.tech` DNS 已验证，可使用隐私政策 `https://afterzero.tech/privacy.html` 和技术支持 `https://afterzero.tech/support.html`。处理完成后需在 App Store 版本 `1.0.0` 中关联构建并完成 TestFlight 回归；仍须补齐 App Store Connect App Privacy、发布资料和步骤 8 的 iPhone StoreKit 验收。步骤 10 未开始。
-- 下一步骤授权：用户已于 2026-08-13 明确授权开始步骤 8，并于 2026-08-20 例外授权开始步骤 9；不授权步骤 10 或正式发布。
-- Git 操作：用户已于 2026-08-21 明确授权更新本次项目交接文件并执行 `git commit`；本次不执行 `git push`、不创建 PR、不提交审核。此前各阶段的提交/推送授权仍以当时记录为准。
+- 当前恢复动作：`1.0.0 (4)` 已完成 App Store Connect 处理、App Store 版本关联、App Privacy/发布资料填写和 TestFlight 安装回归；公网页面已通过 Netlify 上线，`afterzero.tech` DNS 已验证。AI 识图 `1.0.0 (9)` 已完成真实样本识别率与成本验证，构建已上传 App Store Connect。本轮已用当前源码完成 `1.0.0 (9)` 的 iOS Release Archive 和 App Store Connect 分发导出，但未重复上传相同构建号；步骤 4/8 剩余小项延后到上架后。步骤 10 总回归按既有 iPhone 验收证据视为完成，当前仅待 App Store 首次提交。
+- 下一步骤授权：用户已于 2026-08-22 明确授权开始步骤 10，并确认本机 CoreDevice 不可用不再作为新增真机回归阻塞；当前文档收尾已获授权。App Store 首次提交仍需账号持有人在 App Store Connect 最终确认。
+- Git 操作：用户已于 2026-08-22 明确授权本次进度文档 `git commit` 和 `git push`；本次不创建 PR、不提交 App 审核。此前各阶段的 Git 操作授权仍以当时记录为准。
 - Flutter：继续停止并封存；本计划只处理根 Capacitor + React 主线
 
 ## 用户已确认的长期决策
@@ -32,7 +32,7 @@
 
 ## 当前仓库与环境事实
 
-- 当前正式发布目标是 Capacitor + React iOS App；根 `ios/` 已可编译、可在 iPhone 运行，但 StoreKit 真机闭环、App Store 配置和上架尚未完成，仍不能视为可发布 iOS 产品。Android 保留为内部测试包。
+- 当前正式发布目标是 Capacitor + React iOS App；根 `ios/` 已可编译、可在 iPhone 运行，步骤 9 的 App Store Connect 配置与 TestFlight 回归已完成，AI 识图真实样本识别率与成本已验证。步骤 10 的本地 Release 候选已生成，用户确认沿用既有 iPhone 验收证据完成总回归，当前仅剩 App Store 首次提交；步骤 4/8 剩余小项延后到上架后。仍不能视为已发布 iOS 产品。Android 保留为内部测试包。
 - `@capacitor/core`、CLI、Android、iOS 当前均为 `8.4.1`；Local Notifications 为 `8.2.1`。
 - Node.js `v24.15.0`、npm `11.12.1`，满足当前 Capacitor CLI Node `>=22` 要求。
 - 本机已安装并选择 Xcode `26.6`（build `17F113`），Xcode 许可已由用户本人接受；已安装 iOS `26.5` Simulator Runtime。
@@ -41,7 +41,7 @@
 - 当前通知计算未来 6 个月：Android 最多提交 450 条，iOS 最多提交 63 条正式提醒并为测试通知保留一个槽位。iOS 配置已启用前台 sound/banner/list，正式/测试通知均不发送 Android 专属字段；iPhone 真机已验收，Android 仍待回归。
 - 当前 Android 有四个手写 Java 类；iOS 已新增 `AppleLoginPlugin.swift`、`WeChatLoginPlugin.swift`、`SaveFilePlugin.swift` 与 `AfterZeroBridgeViewController.swift`，以后仍按能力逐项实现，不机械复制 Android 四个类。
 - 步骤 3 已建立 provider-neutral 内部 `userId` 与 `identities` 映射：旧微信用户惰性保持 `userId === openid`，Apple 新用户使用随机内部 id。相关 CloudBase 函数已部署，`identities` 与 `appleLoginNonces` 已创建为 ADMINONLY；iPhone Apple 真机闭环已通过，仍不能以此替代 Android 旧微信账号回归。
-- 当前 Premium 已有 StoreKit 2 客户端和 CloudBase 服务端权益验证；`premiumEntitlement` 与 App Store Server Notifications 接收器均已部署。真实购买、恢复、换机及退款/撤销仍未在 iPhone 完成验收，不能描述为已发布或已闭环的跨设备权益。
+- 当前 Premium 已有 StoreKit 2 客户端和 CloudBase 服务端权益验证；`premiumEntitlement` 与 App Store Server Notifications 接收器均已部署。真实购买、恢复、换机及退款/撤销的剩余验收按用户决定延后到上架后，不作为当前发布阻塞；仍不能据此描述为已完成上架后的全生命周期验收。
 
 ## 步骤 0 本轮变更
 
@@ -265,7 +265,7 @@
 - 用户明确例外授权：在步骤 8 的 iPhone StoreKit 真机验收完成前，提前开始步骤 9；该授权不进入步骤 10，不代表步骤 8 已完成。
 - 新增 App target 的 `ios/App/App/PrivacyInfo.xcprivacy`，声明 App 自己的 `UserDefaults` 使用理由 `CA92.1`、无追踪及实际云端账户/用户内容/Premium 购买历史类别；将原先作为 App 资源复制的微信 SDK 同名清单移出 Resources phase，避免两个 `PrivacyInfo.xcprivacy` 产物冲突。
 - `ios/App/App/Info.plist` 增加 `ITSAppUsesNonExemptEncryption=false`。这是基于当前代码只发现系统 HTTPS/TLS、Keychain、StoreKit、SHA-256 身份校验和第三方登录 SDK 的暂定判断；上传前必须由账号持有人结合最终依赖在 App Store Connect 再确认。
-- 新增 [`release-readiness.md`](release-readiness.md)，记录 Bundle ID/Team ID、entitlements、隐私清单、出口合规、App Store Connect 元数据和 TestFlight 的外部待办；README 已同步步骤 9 例外进行中。
+- 新增 [`release-readiness.md`](release-readiness.md)，记录 Bundle ID/Team ID、entitlements、隐私清单、出口合规、App Store Connect 元数据和 TestFlight 候选状态；README 已同步步骤 9 已完成、步骤 8 未闭环。
 - 验证：四份 plist/entitlements 清单 lint 通过，`git diff --check` 通过；iOS `Release`、`iphoneos`、`CODE_SIGNING_ALLOWED=NO` generic device 构建成功，产物包含单一 `PrivacyInfo.xcprivacy`、图标、启动资源和 `io.github.jenkjyu.afterzero` Bundle ID。Simulator 构建不能使用仅真机架构的微信静态库，未将该环境限制误报为工程失败。
-- 本机已创建带私钥的 Apple Distribution 证书；Xcode 已成功 Archive、以 App Store Connect 分发方式导出并上传 `1.0 (1)`、`1.0 (2)`、`1.0 (3)`，传输日志均为上传成功。`1.0 (1)` 已在 Apple 芯片 Mac 的 TestFlight 安装；`1.0 (3)` 正在等待 Apple 处理。自动化 shell 的 `security find-identity` 仍无钥匙串读取权限，不能覆盖 Xcode 实际签名结果。App Store Connect 的隐私标签、年龄/分类、截图、支持 URL、隐私政策 URL、出口合规确认和审核材料仍待账号持有人完成。
+- 本机已创建带私钥的 Apple Distribution 证书；Xcode 已成功 Archive、以 App Store Connect 分发方式导出并上传多个 TestFlight 候选，规范版本 `1.0.0 (4)` 已完成处理、构建关联和 TestFlight 回归。自动化 shell 的 `security find-identity` 仍无钥匙串读取权限，不能覆盖 Xcode 实际签名结果。App Store Connect 的隐私标签、年龄/分类、截图、支持 URL、隐私政策 URL、出口合规确认和审核材料均已完成；尚未提交审核或公开上架。
 - Git：仅保留工作树改动，未暂存、提交、推送或创建 PR。步骤 10 未开始。

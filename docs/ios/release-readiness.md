@@ -1,8 +1,8 @@
 # iOS 步骤 9 发布就绪清单
 
-更新时间：2026-08-21
+更新时间：2026-08-22
 
-本文只记录步骤 9 的签名、隐私、合规和 TestFlight 候选状态；不代表步骤 8 StoreKit 真机闭环或步骤 10 总回归已经完成。
+本文只记录步骤 9 的签名、隐私、合规和 TestFlight 候选状态；步骤 9 已完成。步骤 4/8 的剩余小项按用户决定延后到上架后，不代表步骤 10 的 App Store 首次提交或公开上架已经完成。
 
 ## 已落地到仓库
 
@@ -20,15 +20,16 @@
 - 2026-08-20 已在本机创建带私钥的 Apple Distribution 证书。Xcode 自动签名归档后，以 App Store Connect 分发方式自动重签，导出的 `1.0 (1)` IPA 已确认使用 Apple Distribution、Bundle ID `io.github.jenkjyu.afterzero` 和 Team `RYU53AS626`。
 - `1.0 (2)` 已将直接购买的旧账号交易提示改为“原账号已购买过Premium会员，请点“恢复购买””；归档版本号已校验为 `1.0 (2)`，并于 2026-08-21 以 App Store Connect 分发方式上传成功，Xcode 记录 `Upload succeeded` 与 `EXPORT SUCCEEDED`。上传只产生 TestFlight 候选，不会提交审核或公开上架；仍须等待 Apple 处理完成后才能分配测试者。
 - `1.0 (3)` 已去掉上述提示末尾句号；归档版本号已校验为 `1.0 (3)`，并于 2026-08-21 以 App Store Connect 分发方式上传成功，Xcode 记录 `Upload succeeded` 与 `EXPORT SUCCEEDED`。上传只产生 TestFlight 候选，不会提交审核或公开上架；仍须等待 Apple 处理完成后才能分配测试者。
-- 按 Apple 三段式版本要求，Debug/Release 的 App 版本已改为 `1.0.0`，构建号升为 `4`。`1.0.0 (4)` 已完成 Release Archive，归档内 Bundle ID、版本号和构建号均已核对；以 App Store Connect 分发方式重签并上传成功，Xcode 记录 `Upload succeeded` 与 `EXPORT SUCCEEDED`。当前 Apple 状态为 `PROCESSING`，尚未可在 TestFlight 安装，也未提交审核或公开上架。
+- 按 Apple 三段式版本要求，Debug/Release 的 App 版本已改为 `1.0.0`，构建号升为 `4`。`1.0.0 (4)` 已完成 Release Archive，归档内 Bundle ID、版本号和构建号均已核对；以 App Store Connect 分发方式重签并上传成功，已完成 Apple 处理、版本关联和 TestFlight 回归；尚未提交审核或公开上架。
+- `1.0.0 (9)` 将 AI 识图临时图片上传改为已登录云函数代理，避免 iOS WebView 直接写 CloudBase Storage；归档内版本和构建号已核对为 `1.0.0 (9)`，并已按 App Store Connect 分发方式上传成功。AI 识图已完成真实样本识别率与成本验证；未提交审核或公开发布。
+- 步骤 10 基线中，当前源码已再次完成 `1.0.0 (9)` 的 iPhoneOS Release Archive 和 App Store Connect 分发导出；`DistributionSummary.plist` 核对为 Apple Distribution、Team `RYU53AS626`、Bundle ID `io.github.jenkjyu.afterzero`、版本 `1.0.0`/构建 `9`，导出包包含 React、CloudBase Storage 和 App Privacy 资源。由于构建号 `9` 已上传，不重复上传相同候选。
 - 新增 `website/` 纯静态公网页面源码：`privacy.html` 为隐私政策、`support.html` 为技术支持、`index.html` 为入口。页面已通过 Netlify 部署到公开生产站点，`afterzero.tech` 为主域名，`www.afterzero.tech` 自动跳转到主域名，DNS 验证已完成；可填写的 URL 为 `https://afterzero.tech/privacy.html` 和 `https://afterzero.tech/support.html`。
 
-## 外部配置仍需账号持有人完成
+## 外部配置状态
 
-- App Store Connect 需要补齐隐私标签、年龄分级、分类、截图、支持 URL、隐私政策 URL、审核备注和测试账号/演示路径。
-- 需要在 App Store Connect 填入并实际打开验证隐私政策 URL `https://afterzero.tech/privacy.html` 和技术支持 URL `https://afterzero.tech/support.html`；站点已公开部署并完成 DNS 验证，但这不等于 App Store Connect 元数据已经填写或保存完成。
-- 需要在 App Store Connect 回答该构建的出口合规问题，并确认 `ITSAppUsesNonExemptEncryption=NO` 与最终依赖一致。
-- `1.0 (1)` 已分配内部测试者并在 Apple 芯片 Mac 的 TestFlight 安装；Sandbox 首次购买和注销后恢复购买均已通过。`1.0.0 (4)` 正在等待 Apple 处理，处理完成后需在 App Store 版本 `1.0.0` 中选择该构建，再进行 TestFlight 安装和回归。步骤 8 的 iPhone Sandbox 购买、恢复、退款/撤销验收仍未完成。
+- App Store Connect 隐私标签、年龄分级、分类、截图、支持 URL、隐私政策 URL、审核备注、测试账号/演示路径和出口合规信息已完成填写与确认。
+- `1.0.0 (4)` 已完成 Apple 处理、App Store 版本关联、TestFlight 安装和回归；Sandbox 首次购买和注销后恢复购买已通过。步骤 8 剩余 iPhone StoreKit 购买、恢复、退款/撤销及服务端通知验收按用户决定延后到上架后，不阻塞当前发布。
+- 步骤 10 的本地构建与总回归已完成；用户确认沿用既有 iPhone 验收证据，不再因本机 CoreDevice 服务不可用追加真机阻塞。当前仅需账号持有人在 App Store Connect 最终确认首次提交。
 
 ## 本地验证入口
 
