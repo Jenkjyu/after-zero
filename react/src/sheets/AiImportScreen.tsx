@@ -167,11 +167,10 @@ export function AiImportScreen() {
 
         <div className="ai-import-rules">
           <strong>识别规则</strong>
-          <p>成功生成草稿才消耗 1 次额度；多张图仍只算 1 次，失败不扣次数。</p>
-          <p>“已入账”不会被标记为已还；贴息仅写入备注，需由你确认。</p>
+          <p>同一笔债务可上传多张截图，点击一次“开始识别”后合并生成一份草稿，仅消耗 1 次额度；识别失败不扣次数。</p>
         </div>
         <button type="button" className="btn primary ai-import-start" disabled={busy || !images.length} onClick={recognize}>
-          {busy ? "识别中…" : "开始识别 · 成功后消耗 1 次"}
+          {busy ? "识别中…" : "开始识别"}
         </button>
       </div>
     </div>

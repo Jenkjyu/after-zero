@@ -3169,3 +3169,9 @@ PDF字体经历了一次有价值的测试拦截：先下载的Noto OTF在`pdf`�
 - AI 草稿页黄色框改为固定提醒“请在下方核对并补齐识别草稿，确认无误后再新增债务。”，不再把模型 warnings、OCR 清洗过程或“已入账/贴息”规则堆在黄色框中；数据规则仍保持所有导入计划为未还。
 - `aiDebtImport` 的整理提示词新增通用 `reviewItems`：模型保留可能影响金额、日期、费用或还款状态的原图业务词及期数/上下文，不依赖“贴息”单一词表；服务端 `normalizeDraft` 过滤 OCR 内部噪音，并把服务费、贴息、减免等业务信息统一转成简短备注供用户核对，贴息注明未自动抵扣。
 - 新增通用备注与黄色框回归测试；Node 150/150、React 380/380、TypeScript、React 生产构建、iOS Capacitor sync 和差异检查均通过。本次 AI 识图相关改动已提交为 `226d443` 并推送到 `main`。
+
+## 2026-08-22（续3）：TestFlight `1.0.0 (9)` 已上传
+
+- 按用户确认，将 AI 识图页识别规则改为“同一笔债务可上传多张截图，点击一次‘开始识别’后合并生成一份草稿，仅消耗 1 次额度；识别失败不扣次数”，主按钮简化为“开始识别”；识别中仍显示“识别中…”。
+- React 46 文件 380/380、TypeScript、React 生产构建、Android/iOS Capacitor sync 和 `git diff --check` 通过。iOS 构建号从 `8` 升为 `9`；归档内已核对 Bundle ID `io.github.jenkjyu.afterzero`、版本 `1.0.0`、构建号 `9`，并确认新文案已随包进入 `public/js/react-debts/sheets.js`。
+- `1.0.0 (9)` 已按 App Store Connect 分发方式上传成功，Xcode 返回 `Uploaded App`、`EXPORT SUCCEEDED`；当前等待 Apple 处理，未提交审核或公开发布，待处理完成后在 TestFlight 安装检查。

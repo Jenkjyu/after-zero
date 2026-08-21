@@ -41,7 +41,9 @@ describe("AiImportScreen", () => {
     const first = new File(["one"], "1.png", { type: "image/png" });
     const second = new File(["two"], "2.png", { type: "image/png" });
     fireEvent.change(input, { target: { files: [first, second] } });
-    fireEvent.click(screen.getByText(/开始识别/));
+    expect(screen.getByRole("button", { name: "开始识别" })).toBeInTheDocument();
+    expect(screen.getByText("同一笔债务可上传多张截图，点击一次“开始识别”后合并生成一份草稿，仅消耗 1 次额度；识别失败不扣次数。")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "开始识别" }));
 
     await waitFor(() => expect(bridge.startAiDebtImport).toHaveBeenCalledOnce());
     expect((bridge.startAiDebtImport as ReturnType<typeof vi.fn>).mock.calls[0][0]).toEqual([first, second]);
@@ -61,7 +63,7 @@ describe("AiImportScreen", () => {
     fireEvent.change(container.querySelector('input[type="file"]')!, {
       target: { files: [new File(["x"], "x.png", { type: "image/png" })] },
     });
-    fireEvent.click(screen.getByText(/开始识别/));
+    fireEvent.click(screen.getByRole("button", { name: "开始识别" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("没有识别出有效还款计划");
     expect(openHook.result.current).toBe(true);
     expect(draftHook.result.current).toBe(null);
