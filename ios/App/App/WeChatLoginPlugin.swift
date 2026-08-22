@@ -2,6 +2,32 @@ import Capacitor
 import Foundation
 import Security
 
+#if targetEnvironment(simulator)
+// The official WeChat static library ships device-only slices. Keep the plugin
+// registered on Simulator so the Web runtime has a stable bridge, but make its
+// unsupported status explicit instead of linking a device binary into a sim build.
+@objc(WeChatLoginPlugin)
+public final class WeChatLoginPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "WeChatLoginPlugin"
+    public let jsName = "WeChatLogin"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "isInstalled", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "login", returnType: CAPPluginReturnPromise),
+    ]
+
+    static func registerApp() {}
+    static func handleOpenURL(_ url: URL) -> Bool { false }
+    static func handleUniversalLink(_ userActivity: NSUserActivity) -> Bool { false }
+
+    @objc public func isInstalled(_ call: CAPPluginCall) {
+        call.resolve(["installed": false])
+    }
+
+    @objc public func login(_ call: CAPPluginCall) {
+        call.reject("微信登录仅支持真机", "WECHAT_SIMULATOR_UNSUPPORTED")
+    }
+}
+#else
 private final class WeChatCallbackRouter: NSObject, WXApiDelegate {
     static let shared = WeChatCallbackRouter()
 
@@ -148,3 +174,4 @@ public final class WeChatLoginPlugin: CAPPlugin, CAPBridgedPlugin {
             .replacingOccurrences(of: "=", with: "")
     }
 }
+#endif
