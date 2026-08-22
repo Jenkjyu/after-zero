@@ -55,6 +55,13 @@ test("体验额度未确认时不把 25 次买断额度错误发给试用用户"
   );
 });
 
+test("7 天体验提供 3 次独立识图额度", () => {
+  const now = Date.now();
+  const bucket = resolveCreditBucket({ kind: "trial", trialEndsAt: now + 10000 }, now, 3);
+  assert.deepEqual(bucket, { bucket: "trial", limit: 3 });
+  assert.deepEqual(publicCredits({ paidUsed: 25, trialUsed: 1 }, bucket), { bucket: "trial", limit: 3, used: 1, remaining: 2 });
+});
+
 test("多张重叠截图合并同一期，金额固定按本金加利息，全部保持未还", () => {
   const draft = normalizeDraft({
     productHint: "某消费贷",

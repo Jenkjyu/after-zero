@@ -6,7 +6,7 @@
 
 将现有“AI 债务分析聊天”迁移为“AI 识图录入债务”。用户上传同一笔债务的多张还款计划截图，系统一次性识别整组图片，生成一份可编辑的手动债务草稿；用户补齐信息并确认后，才真正新增债务。
 
-Premium 为一次性购买 ¥28。正式购买包含 25 次终身 AI 识图录入额度。7 天 Premium 体验的识图次数仍未获得产品确认，首版服务端保持 fail-closed，不把买断的 25 次额度发给体验用户；后续确认后通过独立的 `AI_IMPORT_TRIAL_LIMIT` 配置开放。
+Premium 为一次性购买 ¥28。正式购买包含 25 次终身 AI 识图录入额度；7 天 Premium 体验另含 3 次 AI 识图录入额度，体验额度与买断额度独立计算，不把买断的 25 次额度发给体验用户。
 
 ## 不可变的产品规则
 
@@ -97,7 +97,7 @@ Premium 为一次性购买 ¥28。正式购买包含 25 次终身 AI 识图录�
 - 识别成功后复用 `EditSheet`：预填产品提示、出资方、类型、备注和逐期计划；借款日留空；所有 `paid` 强制为 `false`；只有“确认新增债务”调用原有 `setDebt(null, obj) → saveAll() → renderAll()`。
 - 新增并部署 `aiDebtImport`；创建 `aiImportSessions`、`aiImportCredits` 两个 `ADMINONLY` 集合。成功草稿才计费，买断额度固定 25，多图计 1 次；失败释放预留；并发/网络重试通过任务租约与幂等结果避免重复扣费。
 - 账户合并会合并识图用量并封顶 25；注销会删除识图草稿并保留恢复已购权益所必需的已用次数，防止通过注销重置终身额度。相关 `accountBinding`、`deleteAccount`、`premiumEntitlement` 已部署。
-- App 内 Premium 文案、会员协议、用户协议、隐私政策及公开站点源码已同步识图处理、25 次终身额度和临时图片/24 小时草稿期限。
+- App 内 Premium 文案、会员协议、用户协议、隐私政策及公开站点源码已同步识图处理、体验 3 次与买断 25 次额度和临时图片/24 小时草稿期限。
 - TestFlight `1.0.0 (6)` 首次实测发现客户端漏随包引入 CloudBase Storage 模块，导致图片上传在调用 OCR 前报 `uploadFile is not a function`，没有上传图片、调用 OCR 或消耗额度。现已补入与核心 SDK 同为 `2.28.6` 的 `cloudbase.storage.js`，并新增静态回归检查；修复版 `1.0.0 (7)` 已成功上传 App Store Connect，等待 Apple 处理后在 TestFlight 复测。
 - `1.0.0 (7)` 进一步实测发现 CloudBase 存储桶原为“仅管理员可读写”，已在控制台切换为“仅创建者及管理员可读写”；云端操作成功，不需重新发版，待权限传播后复测截图上传。
 - `1.0.0 (7)` 权限修复后仍出现空的 Storage 操作错误，现已将 AI 临时图片改为登录态 `aiDebtImport` 云函数代理上传：客户端压缩图片后调用 `callFunction`，服务端校验任务归属并用管理员 SDK 写入 `ai-import/<sessionId>/...`，失败由服务端清理；既有云备份上传路径不变。
@@ -110,5 +110,5 @@ Premium 为一次性购买 ¥28。正式购买包含 25 次终身 AI 识图录�
 
 1. 在真实 iPhone 的 TestFlight `1.0.0 (8)` 验证图片代理上传、腾讯云 OCR、跨图合并、临时文件删除和失败重试；再用约 20 组脱敏真实截图评估准确率和成本。
 2. 在真实 iPhone 验证相册/文件选图、HEIC/PNG/JPEG 上传、深浅主题、长计划滚动、返回链、失败重试和临时图片删除日志。
-3. 产品负责人确认 7 天 Premium 体验是否提供识图次数；确认前 `AI_IMPORT_TRIAL_LIMIT=0`。
+3. 7 天 Premium 体验已确认提供 3 次独立识图额度，部署配置为 `AI_IMPORT_TRIAL_LIMIT=3`。
 4. 将本次隐私政策源码更新发布到公网，并在 App Store Connect 重新核对 App Privacy 与审核备注；当前只更新了仓库文件，未替用户提交新的 App Store 版本。

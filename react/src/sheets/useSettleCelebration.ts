@@ -36,7 +36,7 @@ export function useSettleCelebration() {
     if (!justSettled) return;
     window.__azBridge.confirmAsync(
       "🎉 还清一笔了！",
-      `「${justSettled.name}」已经还清，你又往"归零"走近了一步。如果 After Zero 帮到了你，可以看看 Premium——解锁云备份、AI 分析和更多功能。`
+      `「${justSettled.name}」已经还清，你又往"归零"走近了一步。如果 After Zero 帮到了你，可以看看 Premium——解锁还款日、统计、备份和 AI 识图等功能。`
     ).then((ok) => { if (ok) openPremiumScreen(); });
   }, [debts, premium]);
 }

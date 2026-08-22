@@ -30,6 +30,8 @@ describe("PremiumScreen", () => {
     expect(screen.queryByText(/按月订阅/)).not.toBeInTheDocument();
     // 2026-08-05起不再展示"真实的服务器成本"这句说明文案，用户要求删掉
     expect(screen.queryByText(/真实的服务器成本/)).not.toBeInTheDocument();
+    expect(screen.getByText(/包含 25 次 AI 识图录入额度/)).toBeInTheDocument();
+    expect(screen.queryByText(/25 次终身 AI 识图录入额度/)).not.toBeInTheDocument();
   });
 
   it("点永久解锁调用原生购买桥接", () => {

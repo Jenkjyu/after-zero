@@ -19,6 +19,7 @@ describe("TermsScreen", () => {
     expect(screen.getByText(/7 天 Premium 会员体验/)).toBeInTheDocument();
     expect(screen.getAllByText(/人民币 28 元/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/25 次终身 AI 识图录入额度/)).toBeInTheDocument();
+    expect(screen.getByText(/3 次 AI 识图录入额度/)).toBeInTheDocument();
   });
 
   it("点返回箭头关闭", () => {

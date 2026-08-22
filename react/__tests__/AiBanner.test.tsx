@@ -8,7 +8,7 @@ describe("AiBanner", () => {
     const btn = document.getElementById("aiBannerBtn")!;
     expect(btn.className).not.toContain("is-ai");
     expect(screen.getByText("AI 识图录入")).toBeInTheDocument();
-    expect(screen.getByText(/25 次终身识图录入额度/)).toBeInTheDocument();
+    expect(screen.getByText(/25 次识图录入额度/)).toBeInTheDocument();
   });
 
   it("已开通Premium时显示顾问文案、带is-ai类(驱动发光效果的CSS钩子)", () => {

@@ -16,7 +16,7 @@ describe("PremiumEntryCard", () => {
     const premium: Premium = { premium: null };
     const { container } = render(<PremiumEntryCard premium={premium} />);
     expect(screen.getByText("升级 Premium")).toBeInTheDocument();
-    expect(screen.getByText("云备份 · 报表导出 · 25 次 AI 识图录入")).toBeInTheDocument();
+    expect(screen.getByText("还款日 · 统计报告 · 云备份 · AI 识图录入")).toBeInTheDocument();
     expect(container.querySelector(".premium-entry-card")).not.toHaveClass("is-member");
   });
 
@@ -25,7 +25,7 @@ describe("PremiumEntryCard", () => {
     const premium: Premium = { premium: { method: "onetime", at: "2026-01-01" } };
     const { container } = render(<PremiumEntryCard premium={premium} />);
     expect(screen.getByText("Premium 会员")).toBeInTheDocument();
-    expect(screen.getByText("查看会员详情与识图额度")).toBeInTheDocument();
+    expect(screen.getByText("查看会员权益与识图额度")).toBeInTheDocument();
     expect(container.querySelector(".premium-entry-card")).toHaveClass("is-member");
   });
 

@@ -21,7 +21,7 @@ export function PremiumEntryCard({ premium }: PremiumEntryCardProps) {
         </div>
         <div className="entry-text">
           <div className="entry-title">{isMember ? "Premium 会员" : "升级 Premium"}</div>
-          <div className="entry-sub">{isMember ? "查看会员详情与识图额度" : "云备份 · 报表导出 · 25 次 AI 识图录入"}</div>
+          <div className="entry-sub">{isMember ? "查看会员权益与识图额度" : "还款日 · 统计报告 · 云备份 · AI 识图录入"}</div>
         </div>
         <svg className="account-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <path d="M9 6l6 6-6 6" />
