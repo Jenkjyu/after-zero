@@ -3203,3 +3203,18 @@ PDF字体经历了一次有价值的测试拦截：先下载的Noto OTF在`pdf`�
 - App Store Connect 当前状态记录为已提交、等待 Apple 审核；尚未公开上架。步骤 10 的本地构建、总回归证据和首次提交均已完成；步骤 4/8 剩余小项继续延后到上架后。
 - 发布资料复核确认：对外描述和审核备注使用“AI 识图导入”，未出现“AI 债务助手”或 `aiAdvisor` 旧功能表述；隐私、App 信息、截图、支持/隐私 URL 和构建关联无新增问题。
 - 本次同步更新 `AGENTS.md`、`README.md`、`docs/ios/handoff.md`、`docs/ios/implementation-plan.md`、`docs/ios/release-readiness.md` 与本机 `PROGRESS.md`；用户已明确授权随后执行 Git commit/push，不纳入既有的 `ios/App/App/WeChatLoginPlugin.swift` 工作树改动。
+
+## 2026-08-23：修正备案/版本展示并上传 TestFlight 最新候选
+
+- 按用户确认，App“关于我们”页底部新增紧凑、可读的 APP 备案信息：`粤ICP备2026116914号-1A`，点击后跳转工信部备案系统；同步将 App 内版本显示从 `1.0` 修正为 `1.0.0`。Android `versionName` 同步为 `1.0.0`。
+- iOS 构建号从 `11` 升为 `12`。React 测试 46 文件、380/380，TypeScript、React production build、`npx cap sync ios`、`npx cap sync android`、Android `:app:assembleDebug` 和 `git diff --check` 均通过；导出的 iOS 包内已核对备案编号、版本字符串和 About 页样式资源。
+- iPhone 17 Pro Simulator（iOS 26.5，设备 ID `2C55AD51-22B2-4408-9BF6-D17632E0DEF0`）已安装并成功冷启动 `io.github.jenkjyu.afterzero`，确认 App 首页可运行。
+- `1.0.0 (12)` 已完成 Release Archive、Apple Distribution 分发导出并成功上传 App Store Connect，Xcode 返回 `Uploaded App`、`EXPORT SUCCEEDED`；当前等待 Apple 处理。该候选未提交新的 App Review，也未公开上架。
+- 本轮修改仍未暂存、提交或推送 Git。
+
+## 2026-08-27：外部审核与公安 APP 备案交接
+
+- Apple App Review：`1.0.0` 首次审核因 Guideline 2.1 App Completeness 要求补充审核资料。账号持有人已在 App Review 页面回复并附上实体 iPhone 的启动及主要用户流程录屏；当前等待 Apple 后续处理，不自动重新提交、不公开上架。
+- 公安平台：个人主体申请和 After Zero APP 已提交/录入“管理 APP”；APP 类型为“计算机应用类 G / 应用工具类 G4”。APP 页“相关前置许可”按当前功能应为“否”，不因使用 AI 自动勾选“人工智能技术/算法”；主体页“是否利用生成式人工智能”应如实填写“是”。
+- 技术支持网址：`https://afterzero.tech/support.html` 为 Apple Support URL 的静态页面，目前通过 Netlify 提供；Apple 要求该页面可访问，不会因填写 Support URL 自动产生新的公安联网备案。若未来迁移至中国大陆托管并作为独立网站运营，再单独评估 ICP 和公安联网备案。
+- 当前停点：等待 Apple 审核沟通和公安平台审核；不新增构建、不自动重新提交 App Review、不修改代码。上架后的 StoreKit 完整生命周期、账户组合/合并后备份可见性和 Android 内测回归仍按既定交接延后。

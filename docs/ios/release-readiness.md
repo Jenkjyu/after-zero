@@ -1,8 +1,8 @@
 # iOS 步骤 9 发布就绪清单
 
-更新时间：2026-08-22
+更新时间：2026-08-27
 
-本文只记录步骤 9 的签名、隐私、合规和 TestFlight 候选状态，以及步骤 10 的发布收尾；步骤 9 已完成，步骤 10 的首次审核提交已由账号持有人手动完成，当前等待 Apple 审核。步骤 4/8 的剩余小项按用户决定延后到上架后；App 尚未公开上架。
+本文只记录步骤 9 的签名、隐私、合规和 TestFlight 候选状态，以及步骤 10 的发布收尾；步骤 9 已完成，步骤 10 的首次审核提交已由账号持有人手动完成。该首次审核因 Guideline 2.1 App Completeness 要求补充资料，账号持有人已在审核沟通中附上实体 iPhone 录屏并回复，当前等待 Apple 后续处理；App 尚未公开上架。步骤 4/8 的剩余小项按用户决定延后到上架后。
 
 ## 已落地到仓库
 
@@ -23,13 +23,15 @@
 - 按 Apple 三段式版本要求，Debug/Release 的 App 版本已改为 `1.0.0`，构建号升为 `4`。`1.0.0 (4)` 已完成 Release Archive，归档内 Bundle ID、版本号和构建号均已核对；以 App Store Connect 分发方式重签并上传成功，已完成 Apple 处理、版本关联和 TestFlight 回归；尚未提交审核或公开上架。
 - `1.0.0 (9)` 将 AI 识图临时图片上传改为已登录云函数代理，避免 iOS WebView 直接写 CloudBase Storage；归档内版本和构建号已核对为 `1.0.0 (9)`，并已按 App Store Connect 分发方式上传成功。AI 识图已完成真实样本识别率与成本验证；未提交审核或公开发布。
 - 步骤 10 基线中，当前源码已再次完成 `1.0.0 (9)` 的 iPhoneOS Release Archive 和 App Store Connect 分发导出；`DistributionSummary.plist` 核对为 Apple Distribution、Team `RYU53AS626`、Bundle ID `io.github.jenkjyu.afterzero`、版本 `1.0.0`/构建 `9`，导出包包含 React、CloudBase Storage 和 App Privacy 资源。由于构建号 `9` 已上传，不重复上传相同候选。
+- 当前源码已将 App 内显示版本修正为 `1.0.0`，并在“关于我们”页底部加入可点击的 APP 备案编号 `粤ICP备2026116914号-1A`，链接至工信部备案系统。构建号升为 `12`；`1.0.0 (12)` 已完成 Release Archive、Apple Distribution 分发导出并成功上传 App Store Connect，Xcode 返回 `Uploaded App` 与 `EXPORT SUCCEEDED`，当前等待 Apple 处理。该上传仅更新 TestFlight 候选，不自动提交审核或公开上架。
 - 新增 `website/` 纯静态公网页面源码：`privacy.html` 为隐私政策、`support.html` 为技术支持、`index.html` 为入口。页面已通过 Netlify 部署到公开生产站点，`afterzero.tech` 为主域名，`www.afterzero.tech` 自动跳转到主域名，DNS 验证已完成；可填写的 URL 为 `https://afterzero.tech/privacy.html` 和 `https://afterzero.tech/support.html`。
 
 ## 外部配置状态
 
-- App Store Connect 隐私标签、年龄分级、分类、截图、支持 URL、隐私政策 URL、审核备注、测试账号/演示路径和出口合规信息已完成填写与确认。
+- App Store Connect 隐私标签、年龄分级、分类、截图、支持 URL、隐私政策 URL、审核备注、测试账号/演示路径和出口合规信息已完成填写与确认。首次审核因 Guideline 2.1 App Completeness 要求补充资料，账号持有人已通过 App Review 页面回复并附上实体 iPhone 录屏；当前等待 Apple 后续处理，不等同于重新提交或公开上架。
 - `1.0.0 (4)` 已完成 Apple 处理、App Store 版本关联、TestFlight 安装和回归；Sandbox 首次购买和注销后恢复购买已通过。步骤 8 剩余 iPhone StoreKit 购买、恢复、退款/撤销及服务端通知验收按用户决定延后到上架后，不阻塞当前发布。
 - 步骤 10 的本地构建与总回归已完成；用户确认沿用既有 iPhone 验收证据，不再因本机 CoreDevice 服务不可用追加真机阻塞。账号持有人已在 App Store Connect 手动修正审核备注中的重复文字并完成 `1.0.0` 首次审核提交，当前等待 Apple 审核结果。
+- 公安平台的个人主体与 After Zero APP 已提交/录入“管理 APP”，APP 类型为“计算机应用类 G / 应用工具类 G4”，当前等待审核。技术支持 URL `https://afterzero.tech/support.html` 为 Netlify 上的静态页面，不因 Apple Support URL 要求而单独新增公安联网备案。
 
 ## 本地验证入口
 

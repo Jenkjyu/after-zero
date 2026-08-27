@@ -1,18 +1,25 @@
 # After Zero iOS 主线滚动交接
 
-更新时间：2026-08-22
+更新时间：2026-08-27
 
 总计划：[`implementation-plan.md`](implementation-plan.md)
 
 ## 当前控制状态
 
-- 当前发布停点：步骤 9“签名、隐私、合规与 TestFlight 发布候选”已完成；步骤 10“iOS 总回归、Android 内测冒烟与 App Store 首次提交”已完成，当前等待 Apple 审核。步骤 3、5、6、7 的 iOS 验收已完成。
-- 当前状态：步骤 3、5、6、7 的 iPhone 集中验收已通过。步骤 4 的微信开放平台审核、官方 iOS SDK、CloudBase 函数/私有集合和 iPhone Apple→微信绑定均已通过；其余账户组合及合并后备份可见性按用户决定延后到上架后。步骤 8 的剩余 StoreKit 真机生命周期验收也延后到上架后，不再阻塞当前发布。AI 识图已完成真实样本识别率与成本验证。步骤 10 的本地基线、Android Release、iOS Release 分发导出、总回归证据和 App Store 首次提交均已完成，当前等待 Apple 审核。Android 回归改列内部测试，不阻塞 iOS 发布。
+- 当前发布停点：步骤 9“签名、隐私、合规与 TestFlight 发布候选”已完成；步骤 10“iOS 总回归、Android 内测冒烟与 App Store 首次提交”已完成。首次 App Review 因 Guideline 2.1 App Completeness 要求补充资料，账号持有人已在审核沟通中附上实体 iPhone 录屏并回复，当前等待 Apple 后续处理；尚未公开上架。步骤 3、5、6、7 的 iOS 验收已完成。
+- 当前状态：步骤 3、5、6、7 的 iPhone 集中验收已通过。步骤 4 的微信开放平台审核、官方 iOS SDK、CloudBase 函数/私有集合和 iPhone Apple→微信绑定均已通过；其余账户组合及合并后备份可见性按用户决定延后到上架后。步骤 8 的剩余 StoreKit 真机生命周期验收也延后到上架后，不再阻塞当前发布。AI 识图已完成真实样本识别率与成本验证。步骤 10 的本地基线、Android Release、iOS Release 分发导出、总回归证据和 App Store 首次提交均已完成。公安平台主体与 After Zero APP 已提交，等待审核；Android 回归改列内部测试，不阻塞 iOS 发布。
 - 上一步：步骤 2 已批准
-- 当前恢复动作：`1.0.0 (4)` 已完成 App Store Connect 处理、App Store 版本关联、App Privacy/发布资料填写和 TestFlight 安装回归；公网页面已通过 Netlify 上线，`afterzero.tech` DNS 已验证。AI 识图 `1.0.0 (9)` 已完成真实样本识别率与成本验证，构建已上传 App Store Connect。本轮已用当前源码完成 `1.0.0 (9)` 的 iOS Release Archive 和 App Store Connect 分发导出，但未重复上传相同构建号；步骤 4/8 剩余小项延后到上架后。步骤 10 总回归按既有 iPhone 验收证据视为完成，账号持有人已在 App Store Connect 手动完成首次提交，当前等待 Apple 审核。
+- 当前恢复动作：`1.0.0 (4)` 已完成 App Store Connect 处理、App Store 版本关联、App Privacy/发布资料填写和 TestFlight 安装回归；公网页面已通过 Netlify 上线，`afterzero.tech` DNS 已验证。AI 识图 `1.0.0 (9)` 已完成真实样本识别率与成本验证。当前源码已将 App 内版本修正为 `1.0.0`，在“关于我们”底部增加可点击的 APP 备案编号 `粤ICP备2026116914号-1A`；最新 `1.0.0 (12)` 已完成 Release Archive、Apple Distribution 导出并上传 App Store Connect。首次审核被 Apple 以 Guideline 2.1 App Completeness 要求补充信息后，账号持有人已回复并附上实体 iPhone 录屏，当前等待 Apple 后续处理；该沟通不等于新的审核提交或公开上架。公安平台已录入主体和 After Zero APP；Support URL 继续使用 `https://afterzero.tech/support.html`，不因 Apple 要求而单独新增公安备案。步骤 4/8 剩余小项延后到上架后。
 - 下一步骤授权：用户已于 2026-08-22 明确授权开始步骤 10，并确认本机 CoreDevice 不可用不再作为新增真机回归阻塞；步骤 10 已完成并已提交审核。当前等待 Apple 审核结果，不能据此宣称已公开上架。
 - Git 操作：用户已于 2026-08-22 明确授权本次进度文档 `git commit` 和 `git push`；本次不创建 PR，App 审核提交已由用户在 App Store Connect 手动完成。此前各阶段的 Git 操作授权仍以当时记录为准。
 - Flutter：继续停止并封存；本计划只处理根 Capacitor + React 主线
+
+## 2026-08-27：外部审核与公安 APP 备案交接
+
+- Apple App Review：`1.0.0` 首次审核因 Guideline 2.1 App Completeness 要求补充审核资料。账号持有人已在 App Review 页面回复，并附上实体 iPhone 的启动及主要用户流程录屏；当前等待 Apple 后续处理，不自动重新提交、不公开上架。
+- 公安平台：个人主体申请和 After Zero APP 已提交/录入“管理 APP”；APP 类型为“计算机应用类 G / 应用工具类 G4”。APP 页的“相关前置许可”应为“否”，不因使用 AI 自动勾选“人工智能技术/算法”。主体页的“是否利用生成式人工智能”应如实填写“是”；若此前申请仍处于待审核且该项填错，优先按平台允许的撤销/补正流程处理。
+- 技术支持网址：`https://afterzero.tech/support.html` 为 Apple Support URL 的静态页面，目前通过 Netlify 提供；Apple 要求该页面可访问，不会因填写 Support URL 自动产生一项新的公安联网备案。若未来迁移至中国大陆托管并作为独立网站运营，再单独评估 ICP 和公安联网备案。
+- 当前动作：等待 Apple 审核沟通和公安平台审核；不新增构建、不自动重新提交 App Review、不修改代码。上架后的 StoreKit 完整生命周期、账户组合/合并后备份可见性和 Android 内测回归仍按既定交接延后。
 
 ## 用户已确认的长期决策
 
