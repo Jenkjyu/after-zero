@@ -12,19 +12,21 @@ afterEach(() => {
 });
 
 describe("AboutScreen", () => {
-  it("未打开时不带open class，打开后渲染版本号+四行入口", () => {
+  it("未打开时不带open class，打开后渲染版本号、入口和备案信息", () => {
     window.__azBridge = makeMockBridge();
     const { container } = render(<AboutScreen />);
     expect(container.querySelector("#aboutScreen")).not.toHaveClass("open");
     act(() => { openAboutScreen(); });
     expect(container.querySelector("#aboutScreen")).toHaveClass("open");
     expect(screen.getByText("After Zero")).toBeInTheDocument();
-    expect(screen.getByText(/版本 1\.0/)).toBeInTheDocument();
+    expect(screen.getByText("版本 1.0.0")).toBeInTheDocument();
     expect(screen.getByText("jenkjyu36@outlook.com")).toBeInTheDocument();
     expect(screen.getByText("隐私政策")).toBeInTheDocument();
     expect(screen.getByText("用户服务协议")).toBeInTheDocument();
     expect(screen.getByText("会员服务协议")).toBeInTheDocument();
     expect(screen.getByText("账户与登录信息")).toBeInTheDocument();
+    expect(screen.getByText("APP备案编号")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "粤ICP备2026116914号-1A" })).toHaveAttribute("href", "https://beian.miit.gov.cn/");
   });
 
   it("点隐私政策打开PrivacyScreen", () => {

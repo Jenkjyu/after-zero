@@ -81,6 +81,21 @@ test("多张重叠截图合并同一期，金额固定按本金加利息，全�
   assert.ok(!draft.warnings.some((item) => item.includes("贴息未自动抵扣")));
 });
 
+test("只有每期总金额时保留可编辑计划，并提示核对本金利息拆分", () => {
+  const draft = normalizeDraft({
+    plan: [
+      { term: 1, date: "2026-09-08", amount: "280.56" },
+      { term: 2, date: "2026-10-08", amount: "280.56" },
+    ],
+  });
+  assert.deepEqual(draft.plan, [
+    { date: "2026-09-08", principal: 280.56, interest: 0, amount: 280.56, paid: false },
+    { date: "2026-10-08", principal: 280.56, interest: 0, amount: 280.56, paid: false },
+  ]);
+  assert.match(draft.notes, /截图未展示逐期本金\/利息拆分/);
+  assert.match(draft.notes, /未猜测利息分配/);
+});
+
 test("业务相关新词进入通用备注，OCR 内部噪音不会进入备注", () => {
   const draft = normalizeDraft({
     notes: "OCR 清洗完成",

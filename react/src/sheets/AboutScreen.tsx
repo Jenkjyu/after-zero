@@ -11,7 +11,9 @@ import { closeAboutScreen, useAboutScreenOpen } from "../shared/state";
 import { EntryCard } from "../mine/DataCards";
 import { useEffect } from "react";
 
-const APP_VERSION = "1.0";
+const APP_VERSION = "1.0.0";
+const APP_FILING_NUMBER = "粤ICP备2026116914号-1A";
+const APP_FILING_URL = "https://beian.miit.gov.cn/";
 
 const ICON_DOC = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
@@ -68,6 +70,11 @@ export function AboutScreen() {
 
         <div className="entry-group">
           <EntryCard hue="rose" icon={ICON_ACCOUNT} title="账户与登录信息" sub="查看本地模式或当前云账号状态" onClick={openAccountScreen} />
+        </div>
+
+        <div className="about-filing" aria-label="APP备案信息">
+          <div className="about-filing-label">APP备案编号</div>
+          <a href={APP_FILING_URL} target="_blank" rel="noreferrer">{APP_FILING_NUMBER}</a>
         </div>
       </div>
     </div>

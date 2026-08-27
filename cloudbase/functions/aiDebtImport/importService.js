@@ -91,17 +91,26 @@ function normalizeDraft(raw) {
   const sourceStatuses = [];
   const rows = [];
   const seen = new Map();
+  let amountOnlyFallbackUsed = false;
 
   for (let index = 0; index < sourceRows.length; index++) {
     const source = sourceRows[index] || {};
     const date = dateValue(source.date || source.planDate || source.repaymentDate);
-    const principal = Math.max(0, round2(source.principal));
-    const interest = Math.max(0, round2(source.interest || source.fee));
-    if (!date || principal + interest <= 0) {
+    let principal = Math.max(0, round2(source.principal));
+    let interest = Math.max(0, round2(source.interest || source.fee));
+    const amount = Math.max(0, round2(source.amount));
+    if (!date || (principal + interest <= 0 && amount <= 0)) {
       warnings.push(`第 ${index + 1} 条识别结果缺少有效日期或金额，已跳过`);
       continue;
     }
     const term = Number.isInteger(Number(source.term)) && Number(source.term) > 0 ? Number(source.term) : null;
+    if (principal + interest <= 0 && amount > 0) {
+      // Some repayment screenshots show only the installment total. Keep the row
+      // editable instead of dropping it, but never invent an interest allocation.
+      principal = amount;
+      interest = 0;
+      amountOnlyFallbackUsed = true;
+    }
     const status = String(source.sourceStatus || source.statusText || source.status || "").trim();
     const subsidy = String(source.subsidyNote || source.subsidy || "").trim();
     if (status) sourceStatuses.push(status);
@@ -118,6 +127,12 @@ function normalizeDraft(raw) {
     }
     seen.set(key, row);
     rows.push({ term, row });
+  }
+
+  if (amountOnlyFallbackUsed) {
+    const note = "截图未展示逐期本金/利息拆分，系统暂按每期总金额填入本金，请核对；未猜测利息分配。";
+    reviewItems.push({ text: note, context: "", category: "amount-only", needsReview: true });
+    warnings.push(note);
   }
 
   rows.sort((a, b) => (a.term && b.term ? a.term - b.term : a.row.date.localeCompare(b.row.date)));

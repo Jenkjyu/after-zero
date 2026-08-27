@@ -291,7 +291,7 @@ async function recognizeImages(fileIds) {
   const prompt =
     "把以下同一笔债务的多张截图提取结果合并成严格 JSON，不要 Markdown。JSON 结构：" +
     '{"productHint":"","funderHint":"","typeHint":"","notes":"","reviewItems":[{"text":"","context":"","category":"","needsReview":true}],"warnings":[],"plan":[{"term":1,"date":"YYYY-MM-DD","principal":0,"interest":0,"amount":0,"sourceStatus":"","subsidyNote":""}]}。' +
-    "重叠截图的同一期只保留一条；只把可能影响金额、日期、费用或还款状态的原图业务信息写入 reviewItems，保留原文和期数/上下文；贴息、服务费、减免等都按同一规则记录，不要只识别某一个固定词。OCR 清洗过程、重复合并、置信度、‘未自动标记’等内部信息不要写入 notes 或 reviewItems。不确定但与账务有关时保留原文，不要自行解释；不得把已入账映射成已还；不得输出 paid、年化利率或还款方式。金额字段按截图提取，服务端会再以本金加利息校准。\n\nOCR 提取结果：\n" + extractedParts.join("\n\n");
+    "重叠截图的同一期只保留一条；只把可能影响金额、日期、费用或还款状态的原图业务信息写入 reviewItems，保留原文和期数/上下文；贴息、服务费、减免等都按同一规则记录，不要只识别某一个固定词。若原图某期只有每期总金额而没有逐期本金/利息拆分，不要丢弃该期，保留 amount，将 principal=amount、interest=0，并在 reviewItems 标记需要用户核对；不要猜测利息分配。OCR 清洗过程、重复合并、置信度、‘未自动标记’等内部信息不要写入 notes 或 reviewItems。不确定但与账务有关时保留原文，不要自行解释；不得把已入账映射成已还；不得输出 paid、年化利率或还款方式。金额字段按截图提取，服务端会再以本金加利息校准。\n\nOCR 提取结果：\n" + extractedParts.join("\n\n");
   const organized = await organizer.generateText({ model: TEXT_MODEL, messages: [{ role: "user", content: prompt }] });
   return normalizeDraft(organized && organized.text);
 }
