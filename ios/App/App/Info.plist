@@ -41,6 +41,10 @@
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>用于拍摄还款计划图片并生成可编辑的债务草稿。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>用于选择您主动提供的还款计划图片并生成可编辑的债务草稿。</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

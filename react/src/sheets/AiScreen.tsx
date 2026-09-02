@@ -7,8 +7,7 @@
 //
 // "历史对话sheet"(原#aiHistorySheet)完全是这个组件内部的本地状态(historyOpen)，不是
 // shared/state.ts里的共享开关——它只从AiScreen自己的header按钮触发，不存在"被多棵独立
-// React树共同触发"这个需要提到共享层的理由，跟PremiumScreen的兑换码输入框展开/收起是
-// 同一类"组件本地UI状态"。
+// React树共同触发"这个需要提到共享层的理由，和其他仅由本组件触发的短期UI状态不同。
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { closeAiScreen, useAiScreenOpen } from "../shared/state";

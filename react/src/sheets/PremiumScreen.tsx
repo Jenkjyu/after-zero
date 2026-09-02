@@ -1,20 +1,13 @@
 // 订阅页——第七步(React迁移收尾)从vanilla的#premiumScreen原样复刻。2026-08-04去掉了月付/
 // 年付两张价卡，只保留买断——面向负债人群的产品判断，一次性买断比按月订阅心理阻力小得多
 // (完整理由见PROGRESS.md 2026-08-04那条)。价卡不再有互斥选中态(只有一个选项，没有"选"这个
-// 动作)，原来的premiumPlanSel/plan useState一并删除。兑换码输入框每次打开都强制复位收起
-// (跟vanilla openPremiumScreen()里的行为一致，避免上次展开残留)。
-import { useEffect, useState } from "react";
+// 动作)，原来的premiumPlanSel/plan useState一并删除。权益只通过 App Store 购买或恢复购买取得。
+import { useEffect } from "react";
 import { closePremiumScreen, openTermsScreen, usePremium, usePremiumScreenOpen } from "../shared/state";
 
 export function PremiumScreen() {
   const isOpen = usePremiumScreenOpen();
   const premium = usePremium();
-  const [redeemOpen, setRedeemOpen] = useState(false);
-  const [redeemCode, setRedeemCodeInput] = useState("");
-
-  useEffect(() => {
-    if (isOpen) { setRedeemOpen(false); setRedeemCodeInput(""); }
-  }, [isOpen]);
 
   useEffect(() => {
     window.__azPremiumScreenBack = () => {
@@ -30,15 +23,6 @@ export function PremiumScreen() {
   async function onRestore() {
     await window.__azBridge.restorePremium();
   }
-  async function onApplyRedeem() {
-    const code = redeemCode.trim();
-    if (!code) { window.__azBridge.toast("请输入兑换码"); return; }
-    const ok = await window.__azBridge.redeemCode(code);
-    if (!ok) return;
-    setRedeemCodeInput(""); setRedeemOpen(false);
-    window.__azBridge.toast("兑换成功，已解锁 Premium");
-  }
-
   const label = window.premiumLabel(premium);
   const isMember = !!label;
   const isTrial = premium?.premium?.method === "trial";
@@ -99,16 +83,7 @@ export function PremiumScreen() {
           <button type="button" className="btn primary" onClick={onSubscribe}>{isMember ? "已开通 Premium" : "¥28 永久解锁"}</button>
           <button type="button" className="btn ghost" onClick={onRestore}>恢复购买</button>
         </div>
-        <div className="redeem-row">
-          <button type="button" className="redeem-toggle" onClick={() => setRedeemOpen((v) => !v)}>我有兑换码</button>
-          {redeemOpen ? (
-            <div className="redeem-input-wrap" style={{ display: "flex" }}>
-              <input type="text" placeholder="输入兑换码" autoComplete="off" value={redeemCode} onChange={(e) => setRedeemCodeInput(e.target.value)} />
-              <button type="button" className="btn primary" onClick={onApplyRedeem}>兑换</button>
-            </div>
-          ) : null}
-        </div>
-        <div className="footnote">开通即表示你同意我们的<button type="button" className="terms-link" onClick={openTermsScreen}>《会员服务协议》</button>。¥28 为一次性买断价，不会自动续费；其中 AI 识图录入为 25 次额度，多张图组成一笔并成功生成草稿时仅消耗 1 次。已购买可在 iPhone 通过 Apple 恢复购买，Android 入口将在接入 Google Play 后开放。</div>
+        <div className="footnote">开通即表示你同意我们的<button type="button" className="terms-link" onClick={openTermsScreen}>《会员服务协议》</button>。已购买可通过 Apple 恢复购买。</div>
       </div>
     </div>
   );

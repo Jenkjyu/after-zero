@@ -141,3 +141,22 @@ test("账户合并不会把已退款的 Apple 买断权益恢复成体验或已�
   assert.deepEqual(entitlement.appAccountTokens.sort(), ["source-token", "target-token"]);
   assert.equal(db.record("premiumEntitlements", "u_source"), undefined);
 });
+
+test("账户合并不会保留历史兑换码 Premium 作为已购权益", async () => {
+  const db = mergeDb({
+    users: [
+      { _id: "target-doc", userId: "u_target", providers: ["apple"] },
+      { _id: "source-doc", userId: "u_source", providers: ["wechat"] },
+    ],
+    identities: [], backups: [], aiUsage: [],
+    premiumEntitlements: [
+      { _id: "u_target", userId: "u_target", kind: "trial", trialEndsAt: 999, appAccountTokens: ["target-token"] },
+      { _id: "u_source", userId: "u_source", kind: "paid", source: "redeem", appAccountTokens: ["source-token"] },
+    ],
+  });
+  await mergeAccounts(db, { currentUserId: "u_target", otherUserId: "u_source", provider: "wechat", now: 100 });
+  const entitlement = db.record("premiumEntitlements", "u_target");
+  assert.equal(entitlement.kind, "trial");
+  assert.equal(entitlement.trialEndsAt, 999);
+  assert.deepEqual(entitlement.appAccountTokens.sort(), ["source-token", "target-token"]);
+});

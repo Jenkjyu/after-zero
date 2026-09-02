@@ -62,7 +62,7 @@ exports.main = async () => {
   const entitlement = entitlementResult && entitlementResult.data || null;
   const importCreditResult = await db.collection("aiImportCredits").doc(userId).get();
   const importCredit = importCreditResult && importCreditResult.data || null;
-  const preservedPremiumEntitlement = entitlement && entitlement.kind === "paid" ? {
+  const preservedPremiumEntitlement = entitlement && entitlement.kind === "paid" && entitlement.source === "appStore" ? {
     kind: "paid",
     source: entitlement.source || "appStore",
     transactionId: entitlement.transactionId || null,

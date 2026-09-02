@@ -3212,9 +3212,31 @@ PDF字体经历了一次有价值的测试拦截：先下载的Noto OTF在`pdf`�
 - `1.0.0 (12)` 已完成 Release Archive、Apple Distribution 分发导出并成功上传 App Store Connect，Xcode 返回 `Uploaded App`、`EXPORT SUCCEEDED`；当前等待 Apple 处理。该候选未提交新的 App Review，也未公开上架。
 - 本轮修改仍未暂存、提交或推送 Git。
 
+## 2026-09-01（续）：修复版 `1.0.0 (13)` 已上传 App Store Connect
+
+- 按 Apple 三项反馈完成修复后的 `1.0.0 (13)` Release Archive，Bundle ID `io.github.jenkjyu.afterzero`、版本 `1.0.0`、构建号 `13` 均已核对。
+- 已通过 App Store Connect 分发方式上传。后续重复上传同一归档时，Apple 返回 `Redundant Binary Upload`，明确表示版本 `1.0` 的 build `13` 已经存在，证明服务器已接收该构建。
+- 真实 iPad 验证按用户决定不再阻塞；本轮以 iPad Simulator 完成了 Apple-only 登录门和拍照流程不崩溃的验证。账号持有人自行在 App Store Connect 网页端关联 `1.0.0 (13)` 并重新提交审核。
+- 本轮未自动提交审核、未公开发布、未暂存、未提交或推送 Git。
+
+## 2026-09-02：`1.0.0 (13)` 已重新提交 App Review
+
+- 用户已在 App Store Connect 网页端选择修复后的 `1.0.0 (13)` 并提交审核。
+- 当前状态为等待 Apple 审核处理；尚未公开上架。真实 iPad 验证按用户决定不再作为当前审核阻塞。
+- 本轮只更新进度记录并执行 Git commit/push；未再次修改功能代码、未自动操作 App Store Connect 提交流程。
+
 ## 2026-08-27：外部审核与公安 APP 备案交接
 
 - Apple App Review：`1.0.0` 首次审核因 Guideline 2.1 App Completeness 要求补充审核资料。账号持有人已在 App Review 页面回复并附上实体 iPhone 的启动及主要用户流程录屏；当前等待 Apple 后续处理，不自动重新提交、不公开上架。
 - 公安平台：个人主体申请和 After Zero APP 已提交/录入“管理 APP”；APP 类型为“计算机应用类 G / 应用工具类 G4”。APP 页“相关前置许可”按当前功能应为“否”，不因使用 AI 自动勾选“人工智能技术/算法”；主体页“是否利用生成式人工智能”应如实填写“是”。
 - 技术支持网址：`https://afterzero.tech/support.html` 为 Apple Support URL 的静态页面，目前通过 Netlify 提供；Apple 要求该页面可访问，不会因填写 Support URL 自动产生新的公安联网备案。若未来迁移至中国大陆托管并作为独立网站运营，再单独评估 ICP 和公安联网备案。
 - 当前停点：等待 Apple 审核沟通和公安平台审核；不新增构建、不自动重新提交 App Review、不修改代码。上架后的 StoreKit 完整生命周期、账户组合/合并后备份可见性和 Android 内测回归仍按既定交接延后。
+
+## 2026-09-01：按 App Review 要求修复兑换码、iOS 微信登录与 iPad 拍照崩溃
+
+- Apple 在审核 `1.0.0 (12)` 时提出三项问题：Guideline 3.1.1 不允许用自定义兑换码解锁数字内容；Guideline 4.2.3(i) 不允许要求用户先安装微信才能登录；Guideline 2.1(a) 在 iPad Air 11-inch (M3)、iPadOS 26.6 上按“登录 → AI 识图录入 → 拍照”会崩溃。
+- 已移除兑换码界面、客户端兑换逻辑、bridge 合同、服务端 `redeem` 动作及相应协议表述；历史 `redeemed` 缓存会被清除，账户合并/注销恢复也不再保留此类权益。历史兑换码记录没有删除，但已无法再被使用。
+- iOS 登录门现在仅显示 Apple 登录，账户页不再显示“绑定微信”，桥接层也拒绝 iOS 微信绑定；Android 仍保留微信登录。没有删除微信原生源码，未来如需恢复 iOS 微信认证，需另行采用符合审核要求的应用内网页授权方案。
+- iOS `Info.plist` 已补齐相机和照片库用途说明，隐私政策同步说明该权限仅用于用户主动拍摄或选择还款计划图片。该变更针对 iPad 拍照触发系统隐私保护终止的问题。
+- 已完成 Node 153/153、React 46 文件 379/379、TypeScript、React production build、iOS/Android Capacitor sync、plist 与云函数语法检查、`git diff --check`。`premiumEntitlement`、`accountBinding`、`deleteAccount` 已部署；无登录健康检查均按预期拒绝访问。
+- iPad Air 11-inch (M4)、iOS 26.5 Simulator 的 Debug 构建已成功；在模拟器中可进入 AI 识图页面、授权相机并打开/退出系统相机，不再崩溃；新建干净 iPad 模拟器也已确认“账户 → 登录”仅显示 Apple 登录和暂不登录，不显示微信。此前微信按钮仍显示的根因是 `.btn` 样式覆盖 HTML `hidden` 属性，已加规则强制隐藏。模拟器不替代 Apple 审核使用的 iPad Air (M3)、iPadOS 26.6 真机验证；真实 iPad 按用户决定不再作为当前审核阻塞。修复后的 `1.0.0 (13)` 已完成上传并由账号持有人重新提交审核。

@@ -240,7 +240,7 @@ async function mergeAccounts(db, input) {
     const freshSourceEntitlement = firstDocument(await transaction.collection("premiumEntitlements").doc(sourceUserId).get()) || firstDocument(sourceEntitlement);
     if (freshTargetEntitlement || freshSourceEntitlement) {
       const candidates = [freshTargetEntitlement, freshSourceEntitlement].filter(Boolean);
-      const paid = candidates.find((record) => record.kind === "paid");
+      const paid = candidates.find((record) => record.kind === "paid" && record.source === "appStore");
       // 已退款/撤销的 Apple 买断不是体验期，合并账号时不能把它重新变成可用 Premium。
       const revoked = candidates.find((record) => record.kind === "expired" && record.source === "appStore" && record.revokedAt);
       const tokens = uniqueStrings(candidates.flatMap((record) => record.appAccountTokens || []));

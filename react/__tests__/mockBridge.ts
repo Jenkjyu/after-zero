@@ -50,7 +50,6 @@ export function makeMockBridge(overrides?: {
     deleteAccount: vi.fn(() => Promise.resolve(true)),
     buyPremium: vi.fn(() => Promise.resolve(true)),
     restorePremium: vi.fn(() => Promise.resolve(true)),
-    redeemCode: vi.fn(() => Promise.resolve(true)),
     resetLocalData: vi.fn(),
     setNotifyEnabled: vi.fn((enabled: boolean) => Promise.resolve(enabled)),
     addNotifyRule: vi.fn(),

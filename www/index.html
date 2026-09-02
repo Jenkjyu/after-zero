@@ -701,6 +701,7 @@
   .login-gate { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: none; align-items: center; justify-content: center;
     padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); }
   .login-gate.open { display: flex; }
+  .login-gate .data-actions > .btn[hidden] { display: none !important; }
   /* 冷启动时复用登录门的品牌开屏，但它不是登录提示：不显示也不接收任何登录操作。 */
   .login-gate.startup-splash .data-actions { display: none; }
   .login-gate-inner { max-width: 340px; width: 100%; text-align: center; }
@@ -1385,12 +1386,6 @@
   .backup-row-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
   .backup-row-actions { display: flex; gap: 6px; flex: none; }
   .backup-row-actions .btn { flex: none; padding: 7px 12px; font-size: 12.5px; }
-  .redeem-row { margin: 14px 2px 0; text-align: center; }
-  .redeem-toggle { background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 600; padding: 4px; font-family: inherit; }
-  .redeem-input-wrap { display: flex; gap: 8px; margin-top: 10px; }
-  .redeem-input-wrap input { flex: 1; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
-    border-radius: 9px; padding: 10px 11px; font-size: 14px; font-family: inherit; }
-  .redeem-input-wrap .btn { flex: none; padding: 10px 16px; }
   .terms-link { background: none; border: none; padding: 0; margin: 0; font: inherit;
     color: var(--accent); font-weight: 700; text-decoration: underline; -webkit-tap-highlight-color: transparent; }
   .terms-body h3 { font-size: 15px; font-weight: 700; margin: 18px 0 6px; }
@@ -1725,8 +1720,8 @@
   // 年付两个入口：面向负债人群的产品判断是"再背一笔月费"对这批用户心理阻力太大，一次性
   // 买断更符合这个场景；以后真正开始付费时靠订阅做增量，不是唯一收入来源。早期曾是
   // Premium/Premium+ 两级分级，已合并成一个 tier——原 Premium+ 的功能（AI）全并入 Premium。
-  // 存 { premium: {method:"onetime"|"redeemed", at:ISO} | null }，只剩单字段；
-  // hasPremium(premium) 判 premium.premium 是否为空，不读method的具体取值。独立于上面几个键。
+  // 存 { premium: {method:"onetime", at:ISO} | null }，只剩单字段；
+  // hasPremium(premium) 只接受服务端确认的体验期或 App Store 购买窗口。独立于上面几个键。
   var PREMIUM_KEY = "after-zero-premium-v1";
   // AI_USAGE_KEY(每日用量软上限)/AI_CHATLOG_KEY(历史对话记录)这两个键第十一步(React迁移
   // 收尾)后整体移交react/src/sheets/AiScreen.tsx所有——跟下面SIM_KEY那条同一个先例，
@@ -1782,6 +1777,8 @@
   function saveNotify() { try { localStorage.setItem(NOTIF_KEY, JSON.stringify(notify)); } catch (e) {} window.dispatchEvent(new CustomEvent("az:state-changed")); }
   // 本机只缓存服务端已经确认的访问窗口；不能把 localStorage 当成购买凭证。
   var premium = loadJSON(PREMIUM_KEY, { premium: null });
+  // 自定义兑换码不再提供 Premium 权益；清理旧本地缓存，避免它在离线时成为替代解锁通道。
+  if (premium && premium.premium && premium.premium.method === "redeemed") premium = { premium: null };
   // iOS 不再相信旧本地开通记录；Android 尚未接入 Google Play 买断，本轮继续保持原行为。
   if (premium && premium.premium && !premium.premium.offlineUntil && !premium.premium.expiresAt) {
     var initialPlatform = window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform();
@@ -2268,7 +2265,7 @@
       premium = { premium: null };
     } else {
       premium = { premium: {
-        method: access.state === "trial" || access.state === "expired" ? "trial" : (access.state === "redeemed" ? "redeemed" : "onetime"),
+        method: access.state === "trial" || access.state === "expired" ? "trial" : "onetime",
         at: new Date(Number(access.checkedAt) || Date.now()).toISOString(),
         expiresAt: access.expiresAt || null,
         offlineUntil: access.offlineUntil || null,
@@ -2297,7 +2294,7 @@
     if (!native || !account) return Promise.resolve(false);
     return native.getAccessCache({ userId: account.userId }).then(function (result) {
       var access = result && result.access;
-      if (access && access.active && Number(access.offlineUntil) > Date.now()) { setPremiumAccess(access); return true; }
+      if (access && access.active && (access.state === "trial" || access.state === "paid") && Number(access.offlineUntil) > Date.now()) { setPremiumAccess(access); return true; }
       return false;
     }).catch(function () { return false; });
   }
@@ -2323,7 +2320,7 @@
     $("loginPurpose").textContent = "";
     var platform = currentPlatform();
     $("appleLoginBtn").hidden = platform !== "ios";
-    $("wxLoginBtn").hidden = platform !== "android" && platform !== "ios";
+    $("wxLoginBtn").hidden = platform !== "android";
     var gate = $("loginGate");
     gate.setAttribute("aria-hidden", "false");
     gate.classList.add("open");
@@ -2448,19 +2445,8 @@
   // premiumLabel(premium))，vanilla这份连同各处调用点一并删除，premium变化时
   // 已有的az:state-changed派发足够让React的usePremium()自动跟上，不需要vanilla
   // 再单独渲染。
-  // premiumPlanSel/openPremiumScreen()/closePremiumScreen()/openTermsScreen()/
-  // closeTermsScreen()已删除——#premiumScreen/#termsScreen整体搬进了React
-  // (react/src/sheets/PremiumScreen.tsx、TermsScreen.tsx)，三张价卡的互斥选中态、
-  // 兑换码输入框的展开/复位现在都是React组件本地状态，开关是shared/state.ts的
-  // openPremiumScreen/closePremiumScreen/openTermsScreen/closeTermsScreen(纯React状态)。
-  // 购买、恢复和兑换都先向服务端取得真实权益；本机只接受服务端返回的访问窗口。
-  function redeemCode(code) {
-    if (!account) { toast("请先登录"); return Promise.resolve(false); }
-    return callPremiumEntitlement({ action: "redeem", code: code }).then(function (access) {
-      if (!access.active) throw new Error("兑换未能开通权益");
-      finishCloudLoginPrompt(true); toast("兑换成功，已解锁 Premium"); return true;
-    }).catch(function (err) { toast("兑换失败：" + ((err && err.message) || "请重试")); return false; });
-  }
+  // premiumScreen/termsScreen整体搬进了React；Premium 只通过 App Store 购买或恢复购买取得，
+  // 本机只缓存服务端返回的体验期或 App Store 访问窗口。
   function verifyStoreKitTransaction(result, allowAccountRecovery) {
     if (!result || result.status !== "success" || !result.jws) return Promise.resolve(false);
     return callPremiumEntitlement({ action: "verifyTransaction", jws: result.jws, allowAccountRecovery: !!allowAccountRecovery }).then(function (access) {
@@ -3086,6 +3072,10 @@
   }
 
   function bindCloudIdentity(targetProvider) {
+    if (currentPlatform() === "ios" && targetProvider === "wechat") {
+      toast("iOS 当前仅支持通过 Apple 登录");
+      return Promise.resolve(false);
+    }
     if (!account) { toast("请先登录当前云账号"); return Promise.resolve(false); }
     if (account.providers && account.providers.indexOf(targetProvider) >= 0) {
       toast("该登录方式已绑定");
@@ -3543,7 +3533,7 @@
   // #topAvatarBtn(在还债务页头像)/"我的"页accountAvatarBtn/premiumEntryBtn的点击现在由
   // React直接调用shared/state.ts的openAccountScreen/openPremiumScreen(第七步)，这几个
   // DOM节点都已经不存在于vanilla里了，这里不再需要绑监听器；accountBackBtn/premiumBackBtn/
-  // termsLink/termsBackBtn/价卡互斥选中/premiumSubscribeBtn/redeemToggleBtn/redeemApplyBtn/
+  // termsLink/termsBackBtn/价卡互斥选中/premiumSubscribeBtn/
   // deleteAccountBtn/wxLogoutBtn同理——#accountScreen/#premiumScreen/#termsScreen整体是
   // React渲染，这些按钮的onClick直接在JSX里写，不再需要在这里查DOM绑监听器。
   $("wxLoginBtn").addEventListener("click", function () {
@@ -3649,7 +3639,7 @@
     deleteDebt: deleteDebt,
     toast: toast,
     confirmAsync: askAsync,
-    // 第七步(accountScreen/premiumScreen)新增：这三个是真实的cloud/native调用或者共享
+    // 第七步(accountScreen/premiumScreen)新增：这些是真实的cloud/native调用或者共享
     // 状态变更，留在vanilla私有作用域里，React只调用不重新实现。
     wxLogout: wxLogout,
     requestCloudLogin: requestCloudLogin,
@@ -3657,7 +3647,6 @@
     deleteAccount: deleteAccount,
     buyPremium: buyPremium,
     restorePremium: restorePremium,
-    redeemCode: redeemCode,
     // "注销账户"确认弹窗的第三条路径新增：只清本机storage、不删服务器账户(见定义处的注释)。
     resetLocalData: resetLocalData,
     // 第八步(notifySheet)新增：这4个都要调用@capacitor/local-notifications原生插件

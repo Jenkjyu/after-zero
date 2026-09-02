@@ -1,18 +1,28 @@
 # After Zero iOS 主线滚动交接
 
-更新时间：2026-08-27
+更新时间：2026-09-02
 
 总计划：[`implementation-plan.md`](implementation-plan.md)
 
 ## 当前控制状态
 
-- 当前发布停点：步骤 9“签名、隐私、合规与 TestFlight 发布候选”已完成；步骤 10“iOS 总回归、Android 内测冒烟与 App Store 首次提交”已完成。首次 App Review 因 Guideline 2.1 App Completeness 要求补充资料，账号持有人已在审核沟通中附上实体 iPhone 录屏并回复，当前等待 Apple 后续处理；尚未公开上架。步骤 3、5、6、7 的 iOS 验收已完成。
+- 当前发布停点：步骤 9“签名、隐私、合规与 TestFlight 发布候选”已完成；步骤 10 首次提交已完成，但 Apple 于 2026-09-01 对 `1.0.0 (12)` 提出 Guideline 3.1.1（自定义兑换码）、4.2.3(i)（iOS 需安装微信才能登录）和 2.1(a)（iPad 拍照崩溃）要求。修复已落在当前源码和云函数，`1.0.0 (13)` 已完成 Release Archive、上传 App Store Connect，并由账号持有人在网页端重新提交审核；当前等待 Apple 处理。真实 iPad 验证按用户决定不再阻塞。App 尚未公开上架。步骤 3、5、6、7 的 iOS 验收已完成。
 - 当前状态：步骤 3、5、6、7 的 iPhone 集中验收已通过。步骤 4 的微信开放平台审核、官方 iOS SDK、CloudBase 函数/私有集合和 iPhone Apple→微信绑定均已通过；其余账户组合及合并后备份可见性按用户决定延后到上架后。步骤 8 的剩余 StoreKit 真机生命周期验收也延后到上架后，不再阻塞当前发布。AI 识图已完成真实样本识别率与成本验证。步骤 10 的本地基线、Android Release、iOS Release 分发导出、总回归证据和 App Store 首次提交均已完成。公安平台主体与 After Zero APP 已提交，等待审核；Android 回归改列内部测试，不阻塞 iOS 发布。
 - 上一步：步骤 2 已批准
-- 当前恢复动作：`1.0.0 (4)` 已完成 App Store Connect 处理、App Store 版本关联、App Privacy/发布资料填写和 TestFlight 安装回归；公网页面已通过 Netlify 上线，`afterzero.tech` DNS 已验证。AI 识图 `1.0.0 (9)` 已完成真实样本识别率与成本验证。当前源码已将 App 内版本修正为 `1.0.0`，在“关于我们”底部增加可点击的 APP 备案编号 `粤ICP备2026116914号-1A`；最新 `1.0.0 (12)` 已完成 Release Archive、Apple Distribution 导出并上传 App Store Connect。首次审核被 Apple 以 Guideline 2.1 App Completeness 要求补充信息后，账号持有人已回复并附上实体 iPhone 录屏，当前等待 Apple 后续处理；该沟通不等于新的审核提交或公开上架。公安平台已录入主体和 After Zero APP；Support URL 继续使用 `https://afterzero.tech/support.html`，不因 Apple 要求而单独新增公安备案。步骤 4/8 剩余小项延后到上架后。
-- 下一步骤授权：用户已于 2026-08-22 明确授权开始步骤 10，并确认本机 CoreDevice 不可用不再作为新增真机回归阻塞；步骤 10 已完成并已提交审核。当前等待 Apple 审核结果，不能据此宣称已公开上架。
+- 当前恢复动作：`1.0.0 (4)` 已完成 App Store Connect 处理、App Store 版本关联、App Privacy/发布资料填写和 TestFlight 安装回归；公网页面已通过 Netlify 上线，`afterzero.tech` DNS 已验证。AI 识图 `1.0.0 (9)` 已完成真实样本识别率与成本验证。当前源码已移除自定义兑换码入口与服务端兑换动作；iOS 仅呈现 Apple 登录且不再提供微信绑定，Android 继续保留微信登录；iPad 拍照已补齐相机/照片权限说明，并部署了相关云函数。修复后的 `1.0.0 (13)` 已上传并由账号持有人重新提交审核，当前等待 Apple 处理；真实 iPad 验证按用户决定不再阻塞。公安平台已录入主体和 After Zero APP；Support URL 继续使用 `https://afterzero.tech/support.html`，不因 Apple 要求而单独新增公安备案。步骤 4/8 剩余小项延后到上架后。
+- 下一步骤授权：用户已于 2026-08-22 明确授权开始步骤 10，并确认本机 CoreDevice 不可用不再作为新增真机回归阻塞；步骤 10 已完成，修复后的 `1.0.0 (13)` 已由账号持有人在网页端重新提交审核，当前等待 Apple 处理，不能据此宣称已公开上架。
 - Git 操作：用户已于 2026-08-22 明确授权本次进度文档 `git commit` 和 `git push`；本次不创建 PR，App 审核提交已由用户在 App Store Connect 手动完成。此前各阶段的 Git 操作授权仍以当时记录为准。
 - Flutter：继续停止并封存；本计划只处理根 Capacitor + React 主线
+
+## 2026-09-01：App Review 3.1.1、4.2.3(i) 与 2.1(a) 修复交接
+
+- Apple 在 iPad Air 11-inch (M3)、iPadOS 26.6 审核 `1.0.0 (12)` 时指出：自定义兑换码不应解锁数字内容；登录不应要求先安装微信；登录后进入“AI 识图录入”并点“拍照”会崩溃。
+- 已移除兑换码 UI、React bridge、客户端本地兑换逻辑和 `premiumEntitlement` 的 `redeem` 动作；历史 `redeemed` 本地缓存会清除，云端账户合并和注销后的恢复也不再把历史兑换权益视为已购权益。未删除历史兑换码数据，但它已没有任何可用的客户端或服务端兑换路径。
+- iOS target 的 `Info.plist` 已补齐相机与照片库用途说明；AI 识图的隐私政策同步说明这些权限只用于用户主动拍摄或选择还款计划图片。
+- iOS 登录门现仅显示 Apple 登录，账户页不再显示“绑定微信”，且桥接层拒绝 iOS 侧微信绑定请求；Android 仍显示并使用微信登录。没有删除微信原生源码，未来如需 iOS 微信认证须另行采用符合审核要求的应用内网页授权方案。
+- 已重新构建 React 产物并完成 iOS/Android Capacitor sync；Node 153/153、React 46 文件 379/379、TypeScript、plist 校验、云函数语法检查和 `git diff --check` 均通过。`premiumEntitlement`、`accountBinding`、`deleteAccount` 已部署，三者无登录调用均按预期 fail-closed。
+- 新建的 iPad Air 11-inch (M4)、iOS 26.5 Simulator 已验证“账户 → 登录”只显示 Apple 登录和暂不登录，不显示微信；此前按钮未隐藏的根因是 `.btn` 样式覆盖了 HTML `hidden` 属性，现已以强制隐藏规则修复。模拟器不替代审核使用的 iPad Air (M3)、iPadOS 26.6 真机验证；真实 iPad 已按用户决定不再作为当前提交阻塞。
+- `1.0.0 (13)` 已完成 Release Archive、上传 App Store Connect，并由账号持有人在网页端重新提交 App Review；当前等待 Apple 处理，未公开发布，也未提交或推送 Git。
 
 ## 2026-08-27：外部审核与公安 APP 备案交接
 

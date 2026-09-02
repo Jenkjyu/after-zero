@@ -5,7 +5,15 @@ import { closeAccountScreen, openAccountScreen, useAccountScreenOpen } from "../
 import { makeMockBridge } from "./mockBridge";
 import type { Account } from "../src/types";
 
-afterEach(() => { closeAccountScreen(); });
+const originalCapacitor = (window as Window & { Capacitor?: unknown }).Capacitor;
+
+afterEach(() => {
+  closeAccountScreen();
+  Object.defineProperty(window, "Capacitor", {
+    configurable: true,
+    value: originalCapacitor,
+  });
+});
 
 const account: Account = {
   userId: "test-openid",
@@ -90,6 +98,18 @@ describe("AccountScreen", () => {
     await act(async () => { fireEvent.click(screen.getByText("绑定 Apple")); });
     expect(bridge.bindCloudIdentity).toHaveBeenCalledWith("apple");
     expect(screen.getByText(/不会改变本机账本/)).toBeInTheDocument();
+  });
+
+  it("iOS 不展示微信绑定入口", () => {
+    Object.defineProperty(window, "Capacitor", {
+      configurable: true,
+      value: { getPlatform: () => "ios" },
+    });
+    const apple: Account = { userId: "apple-user", provider: "apple", providers: ["apple"], nickname: "Apple 用户", avatarUrl: "", loggedInAt: 1 };
+    window.__azBridge = makeMockBridge({ account: apple });
+    render(<AccountScreen />);
+    act(() => { openAccountScreen(); });
+    expect(screen.queryByText("绑定微信")).not.toBeInTheDocument();
   });
 
   it("点返回箭头关闭", () => {

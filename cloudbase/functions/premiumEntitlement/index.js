@@ -34,7 +34,7 @@ function rootCertificates() {
 }
 
 function trialAccess(entitlement, now) {
-  if (entitlement.kind === "paid") return { active: true, state: entitlement.source === "redeem" ? "redeemed" : "paid", expiresAt: null };
+  if (entitlement.kind === "paid" && entitlement.source === "appStore") return { active: true, state: "paid", expiresAt: null };
   const expiresAt = Number(entitlement.trialEndsAt) || 0;
   return { active: expiresAt > now, state: expiresAt > now ? "trial" : "expired", expiresAt };
 }
@@ -188,34 +188,6 @@ async function verifyTransaction(userId, jws, now, allowAccountRecovery) {
   return result && result.result ? result.result : result;
 }
 
-async function redeemCode(userId, code, now) {
-  const normalized = typeof code === "string" ? code.trim() : "";
-  if (!normalized) {
-    const error = new Error("请输入兑换码");
-    error.code = "REDEEM_CODE_REQUIRED";
-    throw error;
-  }
-  const codeHash = crypto.createHash("sha256").update(normalized, "utf8").digest("hex");
-  const entitlement = await ensureEntitlement(userId, now);
-  const result = await db.runTransaction(async (transaction) => {
-    const codeRef = transaction.collection("premiumRedeemCodes").doc(codeHash);
-    const codeDoc = firstDocument(await codeRef.get());
-    if (!codeDoc || codeDoc.status !== "active") {
-      const error = new Error("兑换码无效或已被使用");
-      error.code = "REDEEM_CODE_INVALID";
-      throw error;
-    }
-    // 测试码显式标记为 reusable 时不核销；正式兑换码仍只能使用一次。
-    if (codeDoc.reusable !== true) {
-      await codeRef.update({ status: "redeemed", redeemedBy: userId, redeemedAt: now });
-    }
-    const next = { ...withoutDocumentId(entitlement), kind: "paid", source: "redeem", redeemedAt: now, updatedAt: now };
-    await transaction.collection("premiumEntitlements").doc(userId).set(next);
-    return next;
-  });
-  return result && result.result ? result.result : result;
-}
-
 exports.main = async (event) => {
   try {
     const userId = requiredUserId();
@@ -223,7 +195,6 @@ exports.main = async (event) => {
     const action = event && event.action || "status";
     let entitlement;
     if (action === "verifyTransaction") entitlement = await verifyTransaction(userId, event && event.jws, now, event && event.allowAccountRecovery === true);
-    else if (action === "redeem") entitlement = await redeemCode(userId, event && event.code, now);
     else if (action === "status") entitlement = await ensureEntitlement(userId, now);
     else return { ok: false, code: "ACTION_INVALID", error: "未知权益操作" };
     return { ok: true, entitlement: publicAccess(entitlement, now) };

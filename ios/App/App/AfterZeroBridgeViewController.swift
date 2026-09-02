@@ -210,6 +210,9 @@ final class AfterZeroBridgeViewController: CAPBridgeViewController, UIGestureRec
         // 把跟手进度交给 Web 的最上层 subpage。Web 会同步当前是否有可返回的全屏页，
         // 因此首页、底部 sheet、确认框和登录门不会接管手势。
         if let webView = bridge?.webView {
+#if DEBUG && targetEnvironment(simulator)
+            installSimulatorReviewBypass(in: webView)
+#endif
             installInteractiveBackStateBridge(in: webView)
 
             let pan = UIPanGestureRecognizer(target: self, action: #selector(handleInteractiveBack(_:)))
@@ -221,6 +224,39 @@ final class AfterZeroBridgeViewController: CAPBridgeViewController, UIGestureRec
             installNativeTabBarIfSupported(in: webView)
         }
     }
+
+#if DEBUG && targetEnvironment(simulator)
+    // 仅用于本机 Simulator 的 App Review 路径检查：在网页初始化前写入本地展示状态，
+    // 以便检查 Premium 门禁之后的页面和照片选择器。它不创建 CloudBase 会话，云函数仍会
+    // 以未登录身份拒绝调用；Release 与真机编译完全不包含此代码。
+    private func installSimulatorReviewBypass(in webView: WKWebView) {
+        let script = """
+        (() => {
+          const marker = "after-zero-simulator-review-bypass-v1";
+          if (localStorage.getItem(marker)) return;
+          localStorage.setItem("after-zero-account-v1", JSON.stringify({
+            userId: "simulator-review-user",
+            provider: "apple",
+            providers: ["apple"],
+            nickname: "Simulator Reviewer",
+            avatarUrl: "",
+            loggedInAt: Date.now()
+          }));
+          localStorage.setItem("after-zero-premium-v1", JSON.stringify({
+            premium: {
+              method: "onetime",
+              at: new Date().toISOString(),
+              offlineUntil: Number.MAX_SAFE_INTEGER
+            }
+          }));
+          localStorage.setItem(marker, "1");
+        })();
+        """
+        webView.configuration.userContentController.addUserScript(
+            WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+        )
+    }
+#endif
 
     deinit {
         bridge?.webView?.configuration.userContentController.removeScriptMessageHandler(forName: nativeTabMessageName)

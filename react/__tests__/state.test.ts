@@ -77,7 +77,7 @@ describe("useDebts / usePremium / useAccount", () => {
     expect(before).toEqual({ premium: null });
     expect(before).not.toBe(premium);
 
-    premium.premium = { method: "redeemed", at: "2026-08-11T00:00:00.000Z" };
+    premium.premium = { method: "onetime", at: "2026-08-11T00:00:00.000Z" };
     act(() => { window.dispatchEvent(new CustomEvent("az:state-changed")); });
 
     expect(result.current).toEqual(premium);

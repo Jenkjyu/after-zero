@@ -44,6 +44,10 @@ export function AccountScreen() {
   const isOpen = useAccountScreenOpen();
   const account = useAccount();
   const premium = usePremium();
+  const capacitor = (window as Window & {
+    Capacitor?: { getPlatform?: () => string };
+  }).Capacitor;
+  const isIos = capacitor?.getPlatform?.() === "ios";
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [nickname, setNickname] = useState(account?.nickname || "");
 
@@ -133,7 +137,7 @@ export function AccountScreen() {
         {!account && <p className="account-local-note">登录后可使用云端功能；本地账本仍只保存在本机。</p>}
         {!account && <div className="data-actions" style={{ marginTop: 16 }}><button type="button" className="btn primary" onClick={onLogin}>登录</button></div>}
         {account && !account.providers.includes("apple") && <div className="data-actions" style={{ marginTop: 16 }}><button type="button" className="btn ghost" onClick={() => onBind("apple")}>绑定 Apple</button></div>}
-        {account && !account.providers.includes("wechat") && <div className="data-actions" style={{ marginTop: 10 }}><button type="button" className="btn ghost" onClick={() => onBind("wechat")}>绑定微信</button></div>}
+        {account && !isIos && !account.providers.includes("wechat") && <div className="data-actions" style={{ marginTop: 10 }}><button type="button" className="btn ghost" onClick={() => onBind("wechat")}>绑定微信</button></div>}
         {account && <p className="account-local-note">绑定时会分别验证当前账号和待绑定账号；只合并云备份与 AI 用量，不会改变本机账本。</p>}
         {account && <div className="data-actions" style={{ marginTop: 16 }}><button type="button" className="btn ghost" onClick={onLogout}>退出登录</button></div>}
         {account && <div className="data-actions" style={{ marginTop: 10 }}><button type="button" className="btn danger" onClick={onDeleteAccount}>注销账户</button></div>}

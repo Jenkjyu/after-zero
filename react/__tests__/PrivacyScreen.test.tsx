@@ -20,6 +20,8 @@ describe("PrivacyScreen", () => {
     expect(screen.getByText(/无需账号的本地使用模式/)).toBeInTheDocument();
     expect(screen.getByText(/登录不会触发本地债务或档案的自动上传/)).toBeInTheDocument();
     expect(screen.getByText(/不满 14 周岁/)).toBeInTheDocument();
+    expect(screen.getByText(/相机和照片权限/)).toBeInTheDocument();
+    expect(screen.queryByText(/兑换码/)).not.toBeInTheDocument();
   });
 
   it("点返回箭头关闭", () => {

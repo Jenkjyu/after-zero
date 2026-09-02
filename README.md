@@ -4,9 +4,9 @@
 
 ## 当前产品
 
-当前正式发布主线是 **Capacitor + React 的 iOS App**，包名为 `io.github.jenkjyu.afterzero`。Android 保留为内部测试包，暂不作为正式发布渠道。全新安装默认没有任何债务或档案数据，可直接在本地使用；AI 识图导入、云备份，以及 Premium 的购买、恢复购买和兑换等服务端权益操作才要求登录。
+当前正式发布主线是 **Capacitor + React 的 iOS App**，包名为 `io.github.jenkjyu.afterzero`。Android 保留为内部测试包，暂不作为正式发布渠道。全新安装默认没有任何债务或档案数据，可直接在本地使用；AI 识图导入、云备份，以及 Premium 的购买和恢复购买等服务端权益操作才要求登录。
 
-iOS 已建立同一套 Web 产品的 Capacitor 原生壳，并已完成 Apple/微信登录、文件保存、通知、主要交互和 TestFlight 候选回归。AI 识图已完成真实样本识别率与成本验证。StoreKit 剩余真机生命周期验证按用户决定延后到上架后；App Store 首次提交已完成，当前等待 Apple 审核，尚未公开上架。
+iOS 已建立同一套 Web 产品的 Capacitor 原生壳，并已完成 Apple/微信登录、文件保存、通知、主要交互和 TestFlight 候选回归。AI 识图已完成真实样本识别率与成本验证。StoreKit 剩余真机生命周期验证按用户决定延后到上架后；Apple 于 2026-09-01 要求移除自定义兑换码、避免 iOS 强制安装微信登录，并修复 iPad 拍照入口崩溃。修复已落到当前源码和云函数：iOS 仅呈现 Apple 登录，Android 保留微信登录；修复后的 `1.0.0 (13)` 已上传并由账号持有人提交审核，当前等待 Apple 处理，App 尚未公开上架。
 
 - `react/src/**` 负责“债务”“还款日”“统计”“我的”四个 tab，以及不属于 tab 的 subpage、sheet 和 screen。Vite 使用 `debts`、`pay`、`report`、`mine`、`sheets` 五个入口。
 - `www/index.html` 是唯一 Web 宿主，保留全局 CSS、tabbar、登录门、共享确认框、隐藏导入 input、localStorage/IndexedDB、CloudBase 和原生能力编排；财务计算集中在 `www/js/calc.js`。
@@ -21,9 +21,9 @@ iOS 体验结束且未购买时，仍可使用“债务”tab 的本地功能；
 
 更细的开发边界、硬规则和按任务加载的知识入口见 [`AGENTS.md`](AGENTS.md) 与 [`.agents/skills/`](.agents/skills/)。
 
-## iOS 发布主线（步骤 10 已提交，等待 Apple 审核；步骤 4/8 剩余小项延后上架后）
+## iOS 发布主线（首次审核收到修复要求；步骤 4/8 剩余小项延后上架后）
 
-当前以 iOS 为发布主线，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 3～7 的 iPhone 验收已完成；步骤 9 的签名、隐私、合规和 TestFlight 候选回归已完成，AI 识图真实样本与成本验证也已完成。步骤 10 的本地基线、总回归证据和 App Store 首次提交已完成，当前等待 Apple 审核。步骤 4/8 的剩余小项按用户决定放到上架后，不再阻塞当前发布流程。
+当前以 iOS 为发布主线，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 3～7 的 iPhone 验收已完成；步骤 9 的签名、隐私、合规和 TestFlight 候选回归已完成，AI 识图真实样本与成本验证也已完成。步骤 10 的首次审核已收到三项修复要求：自定义兑换码已从客户端和云端权益路径移除，iOS 只保留 Apple 登录并隐藏微信绑定，iPad 拍照入口补齐相机/照片权限说明；修复后的 `1.0.0 (13)` 已上传并由账号持有人提交审核，当前等待 Apple 处理。步骤 4/8 的剩余小项按用户决定放到上架后，不再阻塞当前发布流程。
 
 Android 的登录、文件、通知和交互回归改为内部测试清单，不再阻塞 iOS 的 TestFlight 或 App Store 发布；共享代码已完成本轮基础构建验证。步骤 4/8 的剩余验证已明确延后到上架后；步骤 10 总回归和首次审核提交已完成，当前等待 Apple 审核，尚未公开上架。权威范围与恢复动作见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
 

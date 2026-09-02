@@ -74,7 +74,7 @@ export interface Debt {
 export interface Premium {
   // 本机只缓存服务端已确认的访问结果；到期时间和3天离线窗口都由服务端返回，
   // 不能把 localStorage 当作购买凭证。
-  premium: { method: "trial" | "onetime" | "redeemed"; at: string; expiresAt?: number | null; offlineUntil?: number | null; appAccountToken?: string | null } | null;
+  premium: { method: "trial" | "onetime"; at: string; expiresAt?: number | null; offlineUntil?: number | null; appAccountToken?: string | null } | null;
 }
 
 export interface Account {
@@ -296,7 +296,7 @@ export interface AzBridge {
   confirmAsync(title: string, body: string, opts?: { month?: string; date?: string; dateMin?: string; amount?: number; amountHint?: string; thirdLabel?: string; checkLabel?: string }): Promise<string | boolean | null>;
   // 第七步(accountScreen/premiumScreen)新增：这三个都是真实的cloud/native调用或者共享状态
   // 变更，不能重写成纯React——wxLogout()清本地账号态+CloudBase signOut；deleteAccount()调
-  // deleteAccount云函数(不信任客户端参数，身份来自已认证会话)；购买、恢复和兑换均由
+  // deleteAccount云函数(不信任客户端参数，身份来自已认证会话)；购买与恢复均由
   // 原生 StoreKit + 服务端权益函数完成，不能在客户端伪造 Premium。
   wxLogout(): void;
   // 本地模式进入AI/云备份或从账户页主动登录时打开可取消的微信登录表面。登录成功返回true，
@@ -310,7 +310,6 @@ export interface AzBridge {
   deleteAccount(): Promise<boolean>;
   buyPremium(): Promise<boolean>;
   restorePremium(): Promise<boolean>;
-  redeemCode(code: string): Promise<boolean>;
   // 勾选“同时重置本机数据”且云端注销成功后调用：清本机localStorage+IndexedDB上传文件库，
   // 随即reload()回到空白本地账本。
   resetLocalData(): void;
