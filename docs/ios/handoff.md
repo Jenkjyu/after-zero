@@ -1,18 +1,24 @@
 # After Zero iOS 主线滚动交接
 
-更新时间：2026-09-02
+更新时间：2026-09-05
 
 总计划：[`implementation-plan.md`](implementation-plan.md)
 
 ## 当前控制状态
 
-- 当前发布停点：步骤 9“签名、隐私、合规与 TestFlight 发布候选”已完成；步骤 10 首次提交已完成，但 Apple 于 2026-09-01 对 `1.0.0 (12)` 提出 Guideline 3.1.1（自定义兑换码）、4.2.3(i)（iOS 需安装微信才能登录）和 2.1(a)（iPad 拍照崩溃）要求。修复已落在当前源码和云函数，`1.0.0 (13)` 已完成 Release Archive、上传 App Store Connect，并由账号持有人在网页端重新提交审核；当前等待 Apple 处理。真实 iPad 验证按用户决定不再阻塞。App 尚未公开上架。步骤 3、5、6、7 的 iOS 验收已完成。
+- 当前发布状态：步骤 9“签名、隐私、合规与 TestFlight 发布候选”和步骤 10 均已完成。针对 2026-09-01 审核反馈的修复已落在源码和云函数，`1.0.0 (13)` 已通过审核并正式上架。真实 iPad 验证按用户决定不再阻塞。步骤 3、5、6、7 的 iOS 验收已完成。
 - 当前状态：步骤 3、5、6、7 的 iPhone 集中验收已通过。步骤 4 的微信开放平台审核、官方 iOS SDK、CloudBase 函数/私有集合和 iPhone Apple→微信绑定均已通过；其余账户组合及合并后备份可见性按用户决定延后到上架后。步骤 8 的剩余 StoreKit 真机生命周期验收也延后到上架后，不再阻塞当前发布。AI 识图已完成真实样本识别率与成本验证。步骤 10 的本地基线、Android Release、iOS Release 分发导出、总回归证据和 App Store 首次提交均已完成。公安平台主体与 After Zero APP 已提交，等待审核；Android 回归改列内部测试，不阻塞 iOS 发布。
 - 上一步：步骤 2 已批准
-- 当前恢复动作：`1.0.0 (4)` 已完成 App Store Connect 处理、App Store 版本关联、App Privacy/发布资料填写和 TestFlight 安装回归；公网页面已通过 Netlify 上线，`afterzero.tech` DNS 已验证。AI 识图 `1.0.0 (9)` 已完成真实样本识别率与成本验证。当前源码已移除自定义兑换码入口与服务端兑换动作；iOS 仅呈现 Apple 登录且不再提供微信绑定，Android 继续保留微信登录；iPad 拍照已补齐相机/照片权限说明，并部署了相关云函数。修复后的 `1.0.0 (13)` 已上传并由账号持有人重新提交审核，当前等待 Apple 处理；真实 iPad 验证按用户决定不再阻塞。公安平台已录入主体和 After Zero APP；Support URL 继续使用 `https://afterzero.tech/support.html`，不因 Apple 要求而单独新增公安备案。步骤 4/8 剩余小项延后到上架后。
-- 下一步骤授权：用户已于 2026-08-22 明确授权开始步骤 10，并确认本机 CoreDevice 不可用不再作为新增真机回归阻塞；步骤 10 已完成，修复后的 `1.0.0 (13)` 已由账号持有人在网页端重新提交审核，当前等待 Apple 处理，不能据此宣称已公开上架。
+- 当前恢复动作：进入上架后维护。`1.0.0 (13)` 已通过审核并正式上架；后续按既定范围完成 StoreKit 完整生命周期、账户组合/合并后备份可见性和 Android 内测回归。公安平台已录入主体和 After Zero APP，仍等待审核；Support URL 继续使用 `https://afterzero.tech/support.html`，不因 Apple 要求而单独新增公安备案。
+- 下一步骤授权：iOS 首发计划已完成；上架后维护事项须由用户按具体范围另行授权。
 - Git 操作：用户已于 2026-08-22 明确授权本次进度文档 `git commit` 和 `git push`；本次不创建 PR，App 审核提交已由用户在 App Store Connect 手动完成。此前各阶段的 Git 操作授权仍以当时记录为准。
 - Flutter：继续停止并封存；本计划只处理根 Capacitor + React 主线
+
+## 2026-09-05：`1.0.0 (13)` 审核通过并正式上架
+
+- 用户确认 `1.0.0 (13)` 已通过 App Review 并正式上架。
+- iOS 首发计划的步骤 10 至此完成；不据此改变 Android 仅供内部测试的范围。
+- 后续仍按既定决定处理 StoreKit 完整生命周期、账户组合/合并后备份可见性、Android 内测回归，以及公安 APP 备案审核。
 
 ## 2026-09-01：App Review 3.1.1、4.2.3(i) 与 2.1(a) 修复交接
 
@@ -49,7 +55,7 @@
 
 ## 当前仓库与环境事实
 
-- 当前正式发布目标是 Capacitor + React iOS App；根 `ios/` 已可编译、可在 iPhone 运行，步骤 9 的 App Store Connect 配置与 TestFlight 回归已完成，AI 识图真实样本识别率与成本已验证。步骤 10 的本地 Release 候选、总回归证据和 App Store 首次提交已完成，当前等待 Apple 审核；步骤 4/8 剩余小项延后到上架后。仍不能视为已公开上架的 iOS 产品。Android 保留为内部测试包。
+- 当前正式发布产品是 Capacitor + React iOS App；根 `ios/` 已可编译、可在 iPhone 运行，步骤 9 的 App Store Connect 配置与 TestFlight 回归已完成，AI 识图真实样本识别率与成本已验证。步骤 10 的本地 Release 候选、总回归证据、审核与正式上架均已完成；步骤 4/8 剩余小项转入上架后维护。Android 保留为内部测试包。
 - `@capacitor/core`、CLI、Android、iOS 当前均为 `8.4.1`；Local Notifications 为 `8.2.1`。
 - Node.js `v24.15.0`、npm `11.12.1`，满足当前 Capacitor CLI Node `>=22` 要求。
 - 本机已安装并选择 Xcode `26.6`（build `17F113`），Xcode 许可已由用户本人接受；已安装 iOS `26.5` Simulator Runtime。

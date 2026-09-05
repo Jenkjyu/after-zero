@@ -14,12 +14,12 @@
 - iOS 步骤 2 已通过检查；步骤 3、5、6、7 均已完成本轮 iPhone 验收，步骤 4 的官方微信 SDK、Apple→微信绑定、CloudBase 账户绑定函数与私有集合也已在 iPhone 通过。用户已确认步骤 4 的其余 iOS 账户组合与合并后备份可见性属于小问题，延后到上架后验证，不再阻塞当前上架。步骤 8 的剩余 StoreKit 购买/恢复/退款撤销等真机验收同样延后到上架后，不再阻塞当前上架。步骤 9 已完成；AI 识图已完成真实样本识别率与成本验证。Android 旧微信、SAF、通知和交互回归改列为内部测试事项，不再阻塞 iOS 步骤完成、TestFlight 或 App Store 发布。权威计划为 `docs/ios/implementation-plan.md`，准确恢复动作见 `docs/ios/handoff.md`。
 - 该计划严格逐步执行：每一步必须完成本步的代码、测试、原生/云端验证和相关文档后停止等待用户检查；用户批准后仍不得自动进入下一步，必须再次收到明确开工指令。
 - 计划期间未经用户改变指令不得暂存、提交、推送或创建 PR。新 session 涉及 iOS 计划时，先完整读取交接和当前步骤；没有明确批准只讨论，不实施。
-- 根 `ios/` 已是可编译、可在 iPhone 运行的 Capacitor 8.4.1 Swift Package Manager 原生壳；Apple/微信登录、iOS `SaveFile` 与本地通知均已完成本轮 iPhone 验收。步骤 9 的签名、隐私、合规、App Store Connect 资料、`1.0.0 (4)` 基线回归已完成；`1.0.0 (12)` 的首次审核在 2026-09-01 收到 Guideline 3.1.1（自定义兑换码）、4.2.3(i)（iOS 需安装微信才能登录）和 2.1(a)（iPad 拍照崩溃）要求。当前源码已移除兑换码入口及云端兑换路径，iOS 仅呈现 Apple 登录并隐藏微信绑定入口，并为拍照入口补齐相机/照片权限说明；相关云函数已部署。修复后的 `1.0.0 (13)` 已完成 Release Archive、上传 App Store Connect，并由账号持有人在网页端提交审核；真实 iPad 验证按用户决定不再阻塞，当前等待 Apple 处理。AI 识图的真实样本识别率与成本也已验证。公安平台主体与 After Zero APP 已提交，等待审核；当前不能把工程误写成已公开上架的 iOS 产品。Flutter 继续封存。
+- 根 `ios/` 已是可编译、可在 iPhone 运行的 Capacitor 8.4.1 Swift Package Manager 原生壳；Apple/微信登录、iOS `SaveFile` 与本地通知均已完成本轮 iPhone 验收。步骤 9 的签名、隐私、合规、App Store Connect 资料、`1.0.0 (4)` 基线回归已完成；`1.0.0 (12)` 的首次审核在 2026-09-01 收到 Guideline 3.1.1（自定义兑换码）、4.2.3(i)（iOS 需安装微信才能登录）和 2.1(a)（iPad 拍照崩溃）要求。当前源码已移除兑换码入口及云端兑换路径，iOS 仅呈现 Apple 登录并隐藏微信绑定入口，并为拍照入口补齐相机/照片权限说明；相关云函数已部署。修复后的 `1.0.0 (13)` 已通过审核并正式上架；真实 iPad 验证按用户决定不再阻塞。AI 识图的真实样本识别率与成本也已验证。公安平台主体与 After Zero APP 已提交，仍等待审核；Flutter 继续封存。
 - **平台优先级（2026-08-14 决策）：iOS 是产品发布主线；Android 仅供内部测试，不进入 Google Play 发布承诺。** Android 实机回归不再作为 iOS 计划、TestFlight 或 App Store 的阻塞门槛；但共享代码仍须完成 React/TypeScript/iOS 构建验证，改动 Android 原生代码或发放 Android 内测包前仍须完成对应 Android 构建与必要冒烟。
 
 ## 当前产品与架构
 
-After Zero 当前产品主线是 **Capacitor + React 的 iOS 发布版本**；Android 保留为同代码库的内部测试包，不作为正式发布渠道。iOS 功能适配、StoreKit 验收与 App Store 上架仍按计划逐步进行。
+After Zero 当前产品主线是已正式上架的 **Capacitor + React iOS App**；Android 保留为同代码库的内部测试包，不作为正式发布渠道。上架后仍按既定交接完成 StoreKit、账户组合和 Android 内测回归。
 
 - `react/src/**`：四个主 tab、subpage、sheet 和 React 侧状态。Vite 使用 `debts`、`pay`、`report`、`mine`、`sheets` 五个入口。
 - `www/index.html`：唯一 Web 宿主，保留全局 CSS、tabbar、登录门、共享确认框、隐藏导入 input、localStorage/IndexedDB、CloudBase、原生插件与文件 I/O 等 impure 编排。
