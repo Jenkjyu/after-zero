@@ -1722,7 +1722,7 @@
   // 买断更符合这个场景；以后真正开始付费时靠订阅做增量，不是唯一收入来源。早期曾是
   // Premium/Premium+ 两级分级，已合并成一个 tier——原 Premium+ 的功能（AI）全并入 Premium。
   // 存 { premium: {method:"onetime", at:ISO} | null }，只剩单字段；
-  // hasPremium(premium) 只接受服务端确认的体验期或 App Store 购买窗口。独立于上面几个键。
+  // hasPremium(premium) 只接受服务端确认的体验期或平台专属永久权益窗口。独立于上面几个键。
   var PREMIUM_KEY = "after-zero-premium-v1";
   // AI_USAGE_KEY(每日用量软上限)/AI_CHATLOG_KEY(历史对话记录)这两个键第十一步(React迁移
   // 收尾)后整体移交react/src/sheets/AiScreen.tsx所有——跟下面SIM_KEY那条同一个先例，
@@ -2310,12 +2310,14 @@
     pendingLoginPromise = null; pendingLoginResolve = null;
     if (resolve) resolve(!!ok);
   }
-  function requestCloudLogin(purpose) {
-    if (account) {
+  function requestCloudLogin(purpose, force) {
+    if (pendingLoginPromise) return pendingLoginPromise;
+    if (account && !force) {
       return refreshPremiumAccess().then(function () { return true; }, function () { return true; });
     }
-    if (pendingLoginPromise) return pendingLoginPromise;
-    $("loginPurpose").textContent = "";
+    var loginPurpose = $("loginPurpose");
+    loginPurpose.textContent = force ? "云端登录已失效，请重新登录后继续激活。" : "";
+    loginPurpose.hidden = !force;
     var platform = currentPlatform();
     $("appleLoginBtn").hidden = platform !== "ios";
     $("wxLoginBtn").hidden = platform !== "android";
@@ -2439,8 +2441,8 @@
   // premiumLabel(premium))，vanilla这份连同各处调用点一并删除，premium变化时
   // 已有的az:state-changed派发足够让React的usePremium()自动跟上，不需要vanilla
   // 再单独渲染。
-  // premiumScreen/termsScreen整体搬进了React；Premium 只通过 App Store 购买或恢复购买取得，
-  // 本机只缓存服务端返回的体验期或 App Store 访问窗口。
+  // premiumScreen/termsScreen整体搬进了React；iOS 只通过 App Store 购买或恢复购买取得，
+  // Android 通过服务端验证的激活码取得。本机只缓存服务端返回的平台访问窗口。
   function verifyStoreKitTransaction(result, allowAccountRecovery) {
     if (!result || result.status !== "success" || !result.jws) return Promise.resolve(false);
     return callPremiumEntitlement({ action: "verifyTransaction", jws: result.jws, allowAccountRecovery: !!allowAccountRecovery }).then(function (access) {
@@ -2485,7 +2487,17 @@
     if (currentPlatform() !== "android") return Promise.resolve(false);
     var cleanCode = String(code || "").trim();
     if (!cleanCode) { toast("请输入激活码"); return Promise.resolve(false); }
-    return (account ? Promise.resolve(true) : requestCloudLogin("激活 Premium")).then(function (loggedIn) {
+    // 本机账户资料可能还在，但 CloudBase 凭证已经丢失或只剩匿名垫底会话。
+    // 激活前只检查现有会话；缺失时让用户主动重新微信登录，不在受保护操作里匿名登录。
+    var loginReady = account ? cbAuth().getLoginState().then(function (loginState) {
+      if (!loginState) return false;
+      return cbAuth().getCredentials().then(function (credentials) {
+        return !!credentials && credentials.scope !== "anonymous";
+      });
+    }).catch(function () { return false; }) : Promise.resolve(false);
+    return loginReady.then(function (ready) {
+      return ready ? true : requestCloudLogin("激活 Premium", !!account);
+    }).then(function (loggedIn) {
       if (!loggedIn || !account) return false;
       return callPremiumEntitlement({ action: "activateAndroidCode", code: cleanCode }).then(function (access) {
         if (access.active) toast("已永久解锁 Premium");

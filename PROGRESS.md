@@ -3246,3 +3246,9 @@ PDF字体经历了一次有价值的测试拦截：先下载的Noto OTF在`pdf`�
 - iOS `Info.plist` 已补齐相机和照片库用途说明，隐私政策同步说明该权限仅用于用户主动拍摄或选择还款计划图片。该变更针对 iPad 拍照触发系统隐私保护终止的问题。
 - 已完成 Node 153/153、React 46 文件 379/379、TypeScript、React production build、iOS/Android Capacitor sync、plist 与云函数语法检查、`git diff --check`。`premiumEntitlement`、`accountBinding`、`deleteAccount` 已部署；无登录健康检查均按预期拒绝访问。
 - iPad Air 11-inch (M4)、iOS 26.5 Simulator 的 Debug 构建已成功；在模拟器中可进入 AI 识图页面、授权相机并打开/退出系统相机，不再崩溃；新建干净 iPad 模拟器也已确认“账户 → 登录”仅显示 Apple 登录和暂不登录，不显示微信。此前微信按钮仍显示的根因是 `.btn` 样式覆盖 HTML `hidden` 属性，已加规则强制隐藏。模拟器不替代 Apple 审核使用的 iPad Air (M3)、iPadOS 26.6 真机验证；真实 iPad 按用户决定不再作为当前审核阻塞。修复后的 `1.0.0 (13)` 已完成上传并由账号持有人重新提交审核。
+
+## 2026-11-01：Android 激活码装机回归与云端会话修复
+
+- 用户决定 Android 与 iOS 暂不合并账号或互通权益：Android 通过微信登录和测试激活码 `0000` 获取平台专属 Premium；iOS 继续按 App Store 购买状态判断。Android 计划准备商店外正式版，但当前签名包仍用于测试，尚未正式对外发布。
+- Android 首轮装机时，激活请求遇到 CloudBase SDK `Cannot read properties of null (reading 'scope')`。修复为激活前检查现有云端登录态与非匿名凭证；本机账号资料还在但云端凭证缺失时，要求用户主动重新微信登录后再提交激活码，不在受保护执行层匿名登录。用户随后确认激活成功。
+- 已完成 Node 161/161、React 383/383、TypeScript、React 构建、Android Capacitor sync、签名 Release APK 构建与 v2 签名校验；新增覆盖缺凭证、匿名凭证、取消重登及正常激活的回归测试。本轮修复只改 Web 宿主与测试，没有改动或重新部署云函数；其余 Android 登录、文件、通知和交互回归仍待对外发布前完成。

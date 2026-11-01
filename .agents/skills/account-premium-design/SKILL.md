@@ -26,9 +26,9 @@ description: Use this skill when modifying or debugging After Zero account scree
 ## Premium 当前模型
 
 - `PREMIUM_KEY = "after-zero-premium-v1"`，形状为 `{ premium: { method: "onetime", at: ISO } | null }`；体验期使用 `method: "trial"` 并带服务端返回的到期时间。
-- `hasPremium()` 只接受服务端确认的体验期或 App Store 购买窗口。加载时删除旧 `premiumPlus`，并清除历史 `redeemed` 本地缓存。
-- 当前只有一个 Premium 等级和一张 ¥28 一次性买断价卡；iOS 通过 App Store 购买或恢复购买取得权益。
-- 不提供自定义兑换码、调试解锁码或任何其他非 App Store 的 Premium 解锁路径。
+- `hasPremium()` 只接受服务端确认的体验期或平台专属访问窗口。加载时删除旧 `premiumPlus`，并清除历史 `redeemed` 本地缓存。
+- 当前只有一个 Premium 等级；iOS 展示 ¥28 一次性买断价卡，只通过 App Store 购买或恢复购买取得权益，不提供自定义兑换码入口。Android 不提供应用内购买，微信登录后通过服务端验证的单账号测试码 `0000` 激活；激活只在 Android 生效，同账号 iOS 仍按 App Store 状态判断。测试码不代表正式发码或销售方案。
+- 本机 `ACCOUNT_KEY` 资料可能在 CloudBase 凭证丢失后仍存在。Android 激活前先检查现有 CloudBase 登录态与凭证；没有有效非匿名会话时强制打开微信登录门，取消登录不提交激活码。匿名垫底只允许用于用户主动登录换票据，不能在激活或其他受保护执行层补建匿名会话。
 - 当前代码中的门禁包括 AI 助手、云备份、报告 Excel/PDF 导出和 `StrategyCta` 的多策略对比入口。图表查看、档案库、本地 JSON 备份导入导出和提前还款模拟没有 Premium 门禁。
 - `StrategyCompareScreen`和云备份执行函数本身没有第二层Premium校验，当前依赖入口门禁；云备份的登录门不同，执行层必须二次检查account。调整权益时先全仓搜索`hasPremium(`、`openPremiumScreen`和Premium页权益文案。
 
@@ -41,7 +41,7 @@ description: Use this skill when modifying or debugging After Zero account scree
 ## 法律副本与已知边界
 
 - 购买方式、价格状态、权益或退款事实变化时，同时核对 `docs/legal/会员服务协议.md` 与 `react/src/sheets/TermsScreen.tsx`。前者是源稿，后者是 App 内硬编码副本，不能只改一处。
-- 当前协议必须继续如实说明：仅买断、iOS 通过 App Store 支付与恢复购买取得权益；购买事实变化时同步更新相关条款。
+- 当前协议必须继续如实说明：iOS 仅通过 App Store 支付与恢复购买取得买断权益；Android 测试激活码仅在 Android 生效，不是对外销售。购买或发码事实变化时同步更新相关条款。
 - `usePremium()` 已用稳定fingerprint快照兼容原地mutation和整体替换，具体模式归 `react-bridge-architecture`。Premium数据形状增加会影响展示或门禁的新字段时，要同步更新snapshot fingerprint/clone与回归测试。
 
 ## 验证

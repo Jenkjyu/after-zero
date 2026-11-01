@@ -5,7 +5,7 @@ description: This skill should be used when debugging or configuring the WeChat 
 
 # 微信登录SDK接线
 
-原生App拉起微信App走OAuth授权（不是网页扫码），必须用微信官方Android SDK（`com.tencent.mm.opensdk`），不能纯JS实现。这几个坑全部是一次性的环境/配置问题，不是代码逻辑问题，但极其隐蔽。
+原生App拉起微信App走OAuth授权（不是网页扫码），必须用微信官方Android SDK（`com.tencent.mm.opensdk`），不能纯JS实现。接线、CloudBase SDK 和本机会话状态要分开排查。
 
 先用`capacitor-native-runtime` skill确认手写Java、manifest、插件注册与build/sync边界；本skill只补微信SDK和CloudBase自定义登录的专项约束。部署`wxLogin`时另用`cloudbase-deploy`，处理release签名/SHA1时另用`release-keystore`。
 
@@ -22,6 +22,8 @@ description: This skill should be used when debugging or configuring the WeChat 
 2. **CloudBase JS SDK（至少2.28.6这个版本）有个内部bug**：`auth._getCredentials()`内部先读`t.scope`再判断`t`是否为`null`，全新设备/App从没建立过任何登录态时`t`就是`null`，直接抛`TypeError: Cannot read properties of null (reading 'scope')`，会连带搞挂`callFunction()`。规避方法：真正走自定义票据登录流程之前，先调一次`auth.signInAnonymously()`（失败就忽略，不阻塞主流程）垫底写入一份本地凭证，绕开这个先用后判的bug。
 
    这个匿名垫底只能存在于用户主动发起的登录换票据流程（当前微信与Apple共用客户端换票据helper）。App的“本地使用”不是CloudBase匿名账号；AI、云备份、注销等受保护执行层必须在没有本地account时直接拒绝，不能调用`signInAnonymously()`。
+
+   另一个触发场景是本机 `after-zero-account-v1` 展示资料还在、CloudBase 凭证却已丢失或只剩匿名会话。Android Premium 激活前用现有登录态与凭证检查，缺失时让用户主动重新微信登录，再提交激活码；不要把本机 account 当作仍有云端身份，也不要在激活执行层自动匿名登录。
 
 3. **CloudBase控制台"身份认证→登录方式"里，"匿名登录"必须单独开启**，不开的话第2条的`signInAnonymously()`会直接被拒（400，报错信息会明确写"当前调用的signInAnonymously()所需的登录方式尚未在云开发控制台启用"）。
 

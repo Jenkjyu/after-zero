@@ -4,9 +4,9 @@
 
 ## 当前产品
 
-当前正式发布主线是 **Capacitor + React 的 iOS App**，包名为 `io.github.jenkjyu.afterzero`。Android 保留为内部测试包，暂不作为正式发布渠道。全新安装默认没有任何债务或档案数据，可直接在本地使用；AI 识图导入、云备份，以及 Premium 的购买和恢复购买等服务端权益操作才要求登录。
+当前已正式发布的是 **Capacitor + React 的 iOS App**，包名为 `io.github.jenkjyu.afterzero`。Android 正准备商店外版本，目前提供签名包装机测试，尚未正式对外发布，也不承诺 Google Play 上架。全新安装默认没有任何债务或档案数据，可直接在本地使用；AI 识图导入、云备份和 Premium 开通等云端操作才要求登录。
 
-iOS 已建立同一套 Web 产品的 Capacitor 原生壳，并已完成 Apple/微信登录、文件保存、通知、主要交互和 TestFlight 候选回归。AI 识图已完成真实样本识别率与成本验证。StoreKit 剩余真机生命周期验证按用户决定延后到上架后；Apple 于 2026-09-01 要求移除自定义兑换码、避免 iOS 强制安装微信登录，并修复 iPad 拍照入口崩溃。修复已落到当前源码和云函数：iOS 仅呈现 Apple 登录，Android 保留微信登录；修复后的 `1.0.0 (13)` 已通过审核并正式上架。
+iOS 已建立同一套 Web 产品的 Capacitor 原生壳，并已完成 Apple 登录、文件保存、通知、主要交互和 TestFlight 候选回归；微信原生接线保留，但 iOS 界面不展示微信登录。AI 识图已完成真实样本识别率与成本验证。StoreKit 剩余真机生命周期验证按用户决定延后到上架后；Apple 于 2026-09-01 要求移除自定义兑换码、避免 iOS 强制安装微信登录，并修复 iPad 拍照入口崩溃。修复已落到当前源码和云函数：iOS 仅呈现 Apple 登录，Android 保留微信登录；修复后的 `1.0.0 (13)` 已通过审核并正式上架。
 
 - `react/src/**` 负责“债务”“还款日”“统计”“我的”四个 tab，以及不属于 tab 的 subpage、sheet 和 screen。Vite 使用 `debts`、`pay`、`report`、`mine`、`sheets` 五个入口。
 - `www/index.html` 是唯一 Web 宿主，保留全局 CSS、tabbar、登录门、共享确认框、隐藏导入 input、localStorage/IndexedDB、CloudBase 和原生能力编排；财务计算集中在 `www/js/calc.js`。
@@ -15,7 +15,7 @@ iOS 已建立同一套 Web 产品的 Capacitor 原生壳，并已完成 Apple/�
 
 “还款日”按期次列出待还项目，支持时间窗口筛选、部分还款、协商减免和按顺序销期。“统计”是一份基于当前账本生成的债务报告，包含结论、还清走势、未来压力、余额排行和类型构成。
 
-当前只有一个 Premium 等级。iOS 登录身份首次经服务端确认后可体验全部功能 7 天；体验结束后为 ¥28 一次性买断，不自动续费。StoreKit 购买、恢复购买和服务端权益验证已经实现，App Store Connect 配置与 TestFlight 回归已完成，但完整真机支付验收尚未完成，因此不能视为已经对外开通支付。最近一次服务端确认后的 Premium 权益可离线使用 3 天。
+当前只有一个 Premium 等级。首次登录身份经服务端确认后可体验全部功能 7 天；iOS 体验结束后为 ¥28 一次性买断，不自动续费。StoreKit 购买、恢复购买和服务端权益验证已经实现，App Store Connect 配置与 TestFlight 回归已完成，但完整真机支付验收尚未完成，因此不能视为已经对外开通支付。Android 暂不提供应用内购买，通过微信登录后可输入服务端验证的测试激活码 `0000`；该码仅供一个账号测试，权益只在 Android 生效，iOS 仍按 App Store 购买状态判断。最近一次服务端确认后的 Premium 权益可离线使用 3 天。
 
 iOS 体验结束且未购买时，仍可使用“债务”tab 的本地功能；AI、“还款日”“统计”，以及云备份、档案库、备份文件导入导出入口会引导至 Premium 页面。提前还款模拟仍可用。AI 额度由服务端按北京时间自然月计数，每月最多 50 次。
 
@@ -25,7 +25,7 @@ iOS 体验结束且未购买时，仍可使用“债务”tab 的本地功能；
 
 当前以 iOS 为发布主线，仍不恢复 Flutter。根 `ios/` 已使用 Capacitor 8.4.1 与 Swift Package Manager 创建，Bundle ID 为 `io.github.jenkjyu.afterzero`、最低 iOS 15，并已换用项目图标和启动图。步骤 3～7 的 iPhone 验收已完成；步骤 9 的签名、隐私、合规和 TestFlight 候选回归已完成，AI 识图真实样本与成本验证也已完成。步骤 10 已完成：自定义兑换码已从客户端和云端权益路径移除，iOS 只保留 Apple 登录并隐藏微信绑定，iPad 拍照入口补齐相机/照片权限说明；修复后的 `1.0.0 (13)` 已通过审核并正式上架。步骤 4/8 的剩余小项按用户决定放到上架后处理。
 
-Android 的登录、文件、通知和交互回归改为内部测试清单，不再阻塞 iOS 的 TestFlight 或 App Store 发布；共享代码已完成本轮基础构建验证。步骤 4/8 的剩余验证已明确延后到上架后；步骤 10 总回归、审核与正式上架均已完成。权威范围与恢复动作见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
+Android 的登录、文件、通知和交互回归独立于 iOS 发布门槛；现已完成微信登录与测试激活码首轮装机验证，其余回归在 Android 对外发布前继续进行。步骤 4/8 的剩余验证已明确延后到上架后；步骤 10 总回归、审核与正式上架均已完成。iOS 历史计划与恢复动作见 [`docs/ios/implementation-plan.md`](docs/ios/implementation-plan.md) 和 [`docs/ios/handoff.md`](docs/ios/handoff.md)。
 
 ## Flutter 重写（已停止并封存）
 

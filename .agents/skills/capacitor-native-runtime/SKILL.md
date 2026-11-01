@@ -24,7 +24,7 @@ description: "Use this skill when modifying or debugging After Zero's Capacitor 
 
 根`ios/`已在iOS主线步骤1通过一次`npx cap add ios`建立，Bundle ID为`io.github.jenkjyu.afterzero`、最低iOS 15。后续只运行build/sync，不能重复`cap add ios`重建。当前Capacitor 8工程使用Swift Package Manager；`CapApp-SPM/Package.swift`固定`capacitor-swift-pm` 8.4.1，并接入本地`@capacitor/local-notifications`。
 
-步骤3已新增`AppleLoginPlugin.swift`、`AfterZeroBridgeViewController.swift`与`App.entitlements`，Apple云函数已部署并完成真实 Apple ID iPhone 端到端验收；仍须完成 Android 旧微信账号回归，才可宣称双平台无回归。步骤5已新增并注册`SaveFilePlugin.swift`：iOS Files 保存、打开和取消已在 iPhone 验收；原生分享能力已实现但当前档案界面未暴露入口，用户确认本轮不阻塞，Android SAF仍待回归。步骤6的双平台通知代码和构建已完成，iPhone验收通过，仍须Android channel、450条上限和重排回归；iOS微信、购买和发布签名仍未实现。
+iOS Apple 登录、StoreKit 原生接线、文件保存与通知已实现，首发版已上架；剩余真机购买生命周期按 `AGENTS.md` 的当前状态处理。Android 微信登录和测试激活码已通过用户首轮装机验证，SAF、通知及其他交互回归仍待完成，不能据此宣称 Android 商店外正式版已经发布。
 
 ## 区分手写插件与npm插件
 
