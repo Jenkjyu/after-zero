@@ -88,16 +88,19 @@ describe("AccountScreen", () => {
     expect(bridge.updateAccountProfile).toHaveBeenCalledWith({ nickname: "新的账户昵称" });
   });
 
-  it("仅显示尚未绑定的登录方式，并经桥接发起双重授权绑定", async () => {
+  it("Android 微信账号不展示无法完成的 Apple 绑定及合并说明", () => {
+    Object.defineProperty(window, "Capacitor", {
+      configurable: true,
+      value: { getPlatform: () => "android" },
+    });
     const bridge = makeMockBridge({ account });
     window.__azBridge = bridge;
     render(<AccountScreen />);
     act(() => { openAccountScreen(); });
-    expect(screen.getByText("绑定 Apple")).toBeInTheDocument();
+    expect(screen.queryByText("绑定 Apple")).not.toBeInTheDocument();
     expect(screen.queryByText("绑定微信")).not.toBeInTheDocument();
-    await act(async () => { fireEvent.click(screen.getByText("绑定 Apple")); });
-    expect(bridge.bindCloudIdentity).toHaveBeenCalledWith("apple");
-    expect(screen.getByText(/不会改变本机账本/)).toBeInTheDocument();
+    expect(screen.queryByText(/绑定时会分别验证/)).not.toBeInTheDocument();
+    expect(bridge.bindCloudIdentity).not.toHaveBeenCalled();
   });
 
   it("iOS 不展示微信绑定入口", () => {
@@ -110,6 +113,8 @@ describe("AccountScreen", () => {
     render(<AccountScreen />);
     act(() => { openAccountScreen(); });
     expect(screen.queryByText("绑定微信")).not.toBeInTheDocument();
+    expect(screen.queryByText("绑定 Apple")).not.toBeInTheDocument();
+    expect(screen.queryByText(/绑定时会分别验证/)).not.toBeInTheDocument();
   });
 
   it("点返回箭头关闭", () => {
@@ -133,6 +138,10 @@ describe("AccountScreen", () => {
   });
 
   it("注销云端账户确认后调用deleteAccount并关闭，默认不重置本地数据", async () => {
+    Object.defineProperty(window, "Capacitor", {
+      configurable: true,
+      value: { getPlatform: () => "ios" },
+    });
     window.__azBridge = makeMockBridge({ account });
     const hook = renderHook(() => useAccountScreenOpen());
     render(<AccountScreen />);
@@ -146,6 +155,26 @@ describe("AccountScreen", () => {
     expect(window.__azBridge.deleteAccount).toHaveBeenCalledOnce();
     expect(window.__azBridge.resetLocalData).not.toHaveBeenCalled();
     expect(hook.result.current).toBe(false);
+  });
+
+  it("Android 注销提示说明激活权益删除、原微信账号可重新输入测试码", async () => {
+    Object.defineProperty(window, "Capacitor", {
+      configurable: true,
+      value: { getPlatform: () => "android" },
+    });
+    const bridge = makeMockBridge({ account });
+    bridge.confirmAsync = vi.fn(() => Promise.resolve(false));
+    window.__azBridge = bridge;
+    render(<AccountScreen />);
+    act(() => { openAccountScreen(); });
+    await act(async () => { fireEvent.click(screen.getByText("注销账户")); });
+    expect(bridge.confirmAsync).toHaveBeenCalledWith(
+      "注销账户",
+      expect.stringContaining("原微信账号重新登录后，需再次输入原测试码"),
+      { checkLabel: "同时重置这台设备上的本地数据" }
+    );
+    expect(bridge.confirmAsync).not.toHaveBeenCalledWith("注销账户", expect.stringContaining("恢复购买"), expect.anything());
+    expect(bridge.deleteAccount).not.toHaveBeenCalled();
   });
 
   it("注销时勾选重置本地数据，只在云端注销成功后执行", async () => {

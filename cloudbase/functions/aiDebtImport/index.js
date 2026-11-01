@@ -108,9 +108,9 @@ async function cleanupSession(userId, sessionId, now) {
   return { cleaned: fileIds.length };
 }
 
-async function creditContext(userId, now) {
+async function creditContext(userId, now, platform) {
   const entitlement = await entitlementFor(userId);
-  const bucketInfo = resolveCreditBucket(entitlement, now, TRIAL_LIMIT);
+  const bucketInfo = resolveCreditBucket(entitlement, now, TRIAL_LIMIT, platform);
   const document = firstDocument(await db.collection("aiImportCredits").doc(userId).get()) || { userId };
   return { bucketInfo, document, credits: publicCredits(document, bucketInfo) };
 }
@@ -121,7 +121,7 @@ async function createSession(userId, event, now) {
   const sessionId = sessionIdFor(userId, idempotencyKey);
   const ref = db.collection("aiImportSessions").doc(sessionId);
   const existing = firstDocument(await ref.get());
-  const context = await creditContext(userId, now);
+  const context = await creditContext(userId, now, event && event.platform);
   if (existing && (existing.status === "succeeded" || existing.status === "accepted") && existing.draft) {
     return { sessionId, status: existing.status, draft: existing.draft, credits: context.credits };
   }
@@ -142,7 +142,7 @@ async function createSession(userId, event, now) {
   return { sessionId, status: session.status, draft: session.draft || null, credits: context.credits };
 }
 
-async function reserveSession(userId, sessionId, fileIds, now) {
+async function reserveSession(userId, sessionId, fileIds, now, platform) {
   const result = await db.runTransaction(async (transaction) => {
     const sessionRef = transaction.collection("aiImportSessions").doc(sessionId);
     const creditRef = transaction.collection("aiImportCredits").doc(userId);
@@ -151,7 +151,7 @@ async function reserveSession(userId, sessionId, fileIds, now) {
     if (!session || session.userId !== userId) throw importError("AI_IMPORT_SESSION_NOT_FOUND", "识别任务不存在或已过期");
     if ((session.status === "succeeded" || session.status === "accepted") && session.draft) return { alreadyDone: true, session };
     const entitlement = firstDocument(await entitlementRef.get());
-    const bucketInfo = resolveCreditBucket(entitlement, now, TRIAL_LIMIT);
+    const bucketInfo = resolveCreditBucket(entitlement, now, TRIAL_LIMIT, platform);
     const credit = firstDocument(await creditRef.get()) || { userId, paidUsed: 0, trialUsed: 0 };
     const credits = publicCredits(credit, bucketInfo);
     if (credits.remaining <= 0) throw importError("AI_IMPORT_QUOTA_EXCEEDED", "AI 识图录入次数已用完");
@@ -299,9 +299,9 @@ async function recognizeImages(fileIds) {
 async function recognize(userId, event, now) {
   const sessionId = String(event && event.sessionId || "");
   const fileIds = validFileIds(sessionId, event && event.fileIds);
-  const reservation = await reserveSession(userId, sessionId, fileIds, now);
+  const reservation = await reserveSession(userId, sessionId, fileIds, now, event && event.platform);
   if (reservation.alreadyDone) {
-    const context = await creditContext(userId, now);
+    const context = await creditContext(userId, now, event && event.platform);
     return { sessionId, status: "succeeded", draft: reservation.session.draft, credits: context.credits };
   }
   try {
@@ -326,7 +326,7 @@ exports.main = async (event) => {
     if (action === "upload") return { ok: true, ...(await uploadForSession(userId, event, now)) };
     if (action === "recognize") return { ok: true, ...(await recognize(userId, event, now)) };
     if (action === "status") {
-      const context = await creditContext(userId, now);
+      const context = await creditContext(userId, now, event && event.platform);
       const sessionId = String(event && event.sessionId || "");
       const session = sessionId ? firstDocument(await db.collection("aiImportSessions").doc(sessionId).get()) : null;
       return { ok: true, credits: context.credits, session: session && session.userId === userId ? session : null };

@@ -47,7 +47,7 @@ export function AccountScreen() {
   const capacitor = (window as Window & {
     Capacitor?: { getPlatform?: () => string };
   }).Capacitor;
-  const isIos = capacitor?.getPlatform?.() === "ios";
+  const isAndroid = capacitor?.getPlatform?.() === "android";
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [nickname, setNickname] = useState(account?.nickname || "");
 
@@ -67,9 +67,6 @@ export function AccountScreen() {
   }
   async function onLogin() {
     await window.__azBridge.requestCloudLogin("");
-  }
-  async function onBind(provider: "apple" | "wechat") {
-    await window.__azBridge.bindCloudIdentity(provider);
   }
   function saveNickname() {
     if (!account) return;
@@ -94,7 +91,9 @@ export function AccountScreen() {
   async function onDeleteAccount() {
     const result = await window.__azBridge.confirmAsync(
       "注销账户",
-      "注销后账户及其云备份将从服务器永久删除，此操作不可撤销。本地债务、档案和设置默认保留。\n已购 Premium 不会自动恢复，日后可重新登录后主动恢复购买。",
+      isAndroid
+        ? "注销后账户及其云备份将从服务器永久删除，此操作不可撤销。本地债务、档案和设置默认保留。\n安卓激活权益会被删除；原微信账号重新登录后，需再次输入原测试码才能重新激活。"
+        : "注销后账户及其云备份将从服务器永久删除，此操作不可撤销。本地债务、档案和设置默认保留。\n已购 Premium 不会自动恢复，日后可重新登录后主动恢复购买。",
       { checkLabel: "同时重置这台设备上的本地数据" }
     );
     if (!result) return;
@@ -136,9 +135,6 @@ export function AccountScreen() {
         </div>
         {!account && <p className="account-local-note">登录后可使用云端功能；本地账本仍只保存在本机。</p>}
         {!account && <div className="data-actions" style={{ marginTop: 16 }}><button type="button" className="btn primary" onClick={onLogin}>登录</button></div>}
-        {account && !account.providers.includes("apple") && <div className="data-actions" style={{ marginTop: 16 }}><button type="button" className="btn ghost" onClick={() => onBind("apple")}>绑定 Apple</button></div>}
-        {account && !isIos && !account.providers.includes("wechat") && <div className="data-actions" style={{ marginTop: 10 }}><button type="button" className="btn ghost" onClick={() => onBind("wechat")}>绑定微信</button></div>}
-        {account && <p className="account-local-note">绑定时会分别验证当前账号和待绑定账号；只合并云备份与 AI 用量，不会改变本机账本。</p>}
         {account && <div className="data-actions" style={{ marginTop: 16 }}><button type="button" className="btn ghost" onClick={onLogout}>退出登录</button></div>}
         {account && <div className="data-actions" style={{ marginTop: 10 }}><button type="button" className="btn danger" onClick={onDeleteAccount}>注销账户</button></div>}
       </div>

@@ -1,12 +1,15 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { PremiumScreen } from "../src/sheets/PremiumScreen";
 import { closePremiumScreen, closeTermsScreen, openPremiumScreen, usePremiumScreenOpen, useTermsScreenOpen } from "../src/shared/state";
 import { makeMockBridge } from "./mockBridge";
 
+const originalCapacitor = (window as Window & { Capacitor?: unknown }).Capacitor;
+
 afterEach(() => {
   closePremiumScreen(); // premiumScreenOpen/termsScreenOpen是模块级状态，重置避免测试间互相污染
   closeTermsScreen();
+  Object.defineProperty(window, "Capacitor", { configurable: true, value: originalCapacitor });
 });
 
 describe("PremiumScreen", () => {
@@ -52,9 +55,11 @@ describe("PremiumScreen", () => {
   });
 
   it("只提供 App Store 购买和恢复购买，不提供兑换码或其他解锁入口", () => {
+    Object.defineProperty(window, "Capacitor", { configurable: true, value: { getPlatform: () => "ios" } });
     window.__azBridge = makeMockBridge();
     render(<PremiumScreen />);
     act(() => { openPremiumScreen(); });
+    expect(screen.queryByText("输入激活码")).not.toBeInTheDocument();
     expect(screen.queryByText("我有兑换码")).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText("输入兑换码")).not.toBeInTheDocument();
     expect(screen.queryByText("兑换")).not.toBeInTheDocument();
@@ -66,6 +71,29 @@ describe("PremiumScreen", () => {
     act(() => { openPremiumScreen(); });
     expect(screen.getByText(/已购买可通过 Apple 恢复购买/)).toBeInTheDocument();
     expect(screen.queryByText(/Google Play/)).not.toBeInTheDocument();
+  });
+
+  it("Android 只显示激活码入口，提交后调用服务端激活桥接", async () => {
+    Object.defineProperty(window, "Capacitor", { configurable: true, value: { getPlatform: () => "android" } });
+    window.__azBridge = makeMockBridge();
+    render(<PremiumScreen />);
+    act(() => { openPremiumScreen(); });
+    expect(screen.queryByText("¥28 永久解锁")).not.toBeInTheDocument();
+    expect(screen.queryByText("恢复购买")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("输入激活码"));
+    fireEvent.change(screen.getByPlaceholderText("请输入激活码"), { target: { value: "0000" } });
+    fireEvent.click(screen.getByText("确认激活"));
+    await waitFor(() => expect(window.__azBridge.activatePremiumCode).toHaveBeenCalledWith("0000"));
+  });
+
+  it("Android 体验期内仍可输入激活码转为永久权益", () => {
+    Object.defineProperty(window, "Capacitor", { configurable: true, value: { getPlatform: () => "android" } });
+    window.__azBridge = makeMockBridge({ premium: { premium: { method: "trial", at: new Date().toISOString(), expiresAt: Date.now() + 60_000 } } });
+    render(<PremiumScreen />);
+    act(() => { openPremiumScreen(); });
+    expect(screen.getByText("输入激活码")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("输入激活码"));
+    expect(screen.getByPlaceholderText("请输入激活码")).toBeInTheDocument();
   });
 
   it("点《会员服务协议》打开termsScreen(纯React状态)", () => {

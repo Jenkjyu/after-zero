@@ -4,13 +4,14 @@ const path = require("path");
 const cloudbase = require("@cloudbase/node-sdk");
 const { Environment, SignedDataVerifier } = require("@apple/app-store-server-library");
 const { deletedPurchaseClaimForUser, withoutDocumentId } = require("./recoveryService");
+const { activateAndroidCode } = require("./androidActivation");
+const { publicAccess } = require("./accessService");
 
 const app = cloudbase.init({ env: cloudbase.SYMBOL_CURRENT_ENV });
 const db = app.database();
 const BUNDLE_ID = "io.github.jenkjyu.afterzero";
 const PRODUCT_ID = "io.github.jenkjyu.afterzero.premium";
 const TRIAL_MS = 7 * 24 * 60 * 60 * 1000;
-const OFFLINE_MS = 3 * 24 * 60 * 60 * 1000;
 
 function firstDocument(result) {
   if (!result || result.data == null) return null;
@@ -31,22 +32,6 @@ function rootCertificates() {
   const certDir = path.join(__dirname, "certs");
   return ["AppleRootCA-G2.cer", "AppleRootCA-G3.cer", "AppleComputerRootCertificate.cer"]
     .map((name) => fs.readFileSync(path.join(certDir, name)));
-}
-
-function trialAccess(entitlement, now) {
-  if (entitlement.kind === "paid" && entitlement.source === "appStore") return { active: true, state: "paid", expiresAt: null };
-  const expiresAt = Number(entitlement.trialEndsAt) || 0;
-  return { active: expiresAt > now, state: expiresAt > now ? "trial" : "expired", expiresAt };
-}
-
-function publicAccess(entitlement, now) {
-  const access = trialAccess(entitlement, now);
-  return {
-    ...access,
-    appAccountToken: entitlement.appAccountTokens && entitlement.appAccountTokens[0],
-    checkedAt: now,
-    offlineUntil: now + OFFLINE_MS,
-  };
 }
 
 function uniqueStrings(values) {
@@ -193,11 +178,20 @@ exports.main = async (event) => {
     const userId = requiredUserId();
     const now = Date.now();
     const action = event && event.action || "status";
+    const platform = event && event.platform;
     let entitlement;
     if (action === "verifyTransaction") entitlement = await verifyTransaction(userId, event && event.jws, now, event && event.allowAccountRecovery === true);
     else if (action === "status") entitlement = await ensureEntitlement(userId, now);
+    else if (action === "activateAndroidCode" && platform === "android") {
+      const user = await getUser(userId);
+      if (!user || !(Array.isArray(user.providers) && user.providers.includes("wechat")) && !user.openid) {
+        return { ok: false, code: "ANDROID_WECHAT_REQUIRED", error: "请先通过安卓微信账号登录" };
+      }
+      await ensureEntitlement(userId, now);
+      entitlement = await activateAndroidCode(db, userId, event && event.code, now);
+    }
     else return { ok: false, code: "ACTION_INVALID", error: "未知权益操作" };
-    return { ok: true, entitlement: publicAccess(entitlement, now) };
+    return { ok: true, entitlement: publicAccess(entitlement, now, platform) };
   } catch (error) {
     console.error("[premiumEntitlement] failed:", error && error.code, error && error.message);
     return { ok: false, code: error && error.code || "PREMIUM_ENTITLEMENT_FAILED", error: error && error.message || "权益校验失败" };

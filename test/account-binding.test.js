@@ -160,3 +160,22 @@ test("账户合并不会保留历史兑换码 Premium 作为已购权益", async
   assert.equal(entitlement.trialEndsAt, 999);
   assert.deepEqual(entitlement.appAccountTokens.sort(), ["source-token", "target-token"]);
 });
+
+test("账户合并保留 Android 激活，但不会把它变成 iOS 已购", async () => {
+  const db = mergeDb({
+    users: [
+      { _id: "target-doc", userId: "u_target", providers: ["apple"] },
+      { _id: "source-doc", userId: "u_source", providers: ["wechat"] },
+    ],
+    identities: [], backups: [], aiUsage: [],
+    premiumEntitlements: [
+      { _id: "u_target", userId: "u_target", kind: "expired", appAccountTokens: ["target-token"] },
+      { _id: "u_source", userId: "u_source", kind: "expired", androidActivation: { codeId: "android-test", activatedAt: 50 }, appAccountTokens: ["source-token"] },
+    ],
+  });
+  await mergeAccounts(db, { currentUserId: "u_target", otherUserId: "u_source", provider: "wechat", now: 100 });
+  const entitlement = db.record("premiumEntitlements", "u_target");
+  assert.notEqual(entitlement.kind, "paid");
+  assert.deepEqual(entitlement.androidActivation, { codeId: "android-test", activatedAt: 50 });
+  assert.equal(db.record("premiumEntitlements", "u_source"), undefined);
+});

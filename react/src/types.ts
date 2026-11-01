@@ -310,6 +310,7 @@ export interface AzBridge {
   deleteAccount(): Promise<boolean>;
   buyPremium(): Promise<boolean>;
   restorePremium(): Promise<boolean>;
+  activatePremiumCode(code: string): Promise<boolean>;
   // 勾选“同时重置本机数据”且云端注销成功后调用：清本机localStorage+IndexedDB上传文件库，
   // 随即reload()回到空白本地账本。
   resetLocalData(): void;

@@ -157,7 +157,8 @@ function normalizeDraft(raw) {
   };
 }
 
-function resolveCreditBucket(entitlement, now, trialLimit) {
+function resolveCreditBucket(entitlement, now, trialLimit, platform) {
+  if (platform === "android" && entitlement && entitlement.androidActivation) return { bucket: "paid", limit: PAID_IMPORT_LIMIT };
   if (entitlement && entitlement.kind === "paid") return { bucket: "paid", limit: PAID_IMPORT_LIMIT };
   const trialEndsAt = Number(entitlement && entitlement.trialEndsAt) || 0;
   const configuredTrialLimit = Math.max(0, Number(trialLimit) || 0);

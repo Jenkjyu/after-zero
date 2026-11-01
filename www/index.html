@@ -514,6 +514,7 @@
   .data-actions { display: flex; gap: 8px; margin-top: 9px; }
   /* 订阅页的购买/恢复是并列操作：统一外框高度，避免描边按钮比实心按钮高 2px。 */
   .premium-actions .btn { box-sizing: border-box; height: 44px; }
+  .premium-activation { margin-top: 12px; }
   .btn { border: none; border-radius: 10px; padding: 11px; font-size: var(--fs-base); font-weight: 600; flex: 1;
     display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
   .btn-ic { width: 15px; height: 15px; flex: none; }
@@ -1779,13 +1780,11 @@
   var premium = loadJSON(PREMIUM_KEY, { premium: null });
   // 自定义兑换码不再提供 Premium 权益；清理旧本地缓存，避免它在离线时成为替代解锁通道。
   if (premium && premium.premium && premium.premium.method === "redeemed") premium = { premium: null };
-  // iOS 不再相信旧本地开通记录；Android 尚未接入 Google Play 买断，本轮继续保持原行为。
-  if (premium && premium.premium && !premium.premium.offlineUntil && !premium.premium.expiresAt) {
-    var initialPlatform = window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform();
-    premium = initialPlatform === "ios" ? { premium: null } : { premium: {
-      method: premium.premium.method || "onetime", at: premium.premium.at || new Date().toISOString(), offlineUntil: Number.MAX_SAFE_INTEGER
-    } };
-  }
+  // 两端都只接受服务端校验后的访问窗口。旧 Android 本地买断记录（含历史迁移时写入的
+  // MAX_SAFE_INTEGER 离线窗口）不是新激活码的凭证，须重新登录后从服务端取得权益。
+  if (premium && premium.premium &&
+      ((!premium.premium.offlineUntil && !premium.premium.expiresAt) ||
+       Number(premium.premium.offlineUntil) === Number.MAX_SAFE_INTEGER)) premium = { premium: null };
   if (premium) delete premium.premiumPlus;
   function savePremium() { try { localStorage.setItem(PREMIUM_KEY, JSON.stringify(premium)); } catch (e) {} }
   // simPrefs/saveSimPrefs()已删除——SIM_KEY整体移交React(见上面注释)。
@@ -2276,7 +2275,7 @@
     window.dispatchEvent(new CustomEvent("az:state-changed"));
   }
   function callPremiumEntitlement(data) {
-    return cbApp().callFunction({ name: "premiumEntitlement", data: data }).then(function (res) {
+    return cbApp().callFunction({ name: "premiumEntitlement", data: Object.assign({ platform: currentPlatform() }, data) }).then(function (res) {
       var result = res && res.result;
       if (!result || !result.ok) {
         var error = new Error((result && result.error) || "权益校验失败");
@@ -2313,7 +2312,6 @@
   }
   function requestCloudLogin(purpose) {
     if (account) {
-      if (!isIosPurchaseRuntime()) return Promise.resolve(true);
       return refreshPremiumAccess().then(function () { return true; }, function () { return true; });
     }
     if (pendingLoginPromise) return pendingLoginPromise;
@@ -2398,9 +2396,7 @@
     var native = storeKitPremium();
     if (native && previousAccount) native.clearAccessCache({ userId: previousAccount.userId }).catch(function () {});
     renderAccountUI();
-    if (isIosPurchaseRuntime()) {
-      setPremiumAccess(null);
-    }
+    setPremiumAccess(null);
     toast("已退出登录");
   }
   function deleteAccount() {
@@ -2416,9 +2412,7 @@
       var native = storeKitPremium();
       if (native && previousAccount) native.clearAccessCache({ userId: previousAccount.userId }).catch(function () {});
       renderAccountUI();
-      if (isIosPurchaseRuntime()) {
-        setPremiumAccess(null);
-      }
+      setPremiumAccess(null);
       toast("已注销账户");
       return true;
     }).catch(function (err) {
@@ -2486,6 +2480,21 @@
         return verifyStoreKitTransaction(result, true);
       });
     }).catch(function (err) { toast("恢复失败：" + ((err && err.message) || "请重试")); return false; });
+  }
+  function activatePremiumCode(code) {
+    if (currentPlatform() !== "android") return Promise.resolve(false);
+    var cleanCode = String(code || "").trim();
+    if (!cleanCode) { toast("请输入激活码"); return Promise.resolve(false); }
+    return (account ? Promise.resolve(true) : requestCloudLogin("激活 Premium")).then(function (loggedIn) {
+      if (!loggedIn || !account) return false;
+      return callPremiumEntitlement({ action: "activateAndroidCode", code: cleanCode }).then(function (access) {
+        if (access.active) toast("已永久解锁 Premium");
+        return !!access.active;
+      });
+    }).catch(function (err) {
+      toast("激活失败：" + ((err && err.message) || "请重试"));
+      return false;
+    });
   }
 
   // ===== AI 债务助手（Premium）=====
@@ -2579,7 +2588,7 @@
   function aiDebtImportCall(data) {
     if (!account) return Promise.reject(cloudLoginRequired("AI 识图录入"));
     return ensureCbAuthReady().then(function () {
-      return cbApp().callFunction({ name: "aiDebtImport", data: data });
+      return cbApp().callFunction({ name: "aiDebtImport", data: Object.assign({ platform: currentPlatform() }, data) });
     }).then(function (res) {
       var result = res && res.result;
       if (!result || !result.ok) {
@@ -2938,11 +2947,6 @@
       if (!account) throw new Error("登录成功但账户资料无效");
       localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
       renderAccountUI();
-      if (!isIosPurchaseRuntime()) {
-        finishCloudLoginPrompt(true);
-        toast("登录成功 ✓");
-        return true;
-      }
       return refreshPremiumAccess().then(function () {
         finishCloudLoginPrompt(true);
         toast("登录成功 ✓");
@@ -3647,6 +3651,7 @@
     deleteAccount: deleteAccount,
     buyPremium: buyPremium,
     restorePremium: restorePremium,
+    activatePremiumCode: activatePremiumCode,
     // "注销账户"确认弹窗的第三条路径新增：只清本机storage、不删服务器账户(见定义处的注释)。
     resetLocalData: resetLocalData,
     // 第八步(notifySheet)新增：这4个都要调用@capacitor/local-notifications原生插件
@@ -3689,8 +3694,8 @@
         if (account) verifyStoreKitTransaction(result).catch(function () {});
       });
     }
-    // 已登录用户静默刷新服务端权益；首次使用不弹登录门，债务首页始终可用。
-    if (account) refreshPremiumAccess();
   }
+  // 已登录用户静默刷新平台对应的服务端权益；首次使用不弹登录门。
+  if (account) refreshPremiumAccess();
 })();
 </script>

@@ -1,13 +1,20 @@
 // 订阅页——第七步(React迁移收尾)从vanilla的#premiumScreen原样复刻。2026-08-04去掉了月付/
 // 年付两张价卡，只保留买断——面向负债人群的产品判断，一次性买断比按月订阅心理阻力小得多
 // (完整理由见PROGRESS.md 2026-08-04那条)。价卡不再有互斥选中态(只有一个选项，没有"选"这个
-// 动作)，原来的premiumPlanSel/plan useState一并删除。权益只通过 App Store 购买或恢复购买取得。
-import { useEffect } from "react";
+// 动作)，原来的premiumPlanSel/plan useState一并删除。iOS 通过 App Store 购买或恢复购买，
+// Android 通过绑定微信账号的激活码开通，两端入口隔离。
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { closePremiumScreen, openTermsScreen, usePremium, usePremiumScreenOpen } from "../shared/state";
 
 export function PremiumScreen() {
   const isOpen = usePremiumScreenOpen();
   const premium = usePremium();
+  const [showActivation, setShowActivation] = useState(false);
+  const [activationCode, setActivationCode] = useState("");
+  const [activating, setActivating] = useState(false);
+  const platform = (window as Window & { Capacitor?: { getPlatform?: () => string } }).Capacitor?.getPlatform?.() || "web";
+  const isAndroid = platform === "android";
 
   useEffect(() => {
     window.__azPremiumScreenBack = () => {
@@ -18,14 +25,30 @@ export function PremiumScreen() {
   }, [isOpen]);
 
   async function onSubscribe() {
+    if (isAndroid) { setShowActivation(true); return; }
     await window.__azBridge.buyPremium();
   }
   async function onRestore() {
     await window.__azBridge.restorePremium();
   }
+  async function onActivate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const code = activationCode.trim();
+    if (!code || activating) return;
+    setActivating(true);
+    try {
+      if (await window.__azBridge.activatePremiumCode(code)) {
+        setActivationCode("");
+        setShowActivation(false);
+      }
+    } finally {
+      setActivating(false);
+    }
+  }
   const label = window.premiumLabel(premium);
   const isMember = !!label;
   const isTrial = premium?.premium?.method === "trial";
+  const isPermanent = isMember && !isTrial;
   const heroSub = isTrial
     ? "当前体验期含 3 次 AI 识图额度"
     : isMember
@@ -67,7 +90,7 @@ export function PremiumScreen() {
             <div className="pf-text"><div className="pf-title">AI 识图录入</div><div className="pf-desc">截图识别还款计划，快速生成债务草稿</div></div></div>
         </div>
 
-        <div id="premiumPrice">
+        {!isAndroid && <div id="premiumPrice">
           <div className="price-grid">
             <div className="price-card">
               <span className="pc-badge">永久解锁</span>
@@ -77,13 +100,21 @@ export function PremiumScreen() {
               <div className="pc-period">一次性付费，永久解锁；包含 25 次 AI 识图录入额度</div>
             </div>
           </div>
-        </div>
+        </div>}
 
         <div className="data-actions premium-actions" style={{ marginTop: 4 }}>
-          <button type="button" className="btn primary" onClick={onSubscribe}>{isMember ? "已开通 Premium" : "¥28 永久解锁"}</button>
-          <button type="button" className="btn ghost" onClick={onRestore}>恢复购买</button>
+          {(!isAndroid || !showActivation || isPermanent) && <button type="button" className="btn primary" onClick={onSubscribe}>{(isAndroid ? isPermanent : isMember) ? "已开通 Premium" : isAndroid ? "输入激活码" : "¥28 永久解锁"}</button>}
+          {!isAndroid && <button type="button" className="btn ghost" onClick={onRestore}>恢复购买</button>}
         </div>
-        <div className="footnote">开通即表示你同意我们的<button type="button" className="terms-link" onClick={openTermsScreen}>《会员服务协议》</button>。已购买可通过 Apple 恢复购买。</div>
+        {isAndroid && showActivation && !isPermanent && <form className="premium-activation field" onSubmit={onActivate}>
+          <label htmlFor="premiumActivationCode">激活码</label>
+          <input id="premiumActivationCode" type="text" autoCapitalize="off" autoComplete="off" spellCheck={false} maxLength={64} value={activationCode} onChange={(event) => setActivationCode(event.target.value)} placeholder="请输入激活码" />
+          <div className="data-actions premium-actions">
+            <button type="submit" className="btn primary" disabled={!activationCode.trim() || activating}>{activating ? "激活中…" : "确认激活"}</button>
+            <button type="button" className="btn ghost" onClick={() => { setShowActivation(false); setActivationCode(""); }}>取消</button>
+          </div>
+        </form>}
+        <div className="footnote">开通即表示你同意我们的<button type="button" className="terms-link" onClick={openTermsScreen}>《会员服务协议》</button>。{isAndroid ? "激活码与当前登录账号绑定。" : "已购买可通过 Apple 恢复购买。"}</div>
       </div>
     </div>
   );
